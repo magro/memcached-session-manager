@@ -27,8 +27,13 @@ import org.apache.catalina.util.LifecycleSupport;
 import org.apache.commons.lang.builder.ToStringBuilder;
 
 /**
- * TODO: DESCRIBE ME<br>
- * Created on: Mar 14, 2009<br>
+ * Use this session manager in a Context element, like this
+ * <code><pre>
+ * &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
+ *     memcachedNodes="localhost:11211 localhost:11212" activeNodeIndex="1" /&gt;
+ *     &lt;Valve className="de.javakaffee.web.msm.SessionTrackerValve" ignorePattern=".*\.png$" /&gt;
+ * &lt;/Context&gt;
+ * </pre></code>
  * 
  * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
  * @version $Id$
@@ -36,26 +41,50 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 public class MemcachedBackupSessionManager extends ManagerBase implements
         Lifecycle {
 
-    private static final String info = "PersistentManager/1.0";
-
-    protected static String name = "PersistentManager";
-
-    protected LifecycleSupport lifecycle = new LifecycleSupport( this );
+    protected static String name = MemcachedBackupSessionManager.class.getSimpleName();
+    private static final String info = name + "/1.0";
 
     private final Logger _logger = Logger
             .getLogger( MemcachedBackupSessionManager.class.getName() );
+    
+    private final LifecycleSupport lifecycle = new LifecycleSupport( this );
 
+    // --------------------  configuration properties  --------------------
+
+    /**
+     * The memcached nodes space separated, e.g.
+     * localhost:11211 localhost:11212
+     * 
+     */
     private String _memcachedNodes;
 
+    /**
+     * The index of the active node, referring to <code>memcachedNodes</code>
+     * (of course starting with 0)
+     */
     private int _activeNodeIndex;
 
-    private String _memcachedId;
+    // --------------------  END configuration properties  --------------------
 
+    /*
+     * the memcached client
+     */
     private MemcachedClient _memcached;
-
-    private int _rejectedSessions;
-
+    
+    /*
+     * findSession may be often called in one request. If a session is requested
+     * that we don't have locally stored each findSession invocation would trigger
+     * a memcached request - this would open the door for DOS attacks... 
+     * 
+     * this solution: use a LRUCache with a timeout to store, which session had been
+     * requested in the last <n> millis.
+     */
     private LRUCache<String, Boolean> _missingSessionsCache;
+
+    /*
+     * we have to implement rejectedSessions - not sure why
+     */
+    private int _rejectedSessions;
 
     /**
      * Return descriptive information about this Manager implementation and the
@@ -63,14 +92,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * <code>&lt;description&gt;/&lt;version&gt;</code>.
      */
     public String getInfo() {
-        return ( info );
+        return info;
     }
 
     /**
      * Return the descriptive short name of this Manager implementation.
      */
     public String getName() {
-        return ( name );
+        return name;
     }
 
     /*
@@ -87,7 +116,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         
         /* init memcached
          */
-        _memcachedId = String.valueOf( _activeNodeIndex );
         try {
             _memcached = new MemcachedClient(
                     new SuffixLocatorConnectionFactory( this ),
@@ -100,7 +128,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /* create the missing sessions cache
          */
         _logger.info( "Creating LRUCache with size 200 and TTL 100" );
-        _missingSessionsCache = new de.javakaffee.web.msm.LRUCache<String, Boolean>( 200, 200 );
+        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 200 );
 
     }
 
@@ -111,7 +139,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     protected synchronized String generateSessionId() {
-        return super.generateSessionId() + "." + _memcachedId;
+        return super.generateSessionId() + "." + _activeNodeIndex;
     }
 
     /*
@@ -273,23 +301,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
     @Override
     public void unload() throws IOException {
-    }
-
-    /**
-     * @return the memcachedId
-     * @author Martin Grotzke
-     */
-    public String getMemcachedId() {
-        return _memcachedId;
-    }
-
-    /**
-     * @param memcachedId
-     *            the memcachedId to set
-     * @author Martin Grotzke
-     */
-    public void setMemcachedId( String memcachedId ) {
-        _memcachedId = memcachedId;
     }
 
     /**
