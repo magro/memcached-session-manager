@@ -29,13 +29,14 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 /**
  * Use this session manager in a Context element, like this
  * <code><pre>
- * &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
- *     memcachedNodes="localhost:11211 localhost:11212" activeNodeIndex="1" /&gt;
- *     &lt;Valve className="de.javakaffee.web.msm.SessionTrackerValve" ignorePattern=".*\.png$" /&gt;
+ * &lt;Context path="/foo"&gt;
+ *     &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
+ *         memcachedNodes="localhost:11211 localhost:11212" activeNodeIndex="1"
+ *         requestUriIgnorePattern=".*\.png$" /&gt;
  * &lt;/Context&gt;
  * </pre></code>
  * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class MemcachedBackupSessionManager extends ManagerBase implements
@@ -63,6 +64,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * (of course starting with 0)
      */
     private int _activeNodeIndex;
+    private String _activeNodeIndexAsString;
+    
+    /**
+     * The pattern used for excluding requests from a session-backup.
+     * Is matched against request.getRequestURI.
+     */
+    private String _requestUriIgnorePattern;
 
     // --------------------  END configuration properties  --------------------
 
@@ -110,9 +118,17 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     @Override
     public void init() {
         _logger.info( "init invoked" );
+        
         if ( initialized )
             return;
+        
         super.init();
+        
+        /* add the valve for tracking requests for that the session must be sent to memcached
+         */
+        final SessionTrackerValve sessionTrackerValve = new SessionTrackerValve(
+                _requestUriIgnorePattern, true );
+        getContainer().getPipeline().addValve( sessionTrackerValve );
         
         /* init memcached
          */
@@ -246,24 +262,42 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             /* for now do not relocate, as simply changing the session id does not
              * trigger sending the cookie to the browser...
              */
-//            final String requestedMemcachedId = getMemcachedId( sessionId );
-//            if ( !_memcachedId.equals( requestedMemcachedId ) ) {
-//                _logger.warning( "Session " + sessionId
-//                        + " found in memcached," + " relocating from "
-//                        + requestedMemcachedId + " to " + _memcachedId );
-//                /*
-//                 * relocate session to our memcached node...
-//                 */
-//                final int idx = sessionId.lastIndexOf( '.' );
-//                final String newSessionId = idx > -1 ? sessionId.substring( 0,
-//                        idx + 1 )
-//                        + _memcachedId : sessionId + "." + _memcachedId;
-//                session.setId( newSessionId );
-//                _memcached.delete( sessionId );
-//                storeSession( session );
-//            }
+            final String requestedMemcachedId = getMemcachedId( sessionId );
+            if ( !_activeNodeIndexAsString.equals( requestedMemcachedId ) ) {
+                _logger.warning( "Session " + sessionId
+                        + " found in memcached," + " relocating from "
+                        + requestedMemcachedId + " to " + _activeNodeIndexAsString );
+                relocate( session );
+            }
         }
         return session;
+    }
+
+    private void relocate( final Session session ) {
+        final String sessionId = session.getId();
+        
+        /*
+         * relocate session to our memcached node...
+         */
+        final int idx = sessionId.lastIndexOf( '.' );
+        final String newSessionId = idx > -1 ? sessionId.substring( 0,
+                idx + 1 )
+                + _activeNodeIndexAsString : sessionId + "." + _activeNodeIndexAsString;
+        session.setId( newSessionId );
+        
+        /* remove old session from memcached
+         */
+        _memcached.delete( sessionId );
+
+        /* store the session under the new id locally
+         */
+        storeSession( session );
+
+        /* flag the session as relocated, so that the session tracker valve
+         * knows it must send a cookie
+         */
+        session.setNote( SessionTrackerValve.RELOCATE, Boolean.TRUE );
+        
     }
 
     private String getMemcachedId( String sessionId ) {
@@ -318,6 +352,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     public void setActiveNodeIndex( int activeNodeIndex ) {
         _activeNodeIndex = activeNodeIndex;
+        _activeNodeIndexAsString = String.valueOf( activeNodeIndex );
     }
 
     @Override
@@ -345,6 +380,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     public void stop() throws LifecycleException {
         if ( initialized )
             destroy();
+    }
+
+    /**
+     * @param requestUriIgnorePattern the requestUriIgnorePattern to set
+     * @author Martin Grotzke
+     */
+    public void setRequestUriIgnorePattern( String requestUriIgnorePattern ) {
+        _requestUriIgnorePattern = requestUriIgnorePattern;
     }
 
 }
