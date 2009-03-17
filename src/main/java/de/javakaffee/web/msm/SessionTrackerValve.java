@@ -51,8 +51,8 @@ class SessionTrackerValve extends ValveBase {
         _logger.info( "Starting, " + (cookie != null ? cookie.getValue() : null) +
                 ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
         
-        final HttpSession session2 = _relocateSessions ? request.getSession( false ) : null;
-        final String sessionId = session2 != null ? session2.getId() : null;
+//        final HttpSession session2 = _relocateSessions ? request.getSession( false ) : null;
+//        final String sessionId = session2 != null ? session2.getId() : null;
         
         getNext().invoke( request, response );
 
@@ -63,21 +63,21 @@ class SessionTrackerValve extends ValveBase {
              final Session session = request.getSessionInternal( false );
              if ( session != null ) {
                  
-                 if ( _relocateSessions && sessionId != null ) {
-                     /* we don't have to compare old and new session ids if we are
-                      * already sending a cookie to the client
-                      */
-                     final Cookie respCookie = getCookie( response, "JSESSIONID" );
-                     if ( respCookie != null ) {
-                         _logger.warning( "Strange: we're told to send a cookie for relocation," +
-                         		" but the response already has a cookie set. I'll do nothing" +
-                         		" (of course send the already existing cookie), but" +
-                         		" you should have a look what's going on here!" );
-                         if ( !sessionId.equals( session.getId() ) ) {
-                             response.addCookie( new Cookie( "JSESSIONID", session.getId() ) );
-                         }
-                     }
-                 }
+//                 if ( _relocateSessions && sessionId != null ) {
+//                     /* we don't have to compare old and new session ids if we are
+//                      * already sending a cookie to the client
+//                      */
+//                     final Cookie respCookie = getCookie( response, "JSESSIONID" );
+//                     if ( respCookie != null ) {
+//                         _logger.warning( "Strange: we're told to send a cookie for relocation," +
+//                         		" but the response already has a cookie set. I'll do nothing" +
+//                         		" (of course send the already existing cookie), but" +
+//                         		" you should have a look what's going on here!" );
+//                         if ( !sessionId.equals( session.getId() ) ) {
+//                             response.addCookie( new Cookie( "JSESSIONID", session.getId() ) );
+//                         }
+//                     }
+//                 }
                  
                  ((MemcachedBackupSessionManager)getContainer().getManager()).storeSession( session );
              }

@@ -263,12 +263,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
              * trigger sending the cookie to the browser...
              */
             final String requestedMemcachedId = getMemcachedId( sessionId );
-            if ( !_activeNodeIndexAsString.equals( requestedMemcachedId ) ) {
-                _logger.warning( "Session " + sessionId
-                        + " found in memcached," + " relocating from "
-                        + requestedMemcachedId + " to " + _activeNodeIndexAsString );
-                relocate( session );
-            }
+//            if ( !_activeNodeIndexAsString.equals( requestedMemcachedId ) ) {
+//                _logger.warning( "Session " + sessionId
+//                        + " found in memcached," + " relocating from "
+//                        + requestedMemcachedId + " to " + _activeNodeIndexAsString );
+//                relocate( session );
+//            }
         }
         return session;
     }
