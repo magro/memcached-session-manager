@@ -35,13 +35,14 @@ public class SessionTrackerValve extends ValveBase {
             ServletException {
         // getContainer().getManager()
         
-        _logger.info( "Starting, " + getCookie( request, "JSESSIONID" ) +
+        final Cookie cookie = getCookie( request, "JSESSIONID" );
+        _logger.info( "Starting, " + (cookie != null ? cookie.getValue() : null) +
                 ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
         
         getNext().invoke( request, response );
 
         
-        if ( _ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+        if ( !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
             /* do we have a session?
              */
              final Session session = request.getSessionInternal( false );
@@ -49,8 +50,9 @@ public class SessionTrackerValve extends ValveBase {
                  ((MemcachedBackupSessionManager)getContainer().getManager()).storeSession( session );
              }
         }
-        
-        _logger.info( "Finished, " + getCookie( response, "JSESSIONID" ) );
+
+        final Cookie respCookie = getCookie( response, "JSESSIONID" );
+        _logger.info( "Finished, " + (respCookie != null ? respCookie.getValue() : null) );
         
     }
 

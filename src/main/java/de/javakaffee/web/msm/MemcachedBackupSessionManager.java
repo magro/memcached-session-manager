@@ -148,7 +148,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             _logger.info( "No session found, loading from memcached." );
             result = loadFromMemcached( id );
             if ( result != null ) {
-                _logger.info( "Found session in memcached, storing locally: " + id );
+                _logger.info( "Found session in memcached, storing locally: " + result.getId() );
                 add( result );
             }
             else {
@@ -215,22 +215,25 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                     + " not found in memcached." );
         } else {
             _logger.info( "Found session with id " + sessionId );
-            final String requestedMemcachedId = getMemcachedId( sessionId );
-            if ( !_memcachedId.equals( requestedMemcachedId ) ) {
-                _logger.warning( "Session " + sessionId
-                        + " found in memcached," + " relocating from "
-                        + requestedMemcachedId + " to " + _memcachedId );
-                /*
-                 * relocate session to our memcached node...
-                 */
-                final int idx = sessionId.lastIndexOf( '.' );
-                final String newSessionId = idx > -1 ? sessionId.substring( 0,
-                        idx + 1 )
-                        + _memcachedId : sessionId + "." + _memcachedId;
-                session.setId( newSessionId );
-                _memcached.delete( sessionId );
-                storeSession( session );
-            }
+            /* for now do not relocate, as simply changing the session id does not
+             * trigger sending the cookie to the browser...
+             */
+//            final String requestedMemcachedId = getMemcachedId( sessionId );
+//            if ( !_memcachedId.equals( requestedMemcachedId ) ) {
+//                _logger.warning( "Session " + sessionId
+//                        + " found in memcached," + " relocating from "
+//                        + requestedMemcachedId + " to " + _memcachedId );
+//                /*
+//                 * relocate session to our memcached node...
+//                 */
+//                final int idx = sessionId.lastIndexOf( '.' );
+//                final String newSessionId = idx > -1 ? sessionId.substring( 0,
+//                        idx + 1 )
+//                        + _memcachedId : sessionId + "." + _memcachedId;
+//                session.setId( newSessionId );
+//                _memcached.delete( sessionId );
+//                storeSession( session );
+//            }
         }
         return session;
     }

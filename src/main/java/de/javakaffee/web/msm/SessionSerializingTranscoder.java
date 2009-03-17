@@ -65,7 +65,7 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
         ObjectOutputStream oos = null;
         try {
             bos = new ByteArrayOutputStream();
-            oos = new ObjectOutputStream( new BufferedOutputStream( bos ) );
+            oos = new ObjectOutputStream( bos );
         } catch ( IOException e ) {
             if ( bos != null ) {
                 try {
