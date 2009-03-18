@@ -247,14 +247,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         return ( session );
 
     }
+    
+    static enum BackupResult {
+        SUCCESS, FAILURE, RELOCATED
+    }
 
-    protected void storeSession( Session session ) {
+    protected BackupResult backupSession( Session session ) {
         try {
-            _memcached.set( session.getId(), 3600, session );
+            storeSessionInMemcached( session );
+            return BackupResult.SUCCESS;
         } catch( RelocationException e ) {
-            _logger.info( "Got a relocation request for session id " + session.getId() + ", moving to " + e.getTargetNodeId() );
+            _logger.info( "Could not store session in memcached (" + session.getId() + "), now moving to " + e.getTargetNodeId() );
+            /* let's do our part of the job
+             */
             relocate( session, e.getTargetNodeId(), false );
+            /* and tell our client to do his part as well
+             */
+            return BackupResult.RELOCATED;
         }
+    }
+
+    private void storeSessionInMemcached( Session session ) {
+        _memcached.set( session.getId(), 3600, session );
     }
 
     private Session loadFromMemcached( String sessionId ) {
@@ -298,7 +312,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
         /* store the session under the new id in memcached
          */
-        storeSession( session );
+        storeSessionInMemcached( session );
 
         /* flag the session as relocated, so that the session tracker valve
          * knows it must send a cookie

@@ -14,6 +14,9 @@ import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
+import org.apache.commons.lang.builder.ToStringBuilder;
+
+import de.javakaffee.web.msm.MemcachedBackupSessionManager.BackupResult;
 
 /**
  * This valve is used for tracking requests for that the session must be sent
@@ -64,7 +67,7 @@ class SessionTrackerValve extends ValveBase {
              _logger.info( "Have a session: " + ( session != null ));
              if ( session != null ) {
                  
-                 if ( _relocateSessions /* && sessionId != null */ ) {
+                if ( _relocateSessions /* && sessionId != null */ ) {
                      /* we don't have to compare old and new session ids if we are
                       * already sending a cookie to the client
                       */
@@ -75,22 +78,35 @@ class SessionTrackerValve extends ValveBase {
                          		" but the response already has a cookie set. I'll do nothing" +
                          		" (of course send the already existing cookie), but" +
                          		" you should have a look what's going on here!" );
+                         setCookie( response, request, session );
                      }
-                     else {
-                         //if ( !sessionId.equals( session.getId() ) ) {
-                         _logger.info( "aDDING a cookie: " + session.getId() );
-                         response.addCookie( new Cookie( "JSESSIONID", session.getId() ) );
-                     //}
-                     }
+//                     else {
+//                         //if ( !sessionId.equals( session.getId() ) ) {
+//                         _logger.info( "aDDING a cookie: " + session.getId() );
+//                         response.addCookie( new Cookie( "JSESSIONID", session.getId() ) );
+//                     //}
+//                     }
                  }
                  
-                 ((MemcachedBackupSessionManager)getContainer().getManager()).storeSession( session );
+                 final BackupResult result = ((MemcachedBackupSessionManager)getContainer().getManager()).backupSession( session );
+                 if ( result == BackupResult.RELOCATED ) {
+                     _logger.info( "Session got relocated, setting a cookie: " + session.getId() );
+                     setCookie( response, request, session );
+                 }
              }
         }
 
         final Cookie respCookie = getCookie( response, "JSESSIONID" );
-        _logger.info( "Finished, " + (respCookie != null ? respCookie.getValue() : null) );
+        _logger.info( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
         
+    }
+
+    private void setCookie( Response response, Request request,
+            final Session session ) {
+        final Cookie newCookie = new Cookie( "JSESSIONID", session.getId() );
+         newCookie.setMaxAge( -1 );
+         newCookie.setPath( request.getContextPath() );
+         response.addCookie( newCookie );
     }
 
     private Cookie getCookie( final HttpServletRequest httpRequest, String name ) {
