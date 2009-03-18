@@ -249,7 +249,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     }
 
     protected void storeSession( Session session ) {
-        _memcached.set( session.getId(), 3600, session );
+        try {
+            _memcached.set( session.getId(), 3600, session );
+        } catch( RelocationException e ) {
+            _logger.info( "Got a relocation request for session id " + session.getId() + ", moving to " + e.getTargetNodeId() );
+            relocate( session, e.getTargetNodeId(), false );
+        }
     }
 
     private Session loadFromMemcached( String sessionId ) {
@@ -262,34 +267,36 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             /* for now do not relocate, as simply changing the session id does not
              * trigger sending the cookie to the browser...
              */
-            final String requestedMemcachedId = getMemcachedId( sessionId );
+//            final String requestedMemcachedId = getMemcachedId( sessionId );
 //            if ( !_activeNodeIndexAsString.equals( requestedMemcachedId ) ) {
 //                _logger.warning( "Session " + sessionId
 //                        + " found in memcached," + " relocating from "
 //                        + requestedMemcachedId + " to " + _activeNodeIndexAsString );
-//                relocate( session );
+//                relocate( session, _activeNodeIndexAsString );
 //            }
         }
         return session;
     }
 
-    private void relocate( final Session session ) {
+    private void relocate( final Session session, String newNodeId, boolean delete ) {
         final String sessionId = session.getId();
         
         /*
          * relocate session to our memcached node...
          */
         final int idx = sessionId.lastIndexOf( '.' );
-        final String newSessionId = idx > -1 ? sessionId.substring( 0,
-                idx + 1 )
-                + _activeNodeIndexAsString : sessionId + "." + _activeNodeIndexAsString;
+        final String newSessionId = idx > -1
+            ? sessionId.substring( 0, idx + 1 ) + newNodeId
+            : sessionId + "." + newNodeId;
         session.setId( newSessionId );
         
         /* remove old session from memcached
          */
-        _memcached.delete( sessionId );
+        if ( delete ) {
+            _memcached.delete( sessionId );
+        }
 
-        /* store the session under the new id locally
+        /* store the session under the new id in memcached
          */
         storeSession( session );
 
@@ -314,8 +321,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public void remove( Session session ) {
-        _logger.info( "remove invoked" );
-        _memcached.delete( session.getId() );
+        _logger.info( "remove invoked, session.rel " + session.getNote( SessionTrackerValve.RELOCATE ) );
+        try {
+            _memcached.delete( session.getId() );
+        } catch( RelocationException e ) {
+            /* We can ignore this */
+        }
         super.remove( session );
     }
 

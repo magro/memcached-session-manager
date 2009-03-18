@@ -22,12 +22,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.ops.Operation;
 
 class SuffixBasedNodeLocator implements NodeLocator {
+    
+    private final Logger _logger = Logger.getLogger( SuffixBasedNodeLocator.class.getName() );
 
     private final List<MemcachedNode> _nodes;
     private final Map<String, MemcachedNode> _nodesMap;
@@ -49,13 +52,49 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     @Override
     public MemcachedNode getPrimary( String key ) {
-        final String nodeId = key.substring( key.lastIndexOf( '.' ) + 1 );
-        return _nodesMap.get( nodeId );
+        final MemcachedNode result = _nodesMap.get( getNodeId( key ) );
+        // TODO: Can we have an invalid node id - no result here?
+        //System.out.println( "-- result: " + result.getSocketAddress() );
+        return result;
+    }
+
+    private String getNodeId( String key ) {
+        return key.substring( key.lastIndexOf( '.' ) + 1 );
     }
 
     @Override
     public Iterator<MemcachedNode> getSequence( String key ) {
-        throw new UnsupportedOperationException( "Not supported - a session must go to a defined node" );
+        String targetIdx = getNextNodeId( key );
+        throw new RelocationException( "The node " + getNodeId( key ) + " is not available, we could move to node " + targetIdx, targetIdx );
+    }
+
+    protected String getNextNodeId( String key ) {
+        /* just for simplicity: we know that the node id is the index
+         * so we use this knowledge (insteaf of getting the node from the map
+         * and the index of the node etc.
+         */
+        String nodeId = getNodeId( key );
+        int idx = Integer.parseInt( nodeId );
+        int targetIdx;
+        if ( idx < 0 ) {
+            _logger.warning( "Got a nodeId < 0, this is not valid" );
+            // TODO: introduce some random here
+            targetIdx = 0;
+        }
+        else if ( idx >= _nodes.size() ) {
+            _logger.warning( "Got a nodeId > number of nodes, this is not valid" );
+            // TODO: introduce some random here
+            targetIdx = 0;
+        }
+        else {
+            targetIdx = idx + 1 % _nodes.size();
+            if ( targetIdx == idx ) {
+                /* we have only a single node - game over
+                 */
+                throw new UnavailableNodeException( "The node " + nodeId + " is not available and there's no node for relocation left.", nodeId );
+            }
+        }
+        return String.valueOf( targetIdx );
     }
 
     @Override
