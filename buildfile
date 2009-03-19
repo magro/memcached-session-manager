@@ -5,14 +5,13 @@ repositories.remote << 'http://www.ibiblio.org/maven2/'
 SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
 CATALINA_HA = 'org.apache.tomcat:catalina-ha:jar:6.0.18'
-MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.3rc1').from(file('lib/memcached-2.3rc1.jar'))
-SPY = artifact('net.spy:spy:jar:2.4').from(file('lib/spy-2.4.jar'))
+MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.3').from(file('lib/memcached-2.3.jar'))
 C_LANG = 'commons-lang:commons-lang:jar:2.4'
 
 desc 'memcached-session-manager'
 define 'memcached-session-manager' do
   project.group = 'de.javakaffee.web'
   project.version = '1.0-SNAPSHOT'
-  compile.with(SERVLET_API, CATALINA, CATALINA_HA, MEMCACHED, SPY, C_LANG)
+  compile.with(SERVLET_API, CATALINA, CATALINA_HA, MEMCACHED, C_LANG)
   package :jar, :id => 'memcached-session-manager'
 end
