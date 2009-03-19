@@ -1,2 +1,33 @@
 This project uses buildr for build management. Have a look at http://buildr.apache.org
 for how to install buildr (the "Getting started" section should be fine).
+
+== Build the sources ==
+$ buildr package
+
+== Installation ==
+Copy the created memcached-session-manager-1.0-SNAPSHOT.jar from the target
+directory to $CATALINA_HOME/libs, and lib/* as well.
+
+Notice: this project is running against/with tomcat6, I have not tested it with
+other versions of tomcat.
+
+== Configuration ==
+In the server.xml (or the context.xml) add an appropriate <Manager/> element to
+your context, so that this looks like this:
+
+<Context path="/hunter">
+    <Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
+        memcachedNodes="localhost:11211 localhost:11212" activeNodeIndex="0"
+        requestUriIgnorePattern=".*\.png$" />
+</Context>
+
+== Run / Test ==
+Startup two memcached nodes (or a single one, but then you also must change the
+configuration shown above) and two tomcats behind an apache/loadbalancer.
+
+You should  be able to use the tomcat examples or just deploy an application
+of yourself. Then make a request that creates a session. Afterwards shut down
+the tomcat on which the session was created and see that the session is taken
+over by the second tomcat.
+
+Now relax or go and grab a coffee :)
