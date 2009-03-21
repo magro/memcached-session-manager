@@ -111,18 +111,22 @@ class SessionTrackerValve extends ValveBase {
 
     private Cookie getCookie( final HttpServletRequest httpRequest, String name ) {
         Cookie[] cookies = httpRequest.getCookies();
-        for ( Cookie cookie : cookies ) {
-            if ( name.equals( cookie.getName() ) ) {
-                return cookie;
+        if ( cookies != null ) {
+            for ( Cookie cookie : cookies ) {
+                if ( name.equals( cookie.getName() ) ) {
+                    return cookie;
+                }
             }
         }
         return null;
     }
 
     private Cookie getCookie( final Response response, String name ) {
-        for ( Cookie cookie : response.getCookies() ) {
-            if ( name.equals( cookie.getName() ) ) {
-                return cookie;
+        if ( response.getCookies() != null ) {
+            for ( Cookie cookie : response.getCookies() ) {
+                if ( name.equals( cookie.getName() ) ) {
+                    return cookie;
+                }
             }
         }
         return null;
