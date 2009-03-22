@@ -18,13 +18,14 @@ package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 
-import junit.framework.Assert;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.startup.Embedded;
@@ -41,31 +42,32 @@ import org.junit.Test;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
- * Integration test testing tomcat failover (tomcats failing).
+ * Integration test testing basic session manager functionality.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class TomcatFailoverIntegrationTest {
+public class MemcachedSessionManagerIntegrationTest {
     
     private static final Log LOG = LogFactory
-            .getLog( TomcatFailoverIntegrationTest.class );
+            .getLog( MemcachedSessionManagerIntegrationTest.class );
     
-    private MemcachedClient _client;
+    private MemcachedClient _memcached;
     private PartitionedHashMap<String,byte[]> _map;
     private MemcachedConnector _connector;
     
     private Embedded _tomcat1;
-    private Embedded _tomcat2;
 
     private int _portTomcat1;
-    private int _portTomcat2;
+
+    private SimpleHttpConnectionManager _connectionManager;
+
+    private HttpClient _httpClient;
 
     @Before
     public void setUp() throws Throwable {
 
         _portTomcat1 = 8888;
-        _portTomcat2 = 8889;
         
         final int port = 21211;
 
@@ -80,18 +82,18 @@ public class TomcatFailoverIntegrationTest {
         final String memcachedNodes = "localhost:" + port;
         _tomcat1 = createCatalina( _portTomcat1, memcachedNodes );
         _tomcat1.start();
-
-        _tomcat2 = createCatalina( _portTomcat2, memcachedNodes );
-        _tomcat2.start();
         
         } catch( Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
         
-        _client = new MemcachedClient(
+        _memcached = new MemcachedClient(
                 new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
                 Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
+        
+        _connectionManager = new SimpleHttpConnectionManager( true );
+        _httpClient = new HttpClient( _connectionManager );
     }
 
     @After
@@ -99,40 +101,27 @@ public class TomcatFailoverIntegrationTest {
         _connector.stop();
         _map.stop();
         _tomcat1.stop();
-        _tomcat2.stop();
+        _connectionManager.shutdown();
     }
     
-//    @Test
-//    public void testConnectDaemon() throws IOException, InterruptedException {
-//        _client.set( "foo", 3600000, "bar" );
-//        Assert.assertEquals( "bar", _client.get( "foo" ) );
-//    }
-    
-    /**
-     * Tests that when two tomcats are running and one tomcat fails the other tomcat can
-     * take over the session.
-     * @throws IOException
-     * @throws InterruptedException
-     */
     @Test
-    public void testTomcatFailover() throws IOException, InterruptedException {
-        final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
-        try {
-            final HttpClient client = new HttpClient( connectionManager );
+    public void testSessionAvailableInMemcached() throws IOException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
+        Thread.sleep( 50 );
+        assertNotNull( "Session not available in memcached.", _memcached.get( sessionId1 ) );
+    }
     
-            final String sessionId1 = makeRequest( client, _portTomcat1, null );
-            
-            Thread.sleep( 200 );
-            
-            Assert.assertNotNull( _client.get( sessionId1 ) );
-            
-            final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
-            
-            Assert.assertEquals( sessionId1, sessionId2 );
-        } finally {
-            connectionManager.shutdown();
-        }
+    @Test
+    public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
         
+        /* wait 11 seconds, as processExpires runs every 11 seconds...
+         */
+        Thread.sleep( 2100 );
+        
+        assertNull( "Expired sesion still existing in memcached", _memcached.get( sessionId1 ) );
     }
 
 }
