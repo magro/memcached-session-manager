@@ -18,7 +18,7 @@ package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 import static org.junit.Assert.assertNull;
 
 import java.io.IOException;
@@ -39,6 +39,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -122,6 +123,19 @@ public class MemcachedSessionManagerIntegrationTest {
         Thread.sleep( 2100 );
         
         assertNull( "Expired sesion still existing in memcached", _memcached.get( sessionId1 ) );
+    }
+    
+    @Test
+    public void testInvalidSessionNotFound() throws IOException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
+        
+        /* wait some time, as processExpires runs every second and the maxInactiveTime is set to 1 sec...
+         */
+        Thread.sleep( 2100 );
+
+        final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertNotSame( "Expired session returned", sessionId1, sessionId2 );
     }
 
 }
