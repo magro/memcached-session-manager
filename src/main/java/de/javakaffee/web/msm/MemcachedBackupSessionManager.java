@@ -69,7 +69,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * (of course starting with 0)
      */
     private int _activeNodeIndex;
-    private String _activeNodeIndexAsString;
     
     /**
      * The pattern used for excluding requests from a session-backup.
@@ -149,7 +148,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /* create the missing sessions cache
          */
         _logger.info( "Creating LRUCache with size 200 and TTL 100" );
-        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 200 );
+        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 100 );
 
     }
 
@@ -284,16 +283,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                     + " not found in memcached." );
         } else {
             _logger.info( "Found session with id " + sessionId );
-            /* for now do not relocate, as simply changing the session id does not
-             * trigger sending the cookie to the browser...
-             */
-//            final String requestedMemcachedId = getMemcachedId( sessionId );
-//            if ( !_activeNodeIndexAsString.equals( requestedMemcachedId ) ) {
-//                _logger.warning( "Session " + sessionId
-//                        + " found in memcached," + " relocating from "
-//                        + requestedMemcachedId + " to " + _activeNodeIndexAsString );
-//                relocate( session, _activeNodeIndexAsString );
-//            }
         }
         return session;
     }
@@ -383,7 +372,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     public void setActiveNodeIndex( int activeNodeIndex ) {
         _activeNodeIndex = activeNodeIndex;
-        _activeNodeIndexAsString = String.valueOf( activeNodeIndex );
     }
 
     @Override
