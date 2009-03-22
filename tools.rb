@@ -1,15 +1,4 @@
-# some artifact related methods, and a shortcut for running a javaclass with rmi-props
-
-
-def javarmi(clazzname, policy, project)
-  Java::Commands.java(clazzname, :classpath => [project._('target/classes/'),project._('target/resources/'),project.compile.dependencies],
-      :java_args => [
-        "-Djava.rmi.server.codebase=file:" + project._('target/classes/') + '/',
-        '-Djava.rmi.server.hostname=localhost',
-        '-Djava.security.policy=' + project._(policy)]
-  )    
-end
-
+# some artifact related methods
 
 def create_pom(art)
   artifact art do |a|
