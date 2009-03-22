@@ -117,7 +117,7 @@ public class MemcachedSessionManagerIntegrationTest {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
         
-        /* wait 11 seconds, as processExpires runs every 11 seconds...
+        /* wait some time, as processExpires runs every second and the maxInactiveTime is set to 1 sec...
          */
         Thread.sleep( 2100 );
         
