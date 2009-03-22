@@ -20,7 +20,7 @@ package de.javakaffee.web.msm;
  * This exception is thrown when a node is not available but the session
  * can be moved to another node.
  * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class RelocationException extends RuntimeException {

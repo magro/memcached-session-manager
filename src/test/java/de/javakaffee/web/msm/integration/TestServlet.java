@@ -20,17 +20,14 @@ import java.io.IOException;
 import java.io.PrintWriter;
 
 import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * TODO: DESCRIBE ME<br>
- * Created on: Mar 22, 2009<br>
+ * The servlet used for integration testing.
  * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class TestServlet extends HttpServlet {

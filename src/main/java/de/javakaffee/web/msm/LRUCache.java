@@ -24,7 +24,7 @@ import java.util.List;
  * An LRUCache that supports a maximum number of cache entries and
  * a time to live for them. The TTL is measured from insertion time to access time.
  * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  * @param <K> the type of the key
  * @param <V> the type of the value

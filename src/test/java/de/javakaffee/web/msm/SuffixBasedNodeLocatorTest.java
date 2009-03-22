@@ -26,6 +26,12 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+/**
+ * Tests the {@link SuffixBasedNodeLocator}.
+ * 
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
+ */
 public class SuffixBasedNodeLocatorTest extends MockObjectTestCase {
 
     @Before

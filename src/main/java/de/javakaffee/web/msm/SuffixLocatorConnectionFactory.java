@@ -18,6 +18,7 @@ package de.javakaffee.web.msm;
 
 import java.util.List;
 
+import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
@@ -25,6 +26,14 @@ import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Manager;
 
+/**
+ * This {@link ConnectionFactory} uses the {@link SuffixBasedNodeLocator}
+ * as {@link NodeLocator} and the {@link SessionSerializingTranscoder} as
+ * {@link Transcoder}.
+ * 
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
+ */
 public final class SuffixLocatorConnectionFactory extends
         DefaultConnectionFactory {
     

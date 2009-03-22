@@ -21,6 +21,12 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+/**
+ * Test the {@link LRUCache}.
+ * 
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
+ */
 public class LRUCacheTest {
 
     @Before

@@ -20,7 +20,7 @@ package de.javakaffee.web.msm;
  * This exception is thrown when a node is not available and no failover
  * node is left.
  * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class UnavailableNodeException extends RuntimeException {

@@ -23,17 +23,19 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
 import net.spy.memcached.transcoders.SerializingTranscoder;
+import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
+import org.apache.catalina.Session;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
 
 /**
- * TODO: DESCRIBE ME<br>
- * Created on: Mar 17, 2009<br>
+ * A {@link Transcoder} that serializes catalina {@link Session}s using the
+ * serialization of {@link StandardSession}.
  * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class SessionSerializingTranscoder extends SerializingTranscoder {

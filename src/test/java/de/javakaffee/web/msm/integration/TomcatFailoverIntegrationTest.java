@@ -26,7 +26,6 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import junit.framework.Assert;
-
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Context;
@@ -51,9 +50,14 @@ import org.junit.Before;
 import org.junit.Test;
 
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.SessionSerializingTranscoder;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
+/**
+ * Integration test testing tomcat failover (tomcats failing).
+ * 
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
+ */
 public class TomcatFailoverIntegrationTest {
     
     private static final Log LOG = LogFactory

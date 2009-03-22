@@ -33,6 +33,13 @@ import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.ops.Operation;
 
+/**
+ * Locates nodes based on a suffix appended to the sessionId (key), which is
+ * used as the index of the nodes of this locator.
+ * 
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
+ */
 class SuffixBasedNodeLocator implements NodeLocator {
     
     private final Logger _logger = Logger.getLogger( SuffixBasedNodeLocator.class.getName() );
