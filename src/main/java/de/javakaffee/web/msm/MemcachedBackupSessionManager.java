@@ -253,6 +253,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     }
 
     protected BackupResult backupSession( Session session ) {
+        _logger.info( "Storing session in memcached: " + session.getId() );
         try {
             storeSessionInMemcached( session );
             return BackupResult.SUCCESS;
