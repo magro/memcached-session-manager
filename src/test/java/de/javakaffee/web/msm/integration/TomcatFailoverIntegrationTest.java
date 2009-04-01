@@ -17,10 +17,8 @@
 package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
-import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 
@@ -28,15 +26,15 @@ import junit.framework.Assert;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.startup.Embedded;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.jgroups.blocks.MemcachedConnector;
-import org.jgroups.blocks.PartitionedHashMap;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import com.thimbleware.jmemcached.Cache;
+import com.thimbleware.jmemcached.MemCacheDaemon;
+import com.thimbleware.jmemcached.storage.hash.LRUCacheStorageDelegate;
 
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
@@ -50,10 +48,9 @@ public class TomcatFailoverIntegrationTest {
     
     private static final Log LOG = LogFactory
             .getLog( TomcatFailoverIntegrationTest.class );
-    
+
+    private MemCacheDaemon _daemon;
     private MemcachedClient _client;
-    private PartitionedHashMap<String,byte[]> _map;
-    private MemcachedConnector _connector;
     
     private Embedded _tomcat1;
     private Embedded _tomcat2;
@@ -69,70 +66,75 @@ public class TomcatFailoverIntegrationTest {
         
         final int port = 21211;
 
-        _map = new PartitionedHashMap<String,byte[]>( "tcp.xml", getClass().getSimpleName() );
-        _connector = new MemcachedConnector( InetAddress.getLocalHost(), port, _map);
-        _connector.setThreadPoolCoreThreads(1);
-        _connector.setThreadPoolMaxThreads(5);
-        _map.start();
-        _connector.start();
+        final InetSocketAddress address = new InetSocketAddress( "localhost", port );
+        _daemon = createDaemon( address );
+        _daemon.start(); 
         
         try {
-        final String memcachedNodes = "localhost:" + port;
-        _tomcat1 = createCatalina( _portTomcat1, memcachedNodes );
-        _tomcat1.start();
-
-        _tomcat2 = createCatalina( _portTomcat2, memcachedNodes );
-        _tomcat2.start();
-        
+            final String memcachedNodes = "localhost:" + port;
+            _tomcat1 = createCatalina( _portTomcat1, memcachedNodes );
+            _tomcat1.start();
+    
+            _tomcat2 = createCatalina( _portTomcat2, memcachedNodes );
+            _tomcat2.start();
         } catch( Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
         
         _client = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
-                Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
+                //new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
+                Arrays.asList( address ) );
     }
 
     @After
     public void tearDown() throws Exception {
-        _connector.stop();
-        _map.stop();
+        _daemon.stop();
         _tomcat1.stop();
         _tomcat2.stop();
     }
     
+    @Test
+    public void testConnectDaemon() throws IOException, InterruptedException {
+        _client.set( "foo", 3600, "bar" );
+        Assert.assertEquals( "bar", _client.get( "foo" ) );
+    }
+    
+//    /**
+//     * Tests that when two tomcats are running and one tomcat fails the other tomcat can
+//     * take over the session.
+//     * @throws IOException
+//     * @throws InterruptedException
+//     */
 //    @Test
-//    public void testConnectDaemon() throws IOException, InterruptedException {
-//        _client.set( "foo", 3600000, "bar" );
-//        Assert.assertEquals( "bar", _client.get( "foo" ) );
+//    public void testTomcatFailover() throws IOException, InterruptedException {
+//        final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
+//        try {
+//            final HttpClient client = new HttpClient( connectionManager );
+//    
+//            final String sessionId1 = makeRequest( client, _portTomcat1, null );
+//            
+//            Thread.sleep( 200 );
+//            
+//            Assert.assertNotNull( _client.get( sessionId1 ) );
+//            
+//            final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
+//            
+//            Assert.assertEquals( sessionId1, sessionId2 );
+//        } finally {
+//            connectionManager.shutdown();
+//        }
+//        
 //    }
     
-    /**
-     * Tests that when two tomcats are running and one tomcat fails the other tomcat can
-     * take over the session.
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Test
-    public void testTomcatFailover() throws IOException, InterruptedException {
-        final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
-        try {
-            final HttpClient client = new HttpClient( connectionManager );
-    
-            final String sessionId1 = makeRequest( client, _portTomcat1, null );
-            
-            Thread.sleep( 200 );
-            
-            Assert.assertNotNull( _client.get( sessionId1 ) );
-            
-            final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
-            
-            Assert.assertEquals( sessionId1, sessionId2 );
-        } finally {
-            connectionManager.shutdown();
-        }
-        
+    private MemCacheDaemon createDaemon( final InetSocketAddress address ) throws IOException {
+        final MemCacheDaemon daemon = new MemCacheDaemon();
+        final LRUCacheStorageDelegate cacheStorage = new LRUCacheStorageDelegate(1000, 1024*1024, 1024000);
+        daemon.setCache(new Cache(cacheStorage));
+        daemon.setAddr( address );
+        daemon.setVerbose(true);
+        return daemon;
     }
+
 
 }
