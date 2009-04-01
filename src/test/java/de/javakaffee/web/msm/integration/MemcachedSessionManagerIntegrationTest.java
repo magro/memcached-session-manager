@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
+import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
@@ -28,7 +29,6 @@ import java.util.Arrays;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Manager;
 import org.apache.catalina.startup.Embedded;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
@@ -38,9 +38,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.thimbleware.jmemcached.Cache;
 import com.thimbleware.jmemcached.MemCacheDaemon;
-import com.thimbleware.jmemcached.storage.hash.LRUCacheStorageDelegate;
 
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
@@ -86,12 +84,8 @@ public class MemcachedSessionManagerIntegrationTest {
             throw e;
         }
         
-        final Manager manager = _tomcat1.getContainer().getManager();
-//        if ( manager == null ) {
-//            throw new IllegalStateException( "The manager is not existing!" );
-//        }
         _memcached = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( manager ),
+                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
                 Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
         
         _connectionManager = new SimpleHttpConnectionManager( true );
@@ -136,15 +130,6 @@ public class MemcachedSessionManagerIntegrationTest {
 
         final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
         assertNotSame( "Expired session returned", sessionId1, sessionId2 );
-    }
-    
-    private MemCacheDaemon createDaemon( final InetSocketAddress address ) throws IOException {
-        final MemCacheDaemon daemon = new MemCacheDaemon();
-        final LRUCacheStorageDelegate cacheStorage = new LRUCacheStorageDelegate(1000, 1024*1024, 1024000);
-        daemon.setCache(new Cache(cacheStorage));
-        daemon.setAddr( address );
-        daemon.setVerbose(true);
-        return daemon;
     }
 
 }

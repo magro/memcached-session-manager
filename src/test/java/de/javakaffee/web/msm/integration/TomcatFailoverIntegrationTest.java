@@ -17,6 +17,8 @@
 package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
+import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -26,15 +28,15 @@ import junit.framework.Assert;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.startup.Embedded;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.thimbleware.jmemcached.Cache;
 import com.thimbleware.jmemcached.MemCacheDaemon;
-import com.thimbleware.jmemcached.storage.hash.LRUCacheStorageDelegate;
 
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
@@ -83,7 +85,7 @@ public class TomcatFailoverIntegrationTest {
         }
         
         _client = new MemcachedClient(
-                //new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
+                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
                 Arrays.asList( address ) );
     }
 
@@ -96,44 +98,40 @@ public class TomcatFailoverIntegrationTest {
     
     @Test
     public void testConnectDaemon() throws IOException, InterruptedException {
-        _client.set( "foo", 3600, "bar" );
-        Assert.assertEquals( "bar", _client.get( "foo" ) );
+        final Object value = "bar";
+        _client.set( "foo.0", 3600, value );
+        Assert.assertEquals( value, _client.get( "foo.0" ) );
     }
     
-//    /**
-//     * Tests that when two tomcats are running and one tomcat fails the other tomcat can
-//     * take over the session.
-//     * @throws IOException
-//     * @throws InterruptedException
-//     */
-//    @Test
-//    public void testTomcatFailover() throws IOException, InterruptedException {
-//        final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
-//        try {
-//            final HttpClient client = new HttpClient( connectionManager );
-//    
-//            final String sessionId1 = makeRequest( client, _portTomcat1, null );
-//            
-//            Thread.sleep( 200 );
-//            
-//            Assert.assertNotNull( _client.get( sessionId1 ) );
-//            
-//            final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
-//            
-//            Assert.assertEquals( sessionId1, sessionId2 );
-//        } finally {
-//            connectionManager.shutdown();
-//        }
-//        
-//    }
+    /**
+     * Tests that when two tomcats are running and one tomcat fails the other tomcat can
+     * take over the session.
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Test
+    public void testTomcatFailover() throws IOException, InterruptedException {
+        final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
+        try {
+            final HttpClient client = new HttpClient( connectionManager );
     
-    private MemCacheDaemon createDaemon( final InetSocketAddress address ) throws IOException {
-        final MemCacheDaemon daemon = new MemCacheDaemon();
-        final LRUCacheStorageDelegate cacheStorage = new LRUCacheStorageDelegate(1000, 1024*1024, 1024000);
-        daemon.setCache(new Cache(cacheStorage));
-        daemon.setAddr( address );
-        daemon.setVerbose(true);
-        return daemon;
+            final String sessionId1 = makeRequest( client, _portTomcat1, null );
+            
+            Thread.sleep( 10 );
+            
+            final Object session = _client.get( sessionId1 );
+            Assert.assertNotNull( session );
+            
+            final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
+            
+            Assert.assertEquals( sessionId1, sessionId2 );
+            
+            Thread.sleep( 10 );
+            
+        } finally {
+            connectionManager.shutdown();
+        }
+        
     }
 
 

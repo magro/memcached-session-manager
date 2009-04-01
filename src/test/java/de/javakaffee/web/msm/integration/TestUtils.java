@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.integration;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
@@ -36,6 +37,10 @@ import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 
+import com.thimbleware.jmemcached.Cache;
+import com.thimbleware.jmemcached.MemCacheDaemon;
+import com.thimbleware.jmemcached.storage.hash.LRUCacheStorageDelegate;
+
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 
 /**
@@ -47,7 +52,7 @@ public class TestUtils {
     
     public static String makeRequest( final HttpClient client, int port, String rsessionId ) throws IOException,
             HttpException {
-        System.out.println( port + " >>>>>>>>>>>>>>>>>> Starting >>>>>>>>>>>>>>>>>>>>");
+        // System.out.println( port + " >>>>>>>>>>>>>>>>>> Starting >>>>>>>>>>>>>>>>>>>>");
         String responseSessionId;
         final HttpMethod method = new GetMethod("http://localhost:"+ port +"/");
         try {
@@ -55,18 +60,18 @@ public class TestUtils {
                 method.setRequestHeader( "Cookie", "JSESSIONID=" + rsessionId );
             }
             
-            System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
+            // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
             //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
             client.executeMethod( method );
-            System.out.println( ">>>>>>>>>>: " + method.getResponseBodyAsString() );
+            // System.out.println( ">>>>>>>>>>: " + method.getResponseBodyAsString() );
             responseSessionId = getSessionIdFromResponse( method );
-            System.out.println( "response cookie: " + responseSessionId );
+            // System.out.println( "response cookie: " + responseSessionId );
             
-            return responseSessionId;
+            return responseSessionId == null ? rsessionId : responseSessionId;
             
         } finally {
             method.releaseConnection();
-            System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Finished <<<<<<<<<<<<<<<<<<<<<<<");
+            // System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Finished <<<<<<<<<<<<<<<<<<<<<<<");
         }
     }
 
@@ -80,6 +85,15 @@ public class TestUtils {
             }
         }
         return null;
+    }
+    
+    public static MemCacheDaemon createDaemon( final InetSocketAddress address ) throws IOException {
+        final MemCacheDaemon daemon = new MemCacheDaemon();
+        final LRUCacheStorageDelegate cacheStorage = new LRUCacheStorageDelegate(100000, 1024*1024, 1024000);
+        daemon.setCache(new Cache(cacheStorage));
+        daemon.setAddr( address );
+        daemon.setVerbose( false );
+        return daemon;
     }
 
     public static Embedded createCatalina( final int port, String memcachedNodes ) throws MalformedURLException,
@@ -103,6 +117,7 @@ public class TestUtils {
         sessionManager.setActiveNodeIndex( 0 );
         sessionManager.setMaxInactiveInterval( 1 ); // 1 second
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
+        engine.setManager( sessionManager );
 
         final Context context = catalina.createContext( "/", "webapp" );
         context.setManager( sessionManager );
