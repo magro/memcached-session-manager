@@ -66,5 +66,22 @@ public class SuffixBasedNodeLocatorTest extends MockObjectTestCase {
         String nextNodeId = cut.getNextNodeId( "foo.0" );
         assertEquals( "1", nextNodeId );
     }
+    
+    /**
+     * The currently selected node is the last one in the list of nodes.
+     * The next node must be the first node in the list of nodes.
+     * 
+     * @author Martin Grotzke
+     */
+    @Test
+    public final void testLastNodeReachedRestartAtFirst() {
+        final List<MemcachedNode> nodes = new ArrayList<MemcachedNode>();
+        nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
+        nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
+        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes );
+        String nextNodeId = cut.getNextNodeId( "foo.1" );
+        assertEquals( "0", nextNodeId );
+        
+    }
 
 }

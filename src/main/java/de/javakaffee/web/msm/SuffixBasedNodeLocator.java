@@ -65,8 +65,9 @@ class SuffixBasedNodeLocator implements NodeLocator {
     @Override
     public MemcachedNode getPrimary( String key ) {
         final MemcachedNode result = _nodesMap.get( getNodeId( key ) );
-        // TODO: Can we have an invalid node id - no result here?
-        //System.out.println( "-- result: " + result.getSocketAddress() );
+        if ( result == null ) {
+            throw new IllegalArgumentException( "No node found for key " + key );
+        }
         return result;
     }
 
@@ -96,6 +97,11 @@ class SuffixBasedNodeLocator implements NodeLocator {
         else if ( idx >= _nodes.size() ) {
             _logger.warning( "Got a nodeId > number of nodes, this is not valid" );
             // TODO: introduce some random here
+            targetIdx = 0;
+        }
+        else if ( idx + 1 == _nodes.size() && idx != 0 ) {
+            /* we have the last node, so the next node is the first node
+             */
             targetIdx = 0;
         }
         else {
