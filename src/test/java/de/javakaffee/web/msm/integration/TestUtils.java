@@ -52,7 +52,7 @@ public class TestUtils {
     
     public static String makeRequest( final HttpClient client, int port, String rsessionId ) throws IOException,
             HttpException {
-        // System.out.println( port + " >>>>>>>>>>>>>>>>>> Starting >>>>>>>>>>>>>>>>>>>>");
+        // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
         String responseSessionId;
         final HttpMethod method = new GetMethod("http://localhost:"+ port +"/");
         try {
@@ -63,6 +63,11 @@ public class TestUtils {
             // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
             //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
             client.executeMethod( method );
+            
+            if ( method.getStatusCode() != 200 ) {
+                throw new RuntimeException( "GET did not return status 200, but " + method.getStatusLine() );
+            }
+            
             // System.out.println( ">>>>>>>>>>: " + method.getResponseBodyAsString() );
             responseSessionId = getSessionIdFromResponse( method );
             // System.out.println( "response cookie: " + responseSessionId );
@@ -71,7 +76,7 @@ public class TestUtils {
             
         } finally {
             method.releaseConnection();
-            // System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Finished <<<<<<<<<<<<<<<<<<<<<<<");
+            // System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Client Finished <<<<<<<<<<<<<<<<<<<<<<<");
         }
     }
 
@@ -98,6 +103,11 @@ public class TestUtils {
 
     public static Embedded createCatalina( final int port, String memcachedNodes ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
+        return createCatalina( port, 1, memcachedNodes );
+    }
+
+    public static Embedded createCatalina( final int port, int sessionTimeout, String memcachedNodes ) throws MalformedURLException,
+            UnknownHostException, LifecycleException {
         final Embedded catalina = new Embedded();
         final Engine engine = catalina.createEngine();
         /* we must have a unique name for mbeans
@@ -115,7 +125,7 @@ public class TestUtils {
         final MemcachedBackupSessionManager sessionManager = new MemcachedBackupSessionManager();
         sessionManager.setMemcachedNodes( memcachedNodes );
         sessionManager.setActiveNodeIndex( 0 );
-        sessionManager.setMaxInactiveInterval( 1 ); // 1 second
+        sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         engine.setManager( sessionManager );
 

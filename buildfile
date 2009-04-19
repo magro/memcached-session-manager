@@ -8,7 +8,7 @@ repositories.remote << 'http://repository.jboss.com/maven2'
 SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
 CATALINA_HA = 'org.apache.tomcat:catalina-ha:jar:6.0.18'
-MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.3').from(file('lib/memcached-2.3.jar'))
+MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.3.1').from(file('lib/memcached-2.3.1.jar'))
 C_LANG = 'commons-lang:commons-lang:jar:2.4'
 
 # Testing

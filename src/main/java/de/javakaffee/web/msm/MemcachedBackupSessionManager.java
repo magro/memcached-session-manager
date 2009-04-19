@@ -18,6 +18,11 @@ package de.javakaffee.web.msm;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.spy.memcached.AddrUtil;
@@ -131,7 +136,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /* add the valve for tracking requests for that the session must be sent to memcached
          */
         final SessionTrackerValve sessionTrackerValve = new SessionTrackerValve(
-                _requestUriIgnorePattern, true );
+                _requestUriIgnorePattern );
         getContainer().getPipeline().addValve( sessionTrackerValve );
         
         /* init memcached
@@ -148,7 +153,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /* create the missing sessions cache
          */
         _logger.info( "Creating LRUCache with size 200 and TTL 100" );
-        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 100 );
+        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
 
     }
 
@@ -160,6 +165,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     @Override
     protected synchronized String generateSessionId() {
         return super.generateSessionId() + "." + _activeNodeIndex;
+    }
+    
+    private boolean isValidSessionIdFormat( String sessionId ) {
+        return sessionId != null && sessionId.indexOf( '.' ) > -1;
     }
 
     /*
@@ -190,13 +199,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public Session findSession( String id ) throws IOException {
-        _logger.info( "findSession invoked: " + id );
         Session result = super.findSession( id );
         if ( result == null && _missingSessionsCache.get( id ) == null ) {
-            _logger.info( "No session found, loading from memcached." );
             result = loadFromMemcached( id );
             if ( result != null ) {
-                _logger.info( "Found session in memcached, storing locally: " + result.getId() );
                 add( result );
             }
             else {
@@ -257,9 +263,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     }
 
     protected BackupResult backupSession( Session session ) {
-        _logger.info( "Storing session in memcached: " + session.getId() );
+        _logger.info( "Trying to store session in memcached: " + session.getId() );
         try {
             storeSessionInMemcached( session );
+            _logger.info( "----------- Backuped session...---------------" );
             return BackupResult.SUCCESS;
         } catch( RelocationException e ) {
             _logger.info( "Could not store session in memcached (" + session.getId() + "), now moving to " + e.getTargetNodeId() );
@@ -273,10 +280,24 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     }
 
     private void storeSessionInMemcached( Session session ) {
-        _memcached.set( session.getId(), 3600, session );
+        final Future<Boolean> future = _memcached.set( session.getId(), 3600, session );
+        try {
+            future.get( 500, TimeUnit.MILLISECONDS );
+            _logger.info( "Got info from memcached that item is stored.");
+        } catch ( Exception e ) {
+            _logger.log( Level.SEVERE, "Could not store session in memcached: " + e +
+                    "\nTrying another node now." );
+            _memcached.set( session.getId(), 3600, session );
+        }
+//        if ( _memcached.get( session.getId() ) == null ) {
+//            throw new IllegalStateException( "Getting session is not possible, sid: " + session.getId() );
+//        }
     }
 
     private Session loadFromMemcached( String sessionId ) {
+        if ( !isValidSessionIdFormat( sessionId ) ) {
+            return null;
+        }
         final Session session = (Session) _memcached.get( sessionId );
         if ( session == null ) {
             _logger.warning( "Session " + sessionId
@@ -330,7 +351,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public void remove( Session session ) {
-        _logger.info( "remove invoked, session.rel " + session.getNote( SessionTrackerValve.RELOCATE ) );
+        _logger.info( "remove invoked, session.rel " + session.getNote( SessionTrackerValve.RELOCATE ) +
+                ", id " + session.getId() );
         try {
             _memcached.delete( session.getId() );
         } catch( RelocationException e ) {

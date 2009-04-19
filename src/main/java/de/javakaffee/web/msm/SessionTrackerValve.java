@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -48,9 +49,8 @@ class SessionTrackerValve extends ValveBase {
     private final Logger _logger = Logger.getLogger( SessionTrackerValve.class.getName() );
 
     private final Pattern _ignorePattern;
-    private final boolean _relocateSessions;
     
-    public SessionTrackerValve( String ignorePattern, boolean relocateSessions ) {
+    public SessionTrackerValve( String ignorePattern ) {
         if ( ignorePattern != null ) {
             _logger.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -58,7 +58,6 @@ class SessionTrackerValve extends ValveBase {
         else {
             _ignorePattern = null;
         }
-        _relocateSessions = relocateSessions;
     }
 
     @Override
@@ -66,21 +65,34 @@ class SessionTrackerValve extends ValveBase {
             ServletException {
         // getContainer().getManager()
         
-        final Cookie cookie = getCookie( request, "JSESSIONID" );
-        _logger.info( "Starting, " + (cookie != null ? cookie.getValue() : null) +
-                ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
+        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+            _logger.info( "====================  Server Starting ====================" );
+        }
+        
+        if ( _logger.isLoggable( Level.FINE ) ) {
+            final Cookie cookie = getCookie( request, "JSESSIONID" );
+            _logger.fine( "Starting, " + (cookie != null ? cookie.getValue() : null) +
+                    ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
+        }
         
 //        final HttpSession session2 = _relocateSessions ? request.getSession( false ) : null;
 //        final String sessionId = session2 != null ? session2.getId() : null;
-        
+        // response.setBufferSize( 100000 );
         getNext().invoke( request, response );
 
         
         if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+            
             /* do we have a session?
+             * 
+             * TODO: this triggers a findSession (and with this a loadFromMemcached),
+             * so we should determine if session backup is necessary using another way,
+             * e.g. checking request/response cookies...
              */
              final Session session = request.getSessionInternal( false );
-             _logger.info( "Have a session: " + ( session != null ));
+             if ( _logger.isLoggable( Level.FINE ) ) {
+                 _logger.fine( "Have a session: " + ( session != null ));
+             }
              if ( session != null ) {
                  
                  // we don't need this?
@@ -106,15 +118,28 @@ class SessionTrackerValve extends ValveBase {
 //                 }
                  
                  final BackupResult result = ((MemcachedBackupSessionManager)getContainer().getManager()).backupSession( session );
+
+                 _logger.info( "++++++++++ got result " + result +
+                         ", id " + session.getId() );
+                 
                  if ( result == BackupResult.RELOCATED ) {
-                     _logger.info( "Session got relocated, setting a cookie: " + session.getId() );
+                     if ( _logger.isLoggable( Level.INFO ) ) {
+                         _logger.info( "Session got relocated, setting a cookie: " + session.getId() );
+                     }
+                     _logger.info( "Session committed: " + response.getResponse().isCommitted() );
                      setCookie( response, request, session );
                  }
              }
         }
 
-        final Cookie respCookie = getCookie( response, "JSESSIONID" );
-        _logger.info( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
+        if ( _logger.isLoggable( Level.INFO ) ) {
+            final Cookie respCookie = getCookie( response, "JSESSIONID" );
+            _logger.info( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
+        }
+
+        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+            _logger.info( "====================  Server Finished ====================" );
+        }
         
     }
 
@@ -139,8 +164,10 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private Cookie getCookie( final Response response, String name ) {
+        _logger.info( "Cookies: " + response.getCookies() + " " + (response.getCookies() != null ? response.getCookies().length : "") );
         if ( response.getCookies() != null ) {
             for ( Cookie cookie : response.getCookies() ) {
+                _logger.info( ">>>>>> " + cookie.getName() + " = " + cookie.getValue() );
                 if ( name.equals( cookie.getName() ) ) {
                     return cookie;
                 }

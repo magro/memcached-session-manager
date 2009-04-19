@@ -22,6 +22,7 @@ import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -130,6 +131,40 @@ public class MemcachedSessionManagerIntegrationTest {
 
         final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
         assertNotSame( "Expired session returned", sessionId1, sessionId2 );
+    }
+    
+    /**
+     * Tests, that relocated sessions are no longer available under the old/former
+     * session id.
+     * 
+     * @throws IOException 
+     * @throws InterruptedException 
+     */
+    @Test
+    public void testRelocateSession() throws IOException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
+        
+        /* wait some time, as processExpires runs every second and the maxInactiveTime is set to 1 sec...
+         */
+        Thread.sleep( 2100 );
+
+        final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertNotSame( "Expired session returned", sessionId1, sessionId2 );
+    }
+    
+    /**
+     * Tests, that session ids with an invalid format (not containing the memcached id)
+     * do not cause issues. Instead, we want to retrieve a new session id.
+     * 
+     * @throws IOException 
+     * @throws InterruptedException 
+     */
+    @Test
+    public void testInvalidSessionId() throws IOException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, "12345" );
+        assertNotNull( "No session created.", sessionId1 );
+        assertTrue( "Invalid session id format", sessionId1.indexOf( '.' ) > -1 );
     }
 
 }

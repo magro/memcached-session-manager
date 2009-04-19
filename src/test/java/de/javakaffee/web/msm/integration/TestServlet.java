@@ -46,8 +46,6 @@ public class TestServlet extends HttpServlet {
         final PrintWriter out = response.getWriter();
         out.println( "OK: " + request.getSession().getId() );
         
-        out.close();
-        
     }
 
 }
