@@ -18,10 +18,8 @@ package de.javakaffee.web.msm;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,6 +33,8 @@ import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.util.LifecycleSupport;
 import org.apache.commons.lang.builder.ToStringBuilder;
+
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 
 /**
  * Use this session manager in a Context element, like this
@@ -50,7 +50,7 @@ import org.apache.commons.lang.builder.ToStringBuilder;
  * @version $Id$
  */
 public class MemcachedBackupSessionManager extends ManagerBase implements
-        Lifecycle {
+        Lifecycle, SessionBackupService {
 
     protected static String name = MemcachedBackupSessionManager.class.getSimpleName();
     private static final String info = name + "/1.0";
@@ -102,6 +102,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * we have to implement rejectedSessions - not sure why
      */
     private int _rejectedSessions;
+    
+    /* TODO: make this a parameter, with test
+     * 
+     */
+    private boolean _sessionBackupAsync = false;
+    private int _memcachedSessionTTL = 3600;
+    private int _sessionBackupTimeout = 100;
 
     /**
      * Return descriptive information about this Manager implementation and the
@@ -136,7 +143,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /* add the valve for tracking requests for that the session must be sent to memcached
          */
         final SessionTrackerValve sessionTrackerValve = new SessionTrackerValve(
-                _requestUriIgnorePattern );
+                _requestUriIgnorePattern, this );
         getContainer().getPipeline().addValve( sessionTrackerValve );
         
         /* init memcached
@@ -257,19 +264,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         return ( session );
 
     }
-    
-    static enum BackupResult {
-        SUCCESS, FAILURE, RELOCATED
-    }
 
-    protected BackupResult backupSession( Session session ) {
-        _logger.info( "Trying to store session in memcached: " + session.getId() );
+    public BackupResult backupSession( Session session ) {
+        if ( _logger.isLoggable( Level.FINE ) ) {
+            _logger.fine( "Trying to store session in memcached: " + session.getId() );
+        }
         try {
             storeSessionInMemcached( session );
-            _logger.info( "----------- Backuped session...---------------" );
             return BackupResult.SUCCESS;
         } catch( RelocationException e ) {
-            _logger.info( "Could not store session in memcached (" + session.getId() + "), now moving to " + e.getTargetNodeId() );
+            if ( _logger.isLoggable( Level.FINE ) ) {
+                _logger.fine( "Could not store session in memcached (" + session.getId() + "), now moving to " + e.getTargetNodeId() );
+            }
             /* let's do our part of the job
              */
             relocate( session, e.getTargetNodeId(), false );
@@ -280,18 +286,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     }
 
     private void storeSessionInMemcached( Session session ) {
-        final Future<Boolean> future = _memcached.set( session.getId(), 3600, session );
-        try {
-            future.get( 500, TimeUnit.MILLISECONDS );
-            _logger.info( "Got info from memcached that item is stored.");
-        } catch ( Exception e ) {
-            _logger.log( Level.SEVERE, "Could not store session in memcached: " + e +
-                    "\nTrying another node now." );
-            _memcached.set( session.getId(), 3600, session );
+        final Future<Boolean> future = _memcached.set( session.getId(), _memcachedSessionTTL, session );
+        if ( !_sessionBackupAsync ) {
+            try {
+                future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
+            } catch ( Exception e ) {
+                if ( _logger.isLoggable( Level.INFO ) ) {
+                    _logger.info( "Could not store session in memcached: " + e +
+                            "\nTrying another node now." );
+                }
+                _memcached.set( session.getId(), _memcachedSessionTTL, session );
+            }
         }
-//        if ( _memcached.get( session.getId() ) == null ) {
-//            throw new IllegalStateException( "Getting session is not possible, sid: " + session.getId() );
-//        }
     }
 
     private Session loadFromMemcached( String sessionId ) {
@@ -299,11 +305,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             return null;
         }
         final Session session = (Session) _memcached.get( sessionId );
-        if ( session == null ) {
-            _logger.warning( "Session " + sessionId
-                    + " not found in memcached." );
-        } else {
-            _logger.info( "Found session with id " + sessionId );
+        if ( _logger.isLoggable( Level.FINE ) ) {
+            if ( session == null ) {
+                _logger.info( "Session " + sessionId + " not found in memcached." );
+            } else {
+                _logger.info( "Found session with id " + sessionId );
+            }
         }
         return session;
     }
@@ -351,7 +358,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public void remove( Session session ) {
-        _logger.info( "remove invoked, session.rel " + session.getNote( SessionTrackerValve.RELOCATE ) +
+        _logger.info( "remove invoked, session.relocate " + session.getNote( SessionTrackerValve.RELOCATE ) +
                 ", id " + session.getId() );
         try {
             _memcached.delete( session.getId() );

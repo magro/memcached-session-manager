@@ -24,8 +24,6 @@ import java.util.regex.Pattern;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpSession;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
@@ -33,7 +31,7 @@ import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.commons.lang.builder.ToStringBuilder;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.BackupResult;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
 
 /**
  * This valve is used for tracking requests for that the session must be sent
@@ -44,13 +42,16 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.BackupResult;
  */
 class SessionTrackerValve extends ValveBase {
     
+    private static final String JSESSIONID = "JSESSIONID";
+
     static final String RELOCATE = "session.relocate";
 
     private final Logger _logger = Logger.getLogger( SessionTrackerValve.class.getName() );
 
     private final Pattern _ignorePattern;
+    private final SessionBackupService _sessionBackupService;
     
-    public SessionTrackerValve( String ignorePattern ) {
+    public SessionTrackerValve( String ignorePattern, SessionBackupService sessionBackupService ) {
         if ( ignorePattern != null ) {
             _logger.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -58,6 +59,7 @@ class SessionTrackerValve extends ValveBase {
         else {
             _ignorePattern = null;
         }
+        _sessionBackupService = sessionBackupService;
     }
 
     @Override
@@ -65,7 +67,7 @@ class SessionTrackerValve extends ValveBase {
             ServletException {
         
         if ( _logger.isLoggable( Level.FINE ) ) {
-            final Cookie cookie = getCookie( request, "JSESSIONID" );
+            final Cookie cookie = getCookie( request, JSESSIONID );
             _logger.fine( "Starting, " + (cookie != null ? cookie.getValue() : null) +
                     ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
         }
@@ -76,17 +78,17 @@ class SessionTrackerValve extends ValveBase {
             
             /* do we have a session?
              * 
-             * TODO: this triggers a findSession (and with this a loadFromMemcached),
-             * so we should determine if session backup is necessary using another way,
-             * e.g. checking request/response cookies...
+             * TODO: test the following optimazation (prior check for cookies before getSessionInternal).
+             * This is there because getSessionInternal triggers a findSession (and with this a loadFromMemcached)
              */
-             final Session session = request.getSessionInternal( false );
+             final Session session = getCookie( request, JSESSIONID ) != null
+                 || getCookie( response, JSESSIONID ) != null ? request.getSessionInternal( false ) : null;
              if ( _logger.isLoggable( Level.FINE ) ) {
                  _logger.fine( "Have a session: " + ( session != null ));
              }
              if ( session != null ) {
                  
-                 final BackupResult result = ((MemcachedBackupSessionManager)getContainer().getManager()).backupSession( session );
+                 final BackupResult result = _sessionBackupService.backupSession( session );
                  
                  if ( result == BackupResult.RELOCATED ) {
                      if ( _logger.isLoggable( Level.FINE ) ) {
@@ -98,7 +100,7 @@ class SessionTrackerValve extends ValveBase {
         }
 
         if ( _logger.isLoggable( Level.FINE ) ) {
-            final Cookie respCookie = getCookie( response, "JSESSIONID" );
+            final Cookie respCookie = getCookie( response, JSESSIONID );
             _logger.fine( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
         }
         
@@ -106,7 +108,7 @@ class SessionTrackerValve extends ValveBase {
 
     private void setCookie( Response response, Request request,
             final Session session ) {
-        final Cookie newCookie = new Cookie( "JSESSIONID", session.getId() );
+        final Cookie newCookie = new Cookie( JSESSIONID, session.getId() );
          newCookie.setMaxAge( -1 );
          newCookie.setPath( request.getContextPath() );
          response.addCookie( newCookie );
@@ -137,27 +139,14 @@ class SessionTrackerValve extends ValveBase {
         return null;
     }
     
-    class SessionInterceptor extends HttpServletRequestWrapper {
+    static interface SessionBackupService {
 
-        public SessionInterceptor(HttpServletRequest request) {
-            super( request );
+        BackupResult backupSession( Session session );
+        
+        static enum BackupResult {
+            SUCCESS, FAILURE, RELOCATED
         }
-
-        /* (non-Javadoc)
-         * @see javax.servlet.http.HttpServletRequestWrapper#getSession()
-         */
-        @Override
-        public HttpSession getSession() {
-            return super.getSession();
-        }
-
-        /* (non-Javadoc)
-         * @see javax.servlet.http.HttpServletRequestWrapper#getSession(boolean)
-         */
-        @Override
-        public HttpSession getSession( boolean create ) {
-            return super.getSession( create );
-        }
+        
     }
     
 }

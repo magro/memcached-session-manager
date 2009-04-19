@@ -29,6 +29,7 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.MemcachedNode;
 
 import org.apache.catalina.startup.Embedded;
 import org.apache.commons.httpclient.HttpClient;
