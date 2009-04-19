@@ -63,11 +63,6 @@ class SessionTrackerValve extends ValveBase {
     @Override
     public void invoke( Request request, Response response ) throws IOException,
             ServletException {
-        // getContainer().getManager()
-        
-        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
-            _logger.info( "====================  Server Starting ====================" );
-        }
         
         if ( _logger.isLoggable( Level.FINE ) ) {
             final Cookie cookie = getCookie( request, "JSESSIONID" );
@@ -75,11 +70,7 @@ class SessionTrackerValve extends ValveBase {
                     ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
         }
         
-//        final HttpSession session2 = _relocateSessions ? request.getSession( false ) : null;
-//        final String sessionId = session2 != null ? session2.getId() : null;
-        // response.setBufferSize( 100000 );
         getNext().invoke( request, response );
-
         
         if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
             
@@ -95,50 +86,20 @@ class SessionTrackerValve extends ValveBase {
              }
              if ( session != null ) {
                  
-                 // we don't need this?
-//                if ( _relocateSessions /* && sessionId != null */ ) {
-//                     /* we don't have to compare old and new session ids if we are
-//                      * already sending a cookie to the client
-//                      */
-//                     final Cookie respCookie = getCookie( response, "JSESSIONID" );
-//                     _logger.info( "Have a cookie: " + (respCookie != null ? respCookie.getValue() : null) );
-//                     if ( respCookie != null ) {
-//                         _logger.warning( "Strange: we're told to send a cookie for relocation," +
-//                         		" but the response already has a cookie set. I'll do nothing" +
-//                         		" (of course send the already existing cookie), but" +
-//                         		" you should have a look what's going on here!" );
-//                         setCookie( response, request, session );
-//                     }
-////                     else {
-////                         //if ( !sessionId.equals( session.getId() ) ) {
-////                         _logger.info( "aDDING a cookie: " + session.getId() );
-////                         response.addCookie( new Cookie( "JSESSIONID", session.getId() ) );
-////                     //}
-////                     }
-//                 }
-                 
                  final BackupResult result = ((MemcachedBackupSessionManager)getContainer().getManager()).backupSession( session );
-
-                 _logger.info( "++++++++++ got result " + result +
-                         ", id " + session.getId() );
                  
                  if ( result == BackupResult.RELOCATED ) {
-                     if ( _logger.isLoggable( Level.INFO ) ) {
-                         _logger.info( "Session got relocated, setting a cookie: " + session.getId() );
+                     if ( _logger.isLoggable( Level.FINE ) ) {
+                         _logger.fine( "Session got relocated, setting a cookie: " + session.getId() );
                      }
-                     _logger.info( "Session committed: " + response.getResponse().isCommitted() );
                      setCookie( response, request, session );
                  }
              }
         }
 
-        if ( _logger.isLoggable( Level.INFO ) ) {
+        if ( _logger.isLoggable( Level.FINE ) ) {
             final Cookie respCookie = getCookie( response, "JSESSIONID" );
-            _logger.info( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
-        }
-
-        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
-            _logger.info( "====================  Server Finished ====================" );
+            _logger.fine( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
         }
         
     }
