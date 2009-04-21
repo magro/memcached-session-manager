@@ -82,7 +82,7 @@ class SessionTrackerValve extends ValveBase {
              * with a check for url rewriting
              */
              final Session session = getCookie( request, JSESSIONID ) != null
-                 || getCookie( response, JSESSIONID ) != null ? /*null : null;// */request.getSessionInternal( false ) : null;
+                 || getCookie( response, JSESSIONID ) != null ? request.getSessionInternal( false ) : null;
              if ( _logger.isLoggable( Level.FINE ) ) {
                  _logger.fine( "Have a session: " + ( session != null ));
              }
