@@ -42,7 +42,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResu
  */
 class SessionTrackerValve extends ValveBase {
     
-    private static final String JSESSIONID = "JSESSIONID";
+    static final String JSESSIONID = "JSESSIONID";
 
     static final String RELOCATE = "session.relocate";
 
@@ -78,11 +78,11 @@ class SessionTrackerValve extends ValveBase {
             
             /* do we have a session?
              * 
-             * TODO: test the following optimazation (prior check for cookies before getSessionInternal).
-             * This is there because getSessionInternal triggers a findSession (and with this a loadFromMemcached)
+             * TODO: extend the following optimization (prior check for cookies before getSessionInternal)
+             * with a check for url rewriting
              */
              final Session session = getCookie( request, JSESSIONID ) != null
-                 || getCookie( response, JSESSIONID ) != null ? request.getSessionInternal( false ) : null;
+                 || getCookie( response, JSESSIONID ) != null ? /*null : null;// */request.getSessionInternal( false ) : null;
              if ( _logger.isLoggable( Level.FINE ) ) {
                  _logger.fine( "Have a session: " + ( session != null ));
              }
@@ -115,7 +115,7 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private Cookie getCookie( final HttpServletRequest httpRequest, String name ) {
-        Cookie[] cookies = httpRequest.getCookies();
+        final Cookie[] cookies = httpRequest.getCookies();
         if ( cookies != null ) {
             for ( Cookie cookie : cookies ) {
                 if ( name.equals( cookie.getName() ) ) {
@@ -127,10 +127,9 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private Cookie getCookie( final Response response, String name ) {
-        _logger.info( "Cookies: " + response.getCookies() + " " + (response.getCookies() != null ? response.getCookies().length : "") );
-        if ( response.getCookies() != null ) {
-            for ( Cookie cookie : response.getCookies() ) {
-                _logger.info( ">>>>>> " + cookie.getName() + " = " + cookie.getValue() );
+        final Cookie[] cookies = response.getCookies();
+        if ( cookies != null ) {
+            for ( Cookie cookie : cookies ) {
                 if ( name.equals( cookie.getName() ) ) {
                     return cookie;
                 }
@@ -139,7 +138,7 @@ class SessionTrackerValve extends ValveBase {
         return null;
     }
     
-    static interface SessionBackupService {
+    public static interface SessionBackupService {
 
         BackupResult backupSession( Session session );
         
