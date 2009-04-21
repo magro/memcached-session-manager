@@ -74,22 +74,20 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     }
     
     @Test
-    public final void testGetSessionInternalNotInvokedWhenNoCookiePresent() throws IOException, ServletException {
+    public final void testGetSessionInternalNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
         
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getCookies" ).will( returnValue( null ) );
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getCookies" ).will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );     
         
     }
 
     @Test
-    public final void testGetSessionInternalInvokedWhenRequestCookiePresent() throws IOException, ServletException {
+    public final void testGetSessionInternalInvokedWhenRequestedSessionIdPresent() throws IOException, ServletException {
         
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getCookies" )
-            .will( returnValue(
-                new Cookie[] { new Cookie( SessionTrackerValve.JSESSIONID, "foo" ) } ) );
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );     
@@ -100,7 +98,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     public final void testGetSessionInternalInvokedWhenResponseCookiePresent() throws IOException, ServletException {
 
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getCookies" ).will( returnValue( null ) );
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getCookies" )
             .will( returnValue( new Cookie[] { new Cookie( SessionTrackerValve.JSESSIONID, "foo" ) } ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
@@ -115,9 +113,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final Session session = (Session) mock( Session.class ).proxy();
 
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getCookies" )
-            .will( returnValue(
-                new Cookie[] { new Cookie( SessionTrackerValve.JSESSIONID, "foo" ) } ) );
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ) )
@@ -135,9 +131,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final String sessionId = "bar";
 
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getCookies" )
-            .will( returnValue(
-                new Cookie[] { new Cookie( SessionTrackerValve.JSESSIONID, "foo" ) } ) );
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ) )

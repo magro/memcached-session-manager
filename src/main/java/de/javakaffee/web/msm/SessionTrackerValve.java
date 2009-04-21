@@ -76,12 +76,13 @@ class SessionTrackerValve extends ValveBase {
         
         if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
             
-            /* do we have a session?
+            /* Do we have a session?
              * 
-             * TODO: extend the following optimization (prior check for cookies before getSessionInternal)
-             * with a check for url rewriting
+             * Prior check for requested sessionId or response cookie
+             * before invoking getSessionInternal, as getSessionInternal triggers a
+             * memcached lookup if the session is not available locally.
              */
-             final Session session = getCookie( request, JSESSIONID ) != null
+             final Session session = request.getRequestedSessionId() != null
                  || getCookie( response, JSESSIONID ) != null ? request.getSessionInternal( false ) : null;
              if ( _logger.isLoggable( Level.FINE ) ) {
                  _logger.fine( "Have a session: " + ( session != null ));
