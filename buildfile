@@ -5,8 +5,6 @@ repositories.remote << 'http://www.ibiblio.org/maven2'
 repositories.remote << 'http://thimbleware.com/maven'
 repositories.remote << 'http://repository.jboss.com/maven2'
 
-#Buildr.settings.build['jmock'] = '2.5.1'
-
 SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
 CATALINA_HA = 'org.apache.tomcat:catalina-ha:jar:6.0.18'
@@ -18,7 +16,6 @@ JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.6' ).
 TC_COYOTE = transitive( 'org.apache.tomcat:coyote:jar:6.0.18' )
 HTTP_CLIENT = transitive( 'commons-httpclient:commons-httpclient:jar:3.1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
-#JMOCK = 'org.jmock:jmock-junit4:jar:2.5.1'
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 
 # Dependencies
