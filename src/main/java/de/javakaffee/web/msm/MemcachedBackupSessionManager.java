@@ -344,11 +344,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         
     }
 
-    private String getMemcachedId( String sessionId ) {
-        final int idx = sessionId.lastIndexOf( '.' );
-        return idx > -1 ? sessionId.substring( idx + 1 ) : null;
-    }
-
     /*
      * (non-Javadoc)
      * 
