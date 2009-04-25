@@ -59,6 +59,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             .getLogger( MemcachedBackupSessionManager.class.getName() );
     
     private final LifecycleSupport lifecycle = new LifecycleSupport( this );
+    
+    private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
 
     // --------------------  configuration properties  --------------------
 
@@ -73,7 +75,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * The index of the active node, referring to <code>memcachedNodes</code>
      * (of course starting with 0)
      */
-    private int _activeNodeIndex;
+    private String _activeNodeIndex;
     
     /**
      * The pattern used for excluding requests from a session-backup.
@@ -150,7 +152,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
          */
         try {
             _memcached = new MemcachedClient(
-                    new SuffixLocatorConnectionFactory( this ),
+                    new SuffixLocatorConnectionFactory( this, _sessionIdFormat ),
                     // new BinaryConnectionFactory(),
                     AddrUtil.getAddresses( _memcachedNodes ) );
         } catch ( IOException e ) {
@@ -171,11 +173,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     protected synchronized String generateSessionId() {
-        return super.generateSessionId() + "." + _activeNodeIndex;
+        return _sessionIdFormat.createSessionId( super.generateSessionId(), _activeNodeIndex );
     }
     
     private boolean isValidSessionIdFormat( String sessionId ) {
-        return sessionId != null && sessionId.indexOf( '.' ) > -1;
+        return _sessionIdFormat.isValid( sessionId );
     }
 
     /*
@@ -321,10 +323,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /*
          * relocate session to our memcached node...
          */
-        final int idx = sessionId.lastIndexOf( '.' );
-        final String newSessionId = idx > -1
-            ? sessionId.substring( 0, idx + 1 ) + newNodeId
-            : sessionId + "." + newNodeId;
+        final String newSessionId = _sessionIdFormat.createNewSessionId( sessionId, newNodeId );
         session.setId( newSessionId );
         
         /* remove old session from memcached
@@ -395,7 +394,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * @author Martin Grotzke
      */
     public void setActiveNodeIndex( int activeNodeIndex ) {
-        _activeNodeIndex = activeNodeIndex;
+        _activeNodeIndex = String.valueOf( activeNodeIndex );
     }
 
     @Override

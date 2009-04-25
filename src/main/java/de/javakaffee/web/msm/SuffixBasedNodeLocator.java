@@ -46,8 +46,9 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     private final List<MemcachedNode> _nodes;
     private final Map<String, MemcachedNode> _nodesMap;
+    private final SessionIdFormat _sessionIdFormat;
 
-    public SuffixBasedNodeLocator( List<MemcachedNode> nodes) {
+    public SuffixBasedNodeLocator( List<MemcachedNode> nodes, SessionIdFormat sessionIdFormat ) {
         _nodes = nodes;
         
         final Map<String,MemcachedNode> map = new HashMap<String, MemcachedNode>( nodes.size(), 1 );
@@ -55,6 +56,8 @@ class SuffixBasedNodeLocator implements NodeLocator {
             map.put( String.valueOf( i ), nodes.get( i ) );
         }
         _nodesMap = map;
+        
+        _sessionIdFormat = sessionIdFormat;
     }
 
     @Override
@@ -72,7 +75,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
     }
 
     private String getNodeId( String key ) {
-        return key.substring( key.lastIndexOf( '.' ) + 1 );
+        return _sessionIdFormat.extractMemcachedId( key );
     }
 
     @Override
@@ -121,7 +124,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         for ( MemcachedNode node : _nodes ) {
             nodes.add( new MyMemcachedNodeROImpl( node ) );
         }
-        return new SuffixBasedNodeLocator( nodes );
+        return new SuffixBasedNodeLocator( nodes, _sessionIdFormat );
     }
     
     static class MyMemcachedNodeROImpl implements MemcachedNode {

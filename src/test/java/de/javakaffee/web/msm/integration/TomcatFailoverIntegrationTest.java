@@ -38,6 +38,7 @@ import org.junit.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -85,7 +86,7 @@ public class TomcatFailoverIntegrationTest {
         }
         
         _client = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
+                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), new SessionIdFormat() ),
                 Arrays.asList( address ) );
     }
 
@@ -99,8 +100,8 @@ public class TomcatFailoverIntegrationTest {
     @Test
     public void testConnectDaemon() throws IOException, InterruptedException {
         final Object value = "bar";
-        _client.set( "foo.0", 3600, value );
-        Assert.assertEquals( value, _client.get( "foo.0" ) );
+        _client.set( "foo-0", 3600, value );
+        Assert.assertEquals( value, _client.get( "foo-0" ) );
     }
     
     /**

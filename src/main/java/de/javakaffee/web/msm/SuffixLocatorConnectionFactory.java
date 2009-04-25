@@ -38,9 +38,11 @@ public final class SuffixLocatorConnectionFactory extends
         DefaultConnectionFactory {
     
     private final Manager _manager;
+    private final SessionIdFormat _sessionIdFormat;
     
-    public SuffixLocatorConnectionFactory( Manager manager ) {
+    public SuffixLocatorConnectionFactory( Manager manager, SessionIdFormat sessionIdFormat ) {
         _manager = manager;
+        _sessionIdFormat = sessionIdFormat;
     }
 
     /* (non-Javadoc)
@@ -49,7 +51,7 @@ public final class SuffixLocatorConnectionFactory extends
     @Override
     public NodeLocator createLocator(
             List<MemcachedNode> nodes ) {
-        return new SuffixBasedNodeLocator( nodes );
+        return new SuffixBasedNodeLocator( nodes, _sessionIdFormat );
     }
     
     @Override

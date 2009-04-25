@@ -46,7 +46,7 @@ public class SuffixBasedNodeLocatorTest extends MockObjectTestCase {
     public final void testGetNextNodeId_NoNodeLeft() {
         final List<MemcachedNode> nodes = new ArrayList<MemcachedNode>();
         nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
-        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes );
+        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes, new SessionIdFormat() );
         // we use try/catch here, as the expected attribute of the @Test
         // annotation does not do what it should
         try {
@@ -62,7 +62,7 @@ public class SuffixBasedNodeLocatorTest extends MockObjectTestCase {
         final List<MemcachedNode> nodes = new ArrayList<MemcachedNode>();
         nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
         nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
-        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes );
+        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes, new SessionIdFormat() );
         String nextNodeId = cut.getNextNodeId( "foo.0" );
         assertEquals( "1", nextNodeId );
     }
@@ -78,7 +78,7 @@ public class SuffixBasedNodeLocatorTest extends MockObjectTestCase {
         final List<MemcachedNode> nodes = new ArrayList<MemcachedNode>();
         nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
         nodes.add( (MemcachedNode) mock( MemcachedNode.class ).proxy() );
-        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes );
+        final SuffixBasedNodeLocator cut = new SuffixBasedNodeLocator( nodes, new SessionIdFormat() );
         String nextNodeId = cut.getNextNodeId( "foo.1" );
         assertEquals( "0", nextNodeId );
         

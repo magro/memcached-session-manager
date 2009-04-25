@@ -19,8 +19,8 @@ package de.javakaffee.web.msm.integration;
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
-import static org.junit.Assert.*;
-import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -40,6 +40,7 @@ import org.junit.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -88,7 +89,7 @@ public class MemcachedFailoverIntegrationTest {
         }
         
         _memcached = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager() ),
+                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), new SessionIdFormat() ),
                 Arrays.asList( address1, address2 ) );
         
         _connectionManager = new SimpleHttpConnectionManager( true );
@@ -120,14 +121,14 @@ public class MemcachedFailoverIntegrationTest {
     public void testRelocateSession() throws HttpException, IOException {
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
-        assertTrue( "Session stored on unexpected memcached server", sid1.endsWith( ".0" ) );
+        assertTrue( "Session stored on unexpected memcached server", sid1.endsWith( "-0" ) );
         
         /* shutdown memcached node 1
          */
         _daemon1.stop();
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
-        assertTrue( "Unexpected SessionId", sid2.equals( sid1.substring( 0, sid1.indexOf( "." ) ) + ".1" ) );
+        assertTrue( "Unexpected SessionId", sid2.equals( sid1.substring( 0, sid1.indexOf( "-" ) ) + "-1" ) );
         
     }
 

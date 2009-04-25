@@ -106,7 +106,17 @@ public class TestUtils {
         return createCatalina( port, 1, memcachedNodes );
     }
 
+    public static Embedded createCatalina( final int port, String memcachedNodes, String jvmRoute ) throws MalformedURLException,
+            UnknownHostException, LifecycleException {
+        return createCatalina( port, 1, memcachedNodes, jvmRoute );
+    }
+
     public static Embedded createCatalina( final int port, int sessionTimeout, String memcachedNodes ) throws MalformedURLException,
+            UnknownHostException, LifecycleException {
+        return createCatalina( port, sessionTimeout, memcachedNodes, null );
+    }
+
+    public static Embedded createCatalina( final int port, int sessionTimeout, String memcachedNodes, String jvmRoute ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
         final Embedded catalina = new Embedded();
         final Engine engine = catalina.createEngine();
@@ -114,6 +124,7 @@ public class TestUtils {
          */
         engine.setName( "engine-" + port );
         engine.setDefaultHost( "localhost" );
+        engine.setJvmRoute( jvmRoute );
         
         final URL root = new URL( TestUtils.class.getResource( "/" ), "../resources" );
         
