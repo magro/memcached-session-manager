@@ -37,7 +37,7 @@ define 'memcached-session-manager' do
   
   compile.with(SERVLET_API, CATALINA, CATALINA_HA, MEMCACHED, C_LANG)
   
-  test.with( JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, JMOCK_CGLIB ).using :properties=>{ :jmock => '2.0' }
+  test.with( JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, JMOCK_CGLIB )
   
   package :jar, :id => 'memcached-session-manager'
 end
