@@ -26,6 +26,7 @@ import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Manager;
 
+
 /**
  * This {@link ConnectionFactory} uses the {@link SuffixBasedNodeLocator}
  * as {@link NodeLocator} and the {@link SessionSerializingTranscoder} as
@@ -39,9 +40,11 @@ public final class SuffixLocatorConnectionFactory extends
     
     private final Manager _manager;
     private final SessionIdFormat _sessionIdFormat;
+    private final NodeIdResolver _resolver;
     
-    public SuffixLocatorConnectionFactory( Manager manager, SessionIdFormat sessionIdFormat ) {
+    public SuffixLocatorConnectionFactory( Manager manager, NodeIdResolver resolver, SessionIdFormat sessionIdFormat ) {
         _manager = manager;
+        _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
     }
 
@@ -51,7 +54,7 @@ public final class SuffixLocatorConnectionFactory extends
     @Override
     public NodeLocator createLocator(
             List<MemcachedNode> nodes ) {
-        return new SuffixBasedNodeLocator( nodes, _sessionIdFormat );
+        return new SuffixBasedNodeLocator( nodes, _resolver, _sessionIdFormat );
     }
     
     @Override

@@ -17,28 +17,17 @@
 package de.javakaffee.web.msm;
 
 /**
- * This exception is thrown when a node is not available but the session
- * can be moved to another node.
+ * This exception is thrown when a node is not available.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class RelocationException extends RuntimeException {
+public class NodeFailureException extends RuntimeException {
 
     private static final long serialVersionUID = 5954872380654336225L;
     
-    private final String _targetNodeId;
-
-    public RelocationException( String msg, String targetNodeId ) {
+    public NodeFailureException( String msg ) {
         super( msg );
-        _targetNodeId = targetNodeId;
-    }
-
-    /**
-     * @return the targetNodeId
-     */
-    public String getTargetNodeId() {
-        return _targetNodeId;
     }
 
     /* (non-Javadoc)

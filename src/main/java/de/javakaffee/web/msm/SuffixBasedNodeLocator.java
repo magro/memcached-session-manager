@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -27,33 +28,43 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.ops.Operation;
 
 /**
- * Locates nodes based on a suffix appended to the sessionId (key), which is
- * used as the index of the nodes of this locator.
+ * Locates nodes based on their id which is a part of the sessionId (key).
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 class SuffixBasedNodeLocator implements NodeLocator {
     
-    private final Logger _logger = Logger.getLogger( SuffixBasedNodeLocator.class.getName() );
+    // private final Logger _logger = Logger.getLogger( SuffixBasedNodeLocator.class.getName() );
 
     private final List<MemcachedNode> _nodes;
+    private final NodeIdResolver _resolver;
     private final Map<String, MemcachedNode> _nodesMap;
     private final SessionIdFormat _sessionIdFormat;
 
-    public SuffixBasedNodeLocator( List<MemcachedNode> nodes, SessionIdFormat sessionIdFormat ) {
+    /**
+     * Create a new {@link SuffixBasedNodeLocator}.
+     * @param nodes the nodes to select from.
+     * @param resolver used to resolve the node id for the address of a memcached node.
+     * @param sessionIdFormat used to extract the node id from the session id.
+     */
+    public SuffixBasedNodeLocator( List<MemcachedNode> nodes,
+            NodeIdResolver resolver,
+            SessionIdFormat sessionIdFormat ) {
         _nodes = nodes;
+        _resolver = resolver;
         
         final Map<String,MemcachedNode> map = new HashMap<String, MemcachedNode>( nodes.size(), 1 );
         for ( int i = 0; i < nodes.size(); i++ ) {
-            map.put( String.valueOf( i ), nodes.get( i ) );
+            final MemcachedNode memcachedNode = nodes.get( i );
+            final String nodeId = resolver.getNodeId( (InetSocketAddress) memcachedNode.getSocketAddress() );
+            map.put( nodeId, memcachedNode );
         }
         _nodesMap = map;
         
@@ -80,42 +91,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     @Override
     public Iterator<MemcachedNode> getSequence( String key ) {
-        String targetIdx = getNextNodeId( key );
-        throw new RelocationException( "The node " + getNodeId( key ) + " is not available, we could move to node " + targetIdx, targetIdx );
-    }
-
-    protected String getNextNodeId( String key ) {
-        /* just for simplicity: we know that the node id is the index
-         * so we use this knowledge (insteaf of getting the node from the map
-         * and the index of the node etc.
-         */
-        String nodeId = getNodeId( key );
-        int idx = Integer.parseInt( nodeId );
-        int targetIdx;
-        if ( idx < 0 ) {
-            _logger.warning( "Got a nodeId < 0, this is not valid" );
-            // TODO: introduce some random here
-            targetIdx = 0;
-        }
-        else if ( idx >= _nodes.size() ) {
-            _logger.warning( "Got a nodeId > number of nodes, this is not valid" );
-            // TODO: introduce some random here
-            targetIdx = 0;
-        }
-        else if ( idx + 1 == _nodes.size() && idx != 0 ) {
-            /* we have the last node, so the next node is the first node
-             */
-            targetIdx = 0;
-        }
-        else {
-            targetIdx = idx + 1 % _nodes.size();
-            if ( targetIdx == idx ) {
-                /* we have only a single node - game over
-                 */
-                throw new UnavailableNodeException( "The node " + nodeId + " is not available and there's no node for relocation left.", nodeId );
-            }
-        }
-        return String.valueOf( targetIdx );
+        throw new NodeFailureException( "The node " + getNodeId( key ) + " is not available." );
     }
 
     @Override
@@ -124,7 +100,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         for ( MemcachedNode node : _nodes ) {
             nodes.add( new MyMemcachedNodeROImpl( node ) );
         }
-        return new SuffixBasedNodeLocator( nodes, _sessionIdFormat );
+        return new SuffixBasedNodeLocator( nodes, _resolver, _sessionIdFormat );
     }
     
     static class MyMemcachedNodeROImpl implements MemcachedNode {

@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.integration;
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
@@ -41,6 +42,7 @@ import org.junit.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
@@ -62,6 +64,8 @@ public class MemcachedSessionManagerIntegrationTest {
 
     private int _portTomcat1;
 
+    private String _memcachedNodeId;
+
     private SimpleHttpConnectionManager _connectionManager;
 
     private HttpClient _httpClient;
@@ -72,13 +76,14 @@ public class MemcachedSessionManagerIntegrationTest {
         _portTomcat1 = 8888;
         
         final int port = 21211;
-
+        
         final InetSocketAddress address = new InetSocketAddress( "localhost", port );
         _daemon = createDaemon( address );
         _daemon.start(); 
         
         try {
-            final String memcachedNodes = "localhost:" + port;
+            _memcachedNodeId = "n1";
+            final String memcachedNodes = _memcachedNodeId + ":localhost:" + port;
             _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
             _tomcat1.start();
         } catch( Throwable e ) {
@@ -87,7 +92,9 @@ public class MemcachedSessionManagerIntegrationTest {
         }
         
         _memcached = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), new SessionIdFormat() ),
+                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(),
+                        NodeIdResolver.node( _memcachedNodeId, address ).build(),
+                        new SessionIdFormat() ),
                 Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
         
         _connectionManager = new SimpleHttpConnectionManager( true );
@@ -99,6 +106,17 @@ public class MemcachedSessionManagerIntegrationTest {
         _daemon.stop();
         _tomcat1.stop();
         _connectionManager.shutdown();
+    }
+    
+    @Test
+    public void testConfiguredMemcachedNodeId() throws IOException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
+        /* test that we have the configured memcachedNodeId in the sessionId,
+         * the session id looks like "<sid>-<memcachedId>[.<jvmRoute>]"
+         */
+        final String nodeId = sessionId1.substring( sessionId1.indexOf( '-' ) + 1, sessionId1.indexOf( '.' ) );
+        assertEquals( "Invalid memcached node id", _memcachedNodeId, nodeId );
     }
     
     @Test

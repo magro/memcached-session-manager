@@ -135,7 +135,6 @@ public class TestUtils {
         
         final MemcachedBackupSessionManager sessionManager = new MemcachedBackupSessionManager();
         sessionManager.setMemcachedNodes( memcachedNodes );
-        sessionManager.setActiveNodeIndex( 0 );
         sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         engine.setManager( sessionManager );

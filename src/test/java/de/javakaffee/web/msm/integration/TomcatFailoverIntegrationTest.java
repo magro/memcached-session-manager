@@ -38,6 +38,7 @@ import org.junit.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
@@ -61,6 +62,8 @@ public class TomcatFailoverIntegrationTest {
     private int _portTomcat1;
     private int _portTomcat2;
 
+    private String _nodeId;
+
     @Before
     public void setUp() throws Throwable {
 
@@ -73,9 +76,10 @@ public class TomcatFailoverIntegrationTest {
         _daemon = createDaemon( address );
         _daemon.start(); 
         
+        _nodeId = "n1";
         try {
-            final String memcachedNodes = "localhost:" + port;
-            _tomcat1 = createCatalina( _portTomcat1, memcachedNodes );
+            final String memcachedNodes = _nodeId + ":localhost:" + port;
+            _tomcat1 = createCatalina( _portTomcat1, 2, memcachedNodes );
             _tomcat1.start();
     
             _tomcat2 = createCatalina( _portTomcat2, memcachedNodes );
@@ -86,7 +90,9 @@ public class TomcatFailoverIntegrationTest {
         }
         
         _client = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), new SessionIdFormat() ),
+                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(),
+                        NodeIdResolver.node( _nodeId, address ).build(),
+                        new SessionIdFormat() ),
                 Arrays.asList( address ) );
     }
 
@@ -100,8 +106,8 @@ public class TomcatFailoverIntegrationTest {
     @Test
     public void testConnectDaemon() throws IOException, InterruptedException {
         final Object value = "bar";
-        _client.set( "foo-0", 3600, value );
-        Assert.assertEquals( value, _client.get( "foo-0" ) );
+        _client.set( "foo-" + _nodeId, 3600, value );
+        Assert.assertEquals( value, _client.get( "foo-" + _nodeId ) );
     }
     
     /**
