@@ -258,6 +258,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         if ( _failoverNodes != null && !_failoverNodes.trim().isEmpty() ) {
             final String[] failoverNodes = _failoverNodes.split( ":" );
             for ( String nodeId : failoverNodes ) {
+                nodeId = nodeId.trim();
                 if ( !_nodeIds.remove( nodeId ) ) {
                     throw new IllegalArgumentException( "Invalid failover node id " + nodeId + ": " +
                     		"not existing in memcachedNodes '" + _memcachedNodes + "'." );
