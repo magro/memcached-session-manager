@@ -17,9 +17,11 @@ your context, so that this looks like this:
 
 <Context path="/hunter">
     <Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
-        memcachedNodes="localhost:11211 localhost:11212" activeNodeIndex="0"
+        memcachedNodes="n1:localhost:11211 n2:localhost:11212" failoverNodes="n2"
         requestUriIgnorePattern=".*\.png$" />
 </Context>
+
+You can use several failoverNodes seperated by comma.
 
 == Run / Test ==
 Startup two memcached nodes (or a single one, but then you also must change the
