@@ -130,8 +130,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     private boolean _sessionBackupAsync = false;
 
-    private int _memcachedSessionTTL = 3600;
-
     private int _sessionBackupTimeout = 100;
 
     private Set<String> _allNodeIds;
@@ -506,7 +504,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
     private void storeSessionInMemcached( Session session ) {
         final Future<Boolean> future = _memcached.set( session.getId(),
-                _memcachedSessionTTL, session );
+                getMaxInactiveInterval(), session );
         if ( !_sessionBackupAsync ) {
             try {
                 future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
@@ -515,7 +513,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                     _logger.info( "Could not store session in memcached: " + e
                             + "\nTrying another node now." );
                 }
-                _memcached.set( session.getId(), _memcachedSessionTTL, session );
+                _memcached.set( session.getId(), getMaxInactiveInterval(), session );
             }
         }
     }
