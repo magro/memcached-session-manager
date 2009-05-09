@@ -16,6 +16,8 @@
  */
 package de.javakaffee.web.msm;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -34,6 +36,8 @@ import java.util.regex.Pattern;
 
 import net.spy.memcached.MemcachedClient;
 
+import org.apache.catalina.Container;
+import org.apache.catalina.Context;
 import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
@@ -58,7 +62,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * @version $Id$
  */
 public class MemcachedBackupSessionManager extends ManagerBase implements
-        Lifecycle, SessionBackupService {
+        Lifecycle, SessionBackupService, PropertyChangeListener {
 
     protected static String name = MemcachedBackupSessionManager.class
             .getSimpleName();
@@ -253,7 +257,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         }
         
         _failoverNodeIds = new ArrayList<String>();
-        if ( _failoverNodes != null && !_failoverNodes.trim().isEmpty() ) {
+        if ( _failoverNodes != null && _failoverNodes.trim().length() != 0 ) {
             final String[] failoverNodes = _failoverNodes.split( ":" );
             for ( String nodeId : failoverNodes ) {
                 nodeId = nodeId.trim();
@@ -278,6 +282,29 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
          */
         _logger.info( "Creating LRUCache with size 200 and TTL 100" );
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
+
+    }
+
+    /*
+     * (non-Javadoc)
+     * Copied from StandardManager.
+     * @see org.apache.catalina.session.StandardManager#setContainer(org.apache.catalina.Container)
+     */
+    public void setContainer(Container container) {
+
+        // De-register from the old Container (if any)
+        if ( this.container != null && this.container instanceof Context ) {
+            ((Context) this.container).removePropertyChangeListener( this );
+        }
+
+        // Default processing provided by our superclass
+        super.setContainer( container );
+
+        // Register with the new Container (if any)
+        if ( this.container != null && this.container instanceof Context ) {
+            setMaxInactiveInterval( ((Context) this.container).getSessionTimeout() * 60 );
+            ((Context) this.container).addPropertyChangeListener( this );
+        }
 
     }
 
@@ -652,6 +679,30 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     public void setRequestUriIgnorePattern( String requestUriIgnorePattern ) {
         _requestUriIgnorePattern = requestUriIgnorePattern;
+    }
+
+    /*
+     * (non-Javadoc)
+     * Copied from StandardManager.
+     * @see org.apache.catalina.session.StandardManager#propertyChange(java.beans.PropertyChangeEvent)
+     */
+    public void propertyChange(PropertyChangeEvent event) {
+
+        // Validate the source of this event
+        if ( !(event.getSource() instanceof Context) ) {
+            return;
+        }
+        
+        // Process a relevant property change
+        if ( event.getPropertyName().equals( "sessionTimeout" ) ) {
+            try {
+                setMaxInactiveInterval( ((Integer) event.getNewValue()).intValue() * 60 );
+            } catch (NumberFormatException e) {
+                _logger.warning("standardManager.sessionTimeout: "
+                                 + event.getNewValue().toString());
+            }
+        }
+
     }
 
     // ===========================  for testing  ==============================
