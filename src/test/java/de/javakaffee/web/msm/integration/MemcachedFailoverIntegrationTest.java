@@ -133,15 +133,21 @@ public class MemcachedFailoverIntegrationTest {
         final String firstNode = sid1.substring( sid1.lastIndexOf( '-' ) + 1 );
         assertNotNull( "No node id encoded in session id.", sid1 );
         
-        /* shutdown memcached node 1
+        /* shutdown appropriate memcached node
          */
-        _daemon1.stop();
+        final boolean node1 = firstNode.equals( _nodeId1 );
+        if ( node1 ) {
+            _daemon1.stop();
+        }
+        else {
+            _daemon2.stop();
+        }
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
         final String secondNode = sid2.substring( sid2.lastIndexOf( '-' ) + 1 );
-        final String expectedNode = firstNode.equals( _nodeId1 ) ? _nodeId2 : _nodeId1;
+        final String expectedNode = node1 ? _nodeId2 : _nodeId1;
 
-        assertEquals( "Unexpected nodeId", expectedNode, secondNode );
+        assertEquals( "Unexpected nodeId.", expectedNode, secondNode );
         
         assertEquals( "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2,
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
