@@ -64,7 +64,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 public class MemcachedBackupSessionManager extends ManagerBase implements
         Lifecycle, SessionBackupService, PropertyChangeListener {
 
-    protected static String name = MemcachedBackupSessionManager.class
+    protected static final String name = MemcachedBackupSessionManager.class
             .getSimpleName();
 
     private static final String info = name + "/1.0";
@@ -371,17 +371,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     /*
      * (non-Javadoc)
      * 
-     * @see org.apache.catalina.session.ManagerBase#getSession(java.lang.String)
-     */
-    @Override
-    public HashMap getSession( String id ) {
-        _logger.info( "getSession invoked: " + id );
-        return super.getSession( id );
-    }
-
-    /*
-     * (non-Javadoc)
-     * 
      * @see
      * org.apache.catalina.session.ManagerBase#createSession(java.lang.String)
      */
@@ -451,32 +440,25 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 
                 /*
                  * relocate session to our memcached node...
+                 * 
+                 * and mark it as a node-failure-session, so that remove(session) does
+                 * not try to remove it from memcached...
+                 * (the session is removed and added when the session id is changed)
                  */
-                final String newSessionId = _sessionIdFormat.createNewSessionId(
-                        session.getId(), targetNodeId );
                 session.setNote( NODE_FAILURE, Boolean.TRUE );
-                session.setId( newSessionId );
+                session.setId( _sessionIdFormat.createNewSessionId(
+                        session.getId(), targetNodeId ) );
                 
                 /* invoke us again, until we have a success or a failure
                  */
                 BackupResult backupResult = backupSession( session );
                 switch( backupResult ) {
                     case SUCCESS:
-                        
                         /*
                          * flag the session as relocated, so that the session tracker valve
                          * knows it must send a cookie
                          */
                         session.setNote( SessionTrackerValve.RELOCATE, Boolean.TRUE );
-
-                        
-                        /* we must add the session
-                         */
-                        add( session );
-                        /* FIXME: the session seems to be not in the local sessions map!
-                         */
-                        _logger.info( "--- session exists " + ( getSession( session.getId() ) != null  ) );
-                        
                         /*
                          * and tell our client to do his part as well
                          */
@@ -589,29 +571,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             }
         }
         return session;
-    }
-
-    private void relocate( final Session session, String newNodeId ) throws NodeFailureException {
-        final String sessionId = session.getId();
-
-        /*
-         * relocate session to our memcached node...
-         */
-        final String newSessionId = _sessionIdFormat.createNewSessionId(
-                sessionId, newNodeId );
-        session.setId( newSessionId );
-
-        /*
-         * store the session under the new id in memcached
-         */
-        storeSessionInMemcached( session );
-
-        /*
-         * flag the session as relocated, so that the session tracker valve
-         * knows it must send a cookie
-         */
-        session.setNote( SessionTrackerValve.RELOCATE, Boolean.TRUE );
-
     }
 
     /*
