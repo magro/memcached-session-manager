@@ -77,6 +77,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
     private static final String NODES_TESTED = "nodes.tested";
 
+    private static final String NODE_FAILURE = "node.failure";
+
     private final Random _random = new Random();
     
 
@@ -448,14 +450,43 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 tested.add( nodeId );
                 
                 /*
-                 * let's do our part of the job
+                 * relocate session to our memcached node...
                  */
-                relocate( session, targetNodeId, false );
+                final String newSessionId = _sessionIdFormat.createNewSessionId(
+                        session.getId(), targetNodeId );
+                session.setNote( NODE_FAILURE, Boolean.TRUE );
+                session.setId( newSessionId );
                 
-                /*
-                 * and tell our client to do his part as well
+                /* invoke us again, until we have a success or a failure
                  */
-                return BackupResult.RELOCATED;
+                BackupResult backupResult = backupSession( session );
+                switch( backupResult ) {
+                    case SUCCESS:
+                        
+                        /*
+                         * flag the session as relocated, so that the session tracker valve
+                         * knows it must send a cookie
+                         */
+                        session.setNote( SessionTrackerValve.RELOCATE, Boolean.TRUE );
+
+                        
+                        /* we must add the session
+                         */
+                        add( session );
+                        /* FIXME: the session seems to be not in the local sessions map!
+                         */
+                        _logger.info( "--- session exists " + ( getSession( session.getId() ) != null  ) );
+                        
+                        /*
+                         * and tell our client to do his part as well
+                         */
+                        return BackupResult.RELOCATED;
+                    default:
+                        /* just pass it up
+                         */
+                        return backupResult;
+                        
+                }
             }
         }
     }
@@ -529,7 +560,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         return idx + 1 >= size ? 0 : idx + 1;
     }
 
-    private void storeSessionInMemcached( Session session ) {
+    private void storeSessionInMemcached( Session session ) throws NodeFailureException {
         final Future<Boolean> future = _memcached.set( session.getId(),
                 getMaxInactiveInterval(), session );
         if ( !_sessionBackupAsync ) {
@@ -537,10 +568,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
             } catch ( Exception e ) {
                 if ( _logger.isLoggable( Level.INFO ) ) {
-                    _logger.info( "Could not store session in memcached: " + e
-                            + "\nTrying another node now." );
+                    _logger.info( "Could not store session " + session.getId() + " in memcached: " + e );
                 }
-                _memcached.set( session.getId(), getMaxInactiveInterval(), session );
+                throw new NodeFailureException( "Could not store session in memcached." );
             }
         }
     }
@@ -561,8 +591,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         return session;
     }
 
-    private void relocate( final Session session, String newNodeId,
-            boolean delete ) {
+    private void relocate( final Session session, String newNodeId ) throws NodeFailureException {
         final String sessionId = session.getId();
 
         /*
@@ -571,13 +600,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         final String newSessionId = _sessionIdFormat.createNewSessionId(
                 sessionId, newNodeId );
         session.setId( newSessionId );
-
-        /*
-         * remove old session from memcached
-         */
-        if ( delete ) {
-            _memcached.delete( sessionId );
-        }
 
         /*
          * store the session under the new id in memcached
@@ -601,13 +623,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public void remove( Session session ) {
-        _logger.info( "remove invoked, session.relocate "
-                + session.getNote( SessionTrackerValve.RELOCATE ) + ", id "
-                + session.getId() );
-        try {
-            _memcached.delete( session.getId() );
-        } catch ( NodeFailureException e ) {
-            /* We can ignore this */
+        _logger.info( "remove invoked," +
+        		" session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE ) +
+                ", node failure: " + session.getNote( NODE_FAILURE ) +
+                ", id: " + session.getId() );
+        if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
+            try {
+                _memcached.delete( session.getId() );
+            } catch ( NodeFailureException e ) {
+                /* We can ignore this */
+            }
         }
         super.remove( session );
     }
