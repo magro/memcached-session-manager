@@ -23,14 +23,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
+import java.util.Map;
 
-import net.spy.memcached.MemcachedClient;
-
+import org.apache.catalina.Session;
+import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.startup.Embedded;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -39,10 +39,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
-
-import de.javakaffee.web.msm.NodeIdResolver;
-import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
  * Integration test testing memcached failover.
@@ -58,7 +54,6 @@ public class MemcachedFailoverIntegrationTest {
     private MemCacheDaemon _daemon1;
     private MemCacheDaemon _daemon2;
     private MemCacheDaemon _daemon3;
-    private MemcachedClient _memcached;
     
     private Embedded _tomcat1;
 
@@ -72,47 +67,48 @@ public class MemcachedFailoverIntegrationTest {
     private String _nodeId2;
     private String _nodeId3;
 
+    private InetSocketAddress _address1;
+
+    private InetSocketAddress _address2;
+
+    private InetSocketAddress _address3;
+
     @Before
     public void setUp() throws Throwable {
 
         _portTomcat1 = 8888;
 
-        final InetSocketAddress address1 = new InetSocketAddress( "localhost", 21211 );
-        _daemon1 = createDaemon( address1 );
+        _address1 = new InetSocketAddress( "localhost", 21211 );
+        _daemon1 = createDaemon( _address1 );
         _daemon1.start();
         
-        final InetSocketAddress address2 = new InetSocketAddress( "localhost", 21212 );
-        _daemon2 = createDaemon( address2 );
+        _address2 = new InetSocketAddress( "localhost", 21212 );
+        _daemon2 = createDaemon( _address2 );
         _daemon2.start();
         
-        final InetSocketAddress address3 = new InetSocketAddress( "localhost", 21213 );
-        _daemon3 = createDaemon( address3 );
+        _address3 = new InetSocketAddress( "localhost", 21213 );
+        _daemon3 = createDaemon( _address3 );
         _daemon3.start();
         
         _nodeId1 = "n1";
         _nodeId2 = "n2";
         _nodeId3 = "n3";
+        
+        _connectionManager = new SimpleHttpConnectionManager( true );
+        _httpClient = new HttpClient( _connectionManager );
+    }
+
+    private void startTomcat() throws Throwable {
         try {
-            final String memcachedNodes = toString( _nodeId1, address1 ) +
-                " " + toString( _nodeId2, address2 ) +
-                " " + toString( _nodeId3, address3 );
+            final String memcachedNodes = toString( _nodeId1, _address1 ) +
+                " " + toString( _nodeId2, _address2 ) +
+                " " + toString( _nodeId3, _address3 );
             _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
             _tomcat1.start();
         } catch( Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
-        
-        _memcached = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(),
-                        NodeIdResolver.node( _nodeId1, address1 )
-                        .node( _nodeId2, address2 )
-                        .node( _nodeId3, address3 ).build(),
-                        new SessionIdFormat() ),
-                Arrays.asList( address1, address2, address3 ) );
-        
-        _connectionManager = new SimpleHttpConnectionManager( true );
-        _httpClient = new HttpClient( _connectionManager );
     }
 
     private String toString( final String nodeId, final InetSocketAddress address ) {
@@ -134,19 +130,19 @@ public class MemcachedFailoverIntegrationTest {
      * 
      * This test asumes/knows, that the "next" node is selected in the case of a node failure.
      * @throws IOException 
-     * @throws HttpException 
-     * 
-     * @throws IOException 
      * @throws InterruptedException 
      * @throws InterruptedException 
-     * @throws InterruptedException 
+     * @throws Throwable 
      */
     @Test
-    public void testRelocateSession() throws HttpException, IOException, InterruptedException {
+    public void testRelocateSession() throws Throwable {
+        
+        startTomcat();
+        
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
         final String firstNode = sid1.substring( sid1.lastIndexOf( '-' ) + 1 );
-        assertNotNull( "No node id encoded in session id.", sid1 );
+        assertNotNull( "No node id encoded in session id.", firstNode );
         
         Thread.sleep( 50 );
 
@@ -172,17 +168,18 @@ public class MemcachedFailoverIntegrationTest {
      * 
      * This test asumes/knows, that the "next" node is selected in the case of a node failure.
      * 
-     * @throws HttpException 
-     * @throws IOException 
      * @throws InterruptedException 
-     * @throws InterruptedException 
+     * @throws Throwable 
      */
     @Test
-    public void testMultipleMemcachedNodesFailure() throws HttpException, IOException, InterruptedException {
+    public void testMultipleMemcachedNodesFailure() throws Throwable {
+        
+        startTomcat();
+        
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
         final String firstNode = sid1.substring( sid1.lastIndexOf( '-' ) + 1 );
-        assertNotNull( "No node id encoded in session id.", sid1 );
+        assertNotNull( "No node id encoded in session id.", firstNode );
         
         Thread.sleep( 50 );
         
@@ -204,6 +201,42 @@ public class MemcachedFailoverIntegrationTest {
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 sid2 );
         
+    }
+    
+    /**
+     * Tests that the previous session id is kept when all memcached nodes fail.
+     * 
+     * @throws Throwable 
+     */
+    @Test
+    public void testAllMemcachedNodesFailure() throws Throwable {
+        
+        startTomcat();
+        
+        final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sid1 );
+        
+        /* shutdown all memcached nodes
+         */
+        _daemon1.stop();
+        _daemon2.stop();
+        _daemon3.stop();
+        
+        final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
+
+        assertEquals( "SessionId changed.", sid1, sid2 );
+        
+        assertNotNull( "Session not existing.", getSessions().get( sid2 ) );
+        
+    }
+
+    private Map<String, Session> getSessions() throws NoSuchFieldException,
+            IllegalAccessException {
+        final Field field = ManagerBase.class.getDeclaredField( "sessions" );
+        field.setAccessible( true );
+        @SuppressWarnings("unchecked")
+        final Map<String,Session> sessions = (Map<String, Session>)field.get( _tomcat1.getContainer().getManager() );
+        return sessions;
     }
     
     /* plain stupid

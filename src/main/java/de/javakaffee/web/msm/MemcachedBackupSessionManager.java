@@ -79,6 +79,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
     private static final String NODE_FAILURE = "node.failure";
 
+    private static final String ORIG_SESSION_ID = "orig.sid";
+
     private final Random _random = new Random();
     
 
@@ -428,6 +430,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             
             if ( targetNodeId == null ) {
                 _logger.warning( "The node " + nodeId + " is not available and there's no node for relocation left, omitting session backup." );
+
+                /* we must set the original session id in case we changed it already
+                 */
+                final String origSessionId = (String) session.getNote( ORIG_SESSION_ID );
+                if ( origSessionId != null && !origSessionId.equals( session.getId() ) ) {
+                    session.setId( origSessionId );
+                }
+                
                 return BackupResult.FAILURE;
             }
             else {
@@ -437,6 +447,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                     session.setNote( NODES_TESTED, tested );
                 }
                 tested.add( nodeId );
+                
+                /* we must store the original session id so that we can
+                 * set this if no memcached node is left for taking over
+                 */
+                if ( session.getNote( ORIG_SESSION_ID ) == null ) {
+                    session.setNote( ORIG_SESSION_ID, session.getId() );
+                }
                 
                 /*
                  * relocate session to our memcached node...
