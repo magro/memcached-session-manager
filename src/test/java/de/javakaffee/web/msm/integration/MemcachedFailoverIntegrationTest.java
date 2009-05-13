@@ -93,12 +93,7 @@ public class MemcachedFailoverIntegrationTest {
         _nodeId1 = "n1";
         _nodeId2 = "n2";
         _nodeId3 = "n3";
-        
-        _connectionManager = new SimpleHttpConnectionManager( true );
-        _httpClient = new HttpClient( _connectionManager );
-    }
 
-    private void startTomcat() throws Throwable {
         try {
             final String memcachedNodes = toString( _nodeId1, _address1 ) +
                 " " + toString( _nodeId2, _address2 ) +
@@ -109,6 +104,9 @@ public class MemcachedFailoverIntegrationTest {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
+        
+        _connectionManager = new SimpleHttpConnectionManager( true );
+        _httpClient = new HttpClient( _connectionManager );
     }
 
     private String toString( final String nodeId, final InetSocketAddress address ) {
@@ -136,8 +134,6 @@ public class MemcachedFailoverIntegrationTest {
      */
     @Test
     public void testRelocateSession() throws Throwable {
-        
-        startTomcat();
         
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
@@ -174,8 +170,6 @@ public class MemcachedFailoverIntegrationTest {
     @Test
     public void testMultipleMemcachedNodesFailure() throws Throwable {
         
-        startTomcat();
-        
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
         final String firstNode = sid1.substring( sid1.lastIndexOf( '-' ) + 1 );
@@ -210,8 +204,6 @@ public class MemcachedFailoverIntegrationTest {
      */
     @Test
     public void testAllMemcachedNodesFailure() throws Throwable {
-        
-        startTomcat();
         
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
