@@ -134,16 +134,21 @@ public class TestUtils {
         new File( docBase ).mkdirs();
         
         final MemcachedBackupSessionManager sessionManager = new MemcachedBackupSessionManager();
-        sessionManager.setMemcachedNodes( memcachedNodes );
-        sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
-        sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         engine.setManager( sessionManager );
 
         final Context context = catalina.createContext( "/", "webapp" );
         context.setManager( sessionManager );
         context.setBackgroundProcessorDelay( 1 );
+        new File( docBase + File.separator + "webapp" ).mkdirs();
         
         host.addChild( context );
+        
+        /* we must set the maxInactiveInterval after the context,
+         * as setContainer(context) uses the session timeout set on the context
+         */
+        sessionManager.setMemcachedNodes( memcachedNodes );
+        sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
+        sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         
         catalina.addEngine( engine );
         
