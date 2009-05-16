@@ -35,7 +35,7 @@ define 'memcached-session-manager' do
   project.group = 'de.javakaffee.web'
   project.version = '1.0-SNAPSHOT'
   
-  compile.with(SERVLET_API, CATALINA, CATALINA_HA, MEMCACHED, C_LANG)
+  compile.with(SERVLET_API, CATALINA, CATALINA_HA, MEMCACHED, C_LANG).using(:source=>'1.5', :target=>'1.5')
   
   test.with( JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, JMOCK_CGLIB )
   
