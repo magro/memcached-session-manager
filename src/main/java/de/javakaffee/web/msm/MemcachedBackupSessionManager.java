@@ -359,6 +359,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     @Override
     public Session findSession( String id ) throws IOException {
         Session result = super.findSession( id );
+        System.out.println( "############  findSession " + id + ", result: " + result);
         if ( result == null && _missingSessionsCache.get( id ) == null ) {
             result = loadFromMemcached( id );
             if ( result != null ) {
@@ -438,6 +439,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                     session.setId( origSessionId );
                 }
                 
+                /* cleanup
+                 */
+                session.removeNote( ORIG_SESSION_ID );
+                session.removeNote( NODE_FAILURE );
+                session.removeNote( NODES_TESTED );
+                
                 return BackupResult.FAILURE;
             }
             else {
@@ -471,11 +478,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 BackupResult backupResult = backupSession( session );
                 switch( backupResult ) {
                     case SUCCESS:
-                        /*
-                         * flag the session as relocated, so that the session tracker valve
-                         * knows it must send a cookie
+                        
+                        /* cleanup
                          */
-                        session.setNote( SessionTrackerValve.RELOCATE, Boolean.TRUE );
+                        session.removeNote( ORIG_SESSION_ID );
+                        session.removeNote( NODE_FAILURE );
+                        session.removeNote( NODES_TESTED );
+                        
                         /*
                          * and tell our client to do his part as well
                          */

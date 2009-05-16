@@ -20,12 +20,16 @@ import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
@@ -132,6 +136,7 @@ public class MemcachedFailoverIntegrationTest {
      * @throws InterruptedException 
      * @throws Throwable 
      */
+    @SuppressWarnings("unchecked")
     @Test
     public void testRelocateSession() throws Throwable {
         
@@ -156,6 +161,9 @@ public class MemcachedFailoverIntegrationTest {
         assertEquals( "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2,
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 sid2 );
+
+        Session session = _tomcat1.getContainer().getManager().findSession( sid2 );
+        assertFalse( "Some notes are set: " + toArray( session.getNoteNames() ), session.getNoteNames().hasNext() );
         
     }
     
@@ -167,6 +175,7 @@ public class MemcachedFailoverIntegrationTest {
      * @throws InterruptedException 
      * @throws Throwable 
      */
+    @SuppressWarnings("unchecked")
     @Test
     public void testMultipleMemcachedNodesFailure() throws Throwable {
         
@@ -194,14 +203,26 @@ public class MemcachedFailoverIntegrationTest {
         assertEquals( "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2,
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 sid2 );
+
+        Session session = _tomcat1.getContainer().getManager().findSession( sid2 );
+        assertFalse( "Some notes are set: " + toArray( session.getNoteNames() ), session.getNoteNames().hasNext() );
         
     }
     
+    private Set<String> toArray( Iterator<String> noteNames ) {
+        final Set<String> result = new HashSet<String>();
+        while ( noteNames.hasNext() ) {
+            result.add( noteNames.next() );
+        }
+        return result;
+    }
+
     /**
      * Tests that the previous session id is kept when all memcached nodes fail.
      * 
      * @throws Throwable 
      */
+    @SuppressWarnings("unchecked")
     @Test
     public void testAllMemcachedNodesFailure() throws Throwable {
         
@@ -219,6 +240,9 @@ public class MemcachedFailoverIntegrationTest {
         assertEquals( "SessionId changed.", sid1, sid2 );
         
         assertNotNull( "Session not existing.", getSessions().get( sid2 ) );
+
+        Session session = _tomcat1.getContainer().getManager().findSession( sid2 );
+        assertFalse( "Some notes are set: " + toArray( session.getNoteNames() ), session.getNoteNames().hasNext() );
         
     }
 
