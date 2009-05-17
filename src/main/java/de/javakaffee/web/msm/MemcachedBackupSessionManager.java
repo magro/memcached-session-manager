@@ -111,6 +111,33 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     private String _requestUriIgnorePattern;
 
+    /**
+     * Specifies if the session shall be stored asynchronously in memcached
+     * as {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * false, the timeout set via {@link #setSessionBackupTimeout(int)} is evaluated.
+     * <p>
+     * Notice: if the session backup is done asynchronously, it is possible that a session
+     * cannot be stored in memcached and we don't notice that - therefore the session would
+     * not get relocated to another memcached node.
+     * </p>
+     * <p>
+     * By default this property is set to <code>false</code> - the session backup is performed synchronously.
+     * </p>
+     */
+    private boolean _sessionBackupAsync = false;
+
+    /**
+     * The timeout in milliseconds after that a session backup is considered as beeing failed.
+     * <p>
+     * This property is only evaluated if sessions are stored synchronously
+     * (set via {@link #setSessionBackupAsync(boolean)}).
+     * </p>
+     * <p>
+     * The default value is <code>100</code> millis.
+     * </p>
+     */
+    private int _sessionBackupTimeout = 100;
+
     // -------------------- END configuration properties --------------------
 
     /*
@@ -132,13 +159,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * we have to implement rejectedSessions - not sure why
      */
     private int _rejectedSessions;
-
-    /*
-     * TODO: make this a parameter, with test
-     */
-    private boolean _sessionBackupAsync = false;
-
-    private int _sessionBackupTimeout = 100;
 
     private Set<String> _allNodeIds;
     private List<String> _nodeIds;
@@ -723,6 +743,40 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
     protected void setFailoverNodeIds( List<String> failoverNodeIds ) {
         _failoverNodeIds = failoverNodeIds;
+    }
+
+    /**
+     * Specifies if the session shall be stored asynchronously in memcached
+     * as {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * false, the timeout set via {@link #setSessionBackupTimeout(int)} is evaluated.
+     * <p>
+     * Notice: if the session backup is done asynchronously, it is possible that a session
+     * cannot be stored in memcached and we don't notice that - therefore the session would
+     * not get relocated to another memcached node.
+     * </p>
+     * <p>
+     * By default this property is set to <code>false</code> - the session backup is performed synchronously.
+     * </p>
+     * 
+     * @param sessionBackupAsync the sessionBackupAsync to set
+     */
+    public void setSessionBackupAsync( boolean sessionBackupAsync ) {
+        _sessionBackupAsync = sessionBackupAsync;
+    }
+
+    /**
+     * The timeout in milliseconds after that a session backup is considered as beeing failed.
+     * <p>
+     * This property is only evaluated if sessions are stored synchronously
+     * (set via {@link #setSessionBackupAsync(boolean)}).
+     * </p>
+     * <p>
+     * The default value is <code>100</code> millis.
+     * 
+     * @param sessionBackupTimeout the sessionBackupTimeout to set (milliseconds)
+     */
+    public void setSessionBackupTimeout( int sessionBackupTimeout ) {
+        _sessionBackupTimeout = sessionBackupTimeout;
     }
 
 }
