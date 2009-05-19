@@ -379,7 +379,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     @Override
     public Session findSession( String id ) throws IOException {
         Session result = super.findSession( id );
-        System.out.println( "############  findSession " + id + ", result: " + result);
         if ( result == null && _missingSessionsCache.get( id ) == null ) {
             result = loadFromMemcached( id );
             if ( result != null ) {
@@ -442,60 +441,29 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             
             /* get the next memcached node to try
              */
-            
-            final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-
             @SuppressWarnings("unchecked")
-            Set<String> tested = (Set<String>) session.getNote( NODES_TESTED );
-            final String targetNodeId = getNextNodeId( nodeId, tested );
+            Set<String> testedNodes = (Set<String>) session.getNote( NODES_TESTED );
+            final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+            final String targetNodeId = getNextNodeId( nodeId, testedNodes );
             
             if ( targetNodeId == null ) {
+                
                 _logger.warning( "The node " + nodeId + " is not available and there's no node for relocation left, omitting session backup." );
 
-                /* we must set the original session id in case we changed it already
-                 */
-                final String origSessionId = (String) session.getNote( ORIG_SESSION_ID );
-                if ( origSessionId != null && !origSessionId.equals( session.getId() ) ) {
-                    session.setId( origSessionId );
-                }
-                
-                /* cleanup
-                 */
-                session.removeNote( ORIG_SESSION_ID );
-                session.removeNote( NODE_FAILURE );
-                session.removeNote( NODES_TESTED );
+                noFailoverNodeLeft( session );
                 
                 return BackupResult.FAILURE;
+                
             }
             else {
                 
-                if ( tested == null ) {
-                    tested = new HashSet<String>();
-                    session.setNote( NODES_TESTED, tested );
-                }
-                tested.add( nodeId );
-                
-                /* we must store the original session id so that we can
-                 * set this if no memcached node is left for taking over
-                 */
-                if ( session.getNote( ORIG_SESSION_ID ) == null ) {
-                    session.setNote( ORIG_SESSION_ID, session.getId() );
+                if ( testedNodes == null ) {
+                    testedNodes = new HashSet<String>();
+                    session.setNote( NODES_TESTED, testedNodes );
                 }
                 
-                /*
-                 * relocate session to our memcached node...
-                 * 
-                 * and mark it as a node-failure-session, so that remove(session) does
-                 * not try to remove it from memcached...
-                 * (the session is removed and added when the session id is changed)
-                 */
-                session.setNote( NODE_FAILURE, Boolean.TRUE );
-                session.setId( _sessionIdFormat.createNewSessionId(
-                        session.getId(), targetNodeId ) );
+                final BackupResult backupResult = failover( session, testedNodes, targetNodeId );
                 
-                /* invoke us again, until we have a success or a failure
-                 */
-                BackupResult backupResult = backupSession( session );
                 switch( backupResult ) {
                     case SUCCESS:
                         
@@ -517,6 +485,53 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 }
             }
         }
+    }
+
+    private BackupResult failover( Session session, Set<String> testedNodes, final String targetNodeId ) {
+
+        final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+        
+        testedNodes.add( nodeId );
+        
+        /* we must store the original session id so that we can
+         * set this if no memcached node is left for taking over
+         */
+        if ( session.getNote( ORIG_SESSION_ID ) == null ) {
+            session.setNote( ORIG_SESSION_ID, session.getId() );
+        }
+        
+        /*
+         * relocate session to our memcached node...
+         * 
+         * and mark it as a node-failure-session, so that remove(session) does
+         * not try to remove it from memcached...
+         * (the session is removed and added when the session id is changed)
+         */
+        session.setNote( NODE_FAILURE, Boolean.TRUE );
+        session.setId( _sessionIdFormat.createNewSessionId(
+                session.getId(), targetNodeId ) );
+        
+        /* invoke backup again, until we have a success or a failure
+         */
+        final BackupResult backupResult = backupSession( session );
+        
+        return backupResult;
+    }
+
+    private void noFailoverNodeLeft( Session session ) {
+        
+        /* we must set the original session id in case we changed it already
+         */
+        final String origSessionId = (String) session.getNote( ORIG_SESSION_ID );
+        if ( origSessionId != null && !origSessionId.equals( session.getId() ) ) {
+            session.setId( origSessionId );
+        }
+        
+        /* cleanup
+         */
+        session.removeNote( ORIG_SESSION_ID );
+        session.removeNote( NODE_FAILURE );
+        session.removeNote( NODES_TESTED );
     }
 
     /**
