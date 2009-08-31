@@ -52,27 +52,60 @@ public class LRUCache<K,V> {
         _map = new LinkedHashMap<K, ManagedItem<V>>( size / 2, 0.75f, true );
     }
 
-    public void put( K key, V value ) {
-        _map.put( key, new ManagedItem<V>( value, System.currentTimeMillis() ) );
-        while ( _map.size() > _size ) {
-            _map.remove( _map.keySet().iterator().next() );
+    public V put( K key, V value ) {
+        synchronized( _map ) {
+            final ManagedItem<V> previous = _map.put( key, new ManagedItem<V>( value, System.currentTimeMillis() ) );
+            while ( _map.size() > _size ) {
+                _map.remove( _map.keySet().iterator().next() );
+            }
+            return previous != null ? previous.value : null;
+        }
+    }
+
+    /**
+     * If the specified key is not already associated with a value or if it's associated
+     * with a different value, associate it with the given value.
+     * This is equivalent to
+     * <pre><code> if (map.get(key) == null || !map.get(key).equals(value))
+     *    return map.put(key, value);
+     * else
+     *    return map.get(key);
+     * </code></pre>
+     * except that the action is performed atomically.
+     * @param key the key to associate the value with.
+     * @param value the value to associate with the provided key.
+     * @return the previous value associated with the specified key, or null if there was no mapping for the key
+     */
+    public V putIfDifferent( K key, V value ) {
+        synchronized( _map ) {
+            final ManagedItem<V> item = _map.get(key);
+            if ( item == null || item.value == null || !item.value.equals( value ) ) {
+                return put( key, value );
+            }
+            else {
+                return item.value;
+            }
         }
     }
 
     public V get( K key ) {
-        final ManagedItem<V> item = _map.get( key );
-        if ( item == null ) {
-            return null;
+        synchronized( _map ) {
+            final ManagedItem<V> item = _map.get( key );
+            if ( item == null ) {
+                return null;
+            }
+            if ( _ttl > -1 && System.currentTimeMillis() - item.insertionTime > _ttl ) {
+                _map.remove( key );
+                return null;
+            }
+            return item.value;
         }
-        if ( _ttl > -1 && System.currentTimeMillis() - item.insertionTime > _ttl ) {
-            _map.remove( key );
-            return null;
-        }
-        return item.value;
     }
     
     public List<K> getKeys() {
-        return new ArrayList<K>( _map.keySet() );
+        synchronized( _map ) {
+            return new ArrayList<K>( _map.keySet() );
+        }
     }
     
     private static final class ManagedItem<T> {
