@@ -16,10 +16,9 @@
  */
 package de.javakaffee.web.msm;
 
-
-import org.apache.catalina.connector.Response;
 import org.apache.coyote.ActionCode;
 import org.apache.coyote.ActionHook;
+import org.apache.coyote.Response;
 
 /**
  * This {@link ActionHook} invokes {@link #beforeCommit()} if {@link #action(ActionCode, Object)}
@@ -33,7 +32,18 @@ public abstract class CommitInterceptingActionHook implements ActionHook {
     private final Response _response;
     private final ActionHook _delegate;
 
+    /**
+     * Create a new <code>CommitInterceptingActionHook</code> for the provided response and
+     * {@link ActionHook} delegate. Both must not be <code>null</code>
+     * @param response the response that is checked for its {@link Response#isCommitted()} property, must not be <code>null</code>.
+     * @param delegate the action hook to delegate the {@link ActionHook#action(ActionCode, Object)} to, must not be <code>null</code>.
+     */
     public CommitInterceptingActionHook( final Response response, final ActionHook delegate ) {
+        if ( response == null || delegate == null ) {
+            throw new IllegalArgumentException("The provided response and action hook must not be null." +
+                    (response == null ? " Response is null." : "") +
+                    (delegate == null ? " ActionHook is null." : ""));
+        }
         _response = response;
         _delegate = delegate;
     }
