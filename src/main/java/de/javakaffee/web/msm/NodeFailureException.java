@@ -26,8 +26,11 @@ public class NodeFailureException extends RuntimeException {
 
     private static final long serialVersionUID = 5954872380654336225L;
     
-    public NodeFailureException( String msg ) {
+    private final String _nodeId;
+    
+    public NodeFailureException( String msg, String nodeId ) {
         super( msg );
+        _nodeId = nodeId;
     }
 
     /* (non-Javadoc)
@@ -37,6 +40,10 @@ public class NodeFailureException extends RuntimeException {
     public synchronized Throwable fillInStackTrace() {
         /* we don't need this, saving time... */
         return null;
+    }
+
+    public String getNodeId() {
+        return _nodeId;
     }
 
 }

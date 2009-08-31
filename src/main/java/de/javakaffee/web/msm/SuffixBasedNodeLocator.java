@@ -91,7 +91,8 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     @Override
     public Iterator<MemcachedNode> getSequence( String key ) {
-        throw new NodeFailureException( "The node " + getNodeId( key ) + " is not available." );
+        final String nodeId = getNodeId( key );
+        throw new NodeFailureException( "The node " + nodeId + " is not available.", nodeId );
     }
 
     @Override

@@ -41,11 +41,14 @@ import org.apache.catalina.Context;
 import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
+import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
+import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.LifecycleSupport;
 import org.apache.commons.lang.builder.ToStringBuilder;
 
+import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 
@@ -80,6 +83,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
     private static final String NODE_FAILURE = "node.failure";
 
     private static final String ORIG_SESSION_ID = "orig.sid";
+
+    private static final String RELOCATE_SESSION_ID = "relocate.sid";
 
     private final Random _random = new Random();
     
@@ -154,6 +159,23 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      * been requested in the last <n> millis.
      */
     private LRUCache<String, Boolean> _missingSessionsCache;
+
+    /*
+     * remove may be called with sessionIds that already failed before (probably because the
+     * browser makes subsequent requests with the old sessionId - the exact reason needs to be verified).
+     * These failed sessionIds should 
+     * If a session is requested
+     * that we don't have locally stored each findSession invocation would
+     * trigger a memcached request - this would open the door for DOS attacks...
+     * 
+     * this solution: use a LRUCache with a timeout to store, which session had
+     * been requested in the last <n> millis.
+     * 
+     * Updated: the node status cache holds the status of each node for the configured TTL.
+     */
+    private NodeAvailabilityCache<String> _nodeAvailabilityCache;
+    
+    //private LRUCache<String, String> _relocatedSessions;
 
     /*
      * we have to implement rejectedSessions - not sure why
@@ -304,9 +326,22 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         /*
          * create the missing sessions cache
          */
-        _logger.info( "Creating LRUCache with size 200 and TTL 100" );
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
+        _nodeAvailabilityCache = new NodeAvailabilityCache<String>( _allNodeIds.size(), 1000, new CacheLoader<String>() {
 
+            @Override
+            public boolean isNodeAvailable( String key ) {
+                try {
+                    _memcached.get( _sessionIdFormat.createSessionId( "ping", key ) );
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            
+        } );
+
+        //_relocatedSessions = new LRUCache<String, String>( 100000, getMaxInactiveInterval() * 1000 );
     }
 
     /*
@@ -358,7 +393,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public void expireSession( String sessionId ) {
-        _logger.info( "expireSession invoked: " + sessionId );
+        _logger.fine( "expireSession invoked: " + sessionId );
         super.expireSession( sessionId );
         _memcached.delete( sessionId );
     }
@@ -387,6 +422,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 _missingSessionsCache.put( id, Boolean.TRUE );
             }
         }
+//        if ( result == null ) {
+//            final String relocatedSessionId = _relocatedSessions.get( id );
+//            if ( relocatedSessionId != null ) {
+//                result = findSession( relocatedSessionId );
+//            }
+//        }
         return result;
     }
 
@@ -398,7 +439,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public Session createSession( String sessionId ) {
-        _logger.info( "createSession invoked: " + sessionId );
+        _logger.fine( "createSession invoked: " + sessionId );
 
         Session session = null;
 
@@ -415,7 +456,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             session.setMaxInactiveInterval( this.maxInactiveInterval );
             session.setId( generateSessionId() );
 
-            _logger.info( ToStringBuilder.reflectionToString( session ) );
+            _logger.fine( ToStringBuilder.reflectionToString( session ) );
 
         }
 
@@ -424,18 +465,34 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         return ( session );
 
     }
+    
+    /* (non-Javadoc)
+     * @see org.apache.catalina.session.ManagerBase#createEmptySession()
+     */
+    @Override
+    public MemcachedBackupSession createEmptySession() {
+        return new MemcachedBackupSession( this );
+    }
 
     public BackupResult backupSession( Session session ) {
-        if ( _logger.isLoggable( Level.FINE ) ) {
+        if ( _logger.isLoggable( Level.INFO ) ) {
             _logger.fine( "Trying to store session in memcached: "
                     + session.getId() );
         }
         try {
+            
+            if ( session.getNote( RELOCATE_SESSION_ID ) != null ) {
+                _logger.info( "Found relocate session id, setting new id on session..." );
+                session.setNote( NODE_FAILURE, Boolean.TRUE );
+                ((MemcachedBackupSession) session).setIdForRelocate( session.getNote( RELOCATE_SESSION_ID ).toString() );
+                session.removeNote( RELOCATE_SESSION_ID );
+            }
+            
             storeSessionInMemcached( session );
             return BackupResult.SUCCESS;
         } catch ( NodeFailureException e ) {
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                _logger.fine( "Could not store session in memcached ("
+            if ( _logger.isLoggable( Level.INFO ) ) {
+                _logger.info( "Could not store session in memcached ("
                         + session.getId() + ")" );
             }
             
@@ -446,11 +503,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
             final String targetNodeId = getNextNodeId( nodeId, testedNodes );
             
+            final MemcachedBackupSession backupSession = (MemcachedBackupSession) session;
+            
             if ( targetNodeId == null ) {
                 
                 _logger.warning( "The node " + nodeId + " is not available and there's no node for relocation left, omitting session backup." );
 
-                noFailoverNodeLeft( session );
+                noFailoverNodeLeft( backupSession );
                 
                 return BackupResult.FAILURE;
                 
@@ -462,10 +521,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                     session.setNote( NODES_TESTED, testedNodes );
                 }
                 
-                final BackupResult backupResult = failover( session, testedNodes, targetNodeId );
+                final BackupResult backupResult = failover( backupSession, testedNodes, targetNodeId );
                 
                 switch( backupResult ) {
                     case SUCCESS:
+                        
+                        //_relocatedSessions.put( session.getNote( ORIG_SESSION_ID ).toString(), session.getId() );
                         
                         /* cleanup
                          */
@@ -486,8 +547,29 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
             }
         }
     }
+    
+    /**
+     * Returns the new session id if the provided session has to be relocated.
+     * @param session the session to check, never null.
+     * @return the new session id, if this session has to be relocated.
+     */
+    public String sessionNeedsRelocate( final Session session ) {
+        final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+        if ( nodeId != null && !_nodeAvailabilityCache.isNodeAvailable( nodeId ) ) {
+            final String nextNodeId = getNextNodeId( nodeId, _nodeAvailabilityCache.getUnavailableNodes() );
+            if ( nextNodeId != null ) {
+                final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), nextNodeId );
+                session.setNote( RELOCATE_SESSION_ID, newSessionId );
+                return newSessionId;
+            }
+            else {
+                _logger.warning( "The node " + nodeId + " is not available and there's no node for relocation left." );
+            }
+        }
+        return null;
+    }
 
-    private BackupResult failover( Session session, Set<String> testedNodes, final String targetNodeId ) {
+    private BackupResult failover( final MemcachedBackupSession session, Set<String> testedNodes, final String targetNodeId ) {
 
         final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
         
@@ -508,7 +590,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
          * (the session is removed and added when the session id is changed)
          */
         session.setNote( NODE_FAILURE, Boolean.TRUE );
-        session.setId( _sessionIdFormat.createNewSessionId(
+        session.setIdForRelocate( _sessionIdFormat.createNewSessionId(
                 session.getId(), targetNodeId ) );
         
         /* invoke backup again, until we have a success or a failure
@@ -518,13 +600,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         return backupResult;
     }
 
-    private void noFailoverNodeLeft( Session session ) {
+    private void noFailoverNodeLeft( MemcachedBackupSession session ) {
         
         /* we must set the original session id in case we changed it already
          */
         final String origSessionId = (String) session.getNote( ORIG_SESSION_ID );
         if ( origSessionId != null && !origSessionId.equals( session.getId() ) ) {
-            session.setId( origSessionId );
+            session.setIdForRelocate( origSessionId );
         }
         
         /* cleanup
@@ -613,7 +695,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
                 if ( _logger.isLoggable( Level.INFO ) ) {
                     _logger.info( "Could not store session " + session.getId() + " in memcached: " + e );
                 }
-                throw new NodeFailureException( "Could not store session in memcached." );
+                final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+                _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
+                throw new NodeFailureException( "Could not store session in memcached.", nodeId );
             }
         }
     }
@@ -622,16 +706,30 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
         if ( !isValidSessionIdFormat( sessionId ) ) {
             return null;
         }
-        final Session session = (Session) _memcached.get( sessionId );
-        if ( _logger.isLoggable( Level.FINE ) ) {
-            if ( session == null ) {
-                _logger.info( "Session " + sessionId
-                        + " not found in memcached." );
-            } else {
-                _logger.info( "Found session with id " + sessionId );
+        final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
+        if ( !_nodeAvailabilityCache.isNodeAvailable( nodeId ) ) {
+            _logger.fine( "Asked for session " + sessionId + ", but the related" +
+            		" memcached node is still marked as unavailable (won't load from memcached)." );
+        }
+        else {
+            _logger.fine( "Loading session from memcached: " + sessionId );
+            try {
+                final Session session = (Session) _memcached.get( sessionId );
+                if ( _logger.isLoggable( Level.FINE ) ) {
+                    if ( session == null ) {
+                        _logger.fine( "Session " + sessionId + " not found in memcached." );
+                    } else {
+                        _logger.fine( "Found session with id " + sessionId );
+                    }
+                }
+                _nodeAvailabilityCache.setNodeAvailable( nodeId, true );
+                return session;
+            } catch (NodeFailureException e) {
+                _logger.warning( "Could not load session with id " + sessionId + " from memcached." );
+                _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
             }
         }
-        return session;
+        return null;
     }
 
     /*
@@ -643,12 +741,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     @Override
     public void remove( Session session ) {
-        _logger.info( "remove invoked," +
+        _logger.fine( "remove invoked," +
         		" session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE ) +
                 ", node failure: " + session.getNote( NODE_FAILURE ) +
+                ", node failure != TRUE: " + (session.getNote( NODE_FAILURE ) != Boolean.TRUE) +
                 ", id: " + session.getId() );
         if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
             try {
+                _logger.fine( "Deleting session from memcached: " + session.getId() );
                 _memcached.delete( session.getId() );
             } catch ( NodeFailureException e ) {
                 /* We can ignore this */
@@ -792,6 +892,42 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
      */
     public void setSessionBackupTimeout( int sessionBackupTimeout ) {
         _sessionBackupTimeout = sessionBackupTimeout;
+    }
+    
+    private static final class MemcachedBackupSession extends StandardSession {
+        
+        private static final long serialVersionUID = 1L;
+        
+        public MemcachedBackupSession(Manager manager) {
+            super( manager );
+        }
+
+        /**
+         * Set a new id for this session.<br/>
+         * Before setting the new id, it removes itself from the associated manager.
+         * After the new id is set, this session adds itself to the session manager.
+         * @param id the new session id
+         */
+        protected void setIdForRelocate( final String id ) {
+            
+            if ( this.id == null ) {
+                throw new IllegalStateException("There's no session id set.");
+            }
+            if ( this.manager == null ) {
+                throw new IllegalStateException("There's no manager set.");
+            }
+            
+            manager.remove( this );
+            this.id = id;
+            manager.add(this);
+            
+        }
+        
+        @Override
+        public void setId( String id ) {
+            super.setId( id );
+        }
+        
     }
 
 }

@@ -30,6 +30,7 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.coyote.ActionHook;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
 
@@ -63,19 +64,40 @@ class SessionTrackerValve extends ValveBase {
     }
 
     @Override
-    public void invoke( Request request, Response response ) throws IOException,
+    public void invoke( final Request request, final Response response ) throws IOException,
             ServletException {
-        
-        if ( _logger.isLoggable( Level.FINE ) ) {
-            final Cookie cookie = getCookie( request, JSESSIONID );
-            _logger.fine( "Starting, " + (cookie != null ? cookie.getValue() : null) +
-                    ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
+
+        if ( _ignorePattern != null && _ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+            getNext().invoke( request, response );
         }
-        
-        getNext().invoke( request, response );
-        
-        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+        else {
             
+            /* add the commit intercepting action hook (only) if a session id was requested
+             */
+            if ( request.getRequestedSessionId() != null ) {
+                final ActionHook origHook = response.getCoyoteResponse().getHook();
+                final ActionHook hook = new CommitInterceptingActionHook(response, origHook) {
+                    
+                    @Override
+                    void beforeCommit() {
+                        //_logger.info( " CommitInterceptingActionHook executing before commit..." );
+                        final Session session = request.getSessionInternal( false );
+                        if ( session != null ) {
+                            final String newSessionId = _sessionBackupService.sessionNeedsRelocate( session );
+                            //_logger.info( "CommitInterceptingActionHook before commit got new session id: " + newSessionId );
+                            if ( newSessionId != null ) {
+                                setSessionIdCookie( response, request, newSessionId );
+                            }
+                        }
+                        response.getCoyoteResponse().setHook( origHook );
+                    }
+                    
+                };
+                response.getCoyoteResponse().setHook( hook );
+            }
+            
+            getNext().invoke( request, response );
+
             /* Do we have a session?
              * 
              * Prior check for requested sessionId or response cookie
@@ -95,24 +117,38 @@ class SessionTrackerValve extends ValveBase {
                      if ( _logger.isLoggable( Level.FINE ) ) {
                          _logger.fine( "Session got relocated, setting a cookie: " + session.getId() );
                      }
-                     setCookie( response, request, session );
+                     setSessionIdCookie( response, request, session );
                  }
              }
+
+            if ( _logger.isLoggable( Level.FINE ) ) {
+                final Cookie respCookie = getCookie( response, JSESSIONID );
+                _logger.fine( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
+            }
         }
 
-        if ( _logger.isLoggable( Level.FINE ) ) {
-            final Cookie respCookie = getCookie( response, JSESSIONID );
-            _logger.fine( "Finished, " + (respCookie != null ? ToStringBuilder.reflectionToString( respCookie ) : null) );
-        }
+//        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+//        if ( _logger.isLoggable( Level.INFO ) ) {
+//            final Cookie cookie = getCookie( request, JSESSIONID );
+//            _logger.info( "++++++++++++++ Starting, " + (cookie != null ? cookie.getValue() : null) +
+//                    ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
+//        }
+//        }
+        
         
     }
 
-    private void setCookie( Response response, Request request,
+    private void setSessionIdCookie( Response response, Request request,
             final Session session ) {
-        final Cookie newCookie = new Cookie( JSESSIONID, session.getId() );
+        setSessionIdCookie( response, request, session.getId() );
+    }
+    
+    private void setSessionIdCookie( Response response, Request request, final String sessionId ) {
+        _logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
+        final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
          newCookie.setMaxAge( -1 );
          newCookie.setPath( request.getContextPath() );
-         response.addCookie( newCookie );
+         response.addCookieInternal( newCookie );
     }
 
     private Cookie getCookie( final HttpServletRequest httpRequest, String name ) {
@@ -140,6 +176,13 @@ class SessionTrackerValve extends ValveBase {
     }
     
     public static interface SessionBackupService {
+        
+        /**
+         * Returns the new session id if the provided session has to be relocated.
+         * @param session the session to check, never null.
+         * @return the new session id, if this session has to be relocated.
+         */
+        String sessionNeedsRelocate( final Session session );
 
         BackupResult backupSession( Session session );
         

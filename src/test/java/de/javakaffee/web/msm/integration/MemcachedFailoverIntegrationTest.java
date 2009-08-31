@@ -80,7 +80,7 @@ public class MemcachedFailoverIntegrationTest {
     @Before
     public void setUp() throws Throwable {
 
-        _portTomcat1 = 8888;
+        _portTomcat1 = 8088;
 
         _address1 = new InetSocketAddress( "localhost", 21211 );
         _daemon1 = createDaemon( _address1 );
