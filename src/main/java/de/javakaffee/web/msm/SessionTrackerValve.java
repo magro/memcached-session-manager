@@ -75,6 +75,9 @@ class SessionTrackerValve extends ValveBase {
             /* add the commit intercepting action hook (only) if a session id was requested
              */
             if ( request.getRequestedSessionId() != null ) {
+                // TODO: check if we have already a CommitInterceptingActionHook here, as tomcat
+                // might reuse its internal stuff according to Bill Barker:
+                // http://www.nabble.com/Re:-How-to-set-header-(directly)-before-response-is-committed-p25217026.html
                 final ActionHook origHook = response.getCoyoteResponse().getHook();
                 final ActionHook hook = new CommitInterceptingActionHook(response, origHook) {
                     
