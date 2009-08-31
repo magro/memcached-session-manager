@@ -22,7 +22,8 @@ import org.apache.coyote.ActionCode;
 import org.apache.coyote.ActionHook;
 
 /**
- * This {@link ActionHook} adds a cookie if required to the response before it's committed.
+ * This {@link ActionHook} invokes {@link #beforeCommit()} if {@link #action(ActionCode, Object)}
+ * is invoked with {@link ActionCode#ACTION_COMMIT} and if the response is not yet committed.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
