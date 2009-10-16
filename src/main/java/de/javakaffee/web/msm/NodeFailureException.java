@@ -25,16 +25,16 @@ package de.javakaffee.web.msm;
 public class NodeFailureException extends RuntimeException {
 
     private static final long serialVersionUID = 5954872380654336225L;
-    
+
     private final String _nodeId;
-    
-    public NodeFailureException( String msg, String nodeId ) {
+
+    public NodeFailureException( final String msg, final String nodeId ) {
         super( msg );
         _nodeId = nodeId;
     }
 
-    /* (non-Javadoc)
-     * @see java.lang.Throwable#fillInStackTrace()
+    /**
+     * {@inheritDoc}
      */
     @Override
     public synchronized Throwable fillInStackTrace() {
@@ -42,6 +42,11 @@ public class NodeFailureException extends RuntimeException {
         return null;
     }
 
+    /**
+     * The id of the node that failed.
+     * 
+     * @return the node id.
+     */
     public String getNodeId() {
         return _nodeId;
     }

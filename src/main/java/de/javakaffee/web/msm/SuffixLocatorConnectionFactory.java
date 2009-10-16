@@ -18,7 +18,6 @@ package de.javakaffee.web.msm;
 
 import java.util.List;
 
-import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
@@ -26,40 +25,51 @@ import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Manager;
 
-
 /**
- * This {@link ConnectionFactory} uses the {@link SuffixBasedNodeLocator}
- * as {@link NodeLocator} and the {@link SessionSerializingTranscoder} as
- * {@link Transcoder}.
+ * This {@link net.spy.memcached.ConnectionFactory} uses the
+ * {@link SuffixBasedNodeLocator} as {@link NodeLocator} and the
+ * {@link SessionSerializingTranscoder} as {@link Transcoder}.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public final class SuffixLocatorConnectionFactory extends
-        DefaultConnectionFactory {
-    
+public final class SuffixLocatorConnectionFactory extends DefaultConnectionFactory {
+
     private final Manager _manager;
     private final SessionIdFormat _sessionIdFormat;
     private final NodeIdResolver _resolver;
-    
-    public SuffixLocatorConnectionFactory( Manager manager, NodeIdResolver resolver, SessionIdFormat sessionIdFormat ) {
+
+    /**
+     * Creates a new instance.
+     * 
+     * @param manager
+     *            the manager
+     * @param resolver
+     *            the {@link NodeIdResolver}
+     * @param sessionIdFormat
+     *            the {@link SessionIdFormat}
+     */
+    public SuffixLocatorConnectionFactory( final Manager manager, final NodeIdResolver resolver,
+            final SessionIdFormat sessionIdFormat ) {
         _manager = manager;
         _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
     }
 
-    /* (non-Javadoc)
-     * @see net.spy.memcached.DefaultConnectionFactory#createLocator(java.util.List)
+    /**
+     * {@inheritDoc}
      */
     @Override
-    public NodeLocator createLocator(
-            List<MemcachedNode> nodes ) {
+    public NodeLocator createLocator( final List<MemcachedNode> nodes ) {
         return new SuffixBasedNodeLocator( nodes, _resolver, _sessionIdFormat );
     }
-    
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Transcoder<Object> getDefaultTranscoder() {
         return new SessionSerializingTranscoder( _manager );
     }
-    
+
 }

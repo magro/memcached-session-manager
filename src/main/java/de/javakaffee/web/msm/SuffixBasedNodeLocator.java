@@ -40,7 +40,7 @@ import net.spy.memcached.ops.Operation;
  * @version $Id$
  */
 class SuffixBasedNodeLocator implements NodeLocator {
-    
+
     // private final Logger _logger = Logger.getLogger( SuffixBasedNodeLocator.class.getName() );
 
     private final List<MemcachedNode> _nodes;
@@ -50,34 +50,44 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     /**
      * Create a new {@link SuffixBasedNodeLocator}.
-     * @param nodes the nodes to select from.
-     * @param resolver used to resolve the node id for the address of a memcached node.
-     * @param sessionIdFormat used to extract the node id from the session id.
+     * 
+     * @param nodes
+     *            the nodes to select from.
+     * @param resolver
+     *            used to resolve the node id for the address of a memcached
+     *            node.
+     * @param sessionIdFormat
+     *            used to extract the node id from the session id.
      */
-    public SuffixBasedNodeLocator( List<MemcachedNode> nodes,
-            NodeIdResolver resolver,
-            SessionIdFormat sessionIdFormat ) {
+    public SuffixBasedNodeLocator( final List<MemcachedNode> nodes, final NodeIdResolver resolver,
+            final SessionIdFormat sessionIdFormat ) {
         _nodes = nodes;
         _resolver = resolver;
-        
-        final Map<String,MemcachedNode> map = new HashMap<String, MemcachedNode>( nodes.size(), 1 );
+
+        final Map<String, MemcachedNode> map = new HashMap<String, MemcachedNode>( nodes.size(), 1 );
         for ( int i = 0; i < nodes.size(); i++ ) {
             final MemcachedNode memcachedNode = nodes.get( i );
             final String nodeId = resolver.getNodeId( (InetSocketAddress) memcachedNode.getSocketAddress() );
             map.put( nodeId, memcachedNode );
         }
         _nodesMap = map;
-        
+
         _sessionIdFormat = sessionIdFormat;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Collection<MemcachedNode> getAll() {
         return _nodesMap.values();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public MemcachedNode getPrimary( String key ) {
+    public MemcachedNode getPrimary( final String key ) {
         final MemcachedNode result = _nodesMap.get( getNodeId( key ) );
         if ( result == null ) {
             throw new IllegalArgumentException( "No node found for key " + key );
@@ -85,149 +95,274 @@ class SuffixBasedNodeLocator implements NodeLocator {
         return result;
     }
 
-    private String getNodeId( String key ) {
+    private String getNodeId( final String key ) {
         return _sessionIdFormat.extractMemcachedId( key );
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public Iterator<MemcachedNode> getSequence( String key ) {
+    public Iterator<MemcachedNode> getSequence( final String key ) {
         final String nodeId = getNodeId( key );
         throw new NodeFailureException( "The node " + nodeId + " is not available.", nodeId );
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public NodeLocator getReadonlyCopy() {
         final List<MemcachedNode> nodes = new ArrayList<MemcachedNode>();
-        for ( MemcachedNode node : _nodes ) {
+        for ( final MemcachedNode node : _nodes ) {
             nodes.add( new MyMemcachedNodeROImpl( node ) );
         }
         return new SuffixBasedNodeLocator( nodes, _resolver, _sessionIdFormat );
     }
-    
+
+    /**
+     * The class that is used for readonly copies.
+     * 
+     */
     static class MyMemcachedNodeROImpl implements MemcachedNode {
 
         private final MemcachedNode _root;
 
-        public MyMemcachedNodeROImpl(MemcachedNode node) {
+        public MyMemcachedNodeROImpl( final MemcachedNode node ) {
             _root = node;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public String toString() {
             return _root.toString();
         }
 
-        public void addOp(Operation op) {
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void addOp( final Operation op ) {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public void connected() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public void copyInputQueue() {
             throw new UnsupportedOperationException();
         }
 
-        public void fillWriteBuffer(boolean optimizeGets) {
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void fillWriteBuffer( final boolean optimizeGets ) {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public void fixupOps() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public int getBytesRemainingToWrite() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public SocketChannel getChannel() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public Operation getCurrentReadOp() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public Operation getCurrentWriteOp() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public ByteBuffer getRbuf() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public int getReconnectCount() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public int getSelectionOps() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public SelectionKey getSk() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public SocketAddress getSocketAddress() {
             return _root.getSocketAddress();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public ByteBuffer getWbuf() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public boolean hasReadOp() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public boolean hasWriteOp() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public boolean isActive() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public void reconnecting() {
             throw new UnsupportedOperationException();
         }
 
-        public void registerChannel(SocketChannel ch, SelectionKey selectionKey) {
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void registerChannel( final SocketChannel ch, final SelectionKey selectionKey ) {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public Operation removeCurrentReadOp() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public Operation removeCurrentWriteOp() {
             throw new UnsupportedOperationException();
         }
 
-        public void setChannel(SocketChannel to) {
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void setChannel( final SocketChannel to ) {
             throw new UnsupportedOperationException();
         }
 
-        public void setSk(SelectionKey to) {
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void setSk( final SelectionKey to ) {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public void setupResend() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public void transitionWriteItem() {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public int writeSome() throws IOException {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public Collection<Operation> destroyInputQueue() {
             throw new UnsupportedOperationException();
         }
     }
-    
+
 }

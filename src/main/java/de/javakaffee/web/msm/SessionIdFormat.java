@@ -19,18 +19,19 @@ package de.javakaffee.web.msm;
 import java.util.regex.Pattern;
 
 /**
- * This class defines the session id format: It creates session ids based on
- * the original session id and the memcached id, and it extracts the session id and
+ * This class defines the session id format: It creates session ids based on the
+ * original session id and the memcached id, and it extracts the session id and
  * memcached id from a compound session id.
  * <p>
- * The session id is of the following format: <code>[^-.]+-[^.]+(\.[\w]+)?</code>
+ * The session id is of the following format:
+ * <code>[^-.]+-[^.]+(\.[\w]+)?</code>
  * </p>
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class SessionIdFormat {
-    
+
     /**
      * The pattern for the session id.
      */
@@ -38,60 +39,69 @@ public class SessionIdFormat {
 
     /**
      * Create a session id including the provided memcachedId.
+     * 
      * @param sessionId
      * @param memcachedId
      * @return the sessionId which now contains the memcachedId.
      */
-    public String createSessionId( String sessionId, String memcachedId ) {
+    public String createSessionId( final String sessionId, final String memcachedId ) {
         final int idx = sessionId.indexOf( '.' );
         if ( idx < 0 ) {
             return sessionId + "-" + memcachedId;
-        }
-        else {
-            return sessionId.substring( 0, idx ) +
-            "-" + memcachedId + sessionId.substring( idx );
+        } else {
+            return sessionId.substring( 0, idx ) + "-" + memcachedId + sessionId.substring( idx );
         }
     }
 
     /**
      * Change the provided session id already including a memcachedId so that it
      * contains the provided newMemcachedId.
-     * @param sessionId the session id containing the former memcachedId.
-     * @param newMemcachedId the new memcached id.
-     * @param memcachedId the new memcached id
-     * @return the sessionId which now contains the new memcachedId instead the former one.
+     * 
+     * @param sessionId
+     *            the session id containing the former memcachedId.
+     * @param newMemcachedId
+     *            the new memcached id.
+     * @param memcachedId
+     *            the new memcached id
+     * @return the sessionId which now contains the new memcachedId instead the
+     *         former one.
      */
-    public String createNewSessionId( String sessionId, String newMemcachedId ) {
+    public String createNewSessionId( final String sessionId, final String newMemcachedId ) {
         final int idxDash = sessionId.indexOf( '-' );
         if ( idxDash < 0 ) {
             return sessionId + "-" + newMemcachedId;
         }
-        
+
         final int idxDot = sessionId.indexOf( '.' );
         if ( idxDot < 0 ) {
             return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
-        }
-        else {
-            return sessionId.substring( 0, idxDash + 1 ) +
-                newMemcachedId + sessionId.substring( idxDot );
+        } else {
+            return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId + sessionId.substring( idxDot );
         }
     }
 
     /**
-     * Checks if the given session id matches the pattern <code>[^-.]+-[^.]+(\.[\w]+)?</code>.
-     * @param sessionId the session id
+     * Checks if the given session id matches the pattern
+     * <code>[^-.]+-[^.]+(\.[\w]+)?</code>.
+     * 
+     * @param sessionId
+     *            the session id
      * @return true if matching, otherwise false.
      */
-    public boolean isValid( String sessionId ) {
+    public boolean isValid( final String sessionId ) {
         return sessionId != null && _pattern.matcher( sessionId ).matches();
     }
 
     /**
      * Extract the memcached id from the given session id.
-     * @param sessionId the session id including the memcached id and eventually the jvmRoute.
-     * @return the memcached id or null if the session id didn't contain any memcached id.
+     * 
+     * @param sessionId
+     *            the session id including the memcached id and eventually the
+     *            jvmRoute.
+     * @return the memcached id or null if the session id didn't contain any
+     *         memcached id.
      */
-    public String extractMemcachedId( String sessionId ) {
+    public String extractMemcachedId( final String sessionId ) {
         final int idxDash = sessionId.indexOf( '-' );
         if ( idxDash < 0 ) {
             return null;
@@ -99,10 +109,9 @@ public class SessionIdFormat {
         final int idxDot = sessionId.indexOf( '.' );
         if ( idxDot < 0 ) {
             return sessionId.substring( idxDash + 1 );
-        }
-        else {
+        } else {
             return sessionId.substring( idxDash + 1, idxDot );
         }
     }
-    
+
 }

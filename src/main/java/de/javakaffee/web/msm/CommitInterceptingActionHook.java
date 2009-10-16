@@ -21,40 +21,58 @@ import org.apache.coyote.ActionHook;
 import org.apache.coyote.Response;
 
 /**
- * This {@link ActionHook} invokes {@link #beforeCommit()} if {@link #action(ActionCode, Object)}
- * is invoked with {@link ActionCode#ACTION_COMMIT} and if the response is not yet committed.
+ * This {@link ActionHook} invokes {@link #beforeCommit()} if
+ * {@link #action(ActionCode, Object)} is invoked with
+ * {@link ActionCode#ACTION_COMMIT} and if the response is not yet committed.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public abstract class CommitInterceptingActionHook implements ActionHook {
-    
+
     private final Response _response;
     private final ActionHook _delegate;
 
     /**
-     * Create a new <code>CommitInterceptingActionHook</code> for the provided response and
-     * {@link ActionHook} delegate. Both must not be <code>null</code>
-     * @param response the response that is checked for its {@link Response#isCommitted()} property, must not be <code>null</code>.
-     * @param delegate the action hook to delegate the {@link ActionHook#action(ActionCode, Object)} to, must not be <code>null</code>.
+     * Create a new <code>CommitInterceptingActionHook</code> for the provided
+     * response and {@link ActionHook} delegate. Both must not be
+     * <code>null</code>
+     * 
+     * @param response
+     *            the response that is checked for its
+     *            {@link Response#isCommitted()} property, must not be
+     *            <code>null</code>.
+     * @param delegate
+     *            the action hook to delegate the
+     *            {@link ActionHook#action(ActionCode, Object)} to, must not be
+     *            <code>null</code>.
      */
     public CommitInterceptingActionHook( final Response response, final ActionHook delegate ) {
         if ( response == null || delegate == null ) {
-            throw new IllegalArgumentException("The provided response and action hook must not be null." +
-                    (response == null ? " Response is null." : "") +
-                    (delegate == null ? " ActionHook is null." : ""));
+            throw new IllegalArgumentException( "The provided response and action hook must not be null." + ( response == null
+                ? " Response is null."
+                : "" ) + ( delegate == null
+                ? " ActionHook is null."
+                : "" ) );
         }
         _response = response;
         _delegate = delegate;
     }
 
-    public void action( ActionCode actionCode, Object param ) {
-        if (actionCode == ActionCode.ACTION_COMMIT && !_response.isCommitted()) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void action( final ActionCode actionCode, final Object param ) {
+        if ( actionCode == ActionCode.ACTION_COMMIT && !_response.isCommitted() ) {
             beforeCommit();
         }
         _delegate.action( actionCode, param );
     }
 
+    /**
+     * Is invoked before the reponse is committed.
+     */
     abstract void beforeCommit();
 
 }

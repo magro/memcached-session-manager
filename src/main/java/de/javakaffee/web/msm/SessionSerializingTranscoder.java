@@ -42,65 +42,65 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
 
     private final Manager _manager;
 
-    public SessionSerializingTranscoder(Manager manager) {
+    public SessionSerializingTranscoder( final Manager manager ) {
         _manager = manager;
     }
 
-    /* (non-Javadoc)
-     * @see net.spy.memcached.transcoders.BaseSerializingTranscoder#serialize(java.lang.Object)
+    /**
+     * {@inheritDoc}
      */
     @Override
-    protected byte[] serialize( Object o ) {
-        if(o == null) {
-            throw new NullPointerException("Can't serialize null");
+    protected byte[] serialize( final Object o ) {
+        if ( o == null ) {
+            throw new NullPointerException( "Can't serialize null" );
         }
-//        byte[] rv=null;
-//        try {
-//            ByteArrayOutputStream bos=new ByteArrayOutputStream();
-//            ObjectOutputStream os=new ObjectOutputStream(bos);
-//            os.writeObject(o);
-//            os.close();
-//            bos.close();
-//            rv=bos.toByteArray();
-//        } catch(IOException e) {
-//            throw new IllegalArgumentException("Non-serializable object", e);
-//        }
-//        return rv;
-        
+        //        byte[] rv=null;
+        //        try {
+        //            ByteArrayOutputStream bos=new ByteArrayOutputStream();
+        //            ObjectOutputStream os=new ObjectOutputStream(bos);
+        //            os.writeObject(o);
+        //            os.close();
+        //            bos.close();
+        //            rv=bos.toByteArray();
+        //        } catch(IOException e) {
+        //            throw new IllegalArgumentException("Non-serializable object", e);
+        //        }
+        //        return rv;
+
         ByteArrayOutputStream bos = null;
         ObjectOutputStream oos = null;
         try {
             bos = new ByteArrayOutputStream();
             oos = new ObjectOutputStream( bos );
-        } catch ( IOException e ) {
+        } catch ( final IOException e ) {
             if ( bos != null ) {
                 try {
                     bos.close();
-                } catch ( IOException f ) {
+                } catch ( final IOException f ) {
                 }
             }
             if ( oos != null ) {
                 try {
                     oos.close();
-                } catch ( IOException f ) {
+                } catch ( final IOException f ) {
                 }
             }
-            throw new IllegalArgumentException("Non-serializable object", e);
+            throw new IllegalArgumentException( "Non-serializable object", e );
         }
 
         try {
             ( (StandardSession) o ).writeObjectData( oos );
             return bos.toByteArray();
-        } catch ( IOException e ) {
-            throw new IllegalArgumentException("Non-serializable object", e);
+        } catch ( final IOException e ) {
+            throw new IllegalArgumentException( "Non-serializable object", e );
         } finally {
             try {
                 bos.close();
-            } catch ( IOException e ) {
+            } catch ( final IOException e ) {
             }
             try {
                 oos.close();
-            } catch ( IOException e ) {
+            } catch ( final IOException e ) {
             }
         }
 
@@ -108,9 +108,13 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
 
     /**
      * Get the object represented by the given serialized bytes.
+     * 
+     * @param in
+     *            the bytes to deserialize
+     * @return the resulting object
      */
     @Override
-    protected Object deserialize( byte[] in ) {
+    protected Object deserialize( final byte[] in ) {
         ByteArrayInputStream bis = null;
         ObjectInputStream ois = null;
         Loader loader = null;
@@ -125,20 +129,19 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
                 ois = new CustomObjectInputStream( bis, classLoader );
             else
                 ois = new ObjectInputStream( bis );
-        } catch ( IOException e ) {
-            getLogger().warn( "Caught IOException decoding %d bytes of data",
-                    in.length, e );
+        } catch ( final IOException e ) {
+            getLogger().warn( "Caught IOException decoding %d bytes of data", in.length, e );
             if ( bis != null ) {
                 try {
                     bis.close();
-                } catch ( IOException f ) {
+                } catch ( final IOException f ) {
                 }
                 bis = null;
             }
             if ( ois != null ) {
                 try {
                     ois.close();
-                } catch ( IOException f ) {
+                } catch ( final IOException f ) {
                 }
                 ois = null;
             }
@@ -146,31 +149,29 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
         }
 
         try {
-            
-            StandardSession session = (StandardSession)_manager.createEmptySession();
+
+            final StandardSession session = (StandardSession) _manager.createEmptySession();
             session.readObjectData( ois );
             session.setManager( _manager );
             return session;
-        } catch ( ClassNotFoundException e ) {
-            getLogger().warn( "Caught CNFE decoding %d bytes of data",
-                    in.length, e );
+        } catch ( final ClassNotFoundException e ) {
+            getLogger().warn( "Caught CNFE decoding %d bytes of data", in.length, e );
             throw new RuntimeException( "Caught CNFE decoding data", e );
-        } catch ( IOException e ) {
-            getLogger().warn( "Caught IOException decoding %d bytes of data",
-                    in.length, e );
+        } catch ( final IOException e ) {
+            getLogger().warn( "Caught IOException decoding %d bytes of data", in.length, e );
             throw new RuntimeException( "Caught IOException decoding data", e );
         } finally {
             // Close the input stream
             if ( bis != null ) {
                 try {
                     bis.close();
-                } catch ( IOException f ) {
+                } catch ( final IOException f ) {
                 }
             }
             if ( ois != null ) {
                 try {
                     ois.close();
-                } catch ( IOException f ) {
+                } catch ( final IOException f ) {
                 }
             }
         }
