@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Resolves an {@link InetAddress} to a memcached node id.
+ * Resolves an {@link InetSocketAddress} to a memcached node id.
  * 
  * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
  * @version $Id$

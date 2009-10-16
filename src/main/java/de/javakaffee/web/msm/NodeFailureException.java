@@ -28,6 +28,14 @@ public class NodeFailureException extends RuntimeException {
 
     private final String _nodeId;
 
+    /**
+     * Creates a new instance with the given msg and nodeId.
+     * 
+     * @param msg
+     *            the error message
+     * @param nodeId
+     *            the id of the node that failed
+     */
     public NodeFailureException( final String msg, final String nodeId ) {
         super( msg );
         _nodeId = nodeId;

@@ -81,14 +81,14 @@ public class NodeAvailabilityCache<K> {
     public Boolean setNodeAvailable( final K key, final boolean available ) {
         final ManagedItem<Boolean> item = _map.get( key );
         final Boolean availableObj = Boolean.valueOf( available );
-        if ( item == null || item.value != availableObj ) {
+        if ( item == null || item._value != availableObj ) {
             final ManagedItem<Boolean> previous =
                     _map.put( key, new ManagedItem<Boolean>( availableObj, System.currentTimeMillis() ) );
             return previous != null
-                ? previous.value
+                ? previous._value
                 : null;
         } else {
-            return item.value;
+            return item._value;
         }
     }
 
@@ -108,12 +108,12 @@ public class NodeAvailabilityCache<K> {
             _map.remove( key );
             return updateIsNodeAvailable( key );
         } else {
-            return item.value;
+            return item._value;
         }
     }
 
     private boolean isExpired( final ManagedItem<Boolean> item ) {
-        return _ttl > -1 && System.currentTimeMillis() - item.insertionTime > _ttl;
+        return _ttl > -1 && System.currentTimeMillis() - item._insertionTime > _ttl;
     }
 
     private boolean updateIsNodeAvailable( final K key ) {
@@ -139,7 +139,7 @@ public class NodeAvailabilityCache<K> {
     public Set<K> getUnavailableNodes() {
         final Set<K> result = new HashSet<K>();
         for ( final Map.Entry<K, ManagedItem<Boolean>> entry : _map.entrySet() ) {
-            if ( !entry.getValue().value.booleanValue() && !isExpired( entry.getValue() ) ) {
+            if ( !entry.getValue()._value.booleanValue() && !isExpired( entry.getValue() ) ) {
                 result.add( entry.getKey() );
             }
         }
@@ -147,12 +147,12 @@ public class NodeAvailabilityCache<K> {
     }
 
     private static final class ManagedItem<T> {
-        final T value;
-        final long insertionTime;
+        private final T _value;
+        private final long _insertionTime;
 
         public ManagedItem( final T value, final long accessTime ) {
-            this.value = value;
-            this.insertionTime = accessTime;
+            _value = value;
+            _insertionTime = accessTime;
         }
     }
 
