@@ -147,7 +147,7 @@ class SessionTrackerValve extends ValveBase {
     }
     
     private void setSessionIdCookie( Response response, Request request, final String sessionId ) {
-        _logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
+        //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
         final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
          newCookie.setMaxAge( -1 );
          newCookie.setPath( request.getContextPath() );

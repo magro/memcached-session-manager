@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Martin Grotzke
+1 * Copyright 2009 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ public class MemcachedSessionManagerIntegrationTest {
     @Before
     public void setUp() throws Throwable {
 
-        _portTomcat1 = 8888;
+        _portTomcat1 = 18888;
         
         final int port = 21211;
         

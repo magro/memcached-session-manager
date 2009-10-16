@@ -67,8 +67,8 @@ public class TomcatFailoverIntegrationTest {
     @Before
     public void setUp() throws Throwable {
 
-        _portTomcat1 = 8888;
-        _portTomcat2 = 8889;
+        _portTomcat1 = 18888;
+        _portTomcat2 = 18889;
         
         final int port = 21211;
 

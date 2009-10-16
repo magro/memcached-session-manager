@@ -50,6 +50,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     private Request _request;
     private Response _response;
     private Mock _responseControl;
+    private Mock _coyoteResponseControl;
+    private org.apache.coyote.Response _coyoteResponse;
 
     @Before
     public void setUp() throws Exception {
@@ -63,6 +65,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _request = (Request) _requestControl.proxy();
         _responseControl = mock( Response.class );
         _response = (Response) _responseControl.proxy();
+//        _coyoteResponseControl = mock( org.apache.coyote.Response.class );
+//        _coyoteResponse = (org.apache.coyote.Response) _responseControl.proxy();
     }
 
     @After
@@ -75,7 +79,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     
     @Test
     public final void testGetSessionInternalNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
-        
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getCookies" ).will( returnValue( null ) );
@@ -85,7 +89,9 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
 
     @Test
     public final void testGetSessionInternalInvokedWhenRequestedSessionIdPresent() throws IOException, ServletException {
-        
+
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
+        _responseControl.expects( once() ).method( "getCoyoteResponse" ).will( returnValue( new org.apache.coyote.Response() ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
@@ -97,6 +103,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     @Test
     public final void testGetSessionInternalInvokedWhenResponseCookiePresent() throws IOException, ServletException {
 
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getCookies" )
@@ -112,6 +119,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         
         final Session session = (Session) mock( Session.class ).proxy();
 
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
+        _responseControl.expects( once() ).method( "getCoyoteResponse" ).will( returnValue( new org.apache.coyote.Response() ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
@@ -130,6 +139,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final Session session = (Session) sessionControl.proxy();
         final String sessionId = "bar";
 
+        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
+        _responseControl.expects( once() ).method( "getCoyoteResponse" ).will( returnValue( new org.apache.coyote.Response() ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
@@ -138,7 +149,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
             .will( returnValue( BackupResult.RELOCATED ) );
         sessionControl.expects( once() ).method( "getId" ).will( returnValue( sessionId ) );
         _requestControl.expects( once() ).method( "getContextPath" );
-        _responseControl.expects( once() ).method( "addCookie" ).with(
+        _responseControl.expects( once() ).method( "addCookieInternal" ).with(
                 and( hasProperty( "name", eq( SessionTrackerValve.JSESSIONID ) ),
                      hasProperty( "value", eq( sessionId ) ) ) );
 
