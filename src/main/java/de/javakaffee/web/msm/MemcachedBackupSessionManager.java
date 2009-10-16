@@ -813,8 +813,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements
 
     @Override
     public void stop() throws LifecycleException {
-        if ( initialized )
+        if ( initialized ) {
+            _memcached.shutdown();
             destroy();
+        }
     }
 
     /**
