@@ -50,8 +50,6 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     private Request _request;
     private Response _response;
     private Mock _responseControl;
-    private Mock _coyoteResponseControl;
-    private org.apache.coyote.Response _coyoteResponse;
 
     @Before
     public void setUp() throws Exception {
@@ -65,8 +63,6 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _request = (Request) _requestControl.proxy();
         _responseControl = mock( Response.class );
         _response = (Response) _responseControl.proxy();
-//        _coyoteResponseControl = mock( org.apache.coyote.Response.class );
-//        _coyoteResponse = (org.apache.coyote.Response) _responseControl.proxy();
     }
 
     @After
