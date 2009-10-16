@@ -103,6 +103,7 @@ public class MemcachedSessionManagerIntegrationTest {
 
     @After
     public void tearDown() throws Exception {
+        _memcached.shutdown();
         _daemon.stop();
         _tomcat1.stop();
         _connectionManager.shutdown();

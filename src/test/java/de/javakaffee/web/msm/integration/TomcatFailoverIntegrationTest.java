@@ -98,16 +98,10 @@ public class TomcatFailoverIntegrationTest {
 
     @After
     public void tearDown() throws Exception {
+        _client.shutdown();
         _daemon.stop();
         _tomcat1.stop();
         _tomcat2.stop();
-    }
-    
-    @Test
-    public void testConnectDaemon() throws IOException, InterruptedException {
-        final Object value = "bar";
-        _client.set( "foo-" + _nodeId, 3600, value );
-        Assert.assertEquals( value, _client.get( "foo-" + _nodeId ) );
     }
     
     /**
