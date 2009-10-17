@@ -253,6 +253,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         initFailoverNodes();
 
+        if ( _nodeIds.isEmpty() ) {
+            throw new IllegalArgumentException( "All nodes are also configured as failover nodes,"
+                    + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
+        }
+
         try {
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
