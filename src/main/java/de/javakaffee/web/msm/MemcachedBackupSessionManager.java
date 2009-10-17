@@ -294,7 +294,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private void initFailoverNodes() {
         _failoverNodeIds = new ArrayList<String>();
         if ( _failoverNodes != null && _failoverNodes.trim().length() != 0 ) {
-            final String[] failoverNodes = _failoverNodes.split( ":" );
+            final String[] failoverNodes = _failoverNodes.split( " " );
             for ( final String failoverNode : failoverNodes ) {
                 final String nodeId = failoverNode.trim();
                 if ( !_nodeIds.remove( nodeId ) ) {
@@ -798,10 +798,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * The node ids of memcached nodes, that shall only be used for session
      * backup by this tomcat/manager, if there are no other memcached nodes
-     * left.
+     * left. Node ids are separated by whitespace.
+     * <p>
+     * E.g. <code>n1 n2</code>
+     * </p>
      * 
      * @param failoverNodes
-     *            the failoverNodes to set, comma separated
+     *            the failoverNodes to set, whitespace separated
      */
     public void setFailoverNodes( final String failoverNodes ) {
         _failoverNodes = failoverNodes;
