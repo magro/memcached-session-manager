@@ -41,7 +41,9 @@ public class SessionIdFormat {
      * Create a session id including the provided memcachedId.
      * 
      * @param sessionId
+     *            the original session id, it might contain the jvm route
      * @param memcachedId
+     *            the memcached id to encode in the session id
      * @return the sessionId which now contains the memcachedId.
      */
     public String createSessionId( final String sessionId, final String memcachedId ) {
@@ -61,8 +63,6 @@ public class SessionIdFormat {
      *            the session id containing the former memcachedId.
      * @param newMemcachedId
      *            the new memcached id.
-     * @param memcachedId
-     *            the new memcached id
      * @return the sessionId which now contains the new memcachedId instead the
      *         former one.
      */

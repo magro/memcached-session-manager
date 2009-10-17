@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +29,7 @@ import java.util.Map;
 public abstract class NodeIdResolver {
 
     /**
-     * Resolve an {@link InetAddress} to a memcached node id.
+     * Resolve an {@link InetSocketAddress} to a memcached node id.
      * 
      * @param address
      *            the address of the memcached node

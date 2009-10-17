@@ -59,7 +59,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * Use this session manager in a Context element, like this <code><pre>
  * &lt;Context path="/foo"&gt;
  *     &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
- *         memcachedNodes="localhost:11211 localhost:11212" activeNodeIndex="1"
+ *         memcachedNodes="n1.localhost:11211 n2.localhost:11212" activeNodeIndex="1"
  *         requestUriIgnorePattern=".*\.png$" /&gt;
  * &lt;/Context&gt;
  * </pre></code>
@@ -220,10 +220,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void init() {
-        _logger.info( "init invoked" );
+        _logger.info( getClass().getSimpleName() + " starts initialization..." );
 
-        if ( initialized )
+        if ( initialized ) {
             return;
+        }
 
         super.init();
 
@@ -231,8 +232,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          * add the valve for tracking requests for that the session must be sent
          * to memcached
          */
-        final SessionTrackerValve sessionTrackerValve = new SessionTrackerValve( _requestUriIgnorePattern, this );
-        getContainer().getPipeline().addValve( sessionTrackerValve );
+        getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern, this ) );
 
         /*
          * init memcached
@@ -248,32 +248,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
         final Map<InetSocketAddress, String> address2Ids = new HashMap<InetSocketAddress, String>();
         while ( matcher.find() ) {
-
-            final String nodeId = matcher.group( 1 );
-            _nodeIds.add( nodeId );
-            _allNodeIds.add( nodeId );
-
-            final String hostname = matcher.group( 2 );
-            final int port = Integer.parseInt( matcher.group( 3 ) );
-            final InetSocketAddress address = new InetSocketAddress( hostname, port );
-            addresses.add( address );
-
-            address2Ids.put( address, nodeId );
-
+            initHandleNodeDefinitionMatch( matcher, addresses, address2Ids );
         }
 
-        _failoverNodeIds = new ArrayList<String>();
-        if ( _failoverNodes != null && _failoverNodes.trim().length() != 0 ) {
-            final String[] failoverNodes = _failoverNodes.split( ":" );
-            for ( String nodeId : failoverNodes ) {
-                nodeId = nodeId.trim();
-                if ( !_nodeIds.remove( nodeId ) ) {
-                    throw new IllegalArgumentException( "Invalid failover node id " + nodeId + ": "
-                            + "not existing in memcachedNodes '" + _memcachedNodes + "'." );
-                }
-                _failoverNodeIds.add( nodeId );
-            }
-        }
+        initFailoverNodes();
 
         try {
             _memcached =
@@ -287,7 +265,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          * create the missing sessions cache
          */
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
-        _nodeAvailabilityCache = new NodeAvailabilityCache<String>( _allNodeIds.size(), 1000, new CacheLoader<String>() {
+        _nodeAvailabilityCache = createNodeAvailabilityCache( 1000 );
+
+        //_relocatedSessions = new LRUCache<String, String>( 100000, getMaxInactiveInterval() * 1000 );
+    }
+
+    private NodeAvailabilityCache<String> createNodeAvailabilityCache( final long ttlInMillis ) {
+        return new NodeAvailabilityCache<String>( _allNodeIds.size(), ttlInMillis, new CacheLoader<String>() {
 
             @Override
             public boolean isNodeAvailable( final String key ) {
@@ -300,8 +284,35 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             }
 
         } );
+    }
 
-        //_relocatedSessions = new LRUCache<String, String>( 100000, getMaxInactiveInterval() * 1000 );
+    private void initFailoverNodes() {
+        _failoverNodeIds = new ArrayList<String>();
+        if ( _failoverNodes != null && _failoverNodes.trim().length() != 0 ) {
+            final String[] failoverNodes = _failoverNodes.split( ":" );
+            for ( final String failoverNode : failoverNodes ) {
+                final String nodeId = failoverNode.trim();
+                if ( !_nodeIds.remove( nodeId ) ) {
+                    throw new IllegalArgumentException( "Invalid failover node id " + nodeId + ": "
+                            + "not existing in memcachedNodes '" + _memcachedNodes + "'." );
+                }
+                _failoverNodeIds.add( nodeId );
+            }
+        }
+    }
+
+    private void initHandleNodeDefinitionMatch( final Matcher matcher, final List<InetSocketAddress> addresses,
+            final Map<InetSocketAddress, String> address2Ids ) {
+        final String nodeId = matcher.group( 1 );
+        _nodeIds.add( nodeId );
+        _allNodeIds.add( nodeId );
+
+        final String hostname = matcher.group( 2 );
+        final int port = Integer.parseInt( matcher.group( 3 ) );
+        final InetSocketAddress address = new InetSocketAddress( hostname, port );
+        addresses.add( address );
+
+        address2Ids.put( address, nodeId );
     }
 
     /**
@@ -457,10 +468,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             /*
              * get the next memcached node to try
              */
-            @SuppressWarnings( "unchecked" )
-            Set<String> testedNodes = (Set<String>) session.getNote( NODES_TESTED );
             final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-            final String targetNodeId = getNextNodeId( nodeId, testedNodes );
+            final String targetNodeId = getNextNodeId( nodeId, getTestedNodes( session ) );
 
             final MemcachedBackupSession backupSession = (MemcachedBackupSession) session;
 
@@ -475,38 +484,50 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
             } else {
 
-                if ( testedNodes == null ) {
-                    testedNodes = new HashSet<String>();
-                    session.setNote( NODES_TESTED, testedNodes );
+                if ( getTestedNodes( session ) == null ) {
+                    setTestedNodes( session, new HashSet<String>() );
                 }
 
-                final BackupResult backupResult = failover( backupSession, testedNodes, targetNodeId );
+                final BackupResult backupResult = failover( backupSession, getTestedNodes( session ), targetNodeId );
 
-                switch ( backupResult ) {
-                    case SUCCESS:
-
-                        //_relocatedSessions.put( session.getNote( ORIG_SESSION_ID ).toString(), session.getId() );
-
-                        /*
-                         * cleanup
-                         */
-                        session.removeNote( ORIG_SESSION_ID );
-                        session.removeNote( NODE_FAILURE );
-                        session.removeNote( NODES_TESTED );
-
-                        /*
-                         * and tell our client to do his part as well
-                         */
-                        return BackupResult.RELOCATED;
-                    default:
-                        /*
-                         * just pass it up
-                         */
-                        return backupResult;
-
-                }
+                return handleAndTranslateBackupResult( backupResult, session );
             }
         }
+    }
+
+    private BackupResult handleAndTranslateBackupResult( final BackupResult backupResult, final Session session ) {
+        switch ( backupResult ) {
+            case SUCCESS:
+
+                //_relocatedSessions.put( session.getNote( ORIG_SESSION_ID ).toString(), session.getId() );
+
+                /*
+                 * cleanup
+                 */
+                session.removeNote( ORIG_SESSION_ID );
+                session.removeNote( NODE_FAILURE );
+                session.removeNote( NODES_TESTED );
+
+                /*
+                 * and tell our client to do his part as well
+                 */
+                return BackupResult.RELOCATED;
+            default:
+                /*
+                 * just pass it up
+                 */
+                return backupResult;
+
+        }
+    }
+
+    private void setTestedNodes( final Session session, final Set<String> testedNodes ) {
+        session.setNote( NODES_TESTED, testedNodes );
+    }
+
+    @SuppressWarnings( "unchecked" )
+    private Set<String> getTestedNodes( final Session session ) {
+        return (Set<String>) session.getNote( NODES_TESTED );
     }
 
     /**
@@ -757,19 +778,44 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * Set the memcached nodes.
+     * <p>
+     * E.g. <code>n1.localhost:11211 n2.localhost:11212</code>
+     * </p>
+     * 
      * @param memcachedNodes
-     *            the memcachedNodes to set, whitespace separated
+     *            the memcached node definitions, whitespace separated
      */
     public void setMemcachedNodes( final String memcachedNodes ) {
         _memcachedNodes = memcachedNodes;
     }
 
     /**
+     * The node ids of memcached nodes, that shall only be used for session
+     * backup by this tomcat/manager, if there are no other memcached nodes
+     * left.
+     * 
      * @param failoverNodes
      *            the failoverNodes to set, comma separated
      */
     public void setFailoverNodes( final String failoverNodes ) {
         _failoverNodes = failoverNodes;
+    }
+
+    /**
+     * Set the regular expression for request uris to ignore for session backup.
+     * This should include static resources like images, in the case they are
+     * served by tomcat.
+     * <p>
+     * E.g. <code>.*\.(png|gif|jpg|css|js)$</code>
+     * </p>
+     * 
+     * @param requestUriIgnorePattern
+     *            the requestUriIgnorePattern to set
+     * @author Martin Grotzke
+     */
+    public void setRequestUriIgnorePattern( final String requestUriIgnorePattern ) {
+        _requestUriIgnorePattern = requestUriIgnorePattern;
     }
 
     /**
@@ -801,8 +847,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void start() throws LifecycleException {
-        if ( !initialized )
+        if ( !initialized ) {
             init();
+        }
     }
 
     /**
@@ -814,15 +861,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _memcached.shutdown();
             destroy();
         }
-    }
-
-    /**
-     * @param requestUriIgnorePattern
-     *            the requestUriIgnorePattern to set
-     * @author Martin Grotzke
-     */
-    public void setRequestUriIgnorePattern( final String requestUriIgnorePattern ) {
-        _requestUriIgnorePattern = requestUriIgnorePattern;
     }
 
     /**
@@ -896,10 +934,21 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _sessionBackupTimeout = sessionBackupTimeout;
     }
 
+    /**
+     * The session class used by this manager, to be able to change the session
+     * id without the whole notification lifecycle (which includes the
+     * application also).
+     */
     private static final class MemcachedBackupSession extends StandardSession {
 
         private static final long serialVersionUID = 1L;
 
+        /**
+         * Creates a new instance with the given manager.
+         * 
+         * @param manager
+         *            the manager
+         */
         public MemcachedBackupSession( final Manager manager ) {
             super( manager );
         }

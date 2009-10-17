@@ -106,33 +106,33 @@ class SessionTrackerValve extends ValveBase {
                 _logger.fine( "Have a session: " + ( session != null ) );
             }
             if ( session != null ) {
-
-                final BackupResult result = _sessionBackupService.backupSession( session );
-
-                if ( result == BackupResult.RELOCATED ) {
-                    if ( _logger.isLoggable( Level.FINE ) ) {
-                        _logger.fine( "Session got relocated, setting a cookie: " + session.getId() );
-                    }
-                    setSessionIdCookie( response, request, session );
-                }
+                backupSession( request, response, session );
             }
 
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                final Cookie respCookie = getCookie( response, JSESSIONID );
-                _logger.fine( "Finished, " + ( respCookie != null
-                    ? ToStringBuilder.reflectionToString( respCookie )
-                    : null ) );
-            }
+            logDebugResponseCookie( response );
+
         }
 
-        //        if ( _ignorePattern == null || !_ignorePattern.matcher( request.getRequestURI() ).matches() ) {
-        //        if ( _logger.isLoggable( Level.INFO ) ) {
-        //            final Cookie cookie = getCookie( request, JSESSIONID );
-        //            _logger.info( "++++++++++++++ Starting, " + (cookie != null ? cookie.getValue() : null) +
-        //                    ", session: " + (request.getSession( false ) != null) + ", request: " + request.getRequestURI()  );
-        //        }
-        //        }
+    }
 
+    private void backupSession( final Request request, final Response response, final Session session ) {
+        final BackupResult result = _sessionBackupService.backupSession( session );
+
+        if ( result == BackupResult.RELOCATED ) {
+            if ( _logger.isLoggable( Level.FINE ) ) {
+                _logger.fine( "Session got relocated, setting a cookie: " + session.getId() );
+            }
+            setSessionIdCookie( response, request, session );
+        }
+    }
+
+    private void logDebugResponseCookie( final Response response ) {
+        if ( _logger.isLoggable( Level.FINE ) ) {
+            final Cookie respCookie = getCookie( response, JSESSIONID );
+            _logger.fine( "Finished, " + ( respCookie != null
+                ? ToStringBuilder.reflectionToString( respCookie )
+                : null ) );
+        }
     }
 
     private ActionHook createCommitHook( final Request request, final Response response ) {

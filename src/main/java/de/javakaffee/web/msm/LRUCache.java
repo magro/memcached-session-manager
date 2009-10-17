@@ -79,7 +79,7 @@ public class LRUCache<K, V> {
                 _map.remove( _map.keySet().iterator().next() );
             }
             return previous != null
-                ? previous.value
+                ? previous._value
                 : null;
         }
     }
@@ -109,10 +109,10 @@ public class LRUCache<K, V> {
     public V putIfDifferent( final K key, final V value ) {
         synchronized ( _map ) {
             final ManagedItem<V> item = _map.get( key );
-            if ( item == null || item.value == null || !item.value.equals( value ) ) {
+            if ( item == null || item._value == null || !item._value.equals( value ) ) {
                 return put( key, value );
             } else {
-                return item.value;
+                return item._value;
             }
         }
     }
@@ -130,11 +130,11 @@ public class LRUCache<K, V> {
             if ( item == null ) {
                 return null;
             }
-            if ( _ttl > -1 && System.currentTimeMillis() - item.insertionTime > _ttl ) {
+            if ( _ttl > -1 && System.currentTimeMillis() - item._insertionTime > _ttl ) {
                 _map.remove( key );
                 return null;
             }
-            return item.value;
+            return item._value;
         }
     }
 
@@ -149,13 +149,19 @@ public class LRUCache<K, V> {
         }
     }
 
+    /**
+     * Stores a value with the timestamp this value was added to the cache.
+     * 
+     * @param <T>
+     *            the type of the value
+     */
     private static final class ManagedItem<T> {
-        final T value;
-        final long insertionTime;
+        private final T _value;
+        private final long _insertionTime;
 
-        public ManagedItem( final T value, final long accessTime ) {
-            this.value = value;
-            this.insertionTime = accessTime;
+        private ManagedItem( final T value, final long accessTime ) {
+            _value = value;
+            _insertionTime = accessTime;
         }
     }
 

@@ -146,11 +146,17 @@ public class NodeAvailabilityCache<K> {
         return result;
     }
 
+    /**
+     * Stores a value with the timestamp this value was added to the cache.
+     * 
+     * @param <T>
+     *            the type of the value
+     */
     private static final class ManagedItem<T> {
         private final T _value;
         private final long _insertionTime;
 
-        public ManagedItem( final T value, final long accessTime ) {
+        private ManagedItem( final T value, final long accessTime ) {
             _value = value;
             _insertionTime = accessTime;
         }
