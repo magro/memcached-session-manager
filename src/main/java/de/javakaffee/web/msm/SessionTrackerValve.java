@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
@@ -170,18 +169,6 @@ class SessionTrackerValve extends ValveBase {
         newCookie.setMaxAge( -1 );
         newCookie.setPath( request.getContextPath() );
         response.addCookieInternal( newCookie );
-    }
-
-    private Cookie getCookie( final HttpServletRequest httpRequest, final String name ) {
-        final Cookie[] cookies = httpRequest.getCookies();
-        if ( cookies != null ) {
-            for ( final Cookie cookie : cookies ) {
-                if ( name.equals( cookie.getName() ) ) {
-                    return cookie;
-                }
-            }
-        }
-        return null;
     }
 
     private Cookie getCookie( final Response response, final String name ) {
