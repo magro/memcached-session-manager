@@ -1,5 +1,9 @@
 .classpath
 .project
+.settings
 target
 work
 reports
+test-output
+src/test/java/de/javakaffee/web/msm/FooTest.java
+src/test/java/de/javakaffee/web/msm/integration/MemcachedFailover2IntegrationTest.java
