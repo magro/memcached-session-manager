@@ -46,7 +46,6 @@ import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.LifecycleSupport;
-import org.apache.commons.lang.builder.ToStringBuilder;
 
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
@@ -425,7 +424,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             session.setMaxInactiveInterval( this.maxInactiveInterval );
             session.setId( generateSessionId() );
 
-            _logger.fine( ToStringBuilder.reflectionToString( session ) );
+            if ( _logger.isLoggable( Level.FINE ) ) {
+                _logger.fine( "Created new session with id " + session.getId() );
+            }
 
         }
 

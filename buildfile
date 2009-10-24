@@ -11,9 +11,9 @@ SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
 CATALINA_HA = 'org.apache.tomcat:catalina-ha:jar:6.0.18'
 MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4').from(file('lib/memcached-2.4.jar'))
-C_LANG = 'commons-lang:commons-lang:jar:2.4'
 COMMONS_IO = transitive('commons-io:commons-io:jar:1.4')
 TC_COYOTE = transitive( 'org.apache.tomcat:coyote:jar:6.0.18' )
+JACKSON = transitive( 'org.codehaus.jackson:jackson-mapper-asl:jar:1.2.1' )
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.6' ).reject { |a| a.group == 'org.slf4j' }
@@ -24,7 +24,7 @@ JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 # Dependencies
 require 'tools'
 
-LIBS = [ CATALINA, CATALINA_HA, MEMCACHED, C_LANG, JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, COMMONS_IO ]
+LIBS = [ CATALINA, CATALINA_HA, MEMCACHED, JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, COMMONS_IO ]
 task("check-deps") do |task|
   checkdeps LIBS      
 end                         
@@ -38,7 +38,7 @@ define 'memcached-session-manager' do
   project.group = 'de.javakaffee.web'
   project.version = '1.0-SNAPSHOT'
   
-  compile.with(SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED, C_LANG, COMMONS_IO).using(:source=>'1.5', :target=>'1.5')
+  compile.with(SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED, COMMONS_IO, JACKSON).using(:source=>'1.5', :target=>'1.5')
   
   test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB )
   

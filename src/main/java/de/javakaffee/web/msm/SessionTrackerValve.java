@@ -28,7 +28,6 @@ import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
-import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.coyote.ActionHook;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
@@ -129,9 +128,16 @@ class SessionTrackerValve extends ValveBase {
         if ( _logger.isLoggable( Level.FINE ) ) {
             final Cookie respCookie = getCookie( response, JSESSIONID );
             _logger.fine( "Finished, " + ( respCookie != null
-                ? ToStringBuilder.reflectionToString( respCookie )
+                ? toString( respCookie )
                 : null ) );
         }
+    }
+
+    private String toString( final Cookie cookie ) {
+        return new StringBuilder( cookie.getClass().getName() ).append( "[name=" ).append( cookie.getName() ).append( ", value=" ).append(
+                cookie.getValue() ).append( ", domain=" ).append( cookie.getDomain() ).append( ", path=" ).append( cookie.getPath() ).append(
+                ", maxAge=" ).append( cookie.getMaxAge() ).append( ", secure=" ).append( cookie.getSecure() ).append( ", version=" ).append(
+                cookie.getVersion() ).toString();
     }
 
     private ActionHook createCommitHook( final Request request, final Response response ) {
