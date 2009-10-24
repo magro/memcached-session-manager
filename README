@@ -5,7 +5,7 @@ for how to install buildr (the "Getting started" section should be fine).
 $ buildr package
 
 == Installation ==
-Copy the created memcached-session-manager-1.0-SNAPSHOT.jar from the target
+Copy the created memcached-session-manager-1.0.jar from the target
 directory to $CATALINA_HOME/libs, and lib/* as well.
 
 Notice: this project is running against/with tomcat6, I have not tested it with
@@ -18,7 +18,7 @@ your context, so that this looks like this:
 <Context path="/hunter">
     <Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
         memcachedNodes="n1:localhost:11211 n2:localhost:11212" failoverNodes="n2"
-        requestUriIgnorePattern=".*\.png$" />
+        requestUriIgnorePattern=".*\.(png|gif|jpg|css|js)$" />
 </Context>
 
 You can use several failoverNodes seperated by comma.
