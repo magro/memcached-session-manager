@@ -36,8 +36,6 @@ desc 'memcached-session-manager'
 define 'memcached-session-manager' do
   project.group = 'de.javakaffee.web'
   project.version = '1.0-SNAPSHOT'
-  THIS_VERSION = '1.0-SNAPSHOT'
-  VERSION_NUMBER = '1.0'
   
   compile.with(SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED, JACKSON).using(:source=>'1.5', :target=>'1.5')
   
