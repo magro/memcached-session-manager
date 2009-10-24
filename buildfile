@@ -42,6 +42,8 @@ define 'memcached-session-manager' do
   test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB )
   
   package :jar, :id => 'memcached-session-manager'
+  package :sources
+  package :javadoc
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'

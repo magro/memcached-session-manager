@@ -58,8 +58,8 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * Use this session manager in a Context element, like this <code><pre>
  * &lt;Context path="/foo"&gt;
  *     &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
- *         memcachedNodes="n1.localhost:11211 n2.localhost:11212" activeNodeIndex="1"
- *         requestUriIgnorePattern=".*\.png$" /&gt;
+ *         memcachedNodes="n1.localhost:11211 n2.localhost:11212" failoverNodes="n2"
+ *         requestUriIgnorePattern=".*\.(png|gif|jpg|css|js)$" /&gt;
  * &lt;/Context&gt;
  * </pre></code>
  * </p>
@@ -449,7 +449,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * 
      * @param session
      *            the session to save
-     * @return the {@link BackupResult}.
+     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResult}
      */
     public BackupResult backupSession( final Session session ) {
         if ( _logger.isLoggable( Level.INFO ) ) {
