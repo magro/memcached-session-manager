@@ -40,6 +40,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
+import de.javakaffee.web.msm.SessionSerializingTranscoderFactory;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -49,13 +50,12 @@ import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
  * @version $Id$
  */
 public class TomcatFailoverIntegrationTest {
-    
-    private static final Log LOG = LogFactory
-            .getLog( TomcatFailoverIntegrationTest.class );
+
+    private static final Log LOG = LogFactory.getLog( TomcatFailoverIntegrationTest.class );
 
     private MemCacheDaemon _daemon;
     private MemcachedClient _client;
-    
+
     private Embedded _tomcat1;
     private Embedded _tomcat2;
 
@@ -69,31 +69,30 @@ public class TomcatFailoverIntegrationTest {
 
         _portTomcat1 = 18888;
         _portTomcat2 = 18889;
-        
+
         final int port = 21211;
 
         final InetSocketAddress address = new InetSocketAddress( "localhost", port );
         _daemon = createDaemon( address );
-        _daemon.start(); 
-        
+        _daemon.start();
+
         _nodeId = "n1";
         try {
             final String memcachedNodes = _nodeId + ":localhost:" + port;
             _tomcat1 = createCatalina( _portTomcat1, 2, memcachedNodes );
             _tomcat1.start();
-    
+
             _tomcat2 = createCatalina( _portTomcat2, memcachedNodes );
             _tomcat2.start();
-        } catch( Throwable e ) {
+        } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
-        
-        _client = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(),
-                        NodeIdResolver.node( _nodeId, address ).build(),
-                        new SessionIdFormat() ),
-                Arrays.asList( address ) );
+
+        _client =
+                new MemcachedClient( new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), NodeIdResolver.node(
+                        _nodeId, address ).build(), new SessionIdFormat(), new SessionSerializingTranscoderFactory() ),
+                        Arrays.asList( address ) );
     }
 
     @After
@@ -103,10 +102,11 @@ public class TomcatFailoverIntegrationTest {
         _tomcat1.stop();
         _tomcat2.stop();
     }
-    
+
     /**
-     * Tests that when two tomcats are running and one tomcat fails the other tomcat can
-     * take over the session.
+     * Tests that when two tomcats are running and one tomcat fails the other
+     * tomcat can take over the session.
+     * 
      * @throws IOException
      * @throws InterruptedException
      */
@@ -115,25 +115,24 @@ public class TomcatFailoverIntegrationTest {
         final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
         try {
             final HttpClient client = new HttpClient( connectionManager );
-    
+
             final String sessionId1 = makeRequest( client, _portTomcat1, null );
-            
+
             Thread.sleep( 10 );
-            
+
             final Object session = _client.get( sessionId1 );
             Assert.assertNotNull( session );
-            
+
             final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
-            
+
             Assert.assertEquals( sessionId1, sessionId2 );
-            
+
             Thread.sleep( 10 );
-            
+
         } finally {
             connectionManager.shutdown();
         }
-        
-    }
 
+    }
 
 }

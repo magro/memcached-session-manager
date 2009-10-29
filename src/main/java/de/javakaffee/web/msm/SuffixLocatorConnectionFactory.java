@@ -38,6 +38,7 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
     private final Manager _manager;
     private final SessionIdFormat _sessionIdFormat;
     private final NodeIdResolver _resolver;
+    private final TranscoderFactory _transcoderFactory;
 
     /**
      * Creates a new instance.
@@ -50,10 +51,11 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
      *            the {@link SessionIdFormat}
      */
     public SuffixLocatorConnectionFactory( final Manager manager, final NodeIdResolver resolver,
-            final SessionIdFormat sessionIdFormat ) {
+            final SessionIdFormat sessionIdFormat, final TranscoderFactory transcoderFactory ) {
         _manager = manager;
         _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
+        _transcoderFactory = transcoderFactory;
     }
 
     /**
@@ -69,7 +71,7 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
      */
     @Override
     public Transcoder<Object> getDefaultTranscoder() {
-        return new SessionSerializingTranscoder( _manager );
+        return _transcoderFactory.createTranscoder( _manager );
     }
 
 }

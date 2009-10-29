@@ -147,6 +147,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     private int _sessionBackupTimeout = 100;
 
+    /**
+     * TODO
+     */
+    private Class<? extends TranscoderFactory> _transcoderFactoryClass = SessionSerializingTranscoderFactory.class;
+
     // -------------------- END configuration properties --------------------
 
     /*
@@ -260,8 +265,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         try {
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
-                            _sessionIdFormat ), addresses );
-        } catch ( final IOException e ) {
+                            _sessionIdFormat, _transcoderFactoryClass.newInstance() ), addresses );
+        } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
 
@@ -825,6 +830,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setRequestUriIgnorePattern( final String requestUriIgnorePattern ) {
         _requestUriIgnorePattern = requestUriIgnorePattern;
+    }
+
+    public void setTranscoderFactoryClass( final String transcoderFactoryClassName ) {
+        try {
+            _transcoderFactoryClass = Class.forName( transcoderFactoryClassName ).asSubclass( TranscoderFactory.class );
+        } catch ( final ClassNotFoundException e ) {
+            _logger.severe( "The transcoderFactoryClass (" + transcoderFactoryClassName + ") could not be found" );
+            throw new RuntimeException( e );
+        }
     }
 
     /**

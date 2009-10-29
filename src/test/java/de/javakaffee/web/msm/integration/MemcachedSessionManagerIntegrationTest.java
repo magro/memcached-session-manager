@@ -44,6 +44,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
+import de.javakaffee.web.msm.SessionSerializingTranscoderFactory;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -53,13 +54,12 @@ import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
  * @version $Id$
  */
 public class MemcachedSessionManagerIntegrationTest {
-    
-    private static final Log LOG = LogFactory
-            .getLog( MemcachedSessionManagerIntegrationTest.class );
+
+    private static final Log LOG = LogFactory.getLog( MemcachedSessionManagerIntegrationTest.class );
 
     private MemCacheDaemon _daemon;
     private MemcachedClient _memcached;
-    
+
     private Embedded _tomcat1;
 
     private int _portTomcat1;
@@ -74,29 +74,28 @@ public class MemcachedSessionManagerIntegrationTest {
     public void setUp() throws Throwable {
 
         _portTomcat1 = 18888;
-        
+
         final int port = 21211;
-        
+
         final InetSocketAddress address = new InetSocketAddress( "localhost", port );
         _daemon = createDaemon( address );
-        _daemon.start(); 
-        
+        _daemon.start();
+
         try {
             _memcachedNodeId = "n1";
             final String memcachedNodes = _memcachedNodeId + ":localhost:" + port;
             _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
             _tomcat1.start();
-        } catch( Throwable e ) {
+        } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
-        
-        _memcached = new MemcachedClient(
-                new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(),
-                        NodeIdResolver.node( _memcachedNodeId, address ).build(),
-                        new SessionIdFormat() ),
-                Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
-        
+
+        _memcached =
+                new MemcachedClient( new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), NodeIdResolver.node(
+                        _memcachedNodeId, address ).build(), new SessionIdFormat(), new SessionSerializingTranscoderFactory() ),
+                        Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
+
         _connectionManager = new SimpleHttpConnectionManager( true );
         _httpClient = new HttpClient( _connectionManager );
     }
@@ -108,31 +107,34 @@ public class MemcachedSessionManagerIntegrationTest {
         _tomcat1.stop();
         _connectionManager.shutdown();
     }
-    
+
     @Test
     public void testConfiguredMemcachedNodeId() throws IOException, InterruptedException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
-        /* test that we have the configured memcachedNodeId in the sessionId,
+        /*
+         * test that we have the configured memcachedNodeId in the sessionId,
          * the session id looks like "<sid>-<memcachedId>[.<jvmRoute>]"
          */
         final String nodeId = sessionId1.substring( sessionId1.indexOf( '-' ) + 1, sessionId1.indexOf( '.' ) );
         assertEquals( "Invalid memcached node id", _memcachedNodeId, nodeId );
     }
-    
+
     @Test
     public void testSessionIdJvmRouteCompatibility() throws IOException, InterruptedException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
-        assertTrue( "Invalid session format, must be <sid>-<memcachedId>[.<jvmRoute>].", sessionId1.matches( "[^-.]+-[^.]+(\\.[\\w]+)?" ) );
+        assertTrue( "Invalid session format, must be <sid>-<memcachedId>[.<jvmRoute>].",
+                sessionId1.matches( "[^-.]+-[^.]+(\\.[\\w]+)?" ) );
     }
-    
+
     /**
-     * Tests, that session ids with an invalid format (not containing the memcached id)
-     * do not cause issues. Instead, we want to retrieve a new session id.
+     * Tests, that session ids with an invalid format (not containing the
+     * memcached id) do not cause issues. Instead, we want to retrieve a new
+     * session id.
      * 
-     * @throws IOException 
-     * @throws InterruptedException 
+     * @throws IOException
+     * @throws InterruptedException
      */
     @Test
     public void testInvalidSessionId() throws IOException, InterruptedException {
@@ -140,7 +142,7 @@ public class MemcachedSessionManagerIntegrationTest {
         assertNotNull( "No session created.", sessionId1 );
         assertTrue( "Invalid session id format", sessionId1.indexOf( '-' ) > -1 );
     }
-    
+
     @Test
     public void testSessionAvailableInMemcached() throws IOException, InterruptedException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -148,45 +150,51 @@ public class MemcachedSessionManagerIntegrationTest {
         Thread.sleep( 50 );
         assertNotNull( "Session not available in memcached.", _memcached.get( sessionId1 ) );
     }
-    
+
     @Test
     public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
-        
-        /* wait some time, as processExpires runs every second and the maxInactiveTime is set to 1 sec...
+
+        /*
+         * wait some time, as processExpires runs every second and the
+         * maxInactiveTime is set to 1 sec...
          */
         Thread.sleep( 2100 );
-        
+
         assertNull( "Expired sesion still existing in memcached", _memcached.get( sessionId1 ) );
     }
-    
+
     @Test
     public void testInvalidSessionNotFound() throws IOException, InterruptedException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
-        
-        /* wait some time, as processExpires runs every second and the maxInactiveTime is set to 1 sec...
+
+        /*
+         * wait some time, as processExpires runs every second and the
+         * maxInactiveTime is set to 1 sec...
          */
         Thread.sleep( 2100 );
 
         final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
         assertNotSame( "Expired session returned", sessionId1, sessionId2 );
     }
-    
+
     /**
-     * Tests, that relocated sessions are no longer available under the old/former
-     * session id.
+     * Tests, that relocated sessions are no longer available under the
+     * old/former session id.
      * 
-     * @throws IOException 
-     * @throws InterruptedException 
+     * @throws IOException
+     * @throws InterruptedException
      */
     @Test
     public void testRelocateSession() throws IOException, InterruptedException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
-        
-        /* wait some time, as processExpires runs every second and the maxInactiveTime is set to 1 sec...
+
+        /*
+         * wait some time, as processExpires runs every second and the
+         * maxInactiveTime is set to 1 sec...
          */
         Thread.sleep( 2100 );
 
