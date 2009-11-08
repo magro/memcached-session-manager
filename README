@@ -1,0 +1,1 @@
+A serialization strategy for the memcached-session-manager that uses Javolution (http://javolution.org/).
