@@ -117,7 +117,6 @@ public class ReflectionBinding extends XMLBinding {
         @SuppressWarnings( "unchecked" )
         @Override
         public Object newInstance( final Class clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
-            System.out.println("XMLArrayFormat.newinstance invoked");
             try {
                 final String componentType = input.getAttribute( "componentType", (String)null );
                 final int length = input.getAttribute( "length", 0 );
