@@ -48,9 +48,9 @@ import javolution.xml.stream.XMLStreamReader;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class XMLReflectionFormat<T> extends XMLFormat<T> {
+public class ReflectionFormat<T> extends XMLFormat<T> {
 
-    private static final Logger LOG = Logger.getLogger( XMLReflectionFormat.class.getName() );
+    private static final Logger LOG = Logger.getLogger( ReflectionFormat.class.getName() );
 
     private final Collection<Field> _attributes;
     private final Collection<Field> _elements;
@@ -62,7 +62,7 @@ public class XMLReflectionFormat<T> extends XMLFormat<T> {
      * @param clazz
      *            the Class that is supported by this {@link XMLFormat}.
      */
-    public XMLReflectionFormat( final Class<T> clazz ) {
+    public ReflectionFormat( final Class<T> clazz ) {
 
         final AttributesAndElements fields = allFields( clazz );
 

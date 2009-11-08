@@ -47,12 +47,14 @@ public class ReflectionBinding extends XMLBinding {
     @SuppressWarnings( "unchecked" )
     @Override
     public <T> XMLFormat<T> getFormat(final Class<T> cls) {
+        
         final XMLFormat<T> format = super.getFormat( cls );
-        //System.out.println( "got format " + format + " for class " +  cls);
+        
         if ( cls.isPrimitive() || cls.equals( String.class ) || Number.class.isAssignableFrom( cls )
-                || Map.class.isAssignableFrom( cls ) || Collection.class.isAssignableFrom( cls ) )
+                || Map.class.isAssignableFrom( cls ) || Collection.class.isAssignableFrom( cls ) ) {
             return format;
-        if ( cls.isArray() ) {
+        }
+        else if ( cls.isArray() ) {
             return (XMLFormat<T>) ARRAY_FORMAT;
         }
         else if ( cls.isEnum() ) {
@@ -61,12 +63,13 @@ public class ReflectionBinding extends XMLBinding {
         else {
             XMLFormat<?> xmlFormat = _formats.get( cls );
             if ( xmlFormat == null ) {
-                xmlFormat = new XMLReflectionFormat( cls );
+                xmlFormat = new ReflectionFormat( cls );
                 _formats.put( cls, xmlFormat );
             }
             return (XMLFormat<T>) xmlFormat;
         }
     }
+    
     static class XMLEnumFormat extends XMLFormat<Enum<?>> {
         
         /**
@@ -143,15 +146,12 @@ public class ReflectionBinding extends XMLBinding {
          */
         @Override
         public void write( final Object obj, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            //System.out.println( "-- have array...");
             final Object[] array = (Object[]) obj;
             output.setAttribute( "type", "array" );
             output.setAttribute( "componentType", obj.getClass().getComponentType().getName() );
             output.setAttribute("length", array.length);
             for( final Object item : array ) {
-                //output.getStreamWriter().writeStartElement( "item" );
                 output.add( item );
-                //output.getStreamWriter().writeEndElement();
             }
         }
         

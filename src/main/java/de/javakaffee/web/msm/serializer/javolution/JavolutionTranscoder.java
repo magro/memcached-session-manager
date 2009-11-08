@@ -41,7 +41,7 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSessio
  * xml data binding</a> facilities.
  * <p>
  * Objects are serialized to/from xml using javolutions built in {@link XMLFormat}s for standard types,
- * custom/user types are bound using the {@link XMLReflectionFormat}.
+ * custom/user types are bound using the {@link ReflectionFormat}.
  * </p>
  * <p>
  * Additionally it's worth to note that cyclic dependencies are supported.
