@@ -30,7 +30,7 @@ define 'msm-javolution-serializer' do
   test.with( compile.dependencies, CLANG )
   test.using :testng
   
-  package :jar, :id => 'msm-aalto-serializer'
+  package :jar, :id => 'msm-javolution-serializer'
   package :sources
   package :javadoc
 
