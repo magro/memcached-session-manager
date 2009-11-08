@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -31,7 +30,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.session.StandardSession;
@@ -40,6 +38,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Person.Gender;
 
 /**
@@ -49,84 +48,17 @@ import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Pers
  */
 public class JavolutionTranscoderTest {
     
-    @Test(enabled=false)
-    void testInstantiate() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-        final Object instance = Class.forName( "de.javakaffee.web.msm.MemcachedBackupSessionManager$MemcachedBackupSession" ).newInstance();
-        System.out.println("got instance: " + instance);
-        
-        System.out.println( ConcurrentHashMap.class.isAssignableFrom( Map.class ) );
-        System.out.println( Map.class.isAssignableFrom( ConcurrentHashMap.class ) );
-        System.out.println( Integer.class.isAssignableFrom( Number.class ) );
-        System.out.println( Number.class.isAssignableFrom( Integer.class ) );
-        System.out.println( String[].class.isArray() );
-        
-        final String[] foo = new String[] { "foo" };
-        System.out.println( foo.getClass().getComponentType() );
-        
-        System.out.println( ((String[]) Array.newInstance( Class.forName( "java.lang.String" ), 0 )).length );
-        
-        System.out.println( Class.forName( "java.util.Arrays$ArrayList" ));
-        System.out.println( Class.forName( "de.javakaffee.web.msm.serializer.xstream.JavolutionTranscoderTest$Person" ));
-        
-    }
-    
-    public static class Foo {
-        private final String[] _bars;
-        private final List<String> _foos;
-        private final Map<String,Integer> _bazens;
-        public Foo() {
-            _bars = new String[] { "foo", "bar" };
-            _foos = new ArrayList<String>(Arrays.asList( "foo", "bar" ));
-            _bazens = new HashMap<String, Integer>();
-            _bazens.put( "foo", 1 );
-            _bazens.put( "bar", 2 );
-        }
-        @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + Arrays.hashCode( _bars );
-            result = prime * result + ( ( _bazens == null )
-                ? 0
-                : _bazens.hashCode() );
-            result = prime * result + ( ( _foos == null )
-                ? 0
-                : _foos.hashCode() );
-            return result;
-        }
-        @Override
-        public boolean equals( final Object obj ) {
-            if ( this == obj )
-                return true;
-            if ( obj == null )
-                return false;
-            if ( getClass() != obj.getClass() )
-                return false;
-            final Foo other = (Foo) obj;
-            if ( !Arrays.equals( _bars, other._bars ) )
-                return false;
-            if ( _bazens == null ) {
-                if ( other._bazens != null )
-                    return false;
-            } else if ( !_bazens.equals( other._bazens ) )
-                return false;
-            if ( _foos == null ) {
-                if ( other._foos != null )
-                    return false;
-            } else if ( !_foos.equals( other._foos ) )
-                return false;
-            return true;
-        }
-    }
-    
-    @Test(enabled=false)
-    public void testArrays() throws Exception {
+    @Test(enabled=true)
+    public void testCollections() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
         final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
-        final Foo foo = new Foo();
-        assertEquals( transcoder.deserialize( transcoder.serialize( foo ) ), foo );
         
+        final MemcachedBackupSession session = manager.createEmptySession();
+        session.setValid( true );
+        session.setAttribute( "foo", new EntityWithCollections() );
+        
+        assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
     }
 
     @Test(enabled=true)
@@ -200,6 +132,55 @@ public class JavolutionTranscoderTest {
         System.out.println( ToStringBuilder.reflectionToString( readJSONValue ) );
         System.out.println( ToStringBuilder.reflectionToString( readJavaValue ) );
 
+    }
+    
+    public static class EntityWithCollections {
+        private final String[] _bars;
+        private final List<String> _foos;
+        private final Map<String,Integer> _bazens;
+        public EntityWithCollections() {
+            _bars = new String[] { "foo", "bar" };
+            _foos = new ArrayList<String>(Arrays.asList( "foo", "bar" ));
+            _bazens = new HashMap<String, Integer>();
+            _bazens.put( "foo", 1 );
+            _bazens.put( "bar", 2 );
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + Arrays.hashCode( _bars );
+            result = prime * result + ( ( _bazens == null )
+                ? 0
+                : _bazens.hashCode() );
+            result = prime * result + ( ( _foos == null )
+                ? 0
+                : _foos.hashCode() );
+            return result;
+        }
+        @Override
+        public boolean equals( final Object obj ) {
+            if ( this == obj )
+                return true;
+            if ( obj == null )
+                return false;
+            if ( getClass() != obj.getClass() )
+                return false;
+            final EntityWithCollections other = (EntityWithCollections) obj;
+            if ( !Arrays.equals( _bars, other._bars ) )
+                return false;
+            if ( _bazens == null ) {
+                if ( other._bazens != null )
+                    return false;
+            } else if ( !_bazens.equals( other._bazens ) )
+                return false;
+            if ( _foos == null ) {
+                if ( other._foos != null )
+                    return false;
+            } else if ( !_foos.equals( other._foos ) )
+                return false;
+            return true;
+        }
     }
 
     private Person createPerson( final String name, final Gender gender, final String... emailAddresses ) {
