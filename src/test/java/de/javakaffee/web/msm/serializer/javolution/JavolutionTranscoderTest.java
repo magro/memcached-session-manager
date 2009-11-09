@@ -48,7 +48,7 @@ import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Pers
  */
 public class JavolutionTranscoderTest {
     
-    @Test(enabled=true)
+    @Test(enabled=false)
     public void testClassWithoutDefaultConstructor() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -61,7 +61,7 @@ public class JavolutionTranscoderTest {
         assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
     }
     
-    @Test(enabled=true)
+    @Test(enabled=false)
     public void testPrivateClass() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -77,7 +77,7 @@ public class JavolutionTranscoderTest {
         assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
     }
     
-    @Test(enabled=false)
+    @Test(enabled=true)
     public void testCollections() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -90,7 +90,7 @@ public class JavolutionTranscoderTest {
         assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
     }
 
-    @Test(enabled=false)
+    @Test(enabled=true)
     public void testCyclicDependencies() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -117,7 +117,7 @@ public class JavolutionTranscoderTest {
         
     }
 
-    @Test(enabled=false)
+    @Test(enabled=true)
     public void testReadValueIntoObject() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
