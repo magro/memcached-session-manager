@@ -154,7 +154,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 final Object value = input.get( field.getName() );
                 field.set( obj, value );
             } catch ( final Exception e ) {
-                JavolutionTranscoder._log.log( Level.WARNING, "Could not set field value for field " + field );
+                LOG.log( Level.SEVERE, "Could not set field value for field " + field, e );
             }
         }
     }
@@ -194,7 +194,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                     final Map<?, ?> map = (Map<?, ?>) object;
                     output.add( map, field.getName(), (Class<Map<?, ?>>) map.getClass() );
                 } else {
-                    output.add( object );
+                    output.add( object, field.getName() );
                 }
             }
         } catch ( final Exception e ) {

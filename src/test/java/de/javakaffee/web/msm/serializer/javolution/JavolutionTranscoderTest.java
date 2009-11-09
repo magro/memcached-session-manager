@@ -48,6 +48,35 @@ import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Pers
  */
 public class JavolutionTranscoderTest {
     
+    @Test(enabled=false)
+    public void testClassWithoutDefaultConstructor() throws Exception {
+        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
+        manager.setContainer( new StandardContext() );
+        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
+        
+        final MemcachedBackupSession session = manager.createEmptySession();
+        session.setValid( true );
+        session.setAttribute( "no-default constructor", new ClassWithoutDefaultConstructor( "foo" ) );
+        
+        assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
+    }
+    
+    @Test(enabled=false)
+    public void testPrivateClass() throws Exception {
+        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
+        manager.setContainer( new StandardContext() );
+        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
+        
+        final MemcachedBackupSession session = manager.createEmptySession();
+        session.setValid( true );
+        final PrivateClass privateClass = new PrivateClass();
+        privateClass.foo = "foo";
+        session.setAttribute( "pc", privateClass );
+        
+        System.out.println( new String( transcoder.serialize( session ) ) );
+        assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
+    }
+    
     @Test(enabled=true)
     public void testCollections() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
@@ -462,6 +491,76 @@ public class JavolutionTranscoderTest {
             return "Email [_email=" + _email + ", _name=" + _name + "]";
         }
 
+    }
+    
+    public static class PublicClass {
+        PrivateClass privateClass;
+        public PublicClass() {
+        }
+        public PublicClass( final PrivateClass protectedClass ) {
+            this.privateClass = protectedClass;
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ( ( privateClass == null )
+                ? 0
+                : privateClass.hashCode() );
+            return result;
+        }
+        @Override
+        public boolean equals( final Object obj ) {
+            if ( this == obj )
+                return true;
+            if ( obj == null )
+                return false;
+            if ( getClass() != obj.getClass() )
+                return false;
+            final PublicClass other = (PublicClass) obj;
+            if ( privateClass == null ) {
+                if ( other.privateClass != null )
+                    return false;
+            } else if ( !privateClass.equals( other.privateClass ) )
+                return false;
+            return true;
+        }
+    }
+    
+    private static class PrivateClass {
+        String foo;
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ( ( foo == null )
+                ? 0
+                : foo.hashCode() );
+            return result;
+        }
+        @Override
+        public boolean equals( final Object obj ) {
+            if ( this == obj )
+                return true;
+            if ( obj == null )
+                return false;
+            if ( getClass() != obj.getClass() )
+                return false;
+            final PrivateClass other = (PrivateClass) obj;
+            if ( foo == null ) {
+                if ( other.foo != null )
+                    return false;
+            } else if ( !foo.equals( other.foo ) )
+                return false;
+            return true;
+        }
+    }
+    
+    public class ClassWithoutDefaultConstructor {
+        final String value;
+        public ClassWithoutDefaultConstructor( final String value ) {
+            this.value = value;
+        }
     }
 
 }
