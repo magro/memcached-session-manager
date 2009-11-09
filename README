@@ -1,1 +1,7 @@
 A serialization strategy for the memcached-session-manager that uses Javolution (http://javolution.org/).
+
+* How to build *
+Install buildr on top of jruby, this is described at http://buildr.apache.org/installing.html.
+
+For building just run @buildr@ (this executes both @buildr compile@ and @buildr test@).
+For more on building with buildr see http://buildr.apache.org/quick_start.html
