@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -263,6 +264,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
 
         try {
+            log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
                             _sessionIdFormat, _transcoderFactoryClass.newInstance() ), addresses );
@@ -734,6 +736,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             } catch ( final NodeFailureException e ) {
                 _logger.warning( "Could not load session with id " + sessionId + " from memcached." );
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
+            } catch ( final Exception e ) {
+                _logger.warning( "Could not load session with id " + sessionId + " from memcached: " + e );
             }
         }
         return null;
@@ -962,9 +966,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * id without the whole notification lifecycle (which includes the
      * application also).
      */
-    private static final class MemcachedBackupSession extends StandardSession {
+    public static final class MemcachedBackupSession extends StandardSession {
 
         private static final long serialVersionUID = 1L;
+
+        /**
+         * Creates a new instance without a given manager. This has to be
+         * assigned via {@link #setManager(Manager)} before this session is
+         * used.
+         * 
+         */
+        public MemcachedBackupSession() {
+            super( null );
+        }
 
         /**
          * Creates a new instance with the given manager.
@@ -1003,6 +1017,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         @Override
         public void setId( final String id ) {
             super.setId( id );
+        }
+
+        public void doAfterDeserialization() {
+            if ( listeners == null ) {
+                listeners = new ArrayList<Object>();
+            }
+            if ( notes == null ) {
+                notes = new Hashtable<Object, Object>();
+            }
         }
 
     }
