@@ -36,12 +36,16 @@ public class ReflectionBinding extends XMLBinding {
     
     private static final Logger _log = Logger.getLogger( ReflectionBinding.class.getName() );
     
-    private static final XMLEnumFormat ENUM_FORMAT = new XMLEnumFormat();
-    private static final XMLArrayFormat ARRAY_FORMAT = new XMLArrayFormat();
-    private static final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
+    private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
+
+    private final ClassLoader _classLoader;
+    private final XMLEnumFormat _enumFormat;
+    private final XMLArrayFormat _arrayFormat;
     
-    
-    public ReflectionBinding() {
+    public ReflectionBinding(final ClassLoader classLoader) {
+        _classLoader = classLoader;
+        _enumFormat = new XMLEnumFormat( classLoader );
+        _arrayFormat = new XMLArrayFormat( classLoader );
     }
 
     @SuppressWarnings( "unchecked" )
@@ -55,15 +59,15 @@ public class ReflectionBinding extends XMLBinding {
             return format;
         }
         else if ( cls.isArray() ) {
-            return (XMLFormat<T>) ARRAY_FORMAT;
+            return (XMLFormat<T>) _arrayFormat;
         }
         else if ( cls.isEnum() ) {
-            return (XMLFormat<T>) ENUM_FORMAT;
+            return (XMLFormat<T>) _enumFormat;
         }
         else {
             XMLFormat<?> xmlFormat = _formats.get( cls );
             if ( xmlFormat == null ) {
-                xmlFormat = new ReflectionFormat( cls );
+                xmlFormat = new ReflectionFormat( cls, _classLoader );
                 _formats.put( cls, xmlFormat );
             }
             return (XMLFormat<T>) xmlFormat;
@@ -71,7 +75,13 @@ public class ReflectionBinding extends XMLBinding {
     }
     
     static class XMLEnumFormat extends XMLFormat<Enum<?>> {
+
+        private final ClassLoader _classLoader;
         
+        public XMLEnumFormat( final ClassLoader classLoader ) {
+            _classLoader = classLoader;
+        }
+
         /**
          * {@inheritDoc}
          */
@@ -107,8 +117,11 @@ public class ReflectionBinding extends XMLBinding {
     }
     
     public static class XMLArrayFormat extends XMLFormat<Object> {
+
+        private final ClassLoader _classLoader;
         
-        public XMLArrayFormat() {
+        public XMLArrayFormat(final ClassLoader classLoader) {
+            _classLoader = classLoader;
         }
         
         /**
@@ -120,7 +133,7 @@ public class ReflectionBinding extends XMLBinding {
             try {
                 final String componentType = input.getAttribute( "componentType", (String)null );
                 final int length = input.getAttribute( "length", 0 );
-                return Array.newInstance( Class.forName( componentType ) , length );
+                return Array.newInstance( Class.forName( componentType, true, _classLoader ) , length );
             } catch ( final Exception e ) {
                 _log.log( Level.SEVERE, "caught exception", e );
                 throw new XMLStreamException( e );

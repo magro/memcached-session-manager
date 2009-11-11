@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -31,12 +32,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javolution.xml.XMLBinding;
+import javolution.xml.XMLObjectWriter;
+
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.session.StandardSession;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import sun.reflect.ReflectionFactory;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Person.Gender;
@@ -47,8 +52,46 @@ import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Pers
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class JavolutionTranscoderTest {
-    
+
+    @SuppressWarnings( "unchecked" )
     @Test(enabled=false)
+    public void testPrivateClassAndClassWithoutDefaultConstructor() throws Exception {
+
+        final XMLBinding binding = new ReflectionBinding( getClass().getClassLoader() );
+
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        final XMLObjectWriter writer = XMLObjectWriter.newInstance(bos);
+        writer.setBinding( binding );
+        
+        final SomePackageProtectedClass o = SomePackageProtectedClass.createWithPrivate( "foo" );
+        
+        writer.write( o, "item" );
+        writer.flush();
+        
+        final byte[] bytes = bos.toByteArray();
+        System.out.println( "Have bytes: " + new String(bytes));
+        writer.close();
+        
+//        final SomePackageProtectedClass read = deserialize( bytes, "item" );
+//        Assert.assertEquals( read, o );
+
+        final ReflectionFactory reflectionFactory = ReflectionFactory.getReflectionFactory();
+
+        final Constructor<SomePackageProtectedClass> constructor = reflectionFactory.newConstructorForSerialization(SomePackageProtectedClass.class, Object.class.getDeclaredConstructor(new Class[0]));
+        final SomePackageProtectedClass instance = constructor.newInstance(new Object[0]);
+        Assert.assertNotNull( instance );
+        System.out.println( "Have instance: " + instance );
+        
+        final String privateClassName = SomePackageProtectedClass.class.getName() + "$SomePrivateClass";
+        final Class<?> clazz = Class.forName( privateClassName );
+        final Constructor<Object> c2 = reflectionFactory.newConstructorForSerialization(clazz, Object.class.getDeclaredConstructor(new Class[0]));
+        final Object privateObj = c2.newInstance(new Object[0]);
+        Assert.assertNotNull( privateObj );
+        System.out.println( "Have instance: " + privateObj );
+        
+    }
+    
+    @Test(enabled=true)
     public void testClassWithoutDefaultConstructor() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -61,7 +104,7 @@ public class JavolutionTranscoderTest {
         assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
     }
     
-    @Test(enabled=false)
+    @Test(enabled=true)
     public void testPrivateClass() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -117,7 +160,7 @@ public class JavolutionTranscoderTest {
         
     }
 
-    @Test(enabled=true)
+    @Test(enabled=false)
     public void testReadValueIntoObject() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
@@ -258,11 +301,11 @@ public class JavolutionTranscoderTest {
         }
         Assert.assertEquals( one.getClass(), another.getClass() );
         if ( one.getClass().isPrimitive() || one instanceof String || Number.class.isAssignableFrom( one.getClass() )
-                || one instanceof Boolean || one instanceof Map<?,?> ) {
+                || one instanceof Boolean || one instanceof Map<?, ?> ) {
             Assert.assertEquals( one, another );
             return;
         }
-
+        
         Class<? extends Object> clazz = one.getClass();
         while ( clazz != null ) {
             assertEqualDeclaredFields( clazz, one, another );
@@ -560,6 +603,35 @@ public class JavolutionTranscoderTest {
         final String value;
         public ClassWithoutDefaultConstructor( final String value ) {
             this.value = value;
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ( ( value == null )
+                ? 0
+                : value.hashCode() );
+            return result;
+        }
+        @Override
+        public boolean equals( final Object obj ) {
+            if ( this == obj )
+                return true;
+            if ( obj == null )
+                return false;
+            if ( getClass() != obj.getClass() )
+                return false;
+            final ClassWithoutDefaultConstructor other = (ClassWithoutDefaultConstructor) obj;
+            if ( value == null ) {
+                if ( other.value != null )
+                    return false;
+            } else if ( !value.equals( other.value ) )
+                return false;
+            return true;
+        }
+        @Override
+        public String toString() {
+            return "ClassWithoutDefaultConstructor [value=" + value + "]";
         }
     }
 

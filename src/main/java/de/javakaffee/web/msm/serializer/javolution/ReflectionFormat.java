@@ -16,12 +16,14 @@
  */
 package de.javakaffee.web.msm.serializer.javolution;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,6 +32,7 @@ import javolution.xml.XMLFormat;
 import javolution.xml.sax.Attributes;
 import javolution.xml.stream.XMLStreamException;
 import javolution.xml.stream.XMLStreamReader;
+import sun.reflect.ReflectionFactory;
 
 /**
  * An {@link XMLFormat} that provides the binding for a certain class to to/from
@@ -52,6 +55,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
     private static final Logger LOG = Logger.getLogger( ReflectionFormat.class.getName() );
 
+    private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
+    private static final Object[] INITARGS = new Object[0];
+
+    private final Constructor<T> _constructor;
+    private final ClassLoader _classLoader;
     private final Collection<Field> _attributes;
     private final Collection<Field> _elements;
     private final Map<String, Field> _attributesMap;
@@ -61,8 +69,20 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
      * 
      * @param clazz
      *            the Class that is supported by this {@link XMLFormat}.
+     * @param classLoader 
      */
-    public ReflectionFormat( final Class<T> clazz ) {
+    @SuppressWarnings( "unchecked" )
+    public ReflectionFormat( final Class<T> clazz, final ClassLoader classLoader ) {
+
+        try {
+            _constructor = REFLECTION_FACTORY.newConstructorForSerialization(clazz, Object.class.getDeclaredConstructor(new Class[0]));
+        } catch ( final SecurityException e ) {
+            throw new RuntimeException( e );
+        } catch ( final NoSuchMethodException e ) {
+            throw new RuntimeException( e );
+        }
+        _classLoader = classLoader;
+        
 
         final AttributesAndElements fields = allFields( clazz );
 
@@ -119,6 +139,18 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
     protected static boolean isAttribute( final Class<?> clazz ) {
         return clazz.isPrimitive() || clazz == String.class || Number.class.isAssignableFrom( clazz ) || clazz.isEnum();
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public T newInstance( final Class<T> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+        try {
+            return _constructor.newInstance( INITARGS );
+        } catch ( final Exception e ) {
+            throw new XMLStreamException( e );
+        }
     }
 
     /**
@@ -295,7 +327,15 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                         field.set( obj, input.getAttribute( fieldName, (Float) null ) );
                     } else if ( field.getType().isAssignableFrom( Byte.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Byte) null ) );
+                    } else if ( field.getType().isAssignableFrom( AtomicInteger.class ) ) {
+                        final int num = input.getAttribute( fieldName, 0 );
+                        field.set( obj, new AtomicInteger( num ) );
                     } else {
+
+                        // TODO
+                        // field.getType().getConstructor( int.class );
+                        // ...
+                        
                         throw new IllegalArgumentException( "Not yet supported as attribute: " + field.getType() );
                     }
                 }

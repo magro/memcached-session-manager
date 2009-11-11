@@ -21,7 +21,6 @@ import java.io.ByteArrayOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javolution.xml.XMLBinding;
 import javolution.xml.XMLFormat;
 import javolution.xml.XMLObjectReader;
 import javolution.xml.XMLObjectWriter;
@@ -29,6 +28,7 @@ import javolution.xml.XMLReferenceResolver;
 import javolution.xml.stream.XMLStreamException;
 import net.spy.memcached.transcoders.SerializingTranscoder;
 
+import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
 
@@ -53,10 +53,10 @@ public class JavolutionTranscoder extends SerializingTranscoder {
     
     static final String REF_ID = "__id";
 
-    private static final XMLBinding XML_BINDING = new ReflectionBinding();
     static Logger _log = Logger.getLogger( JavolutionTranscoder.class.getName() );
 
     private final Manager _manager;
+    private final ReflectionBinding _xmlBinding;
 
     /**
      * Constructor.
@@ -66,6 +66,9 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      */
     public JavolutionTranscoder( final Manager manager ) {
         _manager = manager;
+        
+        final Loader loader = _manager.getContainer().getLoader();
+        _xmlBinding = new ReflectionBinding( loader.getClassLoader() );
     }
     
     /**
@@ -84,7 +87,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
             xmlReferenceResolver.setIdentifierAttribute( REF_ID );
             writer.setReferenceResolver( xmlReferenceResolver );
-            writer.setBinding( XML_BINDING );
+            writer.setBinding( _xmlBinding );
             writer.write( o, "session" );
             writer.flush();
             return bos.toByteArray();
@@ -113,12 +116,13 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
             xmlReferenceResolver.setIdentifierAttribute( REF_ID );
             reader.setReferenceResolver( xmlReferenceResolver );
-            reader.setBinding( XML_BINDING );
+            reader.setBinding( _xmlBinding );
             if ( !reader.hasNext() ) {
                 throw new IllegalStateException("reader has no input");
             }
             final MemcachedBackupSession session = reader.read( "session" );
             session.setManager( _manager );
+            session.doAfterDeserialization();
             return session;
         } catch ( final RuntimeException e ) {
             getLogger().warn( "Caught Exception decoding %d bytes of data", in.length, e );
