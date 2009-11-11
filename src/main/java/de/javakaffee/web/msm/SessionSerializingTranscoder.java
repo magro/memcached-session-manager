@@ -66,13 +66,6 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
         try {
             bos = new ByteArrayOutputStream();
             oos = new ObjectOutputStream( bos );
-        } catch ( final IOException e ) {
-            closeSilently( bos );
-            closeSilently( oos );
-            throw new IllegalArgumentException( "Non-serializable object", e );
-        }
-
-        try {
             ( (StandardSession) o ).writeObjectData( oos );
             return bos.toByteArray();
         } catch ( final IOException e ) {
@@ -118,14 +111,6 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
         try {
             bis = new ByteArrayInputStream( in );
             ois = createObjectInputStream( bis );
-        } catch ( final IOException e ) {
-            getLogger().warn( "Caught IOException decoding %d bytes of data", in.length, e );
-            closeSilently( bis );
-            closeSilently( ois );
-            throw new RuntimeException( "Caught IOException decoding data", e );
-        }
-
-        try {
             final StandardSession session = (StandardSession) _manager.createEmptySession();
             session.readObjectData( ois );
             session.setManager( _manager );
