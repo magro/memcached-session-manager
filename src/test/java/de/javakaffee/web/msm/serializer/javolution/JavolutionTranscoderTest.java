@@ -28,6 +28,7 @@ import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -111,9 +112,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 { MutableInt.class, new MutableInt( 42 ) },
                 { Integer[].class, new Integer[]{ 42 } },
                 { Date.class, new Date( System.currentTimeMillis() - 10000 ) },
-                /*
-                { GregorianCalendar.class, GregorianCalendar.getInstance() }
-                */
+                { Calendar.class, Calendar.getInstance() },
                 { ArrayList.class, new ArrayList<String>( Arrays.asList( "foo" ) ) },
                 { int[].class, new int[] { 1, 2 } },
                 { long[].class, new long[] { 1, 2 } },
@@ -125,7 +124,6 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 { char[].class, "42".toCharArray() },
                 { String[].class, new String[] { "23", "42" } },
                 { Person[].class, new Person[] { createPerson( "foo bar", Gender.MALE, 42 ) } }
-                
         };
     }
     

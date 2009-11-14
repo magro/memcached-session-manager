@@ -18,9 +18,12 @@ package de.javakaffee.web.msm.serializer.javolution;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.GregorianCalendar;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -37,6 +40,8 @@ import javolution.xml.stream.XMLStreamException;
 public class ReflectionBinding extends XMLBinding {
     
     private static final Logger _log = Logger.getLogger( ReflectionBinding.class.getName() );
+    
+    private static final XMLCalendarFormat CALENDAR_FORMAT = new XMLCalendarFormat();
     
     private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
 
@@ -96,6 +101,9 @@ public class ReflectionBinding extends XMLBinding {
         }
         else if ( cls.isEnum() ) {
             return (XMLFormat<T>) _enumFormat;
+        }
+        else if ( Calendar.class.isAssignableFrom( cls ) ) {
+            return (XMLFormat<T>) CALENDAR_FORMAT;
         }
         else {
             XMLFormat<?> xmlFormat = _formats.get( cls );
@@ -319,16 +327,68 @@ public class ReflectionBinding extends XMLBinding {
         
     }
     
+    /**
+     * An {@link XMLFormat} for {@link Calendar} that serialized those calendar fields
+     * that contain actual data (these fields also are used by {@link Calendar#equals(Object)}.
+     */
     public static class XMLCalendarFormat extends XMLFormat<Calendar> {
+        
+        private final Field _zoneField;
+
+        public XMLCalendarFormat() {
+            try {
+                _zoneField = Calendar.class.getDeclaredField( "zone" );
+                _zoneField.setAccessible( true );
+            } catch ( final Exception e ) {
+                throw new RuntimeException( e );
+            }
+        }
+        
+        @Override
+        public Calendar newInstance( final Class<Calendar> clazz, final javolution.xml.XMLFormat.InputElement arg1 ) throws XMLStreamException {
+            if ( clazz.equals( GregorianCalendar.class ) ) {
+                return GregorianCalendar.getInstance();
+            }
+            throw new IllegalArgumentException( "Calendar of type " + clazz.getName() + " not yet supported. Please submit an issue so that it will be implemented." );
+        }
         
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement xml, final Calendar obj ) throws XMLStreamException {
-            
+            /* check if we actually need to set the timezone,
+             * as TimeZone.getTimeZone is synchronized, so we might prevent this
+             */
+            final String timeZoneId = xml.getAttribute( "tz", "" );
+            if ( !getTimeZone( obj ).getID().equals( timeZoneId ) ) {
+                obj.setTimeZone( TimeZone.getTimeZone( timeZoneId ) );
+            }
+            obj.setMinimalDaysInFirstWeek( xml.getAttribute( "minimalDaysInFirstWeek", -1 ) );
+            obj.setFirstDayOfWeek( xml.getAttribute( "firstDayOfWeek", -1 ) );
+            obj.setLenient( xml.getAttribute( "lenient", true ) );
+            obj.setTimeInMillis( xml.getAttribute( "timeInMillis", -1L ) );
         }
         
         @Override
         public void write( final Calendar obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
             
+            if ( !obj.getClass().equals( GregorianCalendar.class ) ) {
+                throw new IllegalArgumentException( "Calendar of type " + obj.getClass().getName() +
+                        " not yet supported. Please submit an issue so that it will be implemented." );
+            }
+            
+            xml.setAttribute( "timeInMillis", obj.getTimeInMillis() );
+            xml.setAttribute( "lenient", obj.isLenient() );
+            xml.setAttribute( "firstDayOfWeek", obj.getFirstDayOfWeek() );
+            xml.setAttribute( "minimalDaysInFirstWeek", obj.getMinimalDaysInFirstWeek() );
+            xml.setAttribute( "tz", getTimeZone( obj ).getID() );
+        }
+        
+        private TimeZone getTimeZone( final Calendar obj ) throws XMLStreamException {
+            /* access the timezone via the field, to prevent cloning of the tz */
+            try {
+                return (TimeZone) _zoneField.get( obj );
+            } catch ( final Exception e ) {
+                throw new XMLStreamException( e );
+            }
         }
         
     }
