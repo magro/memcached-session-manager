@@ -18,6 +18,7 @@ package de.javakaffee.web.msm.serializer.javolution;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -252,22 +253,6 @@ public class ReflectionBinding extends XMLBinding {
         
     }
     
-    public abstract static class AbstractXMLArrayFormat<T> extends XMLFormat<T> {
-        
-        @Override
-        public final void write( final T array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute( "type", "array" );
-            output.setAttribute( "componentType", array.getClass().getComponentType().getName() );
-            output.setAttribute("length", length( array ) );
-            writeElements( array, output );
-        }
-        
-        protected abstract int length( final T array );
-        
-        protected abstract void writeElements( final T array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException;
-        
-    }
-    
     public static class XMLArrayFormat extends XMLFormat<Object[]> {
 
         private final ClassLoader _classLoader;
@@ -316,68 +301,6 @@ public class ReflectionBinding extends XMLBinding {
         
     }
     
-    public static class XMLByteArrayFormat extends XMLFormat<byte[]> {
-        
-        @Override
-        public byte[] newInstance( final Class<byte[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
-            try {
-                final int length = input.getAttribute( "length", 0 );
-                return (byte[]) Array.newInstance( byte.class, length );
-            } catch ( final Exception e ) {
-                _log.log( Level.SEVERE, "caught exception", e );
-                throw new XMLStreamException( e );
-            }
-        }
-        
-        @Override
-        public void read( final javolution.xml.XMLFormat.InputElement input, final byte[] array ) throws XMLStreamException {
-            int i = 0;
-            while ( input.hasNext() ) {
-                array[i++] = input.getNext();
-            }
-        }
-        
-        @Override
-        public final void write( final byte[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final byte item : array ) {
-                output.add( item );
-            }
-        }
-        
-    }
-    
-    public static class XMLCharArrayFormat extends XMLFormat<char[]> {
-        
-        @Override
-        public char[] newInstance( final Class<char[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
-            try {
-                final int length = input.getAttribute( "length", 0 );
-                return (char[]) Array.newInstance( char.class, length );
-            } catch ( final Exception e ) {
-                _log.log( Level.SEVERE, "caught exception", e );
-                throw new XMLStreamException( e );
-            }
-        }
-        
-        @Override
-        public void read( final javolution.xml.XMLFormat.InputElement input, final char[] array ) throws XMLStreamException {
-            int i = 0;
-            while ( input.hasNext() ) {
-                array[i++] = input.getNext();
-            }
-        }
-        
-        @Override
-        public final void write( final char[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final char item : array ) {
-                output.add( item );
-            };
-        }
-        
-    }
-    
     public static class XMLCollectionFormat extends XMLFormat<Collection<Object>> {
         
         @Override
@@ -392,6 +315,20 @@ public class ReflectionBinding extends XMLBinding {
             for( final Object item : obj ) {
                 xml.add( item );
             }
+        }
+        
+    }
+    
+    public static class XMLCalendarFormat extends XMLFormat<Calendar> {
+        
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement xml, final Calendar obj ) throws XMLStreamException {
+            
+        }
+        
+        @Override
+        public void write( final Calendar obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
+            
         }
         
     }
