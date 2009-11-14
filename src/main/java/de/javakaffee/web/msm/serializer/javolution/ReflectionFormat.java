@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -76,6 +75,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
         try {
             _constructor = REFLECTION_FACTORY.newConstructorForSerialization(clazz, Object.class.getDeclaredConstructor(new Class[0]));
+            _constructor.setAccessible( true );
         } catch ( final SecurityException e ) {
             throw new RuntimeException( e );
         } catch ( final NoSuchMethodException e ) {
@@ -218,6 +218,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             final Object object = field.get( obj );
             if ( object != null ) {
                 if ( field.getType().isArray() ) {
+                    // TODO: check on primitive component type
                     final Object[] array = (Object[]) object;
                     output.add( array, field.getName(), Object[].class );
                 } else if ( Collection.class.isAssignableFrom( field.getType() ) ) {
@@ -327,15 +328,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                         field.set( obj, input.getAttribute( fieldName, (Float) null ) );
                     } else if ( field.getType().isAssignableFrom( Byte.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Byte) null ) );
-                    } else if ( field.getType().isAssignableFrom( AtomicInteger.class ) ) {
-                        final int num = input.getAttribute( fieldName, 0 );
-                        field.set( obj, new AtomicInteger( num ) );
                     } else {
-
-                        // TODO
-                        // field.getType().getConstructor( int.class );
-                        // ...
-                        
                         throw new IllegalArgumentException( "Not yet supported as attribute: " + field.getType() );
                     }
                 }

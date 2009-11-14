@@ -18,6 +18,7 @@ JAVOLUTION = transitive('org:javolution:jar:4.1.0')
 
 # Testing
 CLANG = 'commons-lang:commons-lang:jar:2.4'
+JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 
 desc 'msm-javolution-serializer'
 define 'msm-javolution-serializer' do
@@ -27,7 +28,7 @@ define 'msm-javolution-serializer' do
   compile.with( SERVLET_API, TC_CATALINA, TC_COYOTE, TC_LOGGING, MEMCACHED, MSM, JAVOLUTION )
   compile.using( :source=>'1.5', :target=>'1.5' )
   
-  test.with( compile.dependencies, CLANG )
+  test.with( compile.dependencies, CLANG, JMOCK_CGLIB )
   test.using :testng
   
   package :jar, :id => 'msm-javolution-serializer'

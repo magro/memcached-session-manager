@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,13 +54,44 @@ public class ReflectionBinding extends XMLBinding {
     public <T> XMLFormat<T> getFormat(final Class<T> cls) {
         
         final XMLFormat<T> format = super.getFormat( cls );
-        
-        if ( cls.isPrimitive() || cls.equals( String.class ) || Number.class.isAssignableFrom( cls )
+        if ( cls.isPrimitive() || cls == String.class
+                || cls == Boolean.class
+                || cls == Integer.class
+                || cls == Long.class
+                || cls == Short.class
+                || cls == Double.class
+                || cls == Float.class
+                || cls == Short.class
+                || cls == Character.class
+                || cls == Byte.class
                 || Map.class.isAssignableFrom( cls ) || Collection.class.isAssignableFrom( cls ) ) {
             return format;
         }
         else if ( cls.isArray() ) {
-            return (XMLFormat<T>) _arrayFormat;
+            if ( cls == int[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.INT_ARRAY_FORMAT;
+            }
+            else if ( cls == long[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.LONG_ARRAY_FORMAT;
+            }
+            else if ( cls == short[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.SHORT_ARRAY_FORMAT;
+            }
+            else if ( cls == float[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.FLOAT_ARRAY_FORMAT;
+            }
+            else if ( cls == double[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.DOUBLE_ARRAY_FORMAT;
+            }
+            else if ( cls == char[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.CHAR_ARRAY_FORMAT;
+            }
+            else if ( cls == byte[].class ) {
+                return (XMLFormat<T>) XMLArrayFormats.BYTE_ARRAY_FORMAT;
+            }
+            else {
+                return (XMLFormat<T>) _arrayFormat;
+            }
         }
         else if ( cls.isEnum() ) {
             return (XMLFormat<T>) _enumFormat;
@@ -67,11 +99,115 @@ public class ReflectionBinding extends XMLBinding {
         else {
             XMLFormat<?> xmlFormat = _formats.get( cls );
             if ( xmlFormat == null ) {
-                xmlFormat = new ReflectionFormat( cls, _classLoader );
+                if ( Number.class.isAssignableFrom( cls ) ) {
+                    xmlFormat = getNumberFormat( cls );
+                }
+                else {
+                    xmlFormat = new ReflectionFormat( cls, _classLoader );
+                }
                 _formats.put( cls, xmlFormat );
             }
             return (XMLFormat<T>) xmlFormat;
         }
+    }
+    
+    @SuppressWarnings( "unchecked" )
+    static <T> XMLFormat<T> getNumberFormat( final Class<T> clazz ) {
+        try {
+            for( final Constructor<?> constructor : clazz.getConstructors() ) {
+                final Class<?>[] parameterTypes = constructor.getParameterTypes();
+                if ( parameterTypes.length == 1 ) {
+                    if ( parameterTypes[0] == long.class ) {
+                        return new XMLNumberLongFormat<T>( (Constructor<T>) constructor );
+                    }
+                    if ( parameterTypes[0] == int.class ) {
+                        return new XMLNumberIntFormat<T>( (Constructor<T>) constructor );
+                    }
+                }
+            }
+        } catch ( final Exception e ) {
+            throw new RuntimeException( e );
+        }
+        throw new IllegalArgumentException( "No suitable constructor found for class " + clazz.getName() + ".\n" +
+                "Available constructors: " + clazz.getConstructors() );
+    }
+    
+    static class XMLNumberIntFormat<T> extends XMLFormat<T> {
+        
+        private final Constructor<T> _constructor;
+
+        public XMLNumberIntFormat( final Constructor<T> constructor ) {
+            _constructor = constructor;
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public T newInstance( final Class<T> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            final int value = xml.getAttribute( "value", 0 );
+            try {
+                return _constructor.newInstance( value );
+            } catch ( final Exception e ) {
+                throw new XMLStreamException( e );
+            }
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement xml, final T obj ) throws XMLStreamException {
+            // nothing to do...
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "value", obj.toString() );
+        }
+        
+    }
+    
+    static class XMLNumberLongFormat<T> extends XMLFormat<T> {
+        
+        private final Constructor<T> _constructor;
+
+        public XMLNumberLongFormat( final Constructor<T> constructor ) {
+            _constructor = constructor;
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public T newInstance( final Class<T> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            final long value = xml.getAttribute( "value", 0 );
+            try {
+                return _constructor.newInstance( value );
+            } catch ( final Exception e ) {
+                throw new XMLStreamException( e );
+            }
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement xml, final T obj ) throws XMLStreamException {
+            // nothing to do...
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "value", obj.toString() );
+        }
+        
     }
     
     static class XMLEnumFormat extends XMLFormat<Enum<?>> {
@@ -116,7 +252,23 @@ public class ReflectionBinding extends XMLBinding {
         
     }
     
-    public static class XMLArrayFormat extends XMLFormat<Object> {
+    public abstract static class AbstractXMLArrayFormat<T> extends XMLFormat<T> {
+        
+        @Override
+        public final void write( final T array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            output.setAttribute( "type", "array" );
+            output.setAttribute( "componentType", array.getClass().getComponentType().getName() );
+            output.setAttribute("length", length( array ) );
+            writeElements( array, output );
+        }
+        
+        protected abstract int length( final T array );
+        
+        protected abstract void writeElements( final T array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException;
+        
+    }
+    
+    public static class XMLArrayFormat extends XMLFormat<Object[]> {
 
         private final ClassLoader _classLoader;
         
@@ -129,42 +281,99 @@ public class ReflectionBinding extends XMLBinding {
          */
         @SuppressWarnings( "unchecked" )
         @Override
-        public Object newInstance( final Class clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
+        public Object[] newInstance( final Class clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
                 final String componentType = input.getAttribute( "componentType", (String)null );
                 final int length = input.getAttribute( "length", 0 );
-                return Array.newInstance( Class.forName( componentType, true, _classLoader ) , length );
+                return (Object[]) Array.newInstance( Class.forName( componentType, false, _classLoader ) , length );
             } catch ( final Exception e ) {
                 _log.log( Level.SEVERE, "caught exception", e );
                 throw new XMLStreamException( e );
             }
         }
-
-        /**
-         * {@inheritDoc}
-         */
+        
         @Override
-        public void read( final javolution.xml.XMLFormat.InputElement input, final Object obj ) throws XMLStreamException {
-
-            final Object[] arr = (Object[]) obj;
+        public void read( final javolution.xml.XMLFormat.InputElement input, final Object[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                arr[i++] = input.getNext();
+                array[i++] = input.getNext();
             }
         }
-
-        /**
-         * {@inheritDoc}
-         */
+        
         @Override
-        public void write( final Object obj, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            final Object[] array = (Object[]) obj;
+        public final void write( final Object[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
             output.setAttribute( "type", "array" );
-            output.setAttribute( "componentType", obj.getClass().getComponentType().getName() );
-            output.setAttribute("length", array.length);
+            output.setAttribute( "componentType", array.getClass().getComponentType().getName() );
+            output.setAttribute("length", array.length );
+            writeElements( array, output );
+        }
+        
+        public void writeElements( final Object[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
             for( final Object item : array ) {
                 output.add( item );
             }
+        }
+        
+    }
+    
+    public static class XMLByteArrayFormat extends XMLFormat<byte[]> {
+        
+        @Override
+        public byte[] newInstance( final Class<byte[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
+            try {
+                final int length = input.getAttribute( "length", 0 );
+                return (byte[]) Array.newInstance( byte.class, length );
+            } catch ( final Exception e ) {
+                _log.log( Level.SEVERE, "caught exception", e );
+                throw new XMLStreamException( e );
+            }
+        }
+        
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement input, final byte[] array ) throws XMLStreamException {
+            int i = 0;
+            while ( input.hasNext() ) {
+                array[i++] = input.getNext();
+            }
+        }
+        
+        @Override
+        public final void write( final byte[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            output.setAttribute("length", array.length );
+            for( final byte item : array ) {
+                output.add( item );
+            }
+        }
+        
+    }
+    
+    public static class XMLCharArrayFormat extends XMLFormat<char[]> {
+        
+        @Override
+        public char[] newInstance( final Class<char[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
+            try {
+                final int length = input.getAttribute( "length", 0 );
+                return (char[]) Array.newInstance( char.class, length );
+            } catch ( final Exception e ) {
+                _log.log( Level.SEVERE, "caught exception", e );
+                throw new XMLStreamException( e );
+            }
+        }
+        
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement input, final char[] array ) throws XMLStreamException {
+            int i = 0;
+            while ( input.hasNext() ) {
+                array[i++] = input.getNext();
+            }
+        }
+        
+        @Override
+        public final void write( final char[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            output.setAttribute("length", array.length );
+            for( final char item : array ) {
+                output.add( item );
+            };
         }
         
     }

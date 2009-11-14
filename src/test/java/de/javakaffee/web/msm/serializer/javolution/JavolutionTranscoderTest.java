@@ -25,23 +25,29 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import javolution.xml.XMLBinding;
-import javolution.xml.XMLObjectWriter;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.catalina.core.StandardContext;
+import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.session.StandardSession;
 import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.commons.lang.mutable.MutableInt;
+import org.jmock.Mock;
+import org.jmock.cglib.MockObjectTestCase;
 import org.testng.Assert;
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import sun.reflect.ReflectionFactory;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Person.Gender;
@@ -51,122 +57,149 @@ import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoderTest.Pers
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class JavolutionTranscoderTest {
+public class JavolutionTranscoderTest extends MockObjectTestCase {
+    
+    private MemcachedBackupSessionManager _manager;
+    private JavolutionTranscoder _transcoder;
 
-    @SuppressWarnings( "unchecked" )
-    @Test(enabled=false)
-    public void testPrivateClassAndClassWithoutDefaultConstructor() throws Exception {
-
-        final XMLBinding binding = new ReflectionBinding( getClass().getClassLoader() );
-
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        final XMLObjectWriter writer = XMLObjectWriter.newInstance(bos);
-        writer.setBinding( binding );
-        
-        final SomePackageProtectedClass o = SomePackageProtectedClass.createWithPrivate( "foo" );
-        
-        writer.write( o, "item" );
-        writer.flush();
-        
-        final byte[] bytes = bos.toByteArray();
-        System.out.println( "Have bytes: " + new String(bytes));
-        writer.close();
-        
-//        final SomePackageProtectedClass read = deserialize( bytes, "item" );
-//        Assert.assertEquals( read, o );
-
-        final ReflectionFactory reflectionFactory = ReflectionFactory.getReflectionFactory();
-
-        final Constructor<SomePackageProtectedClass> constructor = reflectionFactory.newConstructorForSerialization(SomePackageProtectedClass.class, Object.class.getDeclaredConstructor(new Class[0]));
-        final SomePackageProtectedClass instance = constructor.newInstance(new Object[0]);
-        Assert.assertNotNull( instance );
-        System.out.println( "Have instance: " + instance );
-        
-        final String privateClassName = SomePackageProtectedClass.class.getName() + "$SomePrivateClass";
-        final Class<?> clazz = Class.forName( privateClassName );
-        final Constructor<Object> c2 = reflectionFactory.newConstructorForSerialization(clazz, Object.class.getDeclaredConstructor(new Class[0]));
-        final Object privateObj = c2.newInstance(new Object[0]);
-        Assert.assertNotNull( privateObj );
-        System.out.println( "Have instance: " + privateObj );
-        
+    public static void main( final String[] args ) {
+        try {
+            final Constructor<?> constructor = BigDecimal.class.getConstructor( int.class );
+            final Object instance = constructor.newInstance( 42 );
+            System.out.println( "have instance: " + instance );
+        } catch ( final Exception e ) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
     
-    @Test(enabled=true)
-    public void testClassWithoutDefaultConstructor() throws Exception {
-        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
-        manager.setContainer( new StandardContext() );
-        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
+    @BeforeTest
+    protected void beforeTest() {
+        _manager = new MemcachedBackupSessionManager();
         
-        final MemcachedBackupSession session = manager.createEmptySession();
+        final StandardContext container = new StandardContext();
+        _manager.setContainer( container );
+
+        final Mock webappLoaderControl = mock( WebappLoader.class );
+        final WebappLoader webappLoader = (WebappLoader) webappLoaderControl.proxy();
+        webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
+        webappLoaderControl.expects( atLeastOnce() ).method( "getClassLoader" ).will( returnValue( Thread.currentThread().getContextClassLoader() ) );
+        Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
+        _manager.getContainer().setLoader( webappLoader );
+        
+        Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
+        
+        _transcoder = new JavolutionTranscoder( _manager );
+    }
+
+    @DataProvider( name="typesProvider")
+    protected Object[][] createTypesData() {
+        return new Object[][] {
+                { int.class, 42 },
+                { long.class, 42 },
+                { String.class, "42" },
+                { Long.class, new Long( 42 ) },
+                { Integer.class, new Integer( 42 ) },
+                { Character.class, new Character( 'c' ) },
+                { Byte.class, new Byte( "b".getBytes()[0] ) },
+                { Double.class, new Double( 42d ) },
+                { Float.class, new Float( 42f ) },
+                { Short.class, new Short( (short)42 ) },
+                { BigDecimal.class, new BigDecimal( 42 ) },
+                { AtomicInteger.class, new AtomicInteger( 42 ) },
+                { AtomicLong.class, new AtomicLong( 42 ) },
+                { MutableInt.class, new MutableInt( 42 ) },
+                { Integer[].class, new Integer[]{ 42 } },
+                { Date.class, new Date( System.currentTimeMillis() - 10000 ) },
+                /*
+                { GregorianCalendar.class, GregorianCalendar.getInstance() }
+                */
+                { ArrayList.class, new ArrayList<String>( Arrays.asList( "foo" ) ) },
+                { int[].class, new int[] { 1, 2 } },
+                { long[].class, new long[] { 1, 2 } },
+                { short[].class, new short[] { 1, 2 } },
+                { float[].class, new float[] { 1, 2 } },
+                { double[].class, new double[] { 1, 2 } },
+                { int[].class, new int[] { 1, 2 } },
+                { byte[].class, "42".getBytes() },
+                { char[].class, "42".toCharArray() },
+                { String[].class, new String[] { "23", "42" } },
+                { Person[].class, new Person[] { createPerson( "foo bar", Gender.MALE, 42 ) } }
+                
+        };
+    }
+    
+    @Test(enabled=true, dataProvider="typesProvider")
+    public <T> void testTypes( final Class<T> type, final T instance ) throws Exception {
+        
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        System.out.println( "HAve instance: " + instance );
+        session.setAttribute( type.getSimpleName(), instance );
+        
+        final byte[] serialized = _transcoder.serialize( session );
+        System.out.println(new String(serialized));
+        assertDeepEquals( _transcoder.deserialize( serialized ), session );
+    }
+    
+    @Test(enabled=false)
+    public void testClassWithoutDefaultConstructor() throws Exception {
+        
+        final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
         session.setAttribute( "no-default constructor", new ClassWithoutDefaultConstructor( "foo" ) );
         
-        assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
+        assertDeepEquals( _transcoder.deserialize( _transcoder.serialize( session ) ), session );
     }
     
-    @Test(enabled=true)
+    @Test(enabled=false)
     public void testPrivateClass() throws Exception {
-        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
-        manager.setContainer( new StandardContext() );
-        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
         
-        final MemcachedBackupSession session = manager.createEmptySession();
+        final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
         final PrivateClass privateClass = new PrivateClass();
         privateClass.foo = "foo";
         session.setAttribute( "pc", privateClass );
         
-        System.out.println( new String( transcoder.serialize( session ) ) );
-        assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
+        System.out.println( new String( _transcoder.serialize( session ) ) );
+        assertDeepEquals( _transcoder.deserialize( _transcoder.serialize( session ) ), session );
     }
     
-    @Test(enabled=true)
+    @Test(enabled=false)
     public void testCollections() throws Exception {
-        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
-        manager.setContainer( new StandardContext() );
-        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
-        
-        final MemcachedBackupSession session = manager.createEmptySession();
+        final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
         session.setAttribute( "foo", new EntityWithCollections() );
         
-        assertEquals( transcoder.deserialize( transcoder.serialize( session ) ), session );
+        assertDeepEquals( _transcoder.deserialize( _transcoder.serialize( session ) ), session );
     }
 
-    @Test(enabled=true)
+    @Test(enabled=false)
     public void testCyclicDependencies() throws Exception {
-        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
-        manager.setContainer( new StandardContext() );
-        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
-
-        final StandardSession session = manager.createEmptySession();
+        final StandardSession session = _manager.createEmptySession();
         session.setValid( true );
         session.setCreationTime( System.currentTimeMillis() );
         getField( StandardSession.class, "lastAccessedTime" ).set( session, System.currentTimeMillis() + 100 );
         session.setMaxInactiveInterval( 600 );
 
-        final Person p1 = createPerson( "foo bar", Gender.MALE, "foo.bar@example.org", "foo.bar@example.com" );
-        final Person p2 = createPerson( "bar baz", Gender.FEMALE, "bar.baz@example.org", "bar.baz@example.com" );
+        final Person p1 = createPerson( "foo bar", Gender.MALE, 42, "foo.bar@example.org", "foo.bar@example.com" );
+        final Person p2 = createPerson( "bar baz", Gender.FEMALE, 42, "bar.baz@example.org", "bar.baz@example.com" );
         p1.addFriend( p2 );
         p2.addFriend( p1 );
         
         session.setAttribute( "person1", p1 );
         session.setAttribute( "person2", p2 );
         
-        final byte[] bytes = transcoder.serialize( session );
+        final byte[] bytes = _transcoder.serialize( session );
         // System.out.println( "xml: " + new String( bytes ) );
-        assertEquals( session, transcoder.deserialize( bytes ) );
+        assertDeepEquals( session, _transcoder.deserialize( bytes ) );
         
         
     }
 
     @Test(enabled=false)
     public void testReadValueIntoObject() throws Exception {
-        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
-        manager.setContainer( new StandardContext() );
-        final JavolutionTranscoder transcoder = new JavolutionTranscoder( manager );
-
-        final StandardSession session = manager.createEmptySession();
+        final StandardSession session = _manager.createEmptySession();
         session.setValid( true );
         session.setCreationTime( System.currentTimeMillis() );
         getField( StandardSession.class, "lastAccessedTime" ).set( session, System.currentTimeMillis() + 100 );
@@ -174,31 +207,31 @@ public class JavolutionTranscoderTest {
 
         session.setId( "foo" );
 
-        session.setAttribute( "person1", createPerson( "foo bar", Gender.MALE, "foo.bar@example.org", "foo.bar@example.com" ) );
-        session.setAttribute( "person2", createPerson( "bar baz", Gender.FEMALE, "bar.baz@example.org", "bar.baz@example.com" ) );
+        session.setAttribute( "person1", createPerson( "foo bar", Gender.MALE, 42, "foo.bar@example.org", "foo.bar@example.com" ) );
+        session.setAttribute( "person2", createPerson( "bar baz", Gender.FEMALE, 42, "bar.baz@example.org", "bar.baz@example.com" ) );
 
         final long start1 = System.nanoTime();
-        transcoder.serialize( session );
-        System.out.println("xstream-ser took " + (System.nanoTime() - start1)/1000);
+        _transcoder.serialize( session );
+        System.out.println("javolution ser took " + (System.nanoTime() - start1)/1000);
 
         final long start2 = System.nanoTime();
-        transcoder.serialize( session );
-        System.out.println("xstream-ser took " + (System.nanoTime() - start2)/1000);
+        _transcoder.serialize( session );
+        System.out.println("javolution ser took " + (System.nanoTime() - start2)/1000);
         
         final long start3 = System.nanoTime();
-        final byte[] json = transcoder.serialize( session );
-        final StandardSession readJSONValue = (StandardSession) transcoder.deserialize( json );
-        System.out.println("xstream-round took " + (System.nanoTime() - start3)/1000);
+        final byte[] json = _transcoder.serialize( session );
+        final StandardSession readJSONValue = (StandardSession) _transcoder.deserialize( json );
+        System.out.println("javolution-round took " + (System.nanoTime() - start3)/1000);
 
-        System.out.println( "Have json: " + readJSONValue.getId() );
-        assertEquals( readJSONValue, session );
+        System.out.println( "Have xml: " + readJSONValue.getId() );
+        assertDeepEquals( readJSONValue, session );
 
         final long start4 = System.nanoTime();
-        final StandardSession readJavaValue = javaRoundtrip( session, manager );
+        final StandardSession readJavaValue = javaRoundtrip( session, _manager );
         System.out.println("java-round took " + (System.nanoTime() - start4)/1000);
-        assertEquals( readJavaValue, session );
+        assertDeepEquals( readJavaValue, session );
 
-        assertEquals( readJSONValue, readJavaValue );
+        assertDeepEquals( readJSONValue, readJavaValue );
 
         System.out.println( ToStringBuilder.reflectionToString( session ) );
         System.out.println( ToStringBuilder.reflectionToString( readJSONValue ) );
@@ -255,10 +288,11 @@ public class JavolutionTranscoderTest {
         }
     }
 
-    private Person createPerson( final String name, final Gender gender, final String... emailAddresses ) {
+    private Person createPerson( final String name, final Gender gender, final Integer age, final String... emailAddresses ) {
         final Person person = new Person();
         person.setName( name );
         person.setGender( gender );
+        person.setAge( age );
         final HashMap<String, Object> props = new HashMap<String, Object>();
         for ( int i = 0; i < emailAddresses.length; i++ ) {
             final String emailAddress = emailAddresses[i];
@@ -292,7 +326,7 @@ public class JavolutionTranscoderTest {
      *          email1={name=foo bar, email=foo.bar@example.com}}, gender=MALE}}
      */
 
-    private void assertEquals( final Object one, final Object another ) throws Exception {
+    private void assertDeepEquals( final Object one, final Object another ) throws Exception {
         if ( one == another ) {
             return;
         }
@@ -300,9 +334,24 @@ public class JavolutionTranscoderTest {
             Assert.fail( "One of both is null: " + one + ", " + another );
         }
         Assert.assertEquals( one.getClass(), another.getClass() );
-        if ( one.getClass().isPrimitive() || one instanceof String || Number.class.isAssignableFrom( one.getClass() )
-                || one instanceof Boolean || one instanceof Map<?, ?> ) {
+        if ( one.getClass().isPrimitive() || one instanceof String || one instanceof Character
+                || one instanceof Boolean ) {
             Assert.assertEquals( one, another );
+            return;
+        }
+        
+        if ( Map.class.isAssignableFrom( one.getClass() ) ) {
+            final Map<?, ?> m1 = (Map<?, ?>) one;
+            final Map<?, ?> m2 = (Map<?, ?>) another;
+            Assert.assertEquals( m1.size(), m2.size() );
+            for ( final Map.Entry<?, ?> entry : m1.entrySet() ) {
+                assertDeepEquals( entry.getValue(), m2.get( entry.getKey() ) );
+            }
+            return;
+        }
+        
+        if ( Number.class.isAssignableFrom( one.getClass() ) ) {
+            Assert.assertEquals( ((Number)one).longValue(), ((Number)another).longValue() );
             return;
         }
         
@@ -319,7 +368,7 @@ public class JavolutionTranscoderTest {
         for ( final Field field : clazz.getDeclaredFields() ) {
             field.setAccessible( true );
             if ( !Modifier.isTransient( field.getModifiers() ) ) {
-                assertEquals( field.get( one ), field.get( another ) );
+                assertDeepEquals( field.get( one ), field.get( another ) );
             }
         }
     }
@@ -356,6 +405,7 @@ public class JavolutionTranscoderTest {
 
         private String _name;
         private Gender _gender;
+        private Integer _age;
         private Map<String, Object> _props;
         private final Collection<Person> _friends = new ArrayList<Person>();
 
@@ -387,17 +437,37 @@ public class JavolutionTranscoderTest {
             _gender = gender;
         }
 
+        public Integer getAge() {
+            return _age;
+        }
+
+        public void setAge( final Integer age ) {
+            _age = age;
+        }
+
         public Collection<Person> getFriends() {
             return _friends;
+        }
+
+        /**
+         * @param friends
+         * @param friends2
+         * @return
+         */
+        private boolean flatEquals( final Collection<?> c1, final Collection<?> c2 ) {
+            return c1 == c2 || c1 != null && c2 != null && c1.size() == c2.size();
         }
 
         @Override
         public int hashCode() {
             final int prime = 31;
             int result = 1;
+            result = prime * result + ( ( _age == null )
+                ? 0
+                : _age.hashCode() );
             result = prime * result + ( ( _friends == null )
                 ? 0
-                : _friends.hashCode() );
+                : _friends.size() );
             result = prime * result + ( ( _gender == null )
                 ? 0
                 : _gender.hashCode() );
@@ -419,15 +489,16 @@ public class JavolutionTranscoderTest {
             if ( getClass() != obj.getClass() )
                 return false;
             final Person other = (Person) obj;
+            if ( _age == null ) {
+                if ( other._age != null )
+                    return false;
+            } else if ( !_age.equals( other._age ) )
+                return false;
             if ( _friends == null ) {
                 if ( other._friends != null )
                     return false;
-            }
-            else if ( !flatEquals( _friends, other._friends ) )
+            } else if ( !flatEquals( _friends, other._friends ) )
                 return false;
-            /*else if ( !_friends.equals( other._friends ) )
-                return false;
-                */
             if ( _gender == null ) {
                 if ( other._gender != null )
                     return false;
@@ -446,18 +517,10 @@ public class JavolutionTranscoderTest {
             return true;
         }
 
-        /**
-         * @param friends
-         * @param friends2
-         * @return
-         */
-        private boolean flatEquals( final Collection<?> c1, final Collection<?> c2 ) {
-            return c1 == c2 || c1 != null && c2 != null && c1.size() == c2.size();
-        }
-
         @Override
         public String toString() {
-            return "Person [_friends.size=" + (_friends == null ? "<null>" : _friends.size()) + ", _gender=" + _gender + ", _name=" + _name + ", _props=" + _props + "]";
+            return "Person [_age=" + _age + ", _friends.size=" + _friends.size() + ", _gender=" + _gender + ", _name=" + _name + ", _props="
+                    + _props + "]";
         }
 
     }
