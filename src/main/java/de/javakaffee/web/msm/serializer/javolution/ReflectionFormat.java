@@ -53,12 +53,12 @@ import sun.reflect.ReflectionFactory;
 public class ReflectionFormat<T> extends XMLFormat<T> {
 
     private static final Logger LOG = Logger.getLogger( ReflectionFormat.class.getName() );
-
+    
+    private static final Map<Class<?>, XMLNumberFormat<?>> _numberFormats = new ConcurrentHashMap<Class<?>, XMLNumberFormat<?>>();
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
     private static final Object[] INITARGS = new Object[0];
 
     private final Constructor<T> _constructor;
-    private final ClassLoader _classLoader;
     private final Collection<Field> _attributes;
     private final Collection<Field> _elements;
     private final Map<String, Field> _attributesMap;
@@ -81,7 +81,6 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         } catch ( final NoSuchMethodException e ) {
             throw new RuntimeException( e );
         }
-        _classLoader = classLoader;
         
 
         final AttributesAndElements fields = allFields( clazz );
@@ -218,14 +217,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             final Object object = field.get( obj );
             if ( object != null ) {
                 if ( field.getType().isArray() ) {
-                    // TODO: check on primitive component type
-                    final Object[] array = (Object[]) object;
-                    output.add( array, field.getName(), Object[].class );
+                    addArray( object, field.getName(), output );
                 } else if ( Collection.class.isAssignableFrom( field.getType() ) ) {
                     output.add( (Collection<?>) object, field.getName(), (Class<Collection<?>>) object.getClass() );
                 } else if ( Map.class.isAssignableFrom( field.getType() ) ) {
-                    final Map<?, ?> map = (Map<?, ?>) object;
-                    output.add( map, field.getName(), (Class<Map<?, ?>>) map.getClass() );
+                    output.add( (Map<?, ?>) object, field.getName(), (Class<Map<?, ?>>) object.getClass() );
                 } else {
                     output.add( object, field.getName() );
                 }
@@ -233,6 +229,35 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         } catch ( final Exception e ) {
             LOG.log( Level.SEVERE, "Could not write element for field.", e );
         }
+    }
+    
+    private void addArray( final Object obj, final String name, final OutputElement output ) throws XMLStreamException {
+        final Class<?> cls = obj.getClass();
+        if ( cls == int[].class ) {
+            output.add( (int[])obj, name, int[].class );
+        }
+        else if ( cls == long[].class ) {
+            output.add( (long[])obj, name, long[].class );
+        }
+        else if ( cls == short[].class ) {
+            output.add( (short[])obj, name, short[].class );
+        }
+        else if ( cls == float[].class ) {
+            output.add( (float[])obj, name, float[].class );
+        }
+        else if ( cls == double[].class ) {
+            output.add( (double[])obj, name, double[].class );
+        }
+        else if ( cls == char[].class ) {
+            output.add( (char[])obj, name, char[].class );
+        }
+        else if ( cls == byte[].class ) {
+            output.add( (byte[])obj, name, byte[].class );
+        }
+        else {
+            output.add( (Object[])obj, name, Object[].class );
+        }
+        
     }
 
     private void setAttributeFromField( final T obj, final Field field, final javolution.xml.XMLFormat.OutputElement output ) {
@@ -328,6 +353,9 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                         field.set( obj, input.getAttribute( fieldName, (Float) null ) );
                     } else if ( field.getType().isAssignableFrom( Byte.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Byte) null ) );
+                    } else if ( Number.class.isAssignableFrom( field.getType() ) ) {
+                        final XMLNumberFormat<?> format = getNumberFormat( field.getType() );
+                        field.set( obj, format.newInstanceFromAttribute( input, fieldName ) );
                     } else {
                         throw new IllegalArgumentException( "Not yet supported as attribute: " + field.getType() );
                     }
@@ -337,6 +365,137 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         } catch ( final Exception e ) {
             LOG.log( Level.SEVERE, "Caught exception when trying to set field from attribute.", e );
         }
+    }
+    
+    @SuppressWarnings( "unchecked" )
+    static <T> XMLNumberFormat<T> getNumberFormat( final Class<T> clazz ) {
+        XMLNumberFormat<?> result = _numberFormats.get( clazz );
+        if ( result == null ) {
+            result = createNumberFormat( clazz );
+            _numberFormats.put( clazz, result );
+        }
+        return (XMLNumberFormat<T>) result;
+    }
+    
+    @SuppressWarnings( "unchecked" )
+    static <T> XMLNumberFormat<T> createNumberFormat( final Class<T> clazz ) {
+        try {
+            for( final Constructor<?> constructor : clazz.getConstructors() ) {
+                final Class<?>[] parameterTypes = constructor.getParameterTypes();
+                if ( parameterTypes.length == 1 ) {
+                    if ( parameterTypes[0] == long.class ) {
+                        return new XMLNumberLongFormat<T>( (Constructor<T>) constructor );
+                    }
+                    if ( parameterTypes[0] == int.class ) {
+                        return new XMLNumberIntFormat<T>( (Constructor<T>) constructor );
+                    }
+                }
+            }
+        } catch ( final Exception e ) {
+            throw new RuntimeException( e );
+        }
+        throw new IllegalArgumentException( "No suitable constructor found for class " + clazz.getName() + ".\n" +
+                "Available constructors: " + clazz.getConstructors() );
+    }
+    
+    /**
+     * The base class for number formats.
+     * 
+     * @param <T> the number type.
+     */
+    static abstract class XMLNumberFormat<T> extends XMLFormat<T> {
+        
+        private final Constructor<T> _constructor;
+
+        public XMLNumberFormat( final Constructor<T> constructor ) {
+            _constructor = constructor;
+        }
+        
+        /**
+         * Creates a new instance from the associated constructor. The provided class is ignored, just
+         * the provided {@link InputElement} is used to read the value which will be passed to the constructor.
+         * 
+         * @param clazz can be null for this {@link XMLFormat} implementation
+         * @param xml the input element for the object to create.
+         * @return a new number instance.
+         */
+        @Override
+        public T newInstance( final Class<T> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            return newInstanceFromAttribute( xml, "value" );
+        }
+
+        /**
+         * Creates a new instance from an already associated constructor. The provided {@link InputElement} is
+         * used to read the value from the attribute with the provided name. The value read will be passed to the
+         * constructor of the object to create.
+         * 
+         * @param xml the input element for the object to create.
+         * @param name the attribute name to read the value from.
+         * @return a new number instance.
+         */
+        public T newInstanceFromAttribute( final javolution.xml.XMLFormat.InputElement xml, final String name )
+            throws XMLStreamException {
+            final Object value = getAttribute( name, xml );
+            try {
+                return _constructor.newInstance( value );
+            } catch ( final Exception e ) {
+                throw new XMLStreamException( e );
+            }
+        }
+        
+        protected abstract Object getAttribute( String name, InputElement xml ) throws XMLStreamException;
+
+        /**
+         * Does not perform anything, as the number is already created in {@link #newInstance(Class, javolution.xml.XMLFormat.InputElement)}.
+         * 
+         * @param xml the input element
+         * @param the obj the created number object
+         */
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement xml, final T obj ) throws XMLStreamException {
+            // nothing to do...
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "value", obj.toString() );
+        }
+        
+    }
+    
+    static class XMLNumberIntFormat<T> extends XMLNumberFormat<T> {
+        
+        public XMLNumberIntFormat( final Constructor<T> constructor ) {
+            super( constructor );
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Object getAttribute( final String name, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            return xml.getAttribute( name, 0 );
+        }
+        
+    }
+    
+    static class XMLNumberLongFormat<T> extends XMLNumberFormat<T> {
+        
+        public XMLNumberLongFormat( final Constructor<T> constructor ) {
+            super( constructor );
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Object getAttribute( final String name, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            return xml.getAttribute( name, 0L );
+        }
+        
     }
 
 }

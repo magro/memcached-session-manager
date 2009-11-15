@@ -17,7 +17,6 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.Calendar;
 import java.util.Collection;
@@ -74,30 +73,7 @@ public class ReflectionBinding extends XMLBinding {
             return format;
         }
         else if ( cls.isArray() ) {
-            if ( cls == int[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.INT_ARRAY_FORMAT;
-            }
-            else if ( cls == long[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.LONG_ARRAY_FORMAT;
-            }
-            else if ( cls == short[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.SHORT_ARRAY_FORMAT;
-            }
-            else if ( cls == float[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.FLOAT_ARRAY_FORMAT;
-            }
-            else if ( cls == double[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.DOUBLE_ARRAY_FORMAT;
-            }
-            else if ( cls == char[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.CHAR_ARRAY_FORMAT;
-            }
-            else if ( cls == byte[].class ) {
-                return (XMLFormat<T>) XMLArrayFormats.BYTE_ARRAY_FORMAT;
-            }
-            else {
-                return (XMLFormat<T>) _arrayFormat;
-            }
+            return getArrayFormat( cls );
         }
         else if ( cls.isEnum() ) {
             return (XMLFormat<T>) _enumFormat;
@@ -109,7 +85,7 @@ public class ReflectionBinding extends XMLBinding {
             XMLFormat<?> xmlFormat = _formats.get( cls );
             if ( xmlFormat == null ) {
                 if ( Number.class.isAssignableFrom( cls ) ) {
-                    xmlFormat = getNumberFormat( cls );
+                    xmlFormat = ReflectionFormat.getNumberFormat( cls );
                 }
                 else {
                     xmlFormat = new ReflectionFormat( cls, _classLoader );
@@ -119,104 +95,33 @@ public class ReflectionBinding extends XMLBinding {
             return (XMLFormat<T>) xmlFormat;
         }
     }
-    
+
     @SuppressWarnings( "unchecked" )
-    static <T> XMLFormat<T> getNumberFormat( final Class<T> clazz ) {
-        try {
-            for( final Constructor<?> constructor : clazz.getConstructors() ) {
-                final Class<?>[] parameterTypes = constructor.getParameterTypes();
-                if ( parameterTypes.length == 1 ) {
-                    if ( parameterTypes[0] == long.class ) {
-                        return new XMLNumberLongFormat<T>( (Constructor<T>) constructor );
-                    }
-                    if ( parameterTypes[0] == int.class ) {
-                        return new XMLNumberIntFormat<T>( (Constructor<T>) constructor );
-                    }
-                }
-            }
-        } catch ( final Exception e ) {
-            throw new RuntimeException( e );
+    private <T> XMLFormat<T> getArrayFormat( final Class<T> cls ) {
+        if ( cls == int[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.INT_ARRAY_FORMAT;
         }
-        throw new IllegalArgumentException( "No suitable constructor found for class " + clazz.getName() + ".\n" +
-                "Available constructors: " + clazz.getConstructors() );
-    }
-    
-    static class XMLNumberIntFormat<T> extends XMLFormat<T> {
-        
-        private final Constructor<T> _constructor;
-
-        public XMLNumberIntFormat( final Constructor<T> constructor ) {
-            _constructor = constructor;
+        else if ( cls == long[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.LONG_ARRAY_FORMAT;
         }
-        
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public T newInstance( final Class<T> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
-            final int value = xml.getAttribute( "value", 0 );
-            try {
-                return _constructor.newInstance( value );
-            } catch ( final Exception e ) {
-                throw new XMLStreamException( e );
-            }
+        else if ( cls == short[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.SHORT_ARRAY_FORMAT;
         }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void read( final javolution.xml.XMLFormat.InputElement xml, final T obj ) throws XMLStreamException {
-            // nothing to do...
+        else if ( cls == float[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.FLOAT_ARRAY_FORMAT;
         }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
-            xml.setAttribute( "value", obj.toString() );
+        else if ( cls == double[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.DOUBLE_ARRAY_FORMAT;
         }
-        
-    }
-    
-    static class XMLNumberLongFormat<T> extends XMLFormat<T> {
-        
-        private final Constructor<T> _constructor;
-
-        public XMLNumberLongFormat( final Constructor<T> constructor ) {
-            _constructor = constructor;
+        else if ( cls == char[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.CHAR_ARRAY_FORMAT;
         }
-        
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public T newInstance( final Class<T> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
-            final long value = xml.getAttribute( "value", 0 );
-            try {
-                return _constructor.newInstance( value );
-            } catch ( final Exception e ) {
-                throw new XMLStreamException( e );
-            }
+        else if ( cls == byte[].class ) {
+            return (XMLFormat<T>) XMLArrayFormats.BYTE_ARRAY_FORMAT;
         }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void read( final javolution.xml.XMLFormat.InputElement xml, final T obj ) throws XMLStreamException {
-            // nothing to do...
+        else {
+            return (XMLFormat<T>) _arrayFormat;
         }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
-            xml.setAttribute( "value", obj.toString() );
-        }
-        
     }
     
     static class XMLEnumFormat extends XMLFormat<Enum<?>> {
@@ -236,7 +141,7 @@ public class ReflectionBinding extends XMLBinding {
             final String clazzName = xml.getAttribute( "type", (String)null );
             try {
                 @SuppressWarnings( "unchecked" )
-                final Enum<?> enumValue = Enum.valueOf( Class.forName( clazzName ).asSubclass( Enum.class ), value );
+                final Enum<?> enumValue = Enum.valueOf( Class.forName( clazzName, true, _classLoader ).asSubclass( Enum.class ), value );
                 return enumValue;
             } catch ( final ClassNotFoundException e ) {
                 throw new XMLStreamException( e );
