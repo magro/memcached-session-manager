@@ -1,4 +1,4 @@
-A serialization strategy for the memcached-session-manager (http://code.google.com/p/memcached-session-manager) that uses Javolution (http://javolution.org).
+A serialization strategy for the memcached-session-manager (http://code.google.com/p/memcached-session-manager ) that uses Javolution (http://javolution.org ).
 
 It's implemented using reflection to read/write field values from/to POJOs.
 
