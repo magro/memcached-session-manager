@@ -44,7 +44,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final byte[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Byte> getNext();
             }
         }
         
@@ -74,7 +74,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final char[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Character> getNext();
             }
         }
         
@@ -104,7 +104,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final short[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Short> getNext();
             }
         }
         
@@ -134,7 +134,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final int[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Integer> getNext();
             }
         }
         
@@ -164,7 +164,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final long[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Long> getNext();
             }
         }
         
@@ -194,7 +194,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final float[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Float> getNext();
             }
         }
         
@@ -224,7 +224,7 @@ public class XMLArrayFormats {
         public void read( final javolution.xml.XMLFormat.InputElement input, final double[] array ) throws XMLStreamException {
             int i = 0;
             while ( input.hasNext() ) {
-                array[i++] = input.getNext();
+                array[i++] = input.<Double> getNext();
             }
         }
         
