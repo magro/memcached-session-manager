@@ -666,5 +666,40 @@ public class TestClasses {
         }
         
     }
+    
+    static class Holder<T> {
+        T item;
+        public Holder( final T item ) {
+            this.item = item;
+        }
+    }
+
+    static class HolderList<T> {
+        List<Holder<T>> holders;
+        public HolderList( final List<Holder<T>> holders ) {
+            this.holders = holders;
+        }
+    }
+    
+    static class CounterHolder {
+        AtomicInteger item;
+        public CounterHolder( final AtomicInteger item ) {
+            this.item = item;
+        }
+    }
+
+    static class CounterHolderArray {
+        CounterHolder[] holders;
+        public CounterHolderArray( final CounterHolder ... holders ) {
+            this.holders = holders;
+        }
+    }
+
+    static class HolderArray<T> {
+        Holder<T>[] holders;
+        public HolderArray( final Holder<T> ... holders ) {
+            this.holders = holders;
+        }
+    }
 
 }

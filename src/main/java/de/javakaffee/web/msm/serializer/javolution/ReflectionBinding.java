@@ -66,7 +66,6 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Short.class
                 || cls == Double.class
                 || cls == Float.class
-                || cls == Short.class
                 || cls == Character.class
                 || cls == Byte.class
                 || Map.class.isAssignableFrom( cls ) || Collection.class.isAssignableFrom( cls ) ) {
@@ -84,7 +83,7 @@ public class ReflectionBinding extends XMLBinding {
         else {
             XMLFormat<?> xmlFormat = _formats.get( cls );
             if ( xmlFormat == null ) {
-                if ( Number.class.isAssignableFrom( cls ) ) {
+                if ( ReflectionFormat.isNumberFormat( cls ) ) {
                     xmlFormat = ReflectionFormat.getNumberFormat( cls );
                 }
                 else {

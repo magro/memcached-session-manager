@@ -137,7 +137,17 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     protected static boolean isAttribute( final Class<?> clazz ) {
-        return clazz.isPrimitive() || clazz == String.class || Number.class.isAssignableFrom( clazz ) || clazz.isEnum();
+        return clazz.isPrimitive()
+                || clazz.isEnum()
+                || clazz == String.class
+                || clazz == Boolean.class
+                || clazz == Integer.class
+                || clazz == Long.class
+                || clazz == Short.class
+                || clazz == Double.class
+                || clazz == Float.class
+                || clazz == Character.class
+                || clazz == Byte.class;
     }
     
     /**
@@ -263,22 +273,23 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     private void setAttributeFromField( final T obj, final Field field, final javolution.xml.XMLFormat.OutputElement output ) {
         try {
             
-            if ( field.getType().isPrimitive() ) {
-                if ( field.getType() == boolean.class ) {
+            final Class<?> fieldType = field.getType();
+            if ( fieldType.isPrimitive() ) {
+                if ( fieldType == boolean.class ) {
                     output.setAttribute( field.getName(), field.getBoolean( obj ) );
-                } else if ( field.getType() == int.class ) {
+                } else if ( fieldType == int.class ) {
                     output.setAttribute( field.getName(), field.getInt( obj ) );
-                } else if ( field.getType() == long.class ) {
+                } else if ( fieldType == long.class ) {
                     output.setAttribute( field.getName(), field.getLong( obj ) );
-                } else if ( field.getType() == float.class ) {
+                } else if ( fieldType == float.class ) {
                     output.setAttribute( field.getName(), field.getFloat( obj ) );
-                } else if ( field.getType() == double.class ) {
+                } else if ( fieldType == double.class ) {
                     output.setAttribute( field.getName(), field.getDouble( obj ) );
-                } else if ( field.getType() == byte.class ) {
+                } else if ( fieldType == byte.class ) {
                     output.setAttribute( field.getName(), field.getByte( obj ) );
-                } else if ( field.getType() == char.class ) {
+                } else if ( fieldType == char.class ) {
                     output.setAttribute( field.getName(), field.getChar( obj ) );
-                } else if ( field.getType() == short.class ) {
+                } else if ( fieldType == short.class ) {
                     output.setAttribute( field.getName(), field.getShort( obj ) );
                 }
             } else {
@@ -286,12 +297,12 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 final Object object = field.get( obj );
                 
                 if ( object != null ) {
-                    if ( field.getType() == String.class || Number.class.isAssignableFrom( field.getType() ) ) {
+                    if ( fieldType == String.class || fieldType == Character.class || Number.class.isAssignableFrom( fieldType ) ) {
                         output.setAttribute( field.getName(), object.toString() );
-                    } else if ( field.getType().isEnum() ) {
+                    } else if ( fieldType.isEnum() ) {
                         output.setAttribute( field.getName(), ( (Enum<?>) object ).name() );
                     } else {
-                        throw new IllegalArgumentException( "Not yet supported as attribute: " + field.getType() );
+                        throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
                     }
                 }
             }
@@ -306,58 +317,61 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         try {
 
             final String fieldName = field.getName();
-            if ( field.getType().isPrimitive() ) {
+            final Class<?> fieldType = field.getType();
+            if ( fieldType.isPrimitive() ) {
 
-                if ( field.getType() == boolean.class ) {
+                if ( fieldType == boolean.class ) {
                     field.setBoolean( obj, input.getAttribute( fieldName, false ) );
-                } else if ( field.getType() == int.class ) {
+                } else if ( fieldType == int.class ) {
                     field.setInt( obj, input.getAttribute( fieldName, 0 ) );
-                } else if ( field.getType() == long.class ) {
+                } else if ( fieldType == long.class ) {
                     field.setLong( obj, input.getAttribute( fieldName, (long) 0 ) );
-                } else if ( field.getType() == float.class ) {
+                } else if ( fieldType == float.class ) {
                     field.setFloat( obj, input.getAttribute( fieldName, (float) 0 ) );
-                } else if ( field.getType() == double.class ) {
+                } else if ( fieldType == double.class ) {
                     field.setDouble( obj, input.getAttribute( fieldName, (double) 0 ) );
-                } else if ( field.getType() == byte.class ) {
+                } else if ( fieldType == byte.class ) {
                     field.setByte( obj, input.getAttribute( fieldName, (Byte) null ) );
-                } else if ( field.getType() == char.class ) {
+                } else if ( fieldType == char.class ) {
                     field.setChar( obj, (char) input.getAttribute( fieldName, (char) 0 ) );
-                } else if ( field.getType() == short.class ) {
+                } else if ( fieldType == short.class ) {
                     field.setShort( obj, input.getAttribute( fieldName, (Short) null ) );
                 }
-            } else if ( field.getType().isEnum() ) {
+            } else if ( fieldType.isEnum() ) {
                 final String value = input.getAttribute( fieldName, (String) null );
                 if ( value != null ) {
                     @SuppressWarnings( "unchecked" )
-                    final Enum enumValue = Enum.valueOf( field.getType().asSubclass( Enum.class ), value );
+                    final Enum enumValue = Enum.valueOf( fieldType.asSubclass( Enum.class ), value );
                     field.set( obj, enumValue );
                 }
             } else {
 
-                final Object object = input.getAttribute( fieldName );
+                final CharArray object = input.getAttribute( fieldName );
 
                 if ( object != null ) {
-                    if ( field.getType() == String.class ) {
+                    if ( fieldType == String.class ) {
                         field.set( obj, input.getAttribute( fieldName, (String) null ) );
-                    } else if ( field.getType().isAssignableFrom( Boolean.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Boolean.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Boolean) null ) );
-                    } else if ( field.getType().isAssignableFrom( Integer.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Integer.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Integer) null ) );
-                    } else if ( field.getType().isAssignableFrom( Long.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Long.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Long) null ) );
-                    } else if ( field.getType().isAssignableFrom( Short.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Short.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Short) null ) );
-                    } else if ( field.getType().isAssignableFrom( Double.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Double.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Double) null ) );
-                    } else if ( field.getType().isAssignableFrom( Float.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Float.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Float) null ) );
-                    } else if ( field.getType().isAssignableFrom( Byte.class ) ) {
+                    } else if ( fieldType.isAssignableFrom( Byte.class ) ) {
                         field.set( obj, input.getAttribute( fieldName, (Byte) null ) );
-                    } else if ( Number.class.isAssignableFrom( field.getType() ) ) {
-                        final XMLNumberFormat<?> format = getNumberFormat( field.getType() );
+                    } else if ( fieldType.isAssignableFrom( Character.class ) ) {
+                        field.set( obj, Character.valueOf( object.charAt( 0 ) ) );
+                    } else if ( Number.class.isAssignableFrom( fieldType ) ) {
+                        final XMLNumberFormat<?> format = getNumberFormat( fieldType );
                         field.set( obj, format.newInstanceFromAttribute( input, fieldName ) );
                     } else {
-                        throw new IllegalArgumentException( "Not yet supported as attribute: " + field.getType() );
+                        throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
                     }
                 }
             }
@@ -365,6 +379,16 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         } catch ( final Exception e ) {
             LOG.log( Level.SEVERE, "Caught exception when trying to set field from attribute.", e );
         }
+    }
+    
+    /**
+     * Used to determine, if the given class can be serialized using the
+     * {@link XMLNumberFormat}.
+     * @param clazz the class that is to be checked
+     * @return
+     */
+    static boolean isNumberFormat( final Class<?> clazz ) {
+        return Number.class.isAssignableFrom( clazz );
     }
     
     @SuppressWarnings( "unchecked" )
