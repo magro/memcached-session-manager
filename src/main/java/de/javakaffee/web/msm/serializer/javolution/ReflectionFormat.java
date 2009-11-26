@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -53,14 +54,14 @@ import sun.reflect.ReflectionFactory;
 public class ReflectionFormat<T> extends XMLFormat<T> {
 
     private static final Logger LOG = Logger.getLogger( ReflectionFormat.class.getName() );
-    
+
     private static final Map<Class<?>, XMLNumberFormat<?>> _numberFormats = new ConcurrentHashMap<Class<?>, XMLNumberFormat<?>>();
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
     private static final Object[] INITARGS = new Object[0];
 
     private final Constructor<T> _constructor;
-    private final Collection<Field> _attributes;
-    private final Collection<Field> _elements;
+    private final AttributeHandler[] _attributes;
+    private final FieldHandler[] _elements;
     private final Map<String, Field> _attributesMap;
 
     /**
@@ -68,29 +69,30 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
      * 
      * @param clazz
      *            the Class that is supported by this {@link XMLFormat}.
-     * @param classLoader 
+     * @param classLoader
      */
     @SuppressWarnings( "unchecked" )
     public ReflectionFormat( final Class<T> clazz, final ClassLoader classLoader ) {
 
         try {
-            _constructor = REFLECTION_FACTORY.newConstructorForSerialization(clazz, Object.class.getDeclaredConstructor(new Class[0]));
+            _constructor =
+                    REFLECTION_FACTORY.newConstructorForSerialization( clazz, Object.class.getDeclaredConstructor( new Class[0] ) );
             _constructor.setAccessible( true );
         } catch ( final SecurityException e ) {
             throw new RuntimeException( e );
         } catch ( final NoSuchMethodException e ) {
             throw new RuntimeException( e );
         }
-        
 
         final AttributesAndElements fields = allFields( clazz );
 
-        _attributes = fields.attributes;
-        _elements = fields.elements;
+        _attributes = fields.attributes.toArray( new AttributeHandler[fields.attributes.size()] );
+        _elements = fields.elements.toArray( new FieldHandler[fields.elements.size()] );
 
-        _attributesMap = new ConcurrentHashMap<String, Field>( _attributes.size() + 1 );
-        for ( final Field attribute : _attributes ) {
-            _attributesMap.put( attribute.getName(), attribute );
+        // no concurrency support required here, as we'll only read from the map
+        _attributesMap = new HashMap<String, Field>( _attributes.length + 1 );
+        for ( final AttributeHandler attribute : _attributes ) {
+            _attributesMap.put( attribute._field.getName(), attribute._field );
         }
     }
 
@@ -115,19 +117,60 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     static class AttributesAndElements {
-        private final Collection<Field> attributes;
-        private final Collection<Field> elements;
+        private final Collection<AttributeHandler> attributes;
+        private final Collection<FieldHandler> elements;
 
         AttributesAndElements() {
-            attributes = new ArrayList<Field>();
-            elements = new ArrayList<Field>();
+            attributes = new ArrayList<AttributeHandler>();
+            elements = new ArrayList<FieldHandler>();
         }
 
         void add( final Field field ) {
             if ( isAttribute( field ) ) {
-                attributes.add( field );
+                final Class<?> fieldType = field.getType();
+                if ( fieldType.isPrimitive() ) {
+
+                    if ( fieldType == boolean.class ) {
+                        attributes.add( new BooleanAttributeHandler( field ) );
+                    } else if ( fieldType == int.class ) {
+                        attributes.add( new IntAttributeHandler( field ) );
+                    } else if ( fieldType == long.class ) {
+                        attributes.add( new LongAttributeHandler( field ) );
+                    } else if ( fieldType == float.class ) {
+                        attributes.add( new FloatAttributeHandler( field ) );
+                    } else if ( fieldType == double.class ) {
+                        attributes.add( new DoubleAttributeHandler( field ) );
+                    } else if ( fieldType == byte.class ) {
+                        attributes.add( new ByteAttributeHandler( field ) );
+                    } else if ( fieldType == char.class ) {
+                        attributes.add( new CharAttributeHandler( field ) );
+                    } else if ( fieldType == short.class ) {
+                        attributes.add( new ShortAttributeHandler( field ) );
+                    }
+                } else {
+
+                    if ( fieldType == String.class || fieldType == Character.class || Number.class.isAssignableFrom( fieldType ) ) {
+                        attributes.add( new ToStringAttributeHandler( field ) );
+                    } else if ( fieldType.isEnum() ) {
+                        attributes.add( new EnumAttributeHandler( field ) );
+                    } else {
+                        throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
+                    }
+
+                }
+
             } else {
-                elements.add( field );
+
+                if ( field.getType().isArray() ) {
+                    elements.add( new ArrayFieldHandler( field ) );
+                } else if ( Collection.class.isAssignableFrom( field.getType() ) ) {
+                    elements.add( new CollectionFieldHandler( field ) );
+                } else if ( Map.class.isAssignableFrom( field.getType() ) ) {
+                    elements.add( new MapFieldHandler( field ) );
+                } else {
+                    elements.add( new DefaultFieldHandler( field ) );
+                }
+
             }
         }
     }
@@ -137,19 +180,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     protected static boolean isAttribute( final Class<?> clazz ) {
-        return clazz.isPrimitive()
-                || clazz.isEnum()
-                || clazz == String.class
-                || clazz == Boolean.class
-                || clazz == Integer.class
-                || clazz == Long.class
-                || clazz == Short.class
-                || clazz == Double.class
-                || clazz == Float.class
-                || clazz == Character.class
-                || clazz == Byte.class;
+        return clazz.isPrimitive() || clazz.isEnum() || clazz == String.class || clazz == Boolean.class || clazz == Integer.class
+                || clazz == Long.class || clazz == Short.class || clazz == Double.class || clazz == Float.class
+                || clazz == Character.class || clazz == Byte.class;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -187,15 +222,15 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     private void readElements( final javolution.xml.XMLFormat.InputElement input, final T obj ) {
-        for ( final Field field : _elements ) {
+        for ( final FieldHandler fieldHandler : _elements ) {
             final XMLStreamReader reader = input.getStreamReader();
             reader.getEventType();
 
             try {
-                final Object value = input.get( field.getName() );
-                field.set( obj, value );
+                final Object value = input.get( fieldHandler._field.getName() );
+                fieldHandler._field.set( obj, value );
             } catch ( final Exception e ) {
-                LOG.log( Level.SEVERE, "Could not set field value for field " + field, e );
+                LOG.log( Level.SEVERE, "Could not set field value for field " + fieldHandler._field, e );
             }
         }
     }
@@ -210,110 +245,169 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     private void writeAttributes( final T obj, final javolution.xml.XMLFormat.OutputElement output ) {
-        for ( final Field field : _attributes ) {
-            setAttributeFromField( obj, field, output );
+        for ( final AttributeHandler handler : _attributes ) {
+            try {
+                handler.writeAttribute( obj, output );
+            } catch ( final Exception e ) {
+                LOG.log( Level.SEVERE, "Could not set attribute from field value.", e );
+            }
         }
     }
 
     private void writeElements( final T obj, final javolution.xml.XMLFormat.OutputElement output ) {
-        for ( final Field field : _elements ) {
-            writeElement( obj, field, output );
+        for ( final FieldHandler fieldHandler : _elements ) {
+            fieldHandler.writeElement( obj, output );
         }
     }
 
-    @SuppressWarnings( "unchecked" )
-    private void writeElement( final T obj, final Field field, final javolution.xml.XMLFormat.OutputElement output ) {
-        try {
-            final Object object = field.get( obj );
+    static abstract class AttributeHandler {
+        protected final Field _field;
+
+        public AttributeHandler( final Field field ) {
+            _field = field;
+        }
+
+        abstract void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException;
+    }
+
+    static final class BooleanAttributeHandler extends AttributeHandler {
+        public BooleanAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getBoolean( obj ) );
+        }
+    }
+
+    static final class IntAttributeHandler extends AttributeHandler {
+        public IntAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getInt( obj ) );
+        }
+    }
+
+    static final class LongAttributeHandler extends AttributeHandler {
+        public LongAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getLong( obj ) );
+        }
+    }
+
+    static final class FloatAttributeHandler extends AttributeHandler {
+        public FloatAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getFloat( obj ) );
+        }
+    }
+
+    static final class DoubleAttributeHandler extends AttributeHandler {
+        public DoubleAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getDouble( obj ) );
+        }
+    }
+
+    static final class ByteAttributeHandler extends AttributeHandler {
+        public ByteAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getByte( obj ) );
+        }
+    }
+
+    static final class CharAttributeHandler extends AttributeHandler {
+        public CharAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getChar( obj ) );
+        }
+    }
+
+    static final class ShortAttributeHandler extends AttributeHandler {
+        public ShortAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            output.setAttribute( _field.getName(), _field.getShort( obj ) );
+        }
+    }
+
+    static abstract class ObjectAttributeHandler extends AttributeHandler {
+        public ObjectAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void writeAttribute( final Object obj, final XMLFormat.OutputElement output ) throws IllegalArgumentException,
+            XMLStreamException, IllegalAccessException {
+            final Object object = _field.get( obj );
             if ( object != null ) {
-                if ( field.getType().isArray() ) {
-                    addArray( object, field.getName(), output );
-                } else if ( Collection.class.isAssignableFrom( field.getType() ) ) {
-                    output.add( (Collection<?>) object, field.getName(), (Class<Collection<?>>) object.getClass() );
-                } else if ( Map.class.isAssignableFrom( field.getType() ) ) {
-                    output.add( (Map<?, ?>) object, field.getName(), (Class<Map<?, ?>>) object.getClass() );
-                } else {
-                    output.add( object, field.getName() );
-                }
+                add( object, output );
             }
-        } catch ( final Exception e ) {
-            LOG.log( Level.SEVERE, "Could not write element for field.", e );
         }
-    }
-    
-    private void addArray( final Object obj, final String name, final OutputElement output ) throws XMLStreamException {
-        final Class<?> cls = obj.getClass();
-        if ( cls == int[].class ) {
-            output.add( (int[])obj, name, int[].class );
-        }
-        else if ( cls == long[].class ) {
-            output.add( (long[])obj, name, long[].class );
-        }
-        else if ( cls == short[].class ) {
-            output.add( (short[])obj, name, short[].class );
-        }
-        else if ( cls == float[].class ) {
-            output.add( (float[])obj, name, float[].class );
-        }
-        else if ( cls == double[].class ) {
-            output.add( (double[])obj, name, double[].class );
-        }
-        else if ( cls == char[].class ) {
-            output.add( (char[])obj, name, char[].class );
-        }
-        else if ( cls == byte[].class ) {
-            output.add( (byte[])obj, name, byte[].class );
-        }
-        else {
-            output.add( (Object[])obj, name, Object[].class );
-        }
-        
+
+        abstract void add( Object object, OutputElement output ) throws XMLStreamException;
     }
 
-    private void setAttributeFromField( final T obj, final Field field, final javolution.xml.XMLFormat.OutputElement output ) {
-        try {
-            
-            final Class<?> fieldType = field.getType();
-            if ( fieldType.isPrimitive() ) {
-                if ( fieldType == boolean.class ) {
-                    output.setAttribute( field.getName(), field.getBoolean( obj ) );
-                } else if ( fieldType == int.class ) {
-                    output.setAttribute( field.getName(), field.getInt( obj ) );
-                } else if ( fieldType == long.class ) {
-                    output.setAttribute( field.getName(), field.getLong( obj ) );
-                } else if ( fieldType == float.class ) {
-                    output.setAttribute( field.getName(), field.getFloat( obj ) );
-                } else if ( fieldType == double.class ) {
-                    output.setAttribute( field.getName(), field.getDouble( obj ) );
-                } else if ( fieldType == byte.class ) {
-                    output.setAttribute( field.getName(), field.getByte( obj ) );
-                } else if ( fieldType == char.class ) {
-                    output.setAttribute( field.getName(), field.getChar( obj ) );
-                } else if ( fieldType == short.class ) {
-                    output.setAttribute( field.getName(), field.getShort( obj ) );
-                }
-            } else {
+    static final class ToStringAttributeHandler extends ObjectAttributeHandler {
+        public ToStringAttributeHandler( final Field field ) {
+            super( field );
+        }
 
-                final Object object = field.get( obj );
-                
-                if ( object != null ) {
-                    if ( fieldType == String.class || fieldType == Character.class || Number.class.isAssignableFrom( fieldType ) ) {
-                        output.setAttribute( field.getName(), object.toString() );
-                    } else if ( fieldType.isEnum() ) {
-                        output.setAttribute( field.getName(), ( (Enum<?>) object ).name() );
-                    } else {
-                        throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
-                    }
-                }
-            }
+        @Override
+        void add( final Object object, final OutputElement output ) throws XMLStreamException {
+            output.setAttribute( _field.getName(), object.toString() );
+        }
+    }
 
-        } catch ( final Exception e ) {
-            LOG.log( Level.SEVERE, "Could not set attribute from field value.", e );
+    static final class EnumAttributeHandler extends ObjectAttributeHandler {
+        public EnumAttributeHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void add( final Object object, final OutputElement output ) throws XMLStreamException {
+            output.setAttribute( _field.getName(), ( (Enum<?>) object ).name() );
         }
     }
 
     private void setFieldFromAttribute( final T obj, final Field field, final javolution.xml.XMLFormat.InputElement input ) {
-        
+
         try {
 
             final String fieldName = field.getName();
@@ -380,17 +474,19 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             LOG.log( Level.SEVERE, "Caught exception when trying to set field from attribute.", e );
         }
     }
-    
+
     /**
      * Used to determine, if the given class can be serialized using the
      * {@link XMLNumberFormat}.
-     * @param clazz the class that is to be checked
+     * 
+     * @param clazz
+     *            the class that is to be checked
      * @return
      */
     static boolean isNumberFormat( final Class<?> clazz ) {
         return Number.class.isAssignableFrom( clazz );
     }
-    
+
     @SuppressWarnings( "unchecked" )
     static <T> XMLNumberFormat<T> getNumberFormat( final Class<T> clazz ) {
         XMLNumberFormat<?> result = _numberFormats.get( clazz );
@@ -400,11 +496,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         }
         return (XMLNumberFormat<T>) result;
     }
-    
+
     @SuppressWarnings( "unchecked" )
     static <T> XMLNumberFormat<T> createNumberFormat( final Class<T> clazz ) {
         try {
-            for( final Constructor<?> constructor : clazz.getConstructors() ) {
+            for ( final Constructor<?> constructor : clazz.getConstructors() ) {
                 final Class<?>[] parameterTypes = constructor.getParameterTypes();
                 if ( parameterTypes.length == 1 ) {
                     if ( parameterTypes[0] == long.class ) {
@@ -418,29 +514,33 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         } catch ( final Exception e ) {
             throw new RuntimeException( e );
         }
-        throw new IllegalArgumentException( "No suitable constructor found for class " + clazz.getName() + ".\n" +
-                "Available constructors: " + clazz.getConstructors() );
+        throw new IllegalArgumentException( "No suitable constructor found for class " + clazz.getName() + ".\n"
+                + "Available constructors: " + clazz.getConstructors() );
     }
-    
+
     /**
      * The base class for number formats.
      * 
-     * @param <T> the number type.
+     * @param <T>
+     *            the number type.
      */
     static abstract class XMLNumberFormat<T> extends XMLFormat<T> {
-        
+
         private final Constructor<T> _constructor;
 
         public XMLNumberFormat( final Constructor<T> constructor ) {
             _constructor = constructor;
         }
-        
+
         /**
-         * Creates a new instance from the associated constructor. The provided class is ignored, just
-         * the provided {@link InputElement} is used to read the value which will be passed to the constructor.
+         * Creates a new instance from the associated constructor. The provided
+         * class is ignored, just the provided {@link InputElement} is used to
+         * read the value which will be passed to the constructor.
          * 
-         * @param clazz can be null for this {@link XMLFormat} implementation
-         * @param xml the input element for the object to create.
+         * @param clazz
+         *            can be null for this {@link XMLFormat} implementation
+         * @param xml
+         *            the input element for the object to create.
          * @return a new number instance.
          */
         @Override
@@ -449,12 +549,15 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         }
 
         /**
-         * Creates a new instance from an already associated constructor. The provided {@link InputElement} is
-         * used to read the value from the attribute with the provided name. The value read will be passed to the
-         * constructor of the object to create.
+         * Creates a new instance from an already associated constructor. The
+         * provided {@link InputElement} is used to read the value from the
+         * attribute with the provided name. The value read will be passed to
+         * the constructor of the object to create.
          * 
-         * @param xml the input element for the object to create.
-         * @param name the attribute name to read the value from.
+         * @param xml
+         *            the input element for the object to create.
+         * @param name
+         *            the attribute name to read the value from.
          * @return a new number instance.
          */
         public T newInstanceFromAttribute( final javolution.xml.XMLFormat.InputElement xml, final String name )
@@ -466,14 +569,17 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         protected abstract Object getAttribute( String name, InputElement xml ) throws XMLStreamException;
 
         /**
-         * Does not perform anything, as the number is already created in {@link #newInstance(Class, javolution.xml.XMLFormat.InputElement)}.
+         * Does not perform anything, as the number is already created in
+         * {@link #newInstance(Class, javolution.xml.XMLFormat.InputElement)}.
          * 
-         * @param xml the input element
-         * @param the obj the created number object
+         * @param xml
+         *            the input element
+         * @param the
+         *            obj the created number object
          */
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement xml, final T obj ) throws XMLStreamException {
@@ -487,11 +593,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
             xml.setAttribute( "value", obj.toString() );
         }
-        
+
     }
-    
+
     static class XMLNumberIntFormat<T> extends XMLNumberFormat<T> {
-        
+
         public XMLNumberIntFormat( final Constructor<T> constructor ) {
             super( constructor );
         }
@@ -503,11 +609,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         public Object getAttribute( final String name, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
             return xml.getAttribute( name, 0 );
         }
-        
+
     }
-    
+
     static class XMLNumberLongFormat<T> extends XMLNumberFormat<T> {
-        
+
         public XMLNumberLongFormat( final Constructor<T> constructor ) {
             super( constructor );
         }
@@ -519,7 +625,104 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         public Object getAttribute( final String name, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
             return xml.getAttribute( name, 0L );
         }
-        
+
+    }
+
+    // ============== Field handler ======================================
+
+    static abstract class FieldHandler {
+
+        protected final Field _field;
+
+        public FieldHandler( final Field field ) {
+            _field = field;
+        }
+
+        void writeElement( final Object obj, final XMLFormat.OutputElement output ) {
+            try {
+                final Object object = _field.get( obj );
+                if ( object != null ) {
+                    add( object, output );
+                }
+            } catch ( final Exception e ) {
+                LOG.log( Level.SEVERE, "Could not write element for field.", e );
+            }
+        }
+
+        abstract void add( Object object, XMLFormat.OutputElement output ) throws XMLStreamException;
+
+    }
+
+    static final class ArrayFieldHandler extends FieldHandler {
+
+        public ArrayFieldHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            final String name = _field.getName();
+            final Class<?> cls = object.getClass();
+            if ( cls == int[].class ) {
+                output.add( (int[]) object, name, int[].class );
+            } else if ( cls == long[].class ) {
+                output.add( (long[]) object, name, long[].class );
+            } else if ( cls == short[].class ) {
+                output.add( (short[]) object, name, short[].class );
+            } else if ( cls == float[].class ) {
+                output.add( (float[]) object, name, float[].class );
+            } else if ( cls == double[].class ) {
+                output.add( (double[]) object, name, double[].class );
+            } else if ( cls == char[].class ) {
+                output.add( (char[]) object, name, char[].class );
+            } else if ( cls == byte[].class ) {
+                output.add( (byte[]) object, name, byte[].class );
+            } else {
+                output.add( (Object[]) object, name, Object[].class );
+            }
+        }
+
+    }
+
+    static final class CollectionFieldHandler extends FieldHandler {
+
+        public CollectionFieldHandler( final Field field ) {
+            super( field );
+        }
+
+        @SuppressWarnings( "unchecked" )
+        @Override
+        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            output.add( (Collection<?>) object, _field.getName(), (Class<Collection<?>>) object.getClass() );
+        }
+
+    }
+
+    static final class MapFieldHandler extends FieldHandler {
+
+        public MapFieldHandler( final Field field ) {
+            super( field );
+        }
+
+        @SuppressWarnings( "unchecked" )
+        @Override
+        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            output.add( (Map<?, ?>) object, _field.getName(), (Class<Map<?, ?>>) object.getClass() );
+        }
+
+    }
+
+    static final class DefaultFieldHandler extends FieldHandler {
+
+        public DefaultFieldHandler( final Field field ) {
+            super( field );
+        }
+
+        @Override
+        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            output.add( object, _field.getName() );
+        }
+
     }
 
 }

@@ -57,8 +57,12 @@ public class ReflectionBinding extends XMLBinding {
     @SuppressWarnings( "unchecked" )
     @Override
     public <T> XMLFormat<T> getFormat(final Class<T> cls) {
+
+        XMLFormat<?> xmlFormat = _formats.get( cls );
+        if ( xmlFormat != null ) {
+            return (XMLFormat<T>) xmlFormat;
+        }
         
-        final XMLFormat<T> format = super.getFormat( cls );
         if ( cls.isPrimitive() || cls == String.class
                 || cls == Boolean.class
                 || cls == Integer.class
@@ -69,7 +73,7 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Character.class
                 || cls == Byte.class
                 || Map.class.isAssignableFrom( cls ) || Collection.class.isAssignableFrom( cls ) ) {
-            return format;
+            return super.getFormat( cls );
         }
         else if ( cls.isArray() ) {
             return getArrayFormat( cls );
@@ -81,7 +85,6 @@ public class ReflectionBinding extends XMLBinding {
             return (XMLFormat<T>) CALENDAR_FORMAT;
         }
         else {
-            XMLFormat<?> xmlFormat = _formats.get( cls );
             if ( xmlFormat == null ) {
                 if ( ReflectionFormat.isNumberFormat( cls ) ) {
                     xmlFormat = ReflectionFormat.getNumberFormat( cls );
