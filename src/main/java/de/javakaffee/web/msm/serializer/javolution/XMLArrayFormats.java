@@ -27,9 +27,9 @@ import javolution.xml.stream.XMLStreamException;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class XMLArrayFormats {
-    
-    static final XMLFormat<byte[]> BYTE_ARRAY_FORMAT = new XMLFormat<byte[]>() {
-        
+
+    static final XMLFormat<byte[]> BYTE_ARRAY_FORMAT = new XMLFormat<byte[]>( byte[].class ) {
+
         @Override
         public byte[] newInstance( final Class<byte[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -39,7 +39,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final byte[] array ) throws XMLStreamException {
             int i = 0;
@@ -47,19 +47,19 @@ public class XMLArrayFormats {
                 array[i++] = input.<Byte> getNext();
             }
         }
-        
+
         @Override
         public final void write( final byte[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final byte item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final byte item : array ) {
                 output.add( item );
             }
         }
-        
+
     };
 
-    static final XMLFormat<char[]> CHAR_ARRAY_FORMAT = new XMLFormat<char[]>() {
-        
+    static final XMLFormat<char[]> CHAR_ARRAY_FORMAT = new XMLFormat<char[]>( char[].class ) {
+
         @Override
         public char[] newInstance( final Class<char[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -69,7 +69,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final char[] array ) throws XMLStreamException {
             int i = 0;
@@ -77,19 +77,19 @@ public class XMLArrayFormats {
                 array[i++] = input.<Character> getNext();
             }
         }
-        
+
         @Override
         public final void write( final char[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final char item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final char item : array ) {
                 output.add( item );
-            };
+            }
         }
-        
+
     };
 
-    static final XMLFormat<short[]> SHORT_ARRAY_FORMAT = new XMLFormat<short[]>() {
-        
+    static final XMLFormat<short[]> SHORT_ARRAY_FORMAT = new XMLFormat<short[]>( short[].class ) {
+
         @Override
         public short[] newInstance( final Class<short[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -99,7 +99,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final short[] array ) throws XMLStreamException {
             int i = 0;
@@ -107,19 +107,19 @@ public class XMLArrayFormats {
                 array[i++] = input.<Short> getNext();
             }
         }
-        
+
         @Override
         public final void write( final short[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final short item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final short item : array ) {
                 output.add( item );
-            };
+            }
         }
-        
+
     };
 
-    static final XMLFormat<int[]> INT_ARRAY_FORMAT = new XMLFormat<int[]>() {
-        
+    static final XMLFormat<int[]> INT_ARRAY_FORMAT = new XMLFormat<int[]>( int[].class ) {
+
         @Override
         public int[] newInstance( final Class<int[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -129,7 +129,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final int[] array ) throws XMLStreamException {
             int i = 0;
@@ -137,19 +137,19 @@ public class XMLArrayFormats {
                 array[i++] = input.<Integer> getNext();
             }
         }
-        
+
         @Override
         public final void write( final int[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final int item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final int item : array ) {
                 output.add( item );
-            };
+            }
         }
-        
+
     };
 
-    static final XMLFormat<long[]> LONG_ARRAY_FORMAT = new XMLFormat<long[]>() {
-        
+    static final XMLFormat<long[]> LONG_ARRAY_FORMAT = new XMLFormat<long[]>( long[].class ) {
+
         @Override
         public long[] newInstance( final Class<long[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -159,7 +159,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final long[] array ) throws XMLStreamException {
             int i = 0;
@@ -167,19 +167,19 @@ public class XMLArrayFormats {
                 array[i++] = input.<Long> getNext();
             }
         }
-        
+
         @Override
         public final void write( final long[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final long item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final long item : array ) {
                 output.add( item );
-            };
+            }
         }
-        
+
     };
 
-    static final XMLFormat<float[]> FLOAT_ARRAY_FORMAT = new XMLFormat<float[]>() {
-        
+    static final XMLFormat<float[]> FLOAT_ARRAY_FORMAT = new XMLFormat<float[]>( float[].class ) {
+
         @Override
         public float[] newInstance( final Class<float[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -189,7 +189,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final float[] array ) throws XMLStreamException {
             int i = 0;
@@ -197,19 +197,19 @@ public class XMLArrayFormats {
                 array[i++] = input.<Float> getNext();
             }
         }
-        
+
         @Override
         public final void write( final float[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final float item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final float item : array ) {
                 output.add( item );
-            };
+            }
         }
-        
+
     };
 
-    static final XMLFormat<double[]> DOUBLE_ARRAY_FORMAT = new XMLFormat<double[]>() {
-        
+    static final XMLFormat<double[]> DOUBLE_ARRAY_FORMAT = new XMLFormat<double[]>( double[].class ) {
+
         @Override
         public double[] newInstance( final Class<double[]> clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
@@ -219,7 +219,7 @@ public class XMLArrayFormats {
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final double[] array ) throws XMLStreamException {
             int i = 0;
@@ -227,15 +227,15 @@ public class XMLArrayFormats {
                 array[i++] = input.<Double> getNext();
             }
         }
-        
+
         @Override
         public final void write( final double[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.setAttribute("length", array.length );
-            for( final double item : array ) {
+            output.setAttribute( "length", array.length );
+            for ( final double item : array ) {
                 output.add( item );
-            };
+            }
         }
-        
+
     };
-    
+
 }

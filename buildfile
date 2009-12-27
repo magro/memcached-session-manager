@@ -5,8 +5,7 @@ require 'etc/checkstyle'
 repositories.remote << 'http://repo2.maven.org/maven2'
 repositories.remote << 'http://www.ibiblio.org/maven2'
 repositories.remote << 'http://thimbleware.com/maven'
-repositories.remote << 'http://repository.jboss.com/maven2'
-repositories.remote << 'http://google-gson.googlecode.com/svn/mavenrepo'
+repositories.remote << 'http://download.java.net/maven/2'
 
 SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 TC_CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
@@ -14,7 +13,7 @@ TC_COYOTE = 'org.apache.tomcat:coyote:jar:6.0.18'
 TC_LOGGING = transitive( 'org.apache.tomcat:juli:jar:6.0.18' )
 MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4').from(file('lib/memcached-2.4.jar'))
 MSM = artifact( 'de.javakaffee.web:memcached-session-manager:jar:1.1-SNAPSHOT' ).from(file('lib/memcached-session-manager-1.1-SNAPSHOT.jar'))
-JAVOLUTION = transitive('org:javolution:jar:4.1.0')
+JAVOLUTION = artifact('javolution:javolution:jar:5.4.3').from(file('lib/javolution-5.4.3.jar'))
 
 # Testing
 CLANG = 'commons-lang:commons-lang:jar:2.4'

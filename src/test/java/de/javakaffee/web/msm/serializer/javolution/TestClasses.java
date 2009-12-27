@@ -42,6 +42,21 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
  */
 public class TestClasses {
 
+    static Person createPerson( final String name, final Gender gender, final String... emailAddresses ) {
+        final Person person = new Person();
+        person.setName( name );
+        person.setGender( gender );
+        if ( emailAddresses != null ) {
+            final HashMap<String, Object> props = new HashMap<String, Object>();
+            for ( int i = 0; i < emailAddresses.length; i++ ) {
+                final String emailAddress = emailAddresses[i];
+                props.put( "email" + i, new Email( name, emailAddress ) );
+            }
+            person.setProps( props );
+        }
+        return person;
+    }
+
     static Person createPerson( final String name, final Gender gender, final Integer age, final String... emailAddresses ) {
         final Person person = new Person();
         person.setName( name );
@@ -59,11 +74,30 @@ public class TestClasses {
     static ClassWithoutDefaultConstructor createClassWithoutDefaultConstructor( final String string ) {
         return new ClassWithoutDefaultConstructor( string );
     }
-    
+
     static PrivateClass createPrivateClass( final String string ) {
         final PrivateClass result = new PrivateClass();
         result.foo = string;
         return result;
+    }
+
+    static Container createContainer( final String bodyContent ) {
+        return new Container( bodyContent );
+    }
+
+    public static class Container {
+
+        private final Body _body;
+
+        public Container( final String bodyContent ) {
+            _body = new Body();
+            _body.someContent = bodyContent;
+        }
+
+        class Body {
+            String someContent;
+        }
+
     }
 
     public static class Person implements Serializable {
@@ -84,7 +118,7 @@ public class TestClasses {
         public String getName() {
             return _name;
         }
-        
+
         public void addFriend( final Person p ) {
             _friends.add( p );
         }
@@ -191,8 +225,8 @@ public class TestClasses {
 
         @Override
         public String toString() {
-            return "Person [_age=" + _age + ", _friends.size=" + _friends.size() + ", _gender=" + _gender + ", _name=" + _name + ", _props="
-                    + _props + "]";
+            return "Person [_age=" + _age + ", _friends.size=" + _friends.size() + ", _gender=" + _gender + ", _name=" + _name
+                    + ", _props=" + _props + "]";
         }
 
     }
@@ -203,7 +237,7 @@ public class TestClasses {
 
         private String _name;
         private String _email;
-        
+
         public Email() {
         }
 
@@ -270,14 +304,17 @@ public class TestClasses {
         }
 
     }
-    
+
     public static class PublicClass {
         PrivateClass privateClass;
+
         public PublicClass() {
         }
+
         public PublicClass( final PrivateClass protectedClass ) {
             this.privateClass = protectedClass;
         }
+
         @Override
         public int hashCode() {
             final int prime = 31;
@@ -287,6 +324,7 @@ public class TestClasses {
                 : privateClass.hashCode() );
             return result;
         }
+
         @Override
         public boolean equals( final Object obj ) {
             if ( this == obj )
@@ -304,9 +342,10 @@ public class TestClasses {
             return true;
         }
     }
-    
+
     private static class PrivateClass {
         String foo;
+
         @Override
         public int hashCode() {
             final int prime = 31;
@@ -316,6 +355,7 @@ public class TestClasses {
                 : foo.hashCode() );
             return result;
         }
+
         @Override
         public boolean equals( final Object obj ) {
             if ( this == obj )
@@ -333,12 +373,14 @@ public class TestClasses {
             return true;
         }
     }
-    
+
     public static class ClassWithoutDefaultConstructor {
         final String value;
+
         public ClassWithoutDefaultConstructor( final String value ) {
             this.value = value;
         }
+
         @Override
         public int hashCode() {
             final int prime = 31;
@@ -348,6 +390,7 @@ public class TestClasses {
                 : value.hashCode() );
             return result;
         }
+
         @Override
         public boolean equals( final Object obj ) {
             if ( this == obj )
@@ -364,16 +407,21 @@ public class TestClasses {
                 return false;
             return true;
         }
+
         @Override
         public String toString() {
             return "ClassWithoutDefaultConstructor [value=" + value + "]";
         }
     }
-    
+
     public static class MyContainer {
 
         private int _int;
         private long _long;
+        @SuppressWarnings( "unused" )
+        private final boolean _boolean;
+        @SuppressWarnings( "unused" )
+        private final Boolean _Boolean;
         private String _String;
         private Long _Long;
         private Integer _Integer;
@@ -391,7 +439,7 @@ public class TestClasses {
         private Calendar _Calendar;
         private List<String> _ArrayList;
         private final Set<String> _HashSet;
-        private final Map<String,Integer> _HashMap;
+        private final Map<String, Integer> _HashMap;
         private int[] _intArray;
         private long[] _longArray;
         private short[] _shortArray;
@@ -401,11 +449,13 @@ public class TestClasses {
         private char[] _charArray;
         private String[] _StringArray;
         private Person[] _PersonArray;
-        
+
         public MyContainer() {
-            
+
             _int = 42;
             _long = 42;
+            _boolean = true;
+            _Boolean = Boolean.TRUE;
             _String = "42";
             _Long = new Long( 42 );
             _Integer = new Integer( 42 );
@@ -413,22 +463,22 @@ public class TestClasses {
             _Byte = new Byte( "b".getBytes()[0] );
             _Double = new Double( 42d );
             _Float = new Float( 42f );
-            _Short = new Short( (short)42 );
+            _Short = new Short( (short) 42 );
             _BigDecimal = new BigDecimal( 42 );
             _AtomicInteger = new AtomicInteger( 42 );
             _AtomicLong = new AtomicLong( 42 );
             _MutableInt = new MutableInt( 42 );
-            _IntegerArray = new Integer[]{ 42 };
+            _IntegerArray = new Integer[] { 42 };
             _Date = new Date( System.currentTimeMillis() - 10000 );
             _Calendar = Calendar.getInstance();
             _ArrayList = new ArrayList<String>( Arrays.asList( "foo" ) );
             _HashSet = new HashSet<String>();
             _HashSet.add( "42" );
-            
+
             _HashMap = new HashMap<String, Integer>();
             _HashMap.put( "foo", 23 );
             _HashMap.put( "bar", 42 );
-            
+
             _intArray = new int[] { 1, 2 };
             _longArray = new long[] { 1, 2 };
             _shortArray = new short[] { 1, 2 };
@@ -438,7 +488,7 @@ public class TestClasses {
             _charArray = "42".toCharArray();
             _StringArray = new String[] { "23", "42" };
             _PersonArray = new Person[] { createPerson( "foo bar", Gender.MALE, 42 ) };
-            
+
         }
 
         public int getInt() {
@@ -664,11 +714,12 @@ public class TestClasses {
         public Map<String, Integer> getHashMap() {
             return _HashMap;
         }
-        
+
     }
-    
+
     static class Holder<T> {
         T item;
+
         public Holder( final T item ) {
             this.item = item;
         }
@@ -676,13 +727,15 @@ public class TestClasses {
 
     static class HolderList<T> {
         List<Holder<T>> holders;
+
         public HolderList( final List<Holder<T>> holders ) {
             this.holders = holders;
         }
     }
-    
+
     static class CounterHolder {
         AtomicInteger item;
+
         public CounterHolder( final AtomicInteger item ) {
             this.item = item;
         }
@@ -690,14 +743,16 @@ public class TestClasses {
 
     static class CounterHolderArray {
         CounterHolder[] holders;
-        public CounterHolderArray( final CounterHolder ... holders ) {
+
+        public CounterHolderArray( final CounterHolder... holders ) {
             this.holders = holders;
         }
     }
 
     static class HolderArray<T> {
         Holder<T>[] holders;
-        public HolderArray( final Holder<T> ... holders ) {
+
+        public HolderArray( final Holder<T>... holders ) {
             this.holders = holders;
         }
     }

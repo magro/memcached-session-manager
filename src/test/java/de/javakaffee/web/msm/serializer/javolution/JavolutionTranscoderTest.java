@@ -31,10 +31,16 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javolution.xml.XMLObjectReader;
+import javolution.xml.XMLObjectWriter;
+import javolution.xml.XMLReferenceResolver;
+import javolution.xml.stream.XMLStreamException;
 
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.loader.WebappLoader;
@@ -50,6 +56,7 @@ import org.testng.annotations.Test;
 
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
+import de.javakaffee.web.msm.serializer.javolution.TestClasses.Container;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Email;
@@ -88,6 +95,12 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager );
+    }
+
+    @Test( enabled = true )
+    public void testInnerClass() throws Exception {
+        final Container container = TestClasses.createContainer( "some content" );
+        assertDeepEquals( deserialize( serialize( container ) ), container );
     }
 
     @DataProvider( name = "sharedObjectIdentityProvider" )
@@ -169,8 +182,8 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
     @DataProvider( name = "typesAsSessionAttributesProvider" )
     protected Object[][] createTypesAsSessionAttributesData() {
-        return new Object[][] { { int.class, 42 }, { long.class, 42 }, { String.class, "42" }, { Long.class, new Long( 42 ) },
-                { Integer.class, new Integer( 42 ) }, { Character.class, new Character( 'c' ) },
+        return new Object[][] { { int.class, 42 }, { long.class, 42 }, { Boolean.class, Boolean.TRUE }, { String.class, "42" },
+                { Long.class, new Long( 42 ) }, { Integer.class, new Integer( 42 ) }, { Character.class, new Character( 'c' ) },
                 { Byte.class, new Byte( "b".getBytes()[0] ) }, { Double.class, new Double( 42d ) },
                 { Float.class, new Float( 42f ) }, { Short.class, new Short( (short) 42 ) },
                 { BigDecimal.class, new BigDecimal( 42 ) }, { AtomicInteger.class, new AtomicInteger( 42 ) },
@@ -191,8 +204,9 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( type.getSimpleName(), instance );
 
-        //        System.out.println(new String(_transcoder.serialize( session )));
-        assertDeepEquals( _transcoder.deserialize( _transcoder.serialize( session ) ), session );
+        final byte[] bytes = _transcoder.serialize( session );
+        System.out.println( new String( bytes ) );
+        assertDeepEquals( _transcoder.deserialize( bytes ), session );
     }
 
     @Test( enabled = true )
@@ -202,7 +216,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( MyContainer.class.getSimpleName(), new MyContainer() );
 
-        System.out.println(new String(_transcoder.serialize( session )));
+        System.out.println( new String( _transcoder.serialize( session ) ) );
         assertDeepEquals( _transcoder.deserialize( _transcoder.serialize( session ) ), session );
     }
 
@@ -374,12 +388,22 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
      */
 
     private void assertDeepEquals( final Object one, final Object another ) throws Exception {
+        assertDeepEquals( one, another, new IdentityHashMap<Object, Object>() );
+    }
+
+    private void assertDeepEquals( final Object one, final Object another, final Map<Object, Object> alreadyChecked )
+        throws Exception {
         if ( one == another ) {
             return;
         }
         if ( one == null && another != null || one != null && another == null ) {
             Assert.fail( "One of both is null: " + one + ", " + another );
         }
+        if ( alreadyChecked.containsKey( one ) ) {
+            return;
+        }
+        alreadyChecked.put( one, another );
+
         Assert.assertEquals( one.getClass(), another.getClass() );
         if ( one.getClass().isPrimitive() || one instanceof String || one instanceof Character || one instanceof Boolean ) {
             Assert.assertEquals( one, another );
@@ -403,18 +427,18 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
         Class<? extends Object> clazz = one.getClass();
         while ( clazz != null ) {
-            assertEqualDeclaredFields( clazz, one, another );
+            assertEqualDeclaredFields( clazz, one, another, alreadyChecked );
             clazz = clazz.getSuperclass();
         }
 
     }
 
-    private void assertEqualDeclaredFields( final Class<? extends Object> clazz, final Object one, final Object another )
-        throws Exception, IllegalAccessException {
+    private void assertEqualDeclaredFields( final Class<? extends Object> clazz, final Object one, final Object another,
+            final Map<Object, Object> alreadyChecked ) throws Exception, IllegalAccessException {
         for ( final Field field : clazz.getDeclaredFields() ) {
             field.setAccessible( true );
             if ( !Modifier.isTransient( field.getModifiers() ) ) {
-                assertDeepEquals( field.get( one ), field.get( another ) );
+                assertDeepEquals( field.get( one ), field.get( another ), alreadyChecked );
             }
         }
     }
@@ -438,6 +462,60 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         bis.close();
 
         return readSession;
+    }
+
+    protected byte[] serialize( final Object o ) {
+        if ( o == null ) {
+            throw new NullPointerException( "Can't serialize null" );
+        }
+
+        XMLObjectWriter writer = null;
+        try {
+            final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            writer = XMLObjectWriter.newInstance( bos );
+            final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
+            xmlReferenceResolver.setIdentifierAttribute( "__refId" );
+            writer.setReferenceResolver( xmlReferenceResolver );
+            writer.setBinding( new ReflectionBinding( getClass().getClassLoader() ) );
+            writer.write( o, "session" );
+            writer.flush();
+            return bos.toByteArray();
+        } catch ( final Exception e ) {
+            throw new IllegalArgumentException( "Non-serializable object", e );
+        } finally {
+            try {
+                writer.close();
+            } catch ( final XMLStreamException e ) {
+                // fail silently
+            }
+        }
+
+    }
+
+    protected Object deserialize( final byte[] in ) {
+        XMLObjectReader reader = null;
+        try {
+            final ByteArrayInputStream bis = new ByteArrayInputStream( in );
+            reader = XMLObjectReader.newInstance( bis );
+            final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
+            xmlReferenceResolver.setIdentifierAttribute( "__refId" );
+            reader.setReferenceResolver( xmlReferenceResolver );
+            reader.setBinding( new ReflectionBinding( getClass().getClassLoader() ) );
+            if ( !reader.hasNext() ) {
+                throw new IllegalStateException( "reader has no input" );
+            }
+            return reader.read( "session" );
+        } catch ( final RuntimeException e ) {
+            throw e;
+        } catch ( final javolution.xml.stream.XMLStreamException e ) {
+            throw new RuntimeException( e );
+        } finally {
+            try {
+                reader.close();
+            } catch ( final XMLStreamException e ) {
+                // fail silently
+            }
+        }
     }
 
 }

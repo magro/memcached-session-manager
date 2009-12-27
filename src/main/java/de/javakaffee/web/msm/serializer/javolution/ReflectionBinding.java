@@ -27,9 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javolution.text.CharArray;
 import javolution.xml.XMLBinding;
 import javolution.xml.XMLFormat;
 import javolution.xml.stream.XMLStreamException;
+import javolution.xml.stream.XMLStreamReader;
+import javolution.xml.stream.XMLStreamWriter;
 
 /**
  * An {@link XMLBinding} that provides class bindings based on reflection.
@@ -38,32 +41,64 @@ import javolution.xml.stream.XMLStreamException;
  */
 public class ReflectionBinding extends XMLBinding {
     
+    private static final long serialVersionUID = -7047053153745571559L;
+
     private static final Logger _log = Logger.getLogger( ReflectionBinding.class.getName() );
-    
+
     private static final XMLCalendarFormat CALENDAR_FORMAT = new XMLCalendarFormat();
-    
+
     private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
 
     private final ClassLoader _classLoader;
     private final XMLEnumFormat _enumFormat;
     private final XMLArrayFormat _arrayFormat;
-    
-    public ReflectionBinding(final ClassLoader classLoader) {
+
+    public ReflectionBinding( final ClassLoader classLoader ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @SuppressWarnings( "unchecked" )
     @Override
-    public <T> XMLFormat<T> getFormat(final Class<T> cls) {
+    protected void writeClass( final Class cls, final XMLStreamWriter writer, final boolean useAttributes ) throws XMLStreamException {
+        if ( useAttributes ) {
+            writer.writeAttribute( "class", cls.getName() );
+        } else {
+            writer.writeStartElement( cls.getName() );
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @SuppressWarnings( "unchecked" )
+    @Override
+    protected Class readClass( final XMLStreamReader reader, final boolean useAttributes ) throws XMLStreamException {
+        final CharArray className = useAttributes
+            ? reader.getAttributeValue( null, "class" )
+            : reader.getLocalName();
+        try {
+            return Class.forName( className.toString(), true, _classLoader );
+        } catch ( final ClassNotFoundException e ) {
+            throw new XMLStreamException( e );
+        }
+    }
+
+    @SuppressWarnings( "unchecked" )
+    @Override
+    public XMLFormat<?> getFormat( final Class cls ) throws XMLStreamException {
 
         XMLFormat<?> xmlFormat = _formats.get( cls );
         if ( xmlFormat != null ) {
-            return (XMLFormat<T>) xmlFormat;
+            return xmlFormat;
         }
-        
-        if ( cls.isPrimitive() || cls == String.class
+
+        if ( cls.isPrimitive()
+                || cls == String.class
                 || cls == Boolean.class
                 || cls == Integer.class
                 || cls == Long.class
@@ -72,65 +107,55 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Float.class
                 || cls == Character.class
                 || cls == Byte.class
-                || Map.class.isAssignableFrom( cls ) || Collection.class.isAssignableFrom( cls ) ) {
+                || Map.class.isAssignableFrom( cls )
+                || Collection.class.isAssignableFrom( cls ) ) {
             return super.getFormat( cls );
-        }
-        else if ( cls.isArray() ) {
+        } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
-        }
-        else if ( cls.isEnum() ) {
-            return (XMLFormat<T>) _enumFormat;
-        }
-        else if ( Calendar.class.isAssignableFrom( cls ) ) {
-            return (XMLFormat<T>) CALENDAR_FORMAT;
-        }
-        else {
+        } else if ( cls.isEnum() ) {
+            return _enumFormat;
+        } else if ( Calendar.class.isAssignableFrom( cls ) ) {
+            return CALENDAR_FORMAT;
+        } else {
             if ( xmlFormat == null ) {
                 if ( ReflectionFormat.isNumberFormat( cls ) ) {
                     xmlFormat = ReflectionFormat.getNumberFormat( cls );
-                }
-                else {
+                } else {
                     xmlFormat = new ReflectionFormat( cls, _classLoader );
                 }
                 _formats.put( cls, xmlFormat );
             }
-            return (XMLFormat<T>) xmlFormat;
+            return xmlFormat;
         }
     }
 
     @SuppressWarnings( "unchecked" )
-    private <T> XMLFormat<T> getArrayFormat( final Class<T> cls ) {
+    private XMLFormat getArrayFormat( final Class cls ) {
         if ( cls == int[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.INT_ARRAY_FORMAT;
-        }
-        else if ( cls == long[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.LONG_ARRAY_FORMAT;
-        }
-        else if ( cls == short[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.SHORT_ARRAY_FORMAT;
-        }
-        else if ( cls == float[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.FLOAT_ARRAY_FORMAT;
-        }
-        else if ( cls == double[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.DOUBLE_ARRAY_FORMAT;
-        }
-        else if ( cls == char[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.CHAR_ARRAY_FORMAT;
-        }
-        else if ( cls == byte[].class ) {
-            return (XMLFormat<T>) XMLArrayFormats.BYTE_ARRAY_FORMAT;
-        }
-        else {
-            return (XMLFormat<T>) _arrayFormat;
+            return XMLArrayFormats.INT_ARRAY_FORMAT;
+        } else if ( cls == long[].class ) {
+            return XMLArrayFormats.LONG_ARRAY_FORMAT;
+        } else if ( cls == short[].class ) {
+            return XMLArrayFormats.SHORT_ARRAY_FORMAT;
+        } else if ( cls == float[].class ) {
+            return XMLArrayFormats.FLOAT_ARRAY_FORMAT;
+        } else if ( cls == double[].class ) {
+            return XMLArrayFormats.DOUBLE_ARRAY_FORMAT;
+        } else if ( cls == char[].class ) {
+            return XMLArrayFormats.CHAR_ARRAY_FORMAT;
+        } else if ( cls == byte[].class ) {
+            return XMLArrayFormats.BYTE_ARRAY_FORMAT;
+        } else {
+            return _arrayFormat;
         }
     }
-    
+
     static class XMLEnumFormat extends XMLFormat<Enum<?>> {
 
         private final ClassLoader _classLoader;
-        
+
         public XMLEnumFormat( final ClassLoader classLoader ) {
+            super( null );
             _classLoader = classLoader;
         }
 
@@ -139,8 +164,8 @@ public class ReflectionBinding extends XMLBinding {
          */
         @Override
         public Enum<?> newInstance( final Class<Enum<?>> clazz, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
-            final String value = xml.getAttribute( "value", (String)null );
-            final String clazzName = xml.getAttribute( "type", (String)null );
+            final String value = xml.getAttribute( "value" ).toString();
+            final String clazzName = xml.getAttribute( "type" ).toString();
             try {
                 @SuppressWarnings( "unchecked" )
                 final Enum<?> enumValue = Enum.valueOf( Class.forName( clazzName, true, _classLoader ).asSubclass( Enum.class ), value );
@@ -165,17 +190,18 @@ public class ReflectionBinding extends XMLBinding {
             xml.setAttribute( "value", object.name() );
             xml.setAttribute( "type", object.getClass().getName() );
         }
-        
+
     }
-    
+
     public static class XMLArrayFormat extends XMLFormat<Object[]> {
 
         private final ClassLoader _classLoader;
-        
-        public XMLArrayFormat(final ClassLoader classLoader) {
+
+        public XMLArrayFormat( final ClassLoader classLoader ) {
+            super( null );
             _classLoader = classLoader;
         }
-        
+
         /**
          * {@inheritDoc}
          */
@@ -183,15 +209,15 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public Object[] newInstance( final Class clazz, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
             try {
-                final String componentType = input.getAttribute( "componentType", (String)null );
+                final String componentType = input.getAttribute( "componentType", (String) null );
                 final int length = input.getAttribute( "length", 0 );
-                return (Object[]) Array.newInstance( Class.forName( componentType, false, _classLoader ) , length );
+                return (Object[]) Array.newInstance( Class.forName( componentType, false, _classLoader ), length );
             } catch ( final Exception e ) {
                 _log.log( Level.SEVERE, "caught exception", e );
                 throw new XMLStreamException( e );
             }
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement input, final Object[] array ) throws XMLStreamException {
             int i = 0;
@@ -199,50 +225,36 @@ public class ReflectionBinding extends XMLBinding {
                 array[i++] = input.getNext();
             }
         }
-        
+
         @Override
-        public final void write( final Object[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+        public final void write( final Object[] array, final javolution.xml.XMLFormat.OutputElement output )
+            throws XMLStreamException {
             output.setAttribute( "type", "array" );
             output.setAttribute( "componentType", array.getClass().getComponentType().getName() );
-            output.setAttribute("length", array.length );
+            output.setAttribute( "length", array.length );
             writeElements( array, output );
         }
-        
-        public void writeElements( final Object[] array, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            for( final Object item : array ) {
+
+        public void writeElements( final Object[] array, final javolution.xml.XMLFormat.OutputElement output )
+            throws XMLStreamException {
+            for ( final Object item : array ) {
                 output.add( item );
             }
         }
-        
+
     }
-    
-    public static class XMLCollectionFormat extends XMLFormat<Collection<Object>> {
-        
-        @Override
-        public void read( final javolution.xml.XMLFormat.InputElement xml, final Collection<Object> obj ) throws XMLStreamException {
-            while ( xml.hasNext() ) {
-                obj.add( xml.getNext() );
-            }
-        }
-        
-        @Override
-        public void write( final Collection<Object> obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
-            for( final Object item : obj ) {
-                xml.add( item );
-            }
-        }
-        
-    }
-    
+
     /**
-     * An {@link XMLFormat} for {@link Calendar} that serialized those calendar fields
-     * that contain actual data (these fields also are used by {@link Calendar#equals(Object)}.
+     * An {@link XMLFormat} for {@link Calendar} that serialized those calendar
+     * fields that contain actual data (these fields also are used by
+     * {@link Calendar#equals(Object)}.
      */
     public static class XMLCalendarFormat extends XMLFormat<Calendar> {
-        
+
         private final Field _zoneField;
 
         public XMLCalendarFormat() {
+            super( Calendar.class );
             try {
                 _zoneField = Calendar.class.getDeclaredField( "zone" );
                 _zoneField.setAccessible( true );
@@ -250,19 +262,20 @@ public class ReflectionBinding extends XMLBinding {
                 throw new RuntimeException( e );
             }
         }
-        
+
         @Override
         public Calendar newInstance( final Class<Calendar> clazz, final javolution.xml.XMLFormat.InputElement arg1 ) throws XMLStreamException {
             if ( clazz.equals( GregorianCalendar.class ) ) {
                 return GregorianCalendar.getInstance();
             }
-            throw new IllegalArgumentException( "Calendar of type " + clazz.getName() + " not yet supported. Please submit an issue so that it will be implemented." );
+            throw new IllegalArgumentException( "Calendar of type " + clazz.getName()
+                    + " not yet supported. Please submit an issue so that it will be implemented." );
         }
-        
+
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement xml, final Calendar obj ) throws XMLStreamException {
-            /* check if we actually need to set the timezone,
-             * as TimeZone.getTimeZone is synchronized, so we might prevent this
+            /* check if we actually need to set the timezone, as
+             * TimeZone.getTimeZone is synchronized, so we might prevent this
              */
             final String timeZoneId = xml.getAttribute( "tz", "" );
             if ( !getTimeZone( obj ).getID().equals( timeZoneId ) ) {
@@ -273,22 +286,22 @@ public class ReflectionBinding extends XMLBinding {
             obj.setLenient( xml.getAttribute( "lenient", true ) );
             obj.setTimeInMillis( xml.getAttribute( "timeInMillis", -1L ) );
         }
-        
+
         @Override
         public void write( final Calendar obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
-            
+
             if ( !obj.getClass().equals( GregorianCalendar.class ) ) {
-                throw new IllegalArgumentException( "Calendar of type " + obj.getClass().getName() +
-                        " not yet supported. Please submit an issue so that it will be implemented." );
+                throw new IllegalArgumentException( "Calendar of type " + obj.getClass().getName()
+                        + " not yet supported. Please submit an issue so that it will be implemented." );
             }
-            
+
             xml.setAttribute( "timeInMillis", obj.getTimeInMillis() );
             xml.setAttribute( "lenient", obj.isLenient() );
             xml.setAttribute( "firstDayOfWeek", obj.getFirstDayOfWeek() );
             xml.setAttribute( "minimalDaysInFirstWeek", obj.getMinimalDaysInFirstWeek() );
             xml.setAttribute( "tz", getTimeZone( obj ).getID() );
         }
-        
+
         private TimeZone getTimeZone( final Calendar obj ) throws XMLStreamException {
             /* access the timezone via the field, to prevent cloning of the tz */
             try {
@@ -297,7 +310,7 @@ public class ReflectionBinding extends XMLBinding {
                 throw new XMLStreamException( e );
             }
         }
-        
+
     }
-    
+
 }

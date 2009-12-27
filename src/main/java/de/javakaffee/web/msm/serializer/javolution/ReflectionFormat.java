@@ -28,10 +28,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javolution.text.CharArray;
+import javolution.text.TypeFormat;
 import javolution.xml.XMLFormat;
 import javolution.xml.sax.Attributes;
 import javolution.xml.stream.XMLStreamException;
-import javolution.xml.stream.XMLStreamReader;
 import sun.reflect.ReflectionFactory;
 
 /**
@@ -61,7 +61,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
     private final Constructor<T> _constructor;
     private final AttributeHandler[] _attributes;
-    private final FieldHandler[] _elements;
+    private final Field[] _elements;
     private final Map<String, Field> _attributesMap;
 
     /**
@@ -73,7 +73,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
      */
     @SuppressWarnings( "unchecked" )
     public ReflectionFormat( final Class<T> clazz, final ClassLoader classLoader ) {
-
+        super( null );
         try {
             _constructor =
                     REFLECTION_FACTORY.newConstructorForSerialization( clazz, Object.class.getDeclaredConstructor( new Class[0] ) );
@@ -87,7 +87,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         final AttributesAndElements fields = allFields( clazz );
 
         _attributes = fields.attributes.toArray( new AttributeHandler[fields.attributes.size()] );
-        _elements = fields.elements.toArray( new FieldHandler[fields.elements.size()] );
+        _elements = fields.elements.toArray( new Field[fields.elements.size()] );
 
         // no concurrency support required here, as we'll only read from the map
         _attributesMap = new HashMap<String, Field>( _attributes.length + 1 );
@@ -118,11 +118,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
     static class AttributesAndElements {
         private final Collection<AttributeHandler> attributes;
-        private final Collection<FieldHandler> elements;
+        private final Collection<Field> elements;
 
         AttributesAndElements() {
             attributes = new ArrayList<AttributeHandler>();
-            elements = new ArrayList<FieldHandler>();
+            elements = new ArrayList<Field>();
         }
 
         void add( final Field field ) {
@@ -149,7 +149,8 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                     }
                 } else {
 
-                    if ( fieldType == String.class || fieldType == Character.class || Number.class.isAssignableFrom( fieldType ) ) {
+                    if ( fieldType == String.class || fieldType == Character.class || fieldType == Boolean.class
+                            || Number.class.isAssignableFrom( fieldType ) ) {
                         attributes.add( new ToStringAttributeHandler( field ) );
                     } else if ( fieldType.isEnum() ) {
                         attributes.add( new EnumAttributeHandler( field ) );
@@ -160,17 +161,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 }
 
             } else {
-
-                if ( field.getType().isArray() ) {
-                    elements.add( new ArrayFieldHandler( field ) );
-                } else if ( Collection.class.isAssignableFrom( field.getType() ) ) {
-                    elements.add( new CollectionFieldHandler( field ) );
-                } else if ( Map.class.isAssignableFrom( field.getType() ) ) {
-                    elements.add( new MapFieldHandler( field ) );
-                } else {
-                    elements.add( new DefaultFieldHandler( field ) );
-                }
-
+                elements.add( field );
             }
         }
     }
@@ -222,15 +213,12 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     private void readElements( final javolution.xml.XMLFormat.InputElement input, final T obj ) {
-        for ( final FieldHandler fieldHandler : _elements ) {
-            final XMLStreamReader reader = input.getStreamReader();
-            reader.getEventType();
-
+        for ( final Field field : _elements ) {
             try {
-                final Object value = input.get( fieldHandler._field.getName() );
-                fieldHandler._field.set( obj, value );
+                final Object value = input.get( field.getName() );
+                field.set( obj, value );
             } catch ( final Exception e ) {
-                LOG.log( Level.SEVERE, "Could not set field value for field " + fieldHandler._field, e );
+                LOG.log( Level.SEVERE, "Could not set field value for field " + field, e );
             }
         }
     }
@@ -255,8 +243,15 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     private void writeElements( final T obj, final javolution.xml.XMLFormat.OutputElement output ) {
-        for ( final FieldHandler fieldHandler : _elements ) {
-            fieldHandler.writeElement( obj, output );
+        for ( final Field field : _elements ) {
+            try {
+                final Object object = field.get( obj );
+                if ( object != null ) {
+                    output.add( object, field.getName() );
+                }
+            } catch ( final Exception e ) {
+                LOG.log( Level.SEVERE, "Could not write element for field.", e );
+            }
         }
     }
 
@@ -427,7 +422,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 } else if ( fieldType == byte.class ) {
                     field.setByte( obj, input.getAttribute( fieldName, (Byte) null ) );
                 } else if ( fieldType == char.class ) {
-                    field.setChar( obj, (char) input.getAttribute( fieldName, (char) 0 ) );
+                    field.setChar( obj, input.getAttribute( fieldName, (char) 0 ) );
                 } else if ( fieldType == short.class ) {
                     field.setShort( obj, input.getAttribute( fieldName, (Short) null ) );
                 }
@@ -444,23 +439,24 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
                 if ( object != null ) {
                     if ( fieldType == String.class ) {
-                        field.set( obj, input.getAttribute( fieldName, (String) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (String) null ) );
                     } else if ( fieldType.isAssignableFrom( Boolean.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Boolean) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Boolean) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Boolean) null ) );
                     } else if ( fieldType.isAssignableFrom( Integer.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Integer) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Integer) null ) );
                     } else if ( fieldType.isAssignableFrom( Long.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Long) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Long) null ) );
                     } else if ( fieldType.isAssignableFrom( Short.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Short) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Short) null ) );
                     } else if ( fieldType.isAssignableFrom( Double.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Double) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Double) null ) );
                     } else if ( fieldType.isAssignableFrom( Float.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Float) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Float) null ) );
                     } else if ( fieldType.isAssignableFrom( Byte.class ) ) {
-                        field.set( obj, input.getAttribute( fieldName, (Byte) null ) );
+                        field.set( obj, getAttribute( input, fieldName, (Byte) null ) );
                     } else if ( fieldType.isAssignableFrom( Character.class ) ) {
-                        field.set( obj, Character.valueOf( object.charAt( 0 ) ) );
+                        field.set( obj, getAttribute( input, fieldName, (Character) null ) );
                     } else if ( Number.class.isAssignableFrom( fieldType ) ) {
                         final XMLNumberFormat<?> format = getNumberFormat( fieldType );
                         field.set( obj, format.newInstanceFromAttribute( input, fieldName ) );
@@ -473,6 +469,57 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         } catch ( final Exception e ) {
             LOG.log( Level.SEVERE, "Caught exception when trying to set field from attribute.", e );
         }
+    }
+    
+    private String getAttribute( final InputElement input, final String name, final String defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? value.toString() : defaultValue;
+    }
+    
+    private Boolean getAttribute( final InputElement input, final String name, final Boolean defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Boolean.valueOf( value.toBoolean() ) : defaultValue;
+    }
+    
+    private Integer getAttribute( final InputElement input, final String name, final Integer defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Integer.valueOf( value.toInt() ) : defaultValue;
+    }
+    
+    private Long getAttribute( final InputElement input, final String name, final Long defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Long.valueOf( value.toLong() ) : defaultValue;
+    }
+    
+    private Short getAttribute( final InputElement input, final String name, final Short defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Short.valueOf( TypeFormat.parseShort( value ) ) : defaultValue;
+    }
+    
+    private Float getAttribute( final InputElement input, final String name, final Float defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Float.valueOf( value.toFloat() ) : defaultValue;
+    }
+    
+    private Double getAttribute( final InputElement input, final String name, final Double defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Double.valueOf( value.toDouble() ) : defaultValue;
+    }
+    
+    private Byte getAttribute( final InputElement input, final String name, final Byte defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        return value != null ? Byte.valueOf( TypeFormat.parseByte( value ) ) : defaultValue;
+    }
+    
+    private Character getAttribute( final InputElement input, final String name, final Character defaultValue ) throws XMLStreamException {
+        final CharArray value = input.getAttribute( name );
+        if ( value != null ) {
+            if ( value.length() > 1 ) {
+                throw new XMLStreamException( "The attribute '" + name + "' of type Character has illegal value (length > 1): " + value );
+            }
+            return Character.valueOf( value.charAt( 0 ) );
+        }
+        return defaultValue;
     }
 
     /**
@@ -529,6 +576,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         private final Constructor<T> _constructor;
 
         public XMLNumberFormat( final Constructor<T> constructor ) {
+            super( constructor.getDeclaringClass() );
             _constructor = constructor;
         }
 
@@ -624,103 +672,6 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         @Override
         public Object getAttribute( final String name, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
             return xml.getAttribute( name, 0L );
-        }
-
-    }
-
-    // ============== Field handler ======================================
-
-    static abstract class FieldHandler {
-
-        protected final Field _field;
-
-        public FieldHandler( final Field field ) {
-            _field = field;
-        }
-
-        void writeElement( final Object obj, final XMLFormat.OutputElement output ) {
-            try {
-                final Object object = _field.get( obj );
-                if ( object != null ) {
-                    add( object, output );
-                }
-            } catch ( final Exception e ) {
-                LOG.log( Level.SEVERE, "Could not write element for field.", e );
-            }
-        }
-
-        abstract void add( Object object, XMLFormat.OutputElement output ) throws XMLStreamException;
-
-    }
-
-    static final class ArrayFieldHandler extends FieldHandler {
-
-        public ArrayFieldHandler( final Field field ) {
-            super( field );
-        }
-
-        @Override
-        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            final String name = _field.getName();
-            final Class<?> cls = object.getClass();
-            if ( cls == int[].class ) {
-                output.add( (int[]) object, name, int[].class );
-            } else if ( cls == long[].class ) {
-                output.add( (long[]) object, name, long[].class );
-            } else if ( cls == short[].class ) {
-                output.add( (short[]) object, name, short[].class );
-            } else if ( cls == float[].class ) {
-                output.add( (float[]) object, name, float[].class );
-            } else if ( cls == double[].class ) {
-                output.add( (double[]) object, name, double[].class );
-            } else if ( cls == char[].class ) {
-                output.add( (char[]) object, name, char[].class );
-            } else if ( cls == byte[].class ) {
-                output.add( (byte[]) object, name, byte[].class );
-            } else {
-                output.add( (Object[]) object, name, Object[].class );
-            }
-        }
-
-    }
-
-    static final class CollectionFieldHandler extends FieldHandler {
-
-        public CollectionFieldHandler( final Field field ) {
-            super( field );
-        }
-
-        @SuppressWarnings( "unchecked" )
-        @Override
-        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.add( (Collection<?>) object, _field.getName(), (Class<Collection<?>>) object.getClass() );
-        }
-
-    }
-
-    static final class MapFieldHandler extends FieldHandler {
-
-        public MapFieldHandler( final Field field ) {
-            super( field );
-        }
-
-        @SuppressWarnings( "unchecked" )
-        @Override
-        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.add( (Map<?, ?>) object, _field.getName(), (Class<Map<?, ?>>) object.getClass() );
-        }
-
-    }
-
-    static final class DefaultFieldHandler extends FieldHandler {
-
-        public DefaultFieldHandler( final Field field ) {
-            super( field );
-        }
-
-        @Override
-        void add( final Object object, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-            output.add( object, _field.getName() );
         }
 
     }

@@ -36,12 +36,13 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSessio
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
- * {@link StandardSession}s using <a href="http://javolution.org/">Javolutions</a>
- * <a href="http://javolution.org/target/site/apidocs/javolution/xml/package-summary.html#package_description">
- * xml data binding</a> facilities.
+ * {@link StandardSession}s using <a
+ * href="http://javolution.org/">Javolutions</a> <a href="http://javolution.org/target/site/apidocs/javolution/xml/package-summary.html#package_description"
+ * > xml data binding</a> facilities.
  * <p>
- * Objects are serialized to/from xml using javolutions built in {@link XMLFormat}s for standard types,
- * custom/user types are bound using the {@link ReflectionFormat}.
+ * Objects are serialized to/from xml using javolutions built in
+ * {@link XMLFormat}s for standard types, custom/user types are bound using the
+ * {@link ReflectionFormat}.
  * </p>
  * <p>
  * Additionally it's worth to note that cyclic dependencies are supported.
@@ -50,7 +51,7 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSessio
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class JavolutionTranscoder extends SerializingTranscoder {
-    
+
     static final String REF_ID = "__id";
 
     static Logger _log = Logger.getLogger( JavolutionTranscoder.class.getName() );
@@ -66,11 +67,11 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      */
     public JavolutionTranscoder( final Manager manager ) {
         _manager = manager;
-        
+
         final Loader loader = _manager.getContainer().getLoader();
         _xmlBinding = new ReflectionBinding( loader.getClassLoader() );
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -79,21 +80,22 @@ public class JavolutionTranscoder extends SerializingTranscoder {
         if ( o == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
-        
+
         XMLObjectWriter writer = null;
         try {
             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            writer = XMLObjectWriter.newInstance(bos);
+            writer = XMLObjectWriter.newInstance( bos );
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
             xmlReferenceResolver.setIdentifierAttribute( REF_ID );
             writer.setReferenceResolver( xmlReferenceResolver );
             writer.setBinding( _xmlBinding );
             writer.write( o, "session" );
             writer.flush();
+            // getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
             return bos.toByteArray();
         } catch ( final Exception e ) {
             _log.log( Level.SEVERE, "caught exception", e );
-            throw new IllegalArgumentException( "Non-serializable object", e );
+            throw new IllegalArgumentException( "Could not serialize object", e );
         } finally {
             closeSilently( writer );
         }
@@ -118,7 +120,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             reader.setReferenceResolver( xmlReferenceResolver );
             reader.setBinding( _xmlBinding );
             if ( !reader.hasNext() ) {
-                throw new IllegalStateException("reader has no input");
+                throw new IllegalStateException( "reader has no input" );
             }
             final MemcachedBackupSession session = reader.read( "session" );
             session.setManager( _manager );
@@ -126,7 +128,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             return session;
         } catch ( final RuntimeException e ) {
             getLogger().warn( "Caught Exception decoding %d bytes of data", in.length, e );
-            throw e ;
+            throw e;
         } catch ( final XMLStreamException e ) {
             getLogger().warn( "Caught Exception decoding %d bytes of data", in.length, e );
             throw new RuntimeException( e );
