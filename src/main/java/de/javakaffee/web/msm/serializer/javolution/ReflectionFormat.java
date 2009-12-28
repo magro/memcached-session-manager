@@ -458,7 +458,8 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                     } else if ( fieldType.isAssignableFrom( Character.class ) ) {
                         field.set( obj, getAttribute( input, fieldName, (Character) null ) );
                     } else if ( Number.class.isAssignableFrom( fieldType ) ) {
-                        final XMLNumberFormat<?> format = getNumberFormat( fieldType );
+                        @SuppressWarnings( "unchecked" )
+                        final XMLNumberFormat<?> format = getNumberFormat( (Class<? extends Number>) fieldType );
                         field.set( obj, format.newInstanceFromAttribute( input, fieldName ) );
                     } else {
                         throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
@@ -534,18 +535,17 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         return Number.class.isAssignableFrom( clazz );
     }
 
-    @SuppressWarnings( "unchecked" )
-    static <T> XMLNumberFormat<T> getNumberFormat( final Class<T> clazz ) {
-        XMLNumberFormat<?> result = _numberFormats.get( clazz );
+    static XMLNumberFormat<?> getNumberFormat( final Class<? extends Number> clazz ) {
+        XMLNumberFormat<? extends Number> result = _numberFormats.get( clazz );
         if ( result == null ) {
             result = createNumberFormat( clazz );
             _numberFormats.put( clazz, result );
         }
-        return (XMLNumberFormat<T>) result;
+        return result;
     }
 
     @SuppressWarnings( "unchecked" )
-    static <T> XMLNumberFormat<T> createNumberFormat( final Class<T> clazz ) {
+    static <T extends Number> XMLNumberFormat<T> createNumberFormat( final Class<T> clazz ) {
         try {
             for ( final Constructor<?> constructor : clazz.getConstructors() ) {
                 final Class<?>[] parameterTypes = constructor.getParameterTypes();
@@ -571,7 +571,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
      * @param <T>
      *            the number type.
      */
-    static abstract class XMLNumberFormat<T> extends XMLFormat<T> {
+    static abstract class XMLNumberFormat<T extends Number> extends XMLFormat<T> {
 
         private final Constructor<T> _constructor;
 
@@ -639,12 +639,12 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
          */
         @Override
         public void write( final T obj, final javolution.xml.XMLFormat.OutputElement xml ) throws XMLStreamException {
-            xml.setAttribute( "value", obj.toString() );
+            xml.setAttribute( "value", obj.longValue() );
         }
 
     }
 
-    static class XMLNumberIntFormat<T> extends XMLNumberFormat<T> {
+    static class XMLNumberIntFormat<T extends Number> extends XMLNumberFormat<T> {
 
         public XMLNumberIntFormat( final Constructor<T> constructor ) {
             super( constructor );
@@ -660,7 +660,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
     }
 
-    static class XMLNumberLongFormat<T> extends XMLNumberFormat<T> {
+    static class XMLNumberLongFormat<T extends Number> extends XMLNumberFormat<T> {
 
         public XMLNumberLongFormat( final Constructor<T> constructor ) {
             super( constructor );
