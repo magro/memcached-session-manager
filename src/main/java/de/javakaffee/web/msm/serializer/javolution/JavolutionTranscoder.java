@@ -125,7 +125,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             if ( !reader.hasNext() ) {
                 throw new IllegalStateException( "reader has no input" );
             }
-            final MemcachedBackupSession session = reader.read( "session" );
+            final MemcachedBackupSession session = reader.read( "session", MemcachedBackupSession.class );
             session.setManager( _manager );
             session.doAfterDeserialization();
             return session;
