@@ -17,6 +17,9 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import java.io.Serializable;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,6 +86,46 @@ public class TestClasses {
 
     static Container createContainer( final String bodyContent ) {
         return new Container( bodyContent );
+    }
+    
+    static SomeInterface createProxy() {
+        return (SomeInterface) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
+                new Class<?>[] { SomeInterface.class, Serializable.class },
+                new MyInvocationHandler( SomeInterfaceImpl.class ) );
+    }
+    
+    static class MyInvocationHandler implements InvocationHandler {
+        
+        private final Class<?> _targetClazz;
+        private transient Object _target;
+
+        public MyInvocationHandler( final Class<?> targetClazz ) {
+            _targetClazz = targetClazz;
+        }
+
+        @Override
+        public Object invoke( final Object proxy, final Method method, final Object[] args ) throws Throwable {
+            if ( _target == null ) {
+                _target = _targetClazz.newInstance();
+            }
+            return method.invoke( _target, args );
+        }
+    }
+
+    static interface SomeInterface {
+        String hello();
+    }
+    
+    static class SomeInterfaceImpl implements SomeInterface {
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String hello() {
+            return "hi";
+        }
+        
     }
 
     public static class Container {
@@ -422,6 +465,8 @@ public class TestClasses {
         private final boolean _boolean;
         @SuppressWarnings( "unused" )
         private final Boolean _Boolean;
+        @SuppressWarnings( "unused" )
+        private final Class<?> _Class;
         private String _String;
         private Long _Long;
         private Integer _Integer;
@@ -456,6 +501,7 @@ public class TestClasses {
             _long = 42;
             _boolean = true;
             _Boolean = Boolean.TRUE;
+            _Class = String.class;
             _String = "42";
             _Long = new Long( 42 );
             _Integer = new Integer( 42 );

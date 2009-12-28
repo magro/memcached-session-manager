@@ -65,6 +65,7 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderList;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.MyContainer;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person;
+import de.javakaffee.web.msm.serializer.javolution.TestClasses.SomeInterface;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
 
 /**
@@ -95,6 +96,14 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager );
+    }
+
+    @Test( enabled = true )
+    public void testProxy() throws Exception {
+        final SomeInterface bean = TestClasses.createProxy();
+        final byte[] bytes = serialize( bean );
+        System.out.println( new String( bytes ) );
+        assertDeepEquals( deserialize( bytes ), bean );
     }
 
     @Test( enabled = true )
@@ -182,18 +191,35 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
     @DataProvider( name = "typesAsSessionAttributesProvider" )
     protected Object[][] createTypesAsSessionAttributesData() {
-        return new Object[][] { { int.class, 42 }, { long.class, 42 }, { Boolean.class, Boolean.TRUE }, { String.class, "42" },
-                { Long.class, new Long( 42 ) }, { Integer.class, new Integer( 42 ) }, { Character.class, new Character( 'c' ) },
-                { Byte.class, new Byte( "b".getBytes()[0] ) }, { Double.class, new Double( 42d ) },
-                { Float.class, new Float( 42f ) }, { Short.class, new Short( (short) 42 ) },
-                { BigDecimal.class, new BigDecimal( 42 ) }, { AtomicInteger.class, new AtomicInteger( 42 ) },
-                { AtomicLong.class, new AtomicLong( 42 ) }, { MutableInt.class, new MutableInt( 42 ) },
-                { Integer[].class, new Integer[] { 42 } }, { Date.class, new Date( System.currentTimeMillis() - 10000 ) },
-                { Calendar.class, Calendar.getInstance() }, { ArrayList.class, new ArrayList<String>( Arrays.asList( "foo" ) ) },
-                { int[].class, new int[] { 1, 2 } }, { long[].class, new long[] { 1, 2 } },
-                { short[].class, new short[] { 1, 2 } }, { float[].class, new float[] { 1, 2 } },
-                { double[].class, new double[] { 1, 2 } }, { int[].class, new int[] { 1, 2 } }, { byte[].class, "42".getBytes() },
-                { char[].class, "42".toCharArray() }, { String[].class, new String[] { "23", "42" } },
+        return new Object[][] { { int.class, 42 },
+                { long.class, 42 },
+                { Boolean.class, Boolean.TRUE },
+                { String.class, "42" },
+                { Class.class, String.class },
+                { Long.class, new Long( 42 ) },
+                { Integer.class, new Integer( 42 ) },
+                { Character.class, new Character( 'c' ) },
+                { Byte.class, new Byte( "b".getBytes()[0] ) },
+                { Double.class, new Double( 42d ) },
+                { Float.class, new Float( 42f ) },
+                { Short.class, new Short( (short) 42 ) },
+                { BigDecimal.class, new BigDecimal( 42 ) },
+                { AtomicInteger.class, new AtomicInteger( 42 ) },
+                { AtomicLong.class, new AtomicLong( 42 ) },
+                { MutableInt.class, new MutableInt( 42 ) },
+                { Integer[].class, new Integer[] { 42 } },
+                { Date.class, new Date( System.currentTimeMillis() - 10000 ) },
+                { Calendar.class, Calendar.getInstance() },
+                { ArrayList.class, new ArrayList<String>( Arrays.asList( "foo" ) ) },
+                { int[].class, new int[] { 1, 2 } },
+                { long[].class, new long[] { 1, 2 } },
+                { short[].class, new short[] { 1, 2 } },
+                { float[].class, new float[] { 1, 2 } },
+                { double[].class, new double[] { 1, 2 } },
+                { int[].class, new int[] { 1, 2 } },
+                { byte[].class, "42".getBytes() },
+                { char[].class, "42".toCharArray() },
+                { String[].class, new String[] { "23", "42" } },
                 { Person[].class, new Person[] { createPerson( "foo bar", Gender.MALE, 42 ) } } };
     }
 
@@ -474,7 +500,8 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
             writer = XMLObjectWriter.newInstance( bos );
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
-            xmlReferenceResolver.setIdentifierAttribute( "__refId" );
+            xmlReferenceResolver.setIdentifierAttribute( JavolutionTranscoder.REFERENCE_ATTRIBUTE_ID );
+            xmlReferenceResolver.setReferenceAttribute( JavolutionTranscoder.REFERENCE_ATTRIBUTE_REF_ID );
             writer.setReferenceResolver( xmlReferenceResolver );
             writer.setBinding( new ReflectionBinding( getClass().getClassLoader() ) );
             writer.write( o, "session" );
@@ -498,7 +525,8 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
             final ByteArrayInputStream bis = new ByteArrayInputStream( in );
             reader = XMLObjectReader.newInstance( bis );
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
-            xmlReferenceResolver.setIdentifierAttribute( "__refId" );
+            xmlReferenceResolver.setIdentifierAttribute( JavolutionTranscoder.REFERENCE_ATTRIBUTE_ID );
+            xmlReferenceResolver.setReferenceAttribute( JavolutionTranscoder.REFERENCE_ATTRIBUTE_REF_ID );
             reader.setReferenceResolver( xmlReferenceResolver );
             reader.setBinding( new ReflectionBinding( getClass().getClassLoader() ) );
             if ( !reader.hasNext() ) {

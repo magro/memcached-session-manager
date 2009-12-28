@@ -52,7 +52,8 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSessio
  */
 public class JavolutionTranscoder extends SerializingTranscoder {
 
-    static final String REF_ID = "__id";
+    static final String REFERENCE_ATTRIBUTE_ID = "__id";
+    static final String REFERENCE_ATTRIBUTE_REF_ID = "__ref";
 
     static Logger _log = Logger.getLogger( JavolutionTranscoder.class.getName() );
 
@@ -86,7 +87,8 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
             writer = XMLObjectWriter.newInstance( bos );
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
-            xmlReferenceResolver.setIdentifierAttribute( REF_ID );
+            xmlReferenceResolver.setIdentifierAttribute( REFERENCE_ATTRIBUTE_ID );
+            xmlReferenceResolver.setReferenceAttribute( REFERENCE_ATTRIBUTE_REF_ID );
             writer.setReferenceResolver( xmlReferenceResolver );
             writer.setBinding( _xmlBinding );
             writer.write( o, "session" );
@@ -116,7 +118,8 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             final ByteArrayInputStream bis = new ByteArrayInputStream( in );
             reader = XMLObjectReader.newInstance( bis );
             final XMLReferenceResolver xmlReferenceResolver = new XMLReferenceResolver();
-            xmlReferenceResolver.setIdentifierAttribute( REF_ID );
+            xmlReferenceResolver.setIdentifierAttribute( REFERENCE_ATTRIBUTE_ID );
+            xmlReferenceResolver.setReferenceAttribute( REFERENCE_ATTRIBUTE_REF_ID );
             reader.setReferenceResolver( xmlReferenceResolver );
             reader.setBinding( _xmlBinding );
             if ( !reader.hasNext() ) {

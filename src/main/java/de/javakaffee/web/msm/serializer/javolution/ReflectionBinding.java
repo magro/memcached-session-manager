@@ -18,6 +18,8 @@ package de.javakaffee.web.msm.serializer.javolution;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.GregorianCalendar;
@@ -52,11 +54,13 @@ public class ReflectionBinding extends XMLBinding {
     private final ClassLoader _classLoader;
     private final XMLEnumFormat _enumFormat;
     private final XMLArrayFormat _arrayFormat;
+    private final XMLJdkProxyFormat _jdkProxyFormat;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
+        _jdkProxyFormat = new XMLJdkProxyFormat( classLoader );
     }
 
     /**
@@ -64,7 +68,10 @@ public class ReflectionBinding extends XMLBinding {
      */
     @SuppressWarnings( "unchecked" )
     @Override
-    protected void writeClass( final Class cls, final XMLStreamWriter writer, final boolean useAttributes ) throws XMLStreamException {
+    protected void writeClass( Class cls, final XMLStreamWriter writer, final boolean useAttributes ) throws XMLStreamException {
+        if ( Proxy.isProxyClass( cls ) ) {
+            cls = Proxy.class;
+        }
         if ( useAttributes ) {
             writer.writeAttribute( "class", cls.getName() );
         } else {
@@ -107,6 +114,7 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Float.class
                 || cls == Character.class
                 || cls == Byte.class
+                || cls == Class.class
                 || Map.class.isAssignableFrom( cls )
                 || Collection.class.isAssignableFrom( cls ) ) {
             return super.getFormat( cls );
@@ -116,6 +124,11 @@ public class ReflectionBinding extends XMLBinding {
             return _enumFormat;
         } else if ( Calendar.class.isAssignableFrom( cls ) ) {
             return CALENDAR_FORMAT;
+        } else if ( Proxy.isProxyClass( cls ) || cls == Proxy.class ) {
+            /* the Proxy.isProxyClass check is required for serialization,
+             * Proxy.class is required for deserialization
+             */
+            return _jdkProxyFormat;
         } else {
             if ( xmlFormat == null ) {
                 if ( ReflectionFormat.isNumberFormat( cls ) ) {
@@ -309,6 +322,77 @@ public class ReflectionBinding extends XMLBinding {
             } catch ( final Exception e ) {
                 throw new XMLStreamException( e );
             }
+        }
+
+    }
+
+    public static final class XMLJdkProxyFormat extends XMLFormat<Object> {
+
+        private final ClassLoader _classLoader;
+
+        public XMLJdkProxyFormat( final ClassLoader classLoader ) {
+            super( null );
+            _classLoader = classLoader;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean isReferenceable() {
+            return false;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Object newInstance( final Class<Object> clazz, final javolution.xml.XMLFormat.InputElement input )
+            throws XMLStreamException {
+            final InvocationHandler invocationHandler = input.get( "handler" );
+            final Class<?>[] interfaces = getInterfaces( input );
+            return Proxy.newProxyInstance( _classLoader, interfaces, invocationHandler );
+        }
+
+        private Class<?>[] getInterfaces( final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
+            final String[] interfaceNames = input.get( "interfaces" );
+            if ( interfaceNames != null ) {
+                try {
+                    final Class<?>[] interfaces = new Class<?>[interfaceNames.length];
+                    for ( int i = 0; i < interfaceNames.length; i++ ) {
+                        interfaces[i] = Class.forName( interfaceNames[i], true, _classLoader );
+                    }
+                    return interfaces;
+                } catch ( final ClassNotFoundException e ) {
+                    throw new XMLStreamException( e );
+                }
+            }
+            return new Class<?>[0];
+        }
+
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement input, final Object obj ) throws XMLStreamException {
+            // nothing to do
+        }
+
+        @Override
+        public final void write( final Object obj, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
+            final InvocationHandler invocationHandler = Proxy.getInvocationHandler( obj );
+            output.add( invocationHandler, "handler" );
+            final String[] interfaceNames = getInterfaceNames( obj );
+            output.add( interfaceNames, "interfaces" );
+        }
+
+        private String[] getInterfaceNames( final Object obj ) {
+            final Class<?>[] interfaces = obj.getClass().getInterfaces();
+            if ( interfaces != null ) {
+                final String[] interfaceNames = new String[interfaces.length];
+                for ( int i = 0; i < interfaces.length; i++ ) {
+                    interfaceNames[i] = interfaces[i].getName();
+                }
+                return interfaceNames;
+            }
+            return new String[0];
         }
 
     }

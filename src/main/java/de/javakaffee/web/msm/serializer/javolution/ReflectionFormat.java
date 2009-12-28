@@ -201,7 +201,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         final Attributes attributes = input.getAttributes();
         for ( int i = 0; i < attributes.getLength(); i++ ) {
             final CharArray name = attributes.getLocalName( i );
-            if ( !name.equals( "class" ) && !name.equals( JavolutionTranscoder.REF_ID ) ) {
+            if ( !name.equals( "class" ) && !name.equals( JavolutionTranscoder.REFERENCE_ATTRIBUTE_ID ) ) {
                 final Field field = _attributesMap.get( name.toString() );
                 if ( field != null ) {
                     setFieldFromAttribute( obj, field, input );
