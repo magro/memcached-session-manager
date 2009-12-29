@@ -11,8 +11,8 @@ SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 TC_CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
 TC_COYOTE = 'org.apache.tomcat:coyote:jar:6.0.18'
 TC_LOGGING = transitive( 'org.apache.tomcat:juli:jar:6.0.18' )
-MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4').from(file('lib/memcached-2.4.jar'))
-MSM = artifact( 'de.javakaffee.web:memcached-session-manager:jar:1.1-SNAPSHOT' ).from(file('lib/memcached-session-manager-1.1-SNAPSHOT.jar'))
+MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4.2').from(file('lib/memcached-2.4.2.jar'))
+MSM = artifact( 'de.javakaffee.web:memcached-session-manager:jar:1.1' ).from(file('lib/memcached-session-manager-1.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 
 # Testing
@@ -21,7 +21,7 @@ CLANG = 'commons-lang:commons-lang:jar:2.4'
 desc 'msm-xstream-serializer'
 define 'msm-xstream-serializer' do
   project.group = 'de.javakaffee.web.msm.serializer'
-  project.version = '1.1-SNAPSHOT'
+  project.version = '1.1'
   
   compile.with( SERVLET_API, TC_CATALINA, TC_COYOTE, TC_LOGGING, MEMCACHED, MSM, XSTREAM )
   compile.using( :source=>'1.5', :target=>'1.5' )
