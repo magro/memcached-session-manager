@@ -64,7 +64,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * &lt;/Context&gt;
  * </pre></code>
  * </p>
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -101,14 +101,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * The memcached nodes space separated and with the id prefix, e.g.
      * n1:localhost:11211 n2:localhost:11212
-     * 
+     *
      */
     private String _memcachedNodes;
 
     /**
      * The ids of memcached failover nodes separated by space, e.g.
      * <code>n1 n2</code>
-     * 
+     *
      */
     private String _failoverNodes;
 
@@ -184,7 +184,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * findSession may be often called in one request. If a session is requested
      * that we don't have locally stored each findSession invocation would
      * trigger a memcached request - this would open the door for DOS attacks...
-     * 
+     *
      * this solution: use a LRUCache with a timeout to store, which session had
      * been requested in the last <n> millis.
      */
@@ -197,10 +197,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * a session is requested that we don't have locally stored each findSession
      * invocation would trigger a memcached request - this would open the door
      * for DOS attacks...
-     * 
+     *
      * this solution: use a LRUCache with a timeout to store, which session had
      * been requested in the last <n> millis.
-     * 
+     *
      * Updated: the node status cache holds the status of each node for the
      * configured TTL.
      */
@@ -222,7 +222,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Return descriptive information about this Manager implementation and the
      * corresponding version number, in the format
      * <code>&lt;description&gt;/&lt;version&gt;</code>.
-     * 
+     *
      * @return the info string
      */
     @Override
@@ -232,7 +232,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Return the descriptive short name of this Manager implementation.
-     * 
+     *
      * @return the short name
      */
     @Override
@@ -253,14 +253,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         super.init();
 
-        /*
-         * add the valve for tracking requests for that the session must be sent
+        /* add the valve for tracking requests for that the session must be sent
          * to memcached
          */
         getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern, this ) );
 
-        /*
-         * init memcached
+        /* init memcached
          */
 
         if ( !NODES_PATTERN.matcher( _memcachedNodes ).matches() ) {
@@ -283,6 +281,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
         }
 
+        initMemcachedClient( addresses, address2Ids );
+
+        /* create the missing sessions cache
+         */
+        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
+        _nodeAvailabilityCache = createNodeAvailabilityCache( 1000 );
+
+    }
+
+    private void initMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids ) {
         try {
             log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
             final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
@@ -293,19 +301,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
-
-        /*
-         * create the missing sessions cache
-         */
-        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
-        _nodeAvailabilityCache = createNodeAvailabilityCache( 1000 );
-
-        //_relocatedSessions = new LRUCache<String, String>( 100000, getMaxInactiveInterval() * 1000 );
     }
 
     private NodeAvailabilityCache<String> createNodeAvailabilityCache( final long ttlInMillis ) {
         return new NodeAvailabilityCache<String>( _allNodeIds.size(), ttlInMillis, new CacheLoader<String>() {
-            
+
             public boolean isNodeAvailable( final String key ) {
                 try {
                     _memcached.get( _sessionIdFormat.createSessionId( "ping", key ) );
@@ -398,12 +398,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * Return the active Session, associated with this Manager, with the
      * specified session id (if any); otherwise return <code>null</code>.
-     * 
+     *
      * @param id
      *            The session id for the session to be returned
      * @return the session or <code>null</code> if no session was found locally
      *         or in memcached.
-     * 
+     *
      * @exception IllegalStateException
      *                if a new session cannot be instantiated for any reason
      * @exception IOException
@@ -474,7 +474,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Store the provided session in memcached.
-     * 
+     *
      * @param session
      *            the session to save
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResult}
@@ -566,7 +566,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Returns the new session id if the provided session has to be relocated.
-     * 
+     *
      * @param session
      *            the session to check, never null.
      * @return the new session id, if this session has to be relocated.
@@ -602,7 +602,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         /*
          * relocate session to our memcached node...
-         * 
+         *
          * and mark it as a node-failure-session, so that remove(session) does
          * not try to remove it from memcached... (the session is removed and
          * added when the session id is changed)
@@ -640,7 +640,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Get the next memcached node id for session backup. The active node ids
      * are preferred, if no active node id is left to try, a failover node id is
      * picked. If no failover node id is left, this method returns just null.
-     * 
+     *
      * @param nodeId
      *            the current node id
      * @param excludedNodeIds
@@ -672,7 +672,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Determines the next available node id from the provided node ids. The
      * returned node id will be different from the provided nodeId and will not
      * be contained in the excludedNodeIds.
-     * 
+     *
      * @param nodeId
      *            the original id
      * @param nodeIds
@@ -814,7 +814,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * <p>
      * E.g. <code>n1.localhost:11211 n2.localhost:11212</code>
      * </p>
-     * 
+     *
      * @param memcachedNodes
      *            the memcached node definitions, whitespace separated
      */
@@ -829,7 +829,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * <p>
      * E.g. <code>n1 n2</code>
      * </p>
-     * 
+     *
      * @param failoverNodes
      *            the failoverNodes to set, whitespace separated
      */
@@ -844,7 +844,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * <p>
      * E.g. <code>.*\.(png|gif|jpg|css|js)$</code>
      * </p>
-     * 
+     *
      * @param requestUriIgnorePattern
      *            the requestUriIgnorePattern to set
      * @author Martin Grotzke
@@ -853,6 +853,22 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _requestUriIgnorePattern = requestUriIgnorePattern;
     }
 
+    /**
+     * The class of the factory that creates the
+     * {@link net.spy.memcached.transcoders.Transcoder} to use for serializing/deserializing
+     * sessions to/from memcached (requires a default/no-args constructor).
+     * The default value is the {@link SessionSerializingTranscoderFactory} class
+     * (used if this configuration attribute is not specified).
+     * <p>
+     * After the {@link TranscoderFactory} instance was created from the specified class,
+     * {@link TranscoderFactory#setCopyCollectionsForSerialization(boolean)}
+     * will be invoked with the currently set <code>copyCollectionsForSerialization</code> propery, which
+     * has either still the default value (<code>false</code>) or the value provided via
+     * {@link #setCopyCollectionsForSerialization(boolean)}.
+     * </p>
+     *
+     * @param transcoderFactoryClassName the {@link TranscoderFactory} class name.
+     */
     public void setTranscoderFactoryClass( final String transcoderFactoryClassName ) {
         try {
             _transcoderFactoryClass = Class.forName( transcoderFactoryClassName ).asSubclass( TranscoderFactory.class );
@@ -863,9 +879,27 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * Specifies, if iterating over collection elements shall be done on a copy
+     * of the collection or on the collection itself. The default value is <code>false</code>
+     * (used if this configuration attribute is not specified).
+     * <p>
+     * This option can be useful if you have multiple requests running in
+     * parallel for the same session (e.g. AJAX) and you are using
+     * non-thread-safe collections (e.g. {@link java.util.ArrayList} or
+     * {@link java.util.HashMap}). In this case, your application might modify a
+     * collection while it's being serialized for backup in memcached.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This must be supported by the {@link TranscoderFactory}
+     * specified via {@link #setTranscoderFactoryClass(String)}: after the {@link TranscoderFactory} instance
+     * was created from the specified class, {@link TranscoderFactory#setCopyCollectionsForSerialization(boolean)}
+     * will be invoked with the provided <code>copyCollectionsForSerialization</code> value.
+     * </p>
+     *
      * @param copyCollectionsForSerialization
-     *            specifies, if iterating over collection elements shall be done
-     *            on a copy of the collection or on the collection itself
+     *            <code>true</code>, if iterating over collection elements shall be done
+     *            on a copy of the collection, <code>false</code> if the collections own iterator
+     *            shall be used.
      */
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
@@ -956,7 +990,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * By default this property is set to <code>false</code> - the session
      * backup is performed synchronously.
      * </p>
-     * 
+     *
      * @param sessionBackupAsync
      *            the sessionBackupAsync to set
      */
@@ -973,7 +1007,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * </p>
      * <p>
      * The default value is <code>100</code> millis.
-     * 
+     *
      * @param sessionBackupTimeout
      *            the sessionBackupTimeout to set (milliseconds)
      */
@@ -994,7 +1028,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          * Creates a new instance without a given manager. This has to be
          * assigned via {@link #setManager(Manager)} before this session is
          * used.
-         * 
+         *
          */
         public MemcachedBackupSession() {
             super( null );
@@ -1002,7 +1036,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         /**
          * Creates a new instance with the given manager.
-         * 
+         *
          * @param manager
          *            the manager
          */
@@ -1015,7 +1049,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          * Before setting the new id, it removes itself from the associated
          * manager. After the new id is set, this session adds itself to the
          * session manager.
-         * 
+         *
          * @param id
          *            the new session id
          */
@@ -1039,6 +1073,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             super.setId( id );
         }
 
+        /**
+         * Performs some initialization of this session that is required after
+         * deserialization. This must be invoked by custom serialization strategies
+         * that do not rely on the {@link StandardSession} serialization.
+         */
         public void doAfterDeserialization() {
             if ( listeners == null ) {
                 listeners = new ArrayList<Object>();

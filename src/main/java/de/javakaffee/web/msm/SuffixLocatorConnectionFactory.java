@@ -29,7 +29,7 @@ import org.apache.catalina.Manager;
  * This {@link net.spy.memcached.ConnectionFactory} uses the
  * {@link SuffixBasedNodeLocator} as {@link NodeLocator} and the
  * {@link SessionSerializingTranscoder} as {@link Transcoder}.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -42,13 +42,15 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
 
     /**
      * Creates a new instance.
-     * 
+     *
      * @param manager
      *            the manager
      * @param resolver
      *            the {@link NodeIdResolver}
      * @param sessionIdFormat
      *            the {@link SessionIdFormat}
+     * @param transcoderFactory
+     *            the {@link TranscoderFactory} to use to create the {@link Transcoder}
      */
     public SuffixLocatorConnectionFactory( final Manager manager, final NodeIdResolver resolver,
             final SessionIdFormat sessionIdFormat, final TranscoderFactory transcoderFactory ) {

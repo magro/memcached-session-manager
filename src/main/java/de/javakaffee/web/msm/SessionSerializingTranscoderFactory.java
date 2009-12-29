@@ -19,12 +19,10 @@ package de.javakaffee.web.msm;
 import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Manager;
-import org.apache.catalina.session.StandardSession;
 
 /**
- * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
- * {@link StandardSession}s using the serialization of {@link StandardSession}.
- * 
+ * A {@link TranscoderFactory} that creates {@link SessionSerializingTranscoder} instances.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -33,15 +31,17 @@ public class SessionSerializingTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    @Override
     public Transcoder<Object> createTranscoder( final Manager manager ) {
         return new SessionSerializingTranscoder( manager );
     }
 
     /**
-     * {@inheritDoc}
+     * If <code>copyCollectionsForSerialization</code> is set to <code>true</code>,
+     * an {@link UnsupportedOperationException} will be thrown, as java serialization
+     * cannot be changed and it does not copy collections for serialization.
+     *
+     * @param copyCollectionsForSerialization the copyCollectionsForSerialization value
      */
-    @Override
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         if ( copyCollectionsForSerialization ) {
             throw new UnsupportedOperationException(

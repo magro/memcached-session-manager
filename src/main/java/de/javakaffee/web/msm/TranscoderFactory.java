@@ -19,12 +19,12 @@ package de.javakaffee.web.msm;
 import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Manager;
-import org.apache.catalina.session.StandardSession;
 
 /**
- * The factory to create a {@link net.spy.memcached.transcoders.Transcoder} that
- * serializes and deserializes catalina {@link StandardSession}s.
- * 
+ * This factory is used to create a {@link net.spy.memcached.transcoders.Transcoder}
+ * to serialize/deserialize sessions to/from memcached. Implementations need to provide
+ * a default/no-args constructor so that an instance can be created via {@link Class#newInstance()}.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -32,7 +32,7 @@ public interface TranscoderFactory {
 
     /**
      * Creates a new {@link Transcoder} with the given manager.
-     * 
+     *
      * @param manager
      *            the manager that needs to be set on deserialized sessions.
      * @return an implementation of {@link Transcoder}.
@@ -46,7 +46,7 @@ public interface TranscoderFactory {
      * This will be called before {@link #createTranscoder(Manager)}, so that
      * you can use this property in {@link #createTranscoder(Manager)}.
      * </p>
-     * 
+     *
      * @param copyCollectionsForSerialization
      *            the boolean value.
      */
