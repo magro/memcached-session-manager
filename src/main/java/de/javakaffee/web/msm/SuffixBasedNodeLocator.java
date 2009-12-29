@@ -78,7 +78,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
     /**
      * {@inheritDoc}
      */
-    @Override
     public Collection<MemcachedNode> getAll() {
         return _nodesMap.values();
     }
@@ -86,7 +85,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
     /**
      * {@inheritDoc}
      */
-    @Override
     public MemcachedNode getPrimary( final String key ) {
         final MemcachedNode result = _nodesMap.get( getNodeId( key ) );
         if ( result == null ) {
@@ -102,7 +100,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
     /**
      * {@inheritDoc}
      */
-    @Override
     public Iterator<MemcachedNode> getSequence( final String key ) {
         final String nodeId = getNodeId( key );
         throw new NodeFailureException( "The node " + nodeId + " is not available.", nodeId );
@@ -111,7 +108,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
     /**
      * {@inheritDoc}
      */
-    @Override
     public NodeLocator getReadonlyCopy() {
         final List<MemcachedNode> nodes = new ArrayList<MemcachedNode>();
         for ( final MemcachedNode node : _nodes ) {
@@ -135,7 +131,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public String toString() {
             return _root.toString();
         }
@@ -143,7 +138,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void addOp( final Operation op ) {
             throw new UnsupportedOperationException();
         }
@@ -151,7 +145,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void connected() {
             throw new UnsupportedOperationException();
         }
@@ -159,7 +152,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void copyInputQueue() {
             throw new UnsupportedOperationException();
         }
@@ -167,7 +159,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void fillWriteBuffer( final boolean optimizeGets ) {
             throw new UnsupportedOperationException();
         }
@@ -175,7 +166,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void fixupOps() {
             throw new UnsupportedOperationException();
         }
@@ -183,7 +173,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public int getBytesRemainingToWrite() {
             throw new UnsupportedOperationException();
         }
@@ -191,7 +180,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public SocketChannel getChannel() {
             throw new UnsupportedOperationException();
         }
@@ -199,7 +187,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public Operation getCurrentReadOp() {
             throw new UnsupportedOperationException();
         }
@@ -207,7 +194,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public Operation getCurrentWriteOp() {
             throw new UnsupportedOperationException();
         }
@@ -215,7 +201,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public ByteBuffer getRbuf() {
             throw new UnsupportedOperationException();
         }
@@ -223,7 +208,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public int getReconnectCount() {
             throw new UnsupportedOperationException();
         }
@@ -231,7 +215,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public int getSelectionOps() {
             throw new UnsupportedOperationException();
         }
@@ -239,7 +222,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public SelectionKey getSk() {
             throw new UnsupportedOperationException();
         }
@@ -247,7 +229,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public SocketAddress getSocketAddress() {
             return _root.getSocketAddress();
         }
@@ -255,7 +236,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public ByteBuffer getWbuf() {
             throw new UnsupportedOperationException();
         }
@@ -263,7 +243,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public boolean hasReadOp() {
             throw new UnsupportedOperationException();
         }
@@ -271,7 +250,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public boolean hasWriteOp() {
             throw new UnsupportedOperationException();
         }
@@ -279,7 +257,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public boolean isActive() {
             throw new UnsupportedOperationException();
         }
@@ -287,7 +264,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void reconnecting() {
             throw new UnsupportedOperationException();
         }
@@ -295,7 +271,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void registerChannel( final SocketChannel ch, final SelectionKey selectionKey ) {
             throw new UnsupportedOperationException();
         }
@@ -303,7 +278,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public Operation removeCurrentReadOp() {
             throw new UnsupportedOperationException();
         }
@@ -311,7 +285,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public Operation removeCurrentWriteOp() {
             throw new UnsupportedOperationException();
         }
@@ -319,7 +292,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void setChannel( final SocketChannel to ) {
             throw new UnsupportedOperationException();
         }
@@ -327,7 +299,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void setSk( final SelectionKey to ) {
             throw new UnsupportedOperationException();
         }
@@ -335,7 +306,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void setupResend() {
             throw new UnsupportedOperationException();
         }
@@ -343,7 +313,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public void transitionWriteItem() {
             throw new UnsupportedOperationException();
         }
@@ -351,7 +320,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public int writeSome() throws IOException {
             throw new UnsupportedOperationException();
         }
@@ -359,7 +327,6 @@ class SuffixBasedNodeLocator implements NodeLocator {
         /**
          * {@inheritDoc}
          */
-        @Override
         public Collection<Operation> destroyInputQueue() {
             throw new UnsupportedOperationException();
         }

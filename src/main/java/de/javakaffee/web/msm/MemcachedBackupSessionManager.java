@@ -305,8 +305,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private NodeAvailabilityCache<String> createNodeAvailabilityCache( final long ttlInMillis ) {
         return new NodeAvailabilityCache<String>( _allNodeIds.size(), ttlInMillis, new CacheLoader<String>() {
-
-            @Override
+            
             public boolean isNodeAvailable( final String key ) {
                 try {
                     _memcached.get( _sessionIdFormat.createSessionId( "ping", key ) );
@@ -787,7 +786,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public int getRejectedSessions() {
         return _rejectedSessions;
     }
@@ -795,14 +793,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void load() throws ClassNotFoundException, IOException {
     }
 
     /**
      * {@inheritDoc}
      */
-    @Override
     public void setRejectedSessions( final int rejectedSessions ) {
         _rejectedSessions = rejectedSessions;
     }
@@ -810,7 +806,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void unload() throws IOException {
     }
 
@@ -879,7 +874,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void addLifecycleListener( final LifecycleListener arg0 ) {
         _lifecycle.addLifecycleListener( arg0 );
     }
@@ -887,7 +881,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public LifecycleListener[] findLifecycleListeners() {
         return _lifecycle.findLifecycleListeners();
     }
@@ -895,7 +888,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void removeLifecycleListener( final LifecycleListener arg0 ) {
         _lifecycle.removeLifecycleListener( arg0 );
     }
@@ -903,7 +895,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void start() throws LifecycleException {
         if ( !initialized ) {
             init();
@@ -913,7 +904,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void stop() throws LifecycleException {
         if ( initialized ) {
             _memcached.shutdown();
@@ -924,7 +914,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public void propertyChange( final PropertyChangeEvent event ) {
 
         // Validate the source of this event

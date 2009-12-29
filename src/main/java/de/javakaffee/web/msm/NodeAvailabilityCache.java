@@ -52,7 +52,7 @@ public class NodeAvailabilityCache<K> {
      */
     public NodeAvailabilityCache( final int size, final long ttlInMillis, final CacheLoader<K> cacheLoader ) {
         _ttl = ttlInMillis;
-        _map = new ConcurrentHashMap<K, ManagedItem<Boolean>>( size / 2, 0.75f );
+        _map = new ConcurrentHashMap<K, ManagedItem<Boolean>>( size / 2 );
         _cacheLoader = cacheLoader;
     }
 
