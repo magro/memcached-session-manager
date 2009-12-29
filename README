@@ -3,8 +3,12 @@ A serialization strategy for the memcached-session-manager (http://code.google.c
 It's implemented using reflection to read/write field values from/to POJOs.
 
 Notable features:
-- Support of cyclic dependencies / associations
-- Support of private classes and classes without a default constructor (see additional note below)
+- Support for cyclic dependencies / associations
+- Support for private classes and classes without a default constructor (see additional note below)
+- Supports serialization/deserialization of jdk proxies
+- Supports copying of collections before serialization to prevent ConcurrentModificationExceptions if
+  the application modifies such a (non-thread-safe) collection in another request (set copyCollectionsForSerialization
+  to true in the manager configuration to use this feature)
 
 
 To support serialization of private classes and classes without a default constructor it
