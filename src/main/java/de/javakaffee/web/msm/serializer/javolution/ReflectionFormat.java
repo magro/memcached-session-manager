@@ -49,13 +49,15 @@ import sun.reflect.ReflectionFactory;
  * written to the object.
  * </p>
  * 
+ * @param <T> the type that is read/written by this {@link XMLFormat}.
+ * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class ReflectionFormat<T> extends XMLFormat<T> {
 
     private static final Logger LOG = Logger.getLogger( ReflectionFormat.class.getName() );
 
-    private static final Map<Class<?>, XMLNumberFormat<?>> _numberFormats = new ConcurrentHashMap<Class<?>, XMLNumberFormat<?>>();
+    private static final Map<Class<?>, XMLNumberFormat<?>> NUMBER_FORMATS = new ConcurrentHashMap<Class<?>, XMLNumberFormat<?>>();
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
     private static final Object[] INITARGS = new Object[0];
 
@@ -70,6 +72,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
      * @param clazz
      *            the Class that is supported by this {@link XMLFormat}.
      * @param classLoader
+     *            the {@link ClassLoader} that is used to load user types.
      */
     @SuppressWarnings( "unchecked" )
     public ReflectionFormat( final Class<T> clazz, final ClassLoader classLoader ) {
@@ -116,6 +119,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         }
     }
 
+    /**
+     * A helper class to collect fields that are serialized as elements and
+     * fields (or {@link AttributeHandler}s for fields) that are serialized
+     * as attributes.
+     */
     static class AttributesAndElements {
         private final Collection<AttributeHandler> attributes;
         private final Collection<Field> elements;
@@ -536,10 +544,10 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     }
 
     static XMLNumberFormat<?> getNumberFormat( final Class<? extends Number> clazz ) {
-        XMLNumberFormat<? extends Number> result = _numberFormats.get( clazz );
+        XMLNumberFormat<? extends Number> result = NUMBER_FORMATS.get( clazz );
         if ( result == null ) {
             result = createNumberFormat( clazz );
-            _numberFormats.put( clazz, result );
+            NUMBER_FORMATS.put( clazz, result );
         }
         return result;
     }

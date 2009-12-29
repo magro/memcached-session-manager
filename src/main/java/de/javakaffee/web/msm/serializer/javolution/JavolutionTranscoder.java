@@ -21,7 +21,6 @@ import java.io.ByteArrayOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javolution.xml.XMLFormat;
 import javolution.xml.XMLObjectReader;
 import javolution.xml.XMLObjectWriter;
 import javolution.xml.XMLReferenceResolver;
@@ -30,18 +29,17 @@ import net.spy.memcached.transcoders.SerializingTranscoder;
 
 import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
-import org.apache.catalina.session.StandardSession;
 
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
- * {@link StandardSession}s using <a
+ * {@link org.apache.catalina.session.StandardSession}s using <a
  * href="http://javolution.org/">Javolutions</a> <a href="http://javolution.org/target/site/apidocs/javolution/xml/package-summary.html#package_description"
  * > xml data binding</a> facilities.
  * <p>
  * Objects are serialized to/from xml using javolutions built in
- * {@link XMLFormat}s for standard types, custom/user types are bound using the
+ * {@link javolution.xml.XMLFormat}s for standard types, custom/user types are bound using the
  * {@link ReflectionFormat}.
  * </p>
  * <p>
@@ -55,7 +53,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
     static final String REFERENCE_ATTRIBUTE_ID = "__id";
     static final String REFERENCE_ATTRIBUTE_REF_ID = "__ref";
 
-    static Logger _log = Logger.getLogger( JavolutionTranscoder.class.getName() );
+    private static final Logger LOG = Logger.getLogger( JavolutionTranscoder.class.getName() );
 
     private final Manager _manager;
     private final ReflectionBinding _xmlBinding;
@@ -109,7 +107,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
             // getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
             return bos.toByteArray();
         } catch ( final Exception e ) {
-            _log.log( Level.SEVERE, "caught exception", e );
+            LOG.log( Level.SEVERE, "caught exception", e );
             throw new IllegalArgumentException( "Could not serialize object", e );
         } finally {
             closeSilently( writer );
