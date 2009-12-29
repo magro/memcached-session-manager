@@ -286,6 +286,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         try {
             log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
             final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
+            transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
                             _sessionIdFormat, transcoderFactory ), addresses );

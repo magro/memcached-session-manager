@@ -42,6 +42,10 @@ public interface TranscoderFactory {
     /**
      * Specifies, if iterating over collection elements shall be done on a copy
      * of the collection or on the collection itself.
+     * <p>
+     * This will be called before {@link #createTranscoder(Manager)}, so that
+     * you can use this property in {@link #createTranscoder(Manager)}.
+     * </p>
      * 
      * @param copyCollectionsForSerialization
      *            the boolean value.
