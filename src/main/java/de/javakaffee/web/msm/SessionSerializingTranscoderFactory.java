@@ -38,4 +38,15 @@ public class SessionSerializingTranscoderFactory implements TranscoderFactory {
         return new SessionSerializingTranscoder( manager );
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
+        if ( copyCollectionsForSerialization ) {
+            throw new UnsupportedOperationException(
+                    "Java serialization cannot be changed - it does not copy collections for serialization." );
+        }
+    }
+
 }

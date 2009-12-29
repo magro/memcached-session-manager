@@ -106,15 +106,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private String _memcachedNodes;
 
     /**
-     * The ids of memcached failover nodes comma separated, e.g.
-     * <code>n1,n2</code>
+     * The ids of memcached failover nodes separated by space, e.g.
+     * <code>n1 n2</code>
      * 
      */
     private String _failoverNodes;
 
     /**
-     * The pattern used for excluding requests from a session-backup. Is matched
-     * against request.getRequestURI.
+     * The pattern used for excluding requests from a session-backup, e.g.
+     * <code>.*\.(png|gif|jpg|css|js)$</code>. Is matched against
+     * request.getRequestURI.
      */
     private String _requestUriIgnorePattern;
 
@@ -149,9 +150,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private int _sessionBackupTimeout = 100;
 
     /**
-     * TODO
+     * The class of the factory for
+     * {@link net.spy.memcached.transcoders.Transcoder}s. Default class is
+     * {@link SessionSerializingTranscoderFactory}.
      */
     private Class<? extends TranscoderFactory> _transcoderFactoryClass = SessionSerializingTranscoderFactory.class;
+
+    /**
+     * Specifies, if iterating over collection elements shall be done on a copy
+     * of the collection or on the collection itself.
+     * <p>
+     * This option can be useful if you have multiple requests running in
+     * parallel for the same session (e.g. AJAX) and you are using
+     * non-thread-safe collections (e.g. {@link java.util.ArrayList} or
+     * {@link java.util.HashMap}). In this case, your application might modify a
+     * collection while it's being serialized for backup in memcached.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This must be supported by the TranscoderFactory
+     * specified via {@link #setTranscoderFactoryClass(String)}.
+     * </p>
+     */
+    private boolean _copyCollectionsForSerialization = false;
 
     // -------------------- END configuration properties --------------------
 
@@ -265,9 +285,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         try {
             log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
+            final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
-                            _sessionIdFormat, _transcoderFactoryClass.newInstance() ), addresses );
+                            _sessionIdFormat, transcoderFactory ), addresses );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
@@ -843,6 +864,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _logger.severe( "The transcoderFactoryClass (" + transcoderFactoryClassName + ") could not be found" );
             throw new RuntimeException( e );
         }
+    }
+
+    /**
+     * @param copyCollectionsForSerialization
+     *            specifies, if iterating over collection elements shall be done
+     *            on a copy of the collection or on the collection itself
+     */
+    public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
+        _copyCollectionsForSerialization = copyCollectionsForSerialization;
     }
 
     /**

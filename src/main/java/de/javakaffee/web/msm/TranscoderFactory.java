@@ -22,8 +22,8 @@ import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
 
 /**
- * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
- * {@link StandardSession}s using the serialization of {@link StandardSession}.
+ * The factory to create a {@link net.spy.memcached.transcoders.Transcoder} that
+ * serializes and deserializes catalina {@link StandardSession}s.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
@@ -38,5 +38,14 @@ public interface TranscoderFactory {
      * @return an implementation of {@link Transcoder}.
      */
     Transcoder<Object> createTranscoder( Manager manager );
+
+    /**
+     * Specifies, if iterating over collection elements shall be done on a copy
+     * of the collection or on the collection itself.
+     * 
+     * @param copyCollectionsForSerialization
+     *            the boolean value.
+     */
+    void setCopyCollectionsForSerialization( boolean copyCollectionsForSerialization );
 
 }
