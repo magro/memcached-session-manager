@@ -20,11 +20,15 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.GregorianCalendar;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -54,12 +58,20 @@ public class ReflectionBinding extends XMLBinding {
     private final ClassLoader _classLoader;
     private final XMLEnumFormat _enumFormat;
     private final XMLArrayFormat _arrayFormat;
+    private final XMLCollectionFormat _collectionFormat;
+    private final XMLMapFormat _mapFormat;
     private final XMLJdkProxyFormat _jdkProxyFormat;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
+        this( classLoader, false );
+    }
+
+    public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
+        _collectionFormat = new XMLCollectionFormat( copyCollectionsForSerialization );
+        _mapFormat = new XMLMapFormat( copyCollectionsForSerialization );
         _jdkProxyFormat = new XMLJdkProxyFormat( classLoader );
     }
 
@@ -114,12 +126,14 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Float.class
                 || cls == Character.class
                 || cls == Byte.class
-                || cls == Class.class
-                || Map.class.isAssignableFrom( cls )
-                || Collection.class.isAssignableFrom( cls ) ) {
+                || cls == Class.class ) {
             return super.getFormat( cls );
         } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
+        } else if ( Collection.class.isAssignableFrom( cls ) ) {
+            return _collectionFormat;
+        }  else if ( Map.class.isAssignableFrom( cls ) ) {
+            return _mapFormat;
         } else if ( cls.isEnum() ) {
             return _enumFormat;
         } else if ( Calendar.class.isAssignableFrom( cls ) ) {
@@ -252,6 +266,60 @@ public class ReflectionBinding extends XMLBinding {
             throws XMLStreamException {
             for ( final Object item : array ) {
                 output.add( item );
+            }
+        }
+
+    }
+    
+    public static class XMLCollectionFormat extends XMLFormat<Collection<Object>> {
+        
+        private final boolean _copyForWrite;
+
+        protected XMLCollectionFormat( final boolean copyForWrite ) {
+            super( null );
+            _copyForWrite = copyForWrite;
+        }
+
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement xml, final Collection<Object> obj ) throws XMLStreamException {
+            while ( xml.hasNext() ) {
+                obj.add( xml.getNext() );
+            }
+        }
+
+        @Override
+        public void write( final Collection<Object> obj, final javolution.xml.XMLFormat.OutputElement xml )
+            throws XMLStreamException {
+            for ( final Object item : _copyForWrite ? new ArrayList<Object>( obj ) : obj ) {
+                xml.add( item );
+            }
+        }
+
+    }
+    
+    public static class XMLMapFormat extends XMLFormat<Map<Object,Object>> {
+        
+        private final boolean _copyForWrite;
+
+        protected XMLMapFormat( final boolean copyForWrite ) {
+            super( null );
+            _copyForWrite = copyForWrite;
+        }
+
+        @Override
+        public void read( final javolution.xml.XMLFormat.InputElement xml, final Map<Object,Object> obj ) throws XMLStreamException {
+            while ( xml.hasNext() ) {
+                obj.put(xml.get("k"), xml.get("v"));
+            }
+        }
+
+        @Override
+        public void write( final Map<Object,Object> obj, final javolution.xml.XMLFormat.OutputElement xml )
+            throws XMLStreamException {
+            final Set<Entry<Object, Object>> entrySet = _copyForWrite ? new LinkedHashMap<Object, Object>( obj ).entrySet() : obj.entrySet();
+            for ( final Map.Entry<Object, Object> entry : entrySet ) {
+                xml.add( entry.getKey(), "k" );
+                xml.add( entry.getValue(), "v" );
             }
         }
 

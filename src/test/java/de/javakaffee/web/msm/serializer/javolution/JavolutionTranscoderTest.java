@@ -95,7 +95,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
-        _transcoder = new JavolutionTranscoder( _manager );
+        _transcoder = new JavolutionTranscoder( _manager, true );
     }
 
     @Test( enabled = true )

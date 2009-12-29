@@ -67,10 +67,23 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      *            the manager
      */
     public JavolutionTranscoder( final Manager manager ) {
-        _manager = manager;
+        this( manager, false );
+    }
 
+    /**
+     * Constructor.
+     * 
+     * @param manager
+     *            the manager
+     * @param copyCollectionsForSerialization
+     *            specifies, if iterating over collection elements shall be done
+     *            on a copy of the collection or on the collection itself
+     */
+    public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization ) {
+        _manager = manager;
+        
         final Loader loader = _manager.getContainer().getLoader();
-        _xmlBinding = new ReflectionBinding( loader.getClassLoader() );
+        _xmlBinding = new ReflectionBinding( loader.getClassLoader(), copyCollectionsForSerialization );
     }
 
     /**

@@ -29,12 +29,22 @@ import de.javakaffee.web.msm.TranscoderFactory;
  */
 public class JavolutionTranscoderFactory implements TranscoderFactory {
 
+    private boolean _copyCollectionsForSerialization;
+
     /**
      * {@inheritDoc}
      */
     @Override
     public Transcoder<Object> createTranscoder( final Manager manager ) {
-        return new JavolutionTranscoder( manager );
+        return new JavolutionTranscoder( manager, _copyCollectionsForSerialization );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
+        _copyCollectionsForSerialization = copyCollectionsForSerialization;
     }
 
 }
