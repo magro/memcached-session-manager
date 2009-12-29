@@ -44,8 +44,8 @@ public class XStreamTranscoderFactory implements TranscoderFactory {
     public void setCopyCollectionsForSerialization( final boolean val ) {
         if ( val ) {
             throw new UnsupportedOperationException( "XStream's CollectionConverter does not seem" +
-            		" to be able to do this. See http://xstream.codehaus.org/converters.html" +
-            		" for a list of xstream converters." );
+                    " to be able to do this. See http://xstream.codehaus.org/converters.html" +
+                    " for a list of xstream converters." );
         }
     }
 
