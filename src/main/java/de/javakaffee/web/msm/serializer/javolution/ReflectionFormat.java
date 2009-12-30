@@ -428,11 +428,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 } else if ( fieldType == double.class ) {
                     field.setDouble( obj, input.getAttribute( fieldName, (double) 0 ) );
                 } else if ( fieldType == byte.class ) {
-                    field.setByte( obj, input.getAttribute( fieldName, (Byte) null ) );
+                    field.setByte( obj, input.getAttribute( fieldName, (byte) 0 ) );
                 } else if ( fieldType == char.class ) {
                     field.setChar( obj, input.getAttribute( fieldName, (char) 0 ) );
                 } else if ( fieldType == short.class ) {
-                    field.setShort( obj, input.getAttribute( fieldName, (Short) null ) );
+                    field.setShort( obj, input.getAttribute( fieldName, (short) 0 ) );
                 }
             } else if ( fieldType.isEnum() ) {
                 final String value = input.getAttribute( fieldName, (String) null );
@@ -476,7 +476,11 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             }
 
         } catch ( final Exception e ) {
-            LOG.log( Level.SEVERE, "Caught exception when trying to set field from attribute.", e );
+            try {
+                LOG.log( Level.SEVERE, "Caught exception when trying to set field ("+ field +") from attribute ("+ input.getAttribute( field.getName() )+").", e );
+            } catch ( final XMLStreamException e1 ) {
+                // fail silently
+            }
         }
     }
     
