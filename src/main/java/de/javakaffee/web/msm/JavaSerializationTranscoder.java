@@ -33,22 +33,24 @@ import org.apache.catalina.util.CustomObjectInputStream;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
- * {@link StandardSession}s using the serialization of {@link StandardSession}.
- * 
+ * {@link StandardSession}s using java serialization (and the serialization of
+ * {@link StandardSession} via {@link StandardSession#writeObjectData(ObjectOutputStream)}
+ * and {@link StandardSession#readObjectData(ObjectInputStream)}).
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionSerializingTranscoder extends SerializingTranscoder {
+public class JavaSerializationTranscoder extends SerializingTranscoder {
 
     private final Manager _manager;
 
     /**
      * Constructor.
-     * 
+     *
      * @param manager
      *            the manager
      */
-    public SessionSerializingTranscoder( final Manager manager ) {
+    public JavaSerializationTranscoder( final Manager manager ) {
         _manager = manager;
     }
 
@@ -99,7 +101,7 @@ public class SessionSerializingTranscoder extends SerializingTranscoder {
 
     /**
      * Get the object represented by the given serialized bytes.
-     * 
+     *
      * @param in
      *            the bytes to deserialize
      * @return the resulting object

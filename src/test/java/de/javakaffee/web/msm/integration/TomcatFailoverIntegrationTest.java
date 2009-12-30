@@ -40,7 +40,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.SessionSerializingTranscoderFactory;
+import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -91,7 +91,7 @@ public class TomcatFailoverIntegrationTest {
 
         _client =
                 new MemcachedClient( new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), NodeIdResolver.node(
-                        _nodeId, address ).build(), new SessionIdFormat(), new SessionSerializingTranscoderFactory() ),
+                        _nodeId, address ).build(), new SessionIdFormat(), new JavaSerializationTranscoderFactory() ),
                         Arrays.asList( address ) );
     }
 

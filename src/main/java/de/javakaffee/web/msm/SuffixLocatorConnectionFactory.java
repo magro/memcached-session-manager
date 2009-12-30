@@ -28,7 +28,7 @@ import org.apache.catalina.Manager;
 /**
  * This {@link net.spy.memcached.ConnectionFactory} uses the
  * {@link SuffixBasedNodeLocator} as {@link NodeLocator} and the
- * {@link SessionSerializingTranscoder} as {@link Transcoder}.
+ * {@link JavaSerializationTranscoder} as {@link Transcoder}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$

@@ -152,9 +152,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * The class of the factory for
      * {@link net.spy.memcached.transcoders.Transcoder}s. Default class is
-     * {@link SessionSerializingTranscoderFactory}.
+     * {@link JavaSerializationTranscoderFactory}.
      */
-    private Class<? extends TranscoderFactory> _transcoderFactoryClass = SessionSerializingTranscoderFactory.class;
+    private Class<? extends TranscoderFactory> _transcoderFactoryClass = JavaSerializationTranscoderFactory.class;
 
     /**
      * Specifies, if iterating over collection elements shall be done on a copy
@@ -857,7 +857,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * The class of the factory that creates the
      * {@link net.spy.memcached.transcoders.Transcoder} to use for serializing/deserializing
      * sessions to/from memcached (requires a default/no-args constructor).
-     * The default value is the {@link SessionSerializingTranscoderFactory} class
+     * The default value is the {@link JavaSerializationTranscoderFactory} class
      * (used if this configuration attribute is not specified).
      * <p>
      * After the {@link TranscoderFactory} instance was created from the specified class,

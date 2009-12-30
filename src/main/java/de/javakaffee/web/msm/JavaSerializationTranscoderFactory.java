@@ -21,18 +21,18 @@ import net.spy.memcached.transcoders.Transcoder;
 import org.apache.catalina.Manager;
 
 /**
- * A {@link TranscoderFactory} that creates {@link SessionSerializingTranscoder} instances.
+ * A {@link TranscoderFactory} that creates {@link JavaSerializationTranscoder} instances.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionSerializingTranscoderFactory implements TranscoderFactory {
+public class JavaSerializationTranscoderFactory implements TranscoderFactory {
 
     /**
      * {@inheritDoc}
      */
     public Transcoder<Object> createTranscoder( final Manager manager ) {
-        return new SessionSerializingTranscoder( manager );
+        return new JavaSerializationTranscoder( manager );
     }
 
     /**
