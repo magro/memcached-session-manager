@@ -103,7 +103,6 @@ public class TestClasses {
             _targetClazz = targetClazz;
         }
 
-        @Override
         public Object invoke( final Object proxy, final Method method, final Object[] args ) throws Throwable {
             if ( _target == null ) {
                 _target = _targetClazz.newInstance();
@@ -121,7 +120,6 @@ public class TestClasses {
         /**
          * {@inheritDoc}
          */
-        @Override
         public String hello() {
             return "hi";
         }

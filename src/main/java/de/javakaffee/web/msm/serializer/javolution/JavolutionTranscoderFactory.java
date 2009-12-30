@@ -34,7 +34,6 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    @Override
     public Transcoder<Object> createTranscoder( final Manager manager ) {
         return new JavolutionTranscoder( manager, _copyCollectionsForSerialization );
     }
@@ -42,7 +41,6 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    @Override
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
     }
