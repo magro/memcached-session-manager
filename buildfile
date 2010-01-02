@@ -22,7 +22,7 @@ JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 desc 'msm-javolution-serializer'
 define 'msm-javolution-serializer' do
   project.group = 'de.javakaffee.web.msm.serializer'
-  project.version = '1.1'
+  project.version = '1.1.1-SNAPSHOT'
   
   compile.with( SERVLET_API, TC_CATALINA, TC_COYOTE, TC_LOGGING, MEMCACHED, MSM, JAVOLUTION )
   compile.using( :source=>'1.5', :target=>'1.5' )
