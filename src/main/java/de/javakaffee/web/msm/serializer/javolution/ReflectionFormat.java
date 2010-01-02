@@ -588,7 +588,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         private final Constructor<T> _constructor;
 
         public XMLNumberFormat( final Constructor<T> constructor ) {
-            super( constructor.getDeclaringClass() );
+            super( null );
             _constructor = constructor;
         }
 
