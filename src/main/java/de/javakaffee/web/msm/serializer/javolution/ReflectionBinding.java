@@ -17,8 +17,10 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -39,6 +41,7 @@ import javolution.xml.XMLFormat;
 import javolution.xml.stream.XMLStreamException;
 import javolution.xml.stream.XMLStreamReader;
 import javolution.xml.stream.XMLStreamWriter;
+import sun.reflect.ReflectionFactory;
 
 /**
  * An {@link XMLBinding} that provides class bindings based on reflection.
@@ -50,7 +53,10 @@ public class ReflectionBinding extends XMLBinding {
     private static final long serialVersionUID = -7047053153745571559L;
 
     private static final Logger _log = Logger.getLogger( ReflectionBinding.class.getName() );
-
+    
+    private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
+    private static final Object[] INITARGS = new Object[0];
+    
     private static final XMLCalendarFormat CALENDAR_FORMAT = new XMLCalendarFormat();
 
     private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
@@ -279,6 +285,27 @@ public class ReflectionBinding extends XMLBinding {
             super( null );
             _copyForWrite = copyForWrite;
         }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @SuppressWarnings( "unchecked" )
+        @Override
+        public Collection<Object> newInstance( final Class<Collection<Object>> cls, final javolution.xml.XMLFormat.InputElement xml )
+            throws XMLStreamException {
+            if ( Modifier.isPrivate( cls.getModifiers() ) ) {
+                try {
+                    final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
+                    constructor.setAccessible( true );
+                    return (Collection<Object>) constructor.newInstance( INITARGS );
+                } catch ( final Exception e ) {
+                    throw new XMLStreamException( e );
+                }
+            }
+            else {
+                return super.newInstance( cls, xml );
+            }
+        }
 
         @Override
         public void read( final javolution.xml.XMLFormat.InputElement xml, final Collection<Object> obj ) throws XMLStreamException {
@@ -304,6 +331,27 @@ public class ReflectionBinding extends XMLBinding {
         protected XMLMapFormat( final boolean copyForWrite ) {
             super( null );
             _copyForWrite = copyForWrite;
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @SuppressWarnings( "unchecked" )
+        @Override
+        public Map<Object, Object> newInstance( final Class<Map<Object, Object>> cls, final javolution.xml.XMLFormat.InputElement xml )
+            throws XMLStreamException {
+            if ( Modifier.isPrivate( cls.getModifiers() ) ) {
+                try {
+                    final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
+                    constructor.setAccessible( true );
+                    return (Map<Object, Object>) constructor.newInstance( INITARGS );
+                } catch ( final Exception e ) {
+                    throw new XMLStreamException( e );
+                }
+            }
+            else {
+                return super.newInstance( cls, xml );
+            }
         }
 
         @Override

@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -96,6 +97,49 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager, true );
+    }
+
+    /**
+     * This is the test for issue #28:
+     * msm-javolution-serializer should support serialization of java.util.Collections$EmptyList
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=28
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testJavaUtilCollectionsEmptyList() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        session.setAttribute( "emptyList", Collections.<String>emptyList() );
+        session.setAttribute( "arrayList", new ArrayList<String>() );
+
+        final MemcachedBackupSession deserialized =
+                (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );
+        
+        assertDeepEquals( deserialized, session );
+    }
+
+    /**
+     * This is another test for issue #28, just for maps:
+     * msm-javolution-serializer should support serialization of java.util.Collections$EmptyList
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=28
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testJavaUtilCollectionsEmptyMap() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        session.setAttribute( "emptyMap", Collections.<String, String>emptyMap() );
+        session.setAttribute( "hashMap", new HashMap<String, String>() );
+
+        System.out.println( new String( _transcoder.serialize( session ) ) );
+        final MemcachedBackupSession deserialized =
+                (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );
+        
+        assertDeepEquals( deserialized, session );
     }
 
     @Test( enabled = true )
