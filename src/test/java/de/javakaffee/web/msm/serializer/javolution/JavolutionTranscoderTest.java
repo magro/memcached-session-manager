@@ -100,6 +100,30 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
     }
 
     /**
+     * This is test for issue #30:
+     * msm-javolution-serializer should support serialization of java.util.Collections$UnmodifiableMap  
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=30
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testJavaUtilCollectionsUnmodifiable() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        
+        session.setAttribute( "unmodifiableList", Collections.unmodifiableList( new ArrayList<String>( Arrays.asList( "foo", "bar" ) ) ) );
+        final HashMap<String, String> m = new HashMap<String, String>();
+        m.put( "foo", "bar" );
+        session.setAttribute( "unmodifiableList", Collections.unmodifiableMap( m ) );
+
+        final MemcachedBackupSession deserialized =
+                (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );
+        
+        assertDeepEquals( deserialized, session );
+    }
+
+    /**
      * This is the test for issue #28:
      * msm-javolution-serializer should support serialization of java.util.Collections$EmptyList
      * 
