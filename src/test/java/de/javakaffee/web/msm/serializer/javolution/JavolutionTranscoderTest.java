@@ -108,11 +108,13 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
      * @throws Exception
      */
     @Test( enabled = true )
-    public void testJavaUtilCollectionsEmptyList() throws Exception {
+    public void testJavaUtilLists() throws Exception {
         final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
+        
         session.setAttribute( "emptyList", Collections.<String>emptyList() );
         session.setAttribute( "arrayList", new ArrayList<String>() );
+        session.setAttribute( "arraysAsList", Arrays.asList( "foo", "bar" ) );
 
         final MemcachedBackupSession deserialized =
                 (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );

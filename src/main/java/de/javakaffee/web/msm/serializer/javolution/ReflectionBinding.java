@@ -136,7 +136,9 @@ public class ReflectionBinding extends XMLBinding {
             return super.getFormat( cls );
         } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
-        } else if ( Collection.class.isAssignableFrom( cls ) ) {
+        } else if ( Collection.class.isAssignableFrom( cls ) && !Modifier.isPrivate( cls.getModifiers() ) ) {
+            // the check for the private modifier is required, so that
+            // lists like Arrays.ArrayList are handled by the ReflectionFormat
             return _collectionFormat;
         }  else if ( Map.class.isAssignableFrom( cls ) ) {
             return _mapFormat;
