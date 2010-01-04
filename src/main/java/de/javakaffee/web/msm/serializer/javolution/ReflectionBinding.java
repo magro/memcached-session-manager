@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javolution.lang.Reflection;
 import javolution.text.CharArray;
 import javolution.xml.XMLBinding;
 import javolution.xml.XMLFormat;
@@ -79,6 +80,8 @@ public class ReflectionBinding extends XMLBinding {
         _collectionFormat = new XMLCollectionFormat( copyCollectionsForSerialization );
         _mapFormat = new XMLMapFormat( copyCollectionsForSerialization );
         _jdkProxyFormat = new XMLJdkProxyFormat( classLoader );
+        
+        Reflection.getInstance().add( classLoader );
     }
 
     /**
@@ -136,11 +139,13 @@ public class ReflectionBinding extends XMLBinding {
             return super.getFormat( cls );
         } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
-        } else if ( Collection.class.isAssignableFrom( cls ) && !Modifier.isPrivate( cls.getModifiers() ) ) {
+        } else if ( Collection.class.isAssignableFrom( cls )
+                && Modifier.isPublic( cls.getModifiers() ) ) {
             // the check for the private modifier is required, so that
             // lists like Arrays.ArrayList are handled by the ReflectionFormat
             return _collectionFormat;
-        }  else if ( Map.class.isAssignableFrom( cls ) ) {
+        }  else if ( Map.class.isAssignableFrom( cls )
+                && Modifier.isPublic( cls.getModifiers() ) ) {
             return _mapFormat;
         } else if ( cls.isEnum() ) {
             return _enumFormat;

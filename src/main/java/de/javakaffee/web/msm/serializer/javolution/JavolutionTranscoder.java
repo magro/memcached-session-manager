@@ -124,6 +124,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      */
     @Override
     protected Object deserialize( final byte[] in ) {
+        // getLogger().info( "Loading serialized:\n" + new String( in ) );
         XMLObjectReader reader = null;
         try {
             final ByteArrayInputStream bis = new ByteArrayInputStream( in );
