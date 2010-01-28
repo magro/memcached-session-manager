@@ -1,0 +1,26 @@
+A serialization strategy for the memcached-session-manager (http://code.google.com/p/memcached-session-manager ) that uses Javolution (http://javolution.org ).
+
+It's implemented using reflection to read/write field values from/to POJOs.
+
+Notable features:
+- Support for cyclic dependencies / associations
+- Support for private classes and classes without a default constructor (see additional note below)
+- Supports serialization/deserialization of jdk proxies
+- Supports copying of collections before serialization to prevent ConcurrentModificationExceptions if
+  the application modifies such a (non-thread-safe) collection in another request (set copyCollectionsForSerialization
+  to true in the manager configuration to use this feature)
+
+
+To support serialization of private classes and classes without a default constructor it
+uses Sun's ReflectionFactory (sun.reflect.ReflectionFactory), therefore it's just bound to Sun
+JVMs (just drop a note and it will be made configurable).
+
+
+= How to build =
+Install buildr on top of jruby, this is described at http://buildr.apache.org/installing.html.
+
+For building just run 
+$ buildr 
+(this executes both `buildr compile` and `buildr test`).
+
+For more on building with buildr see http://buildr.apache.org/quick_start.html
