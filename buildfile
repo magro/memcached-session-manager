@@ -34,8 +34,8 @@ task("dep-tree") do |task|
   deptree LIBS
 end
 
-desc 'Memcached-based session failover for Apache Tomcat'
-define 'memcached-session-manager' do
+desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
+define 'msm' do
   project.group = 'de.javakaffee.web.msm'
   project.version = '1.2-SNAPSHOT'
 
