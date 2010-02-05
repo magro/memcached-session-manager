@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javolution.xml.XMLFormat;
 import javolution.xml.XMLObjectReader;
 import javolution.xml.XMLObjectWriter;
 import javolution.xml.XMLReferenceResolver;
@@ -65,7 +66,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      *            the manager
      */
     public JavolutionTranscoder( final Manager manager ) {
-        this( manager, false );
+        this( manager, false, null );
     }
 
     /**
@@ -76,12 +77,14 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      * @param copyCollectionsForSerialization
      *            specifies, if iterating over collection elements shall be done
      *            on a copy of the collection or on the collection itself
+     * @param customFormats a list of custom {@link XMLFormat}s or <code>null</code>.
      */
-    public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization ) {
+    public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization,
+            final XMLFormat<?>[] customFormats ) {
+        super.setCompressionThreshold( 1000 * 1000 );
         _manager = manager;
-        
         final Loader loader = _manager.getContainer().getLoader();
-        _xmlBinding = new ReflectionBinding( loader.getClassLoader(), copyCollectionsForSerialization );
+        _xmlBinding = new ReflectionBinding( loader.getClassLoader(), copyCollectionsForSerialization, customFormats );
     }
 
     /**

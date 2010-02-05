@@ -52,4 +52,14 @@ public interface TranscoderFactory {
      */
     void setCopyCollectionsForSerialization( boolean copyCollectionsForSerialization );
 
+    /**
+     * An optional list of custom converter class names.
+     * <p>
+     * This will be called before {@link #createTranscoder(Manager)}, so that
+     * you can use this property in {@link #createTranscoder(Manager)}.
+     * </p>
+     * @param customConverterClassNames a list of class names or <code>null</code>.
+     */
+    void setCustomConverterClassNames( String[] customConverterClassNames );
+
 }

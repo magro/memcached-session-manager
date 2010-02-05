@@ -68,18 +68,21 @@ public class ReflectionBinding extends XMLBinding {
     private final XMLCollectionFormat _collectionFormat;
     private final XMLMapFormat _mapFormat;
     private final XMLJdkProxyFormat _jdkProxyFormat;
+    private final XMLFormat<?>[] _customFormats;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
-        this( classLoader, false );
+        this( classLoader, false, null );
     }
 
-    public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization ) {
+    public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization,
+            final XMLFormat<?>[] customFormats ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
         _collectionFormat = new XMLCollectionFormat( copyCollectionsForSerialization );
         _mapFormat = new XMLMapFormat( copyCollectionsForSerialization );
         _jdkProxyFormat = new XMLJdkProxyFormat( classLoader );
+        _customFormats = customFormats;
         
         Reflection.getInstance().add( classLoader );
     }
@@ -156,6 +159,8 @@ public class ReflectionBinding extends XMLBinding {
              * Proxy.class is required for deserialization
              */
             return _jdkProxyFormat;
+        } else if ( ( xmlFormat = getCustomFormat( cls ) ) != null ) {
+            return xmlFormat;
         } else {
             if ( xmlFormat == null ) {
                 if ( ReflectionFormat.isNumberFormat( cls ) ) {
@@ -167,6 +172,18 @@ public class ReflectionBinding extends XMLBinding {
             }
             return xmlFormat;
         }
+    }
+    
+    private XMLFormat<?> getCustomFormat( final Class<?> cls ) {
+        if ( _customFormats == null ) {
+            return null;
+        }
+        for( XMLFormat<?> xmlFormat : _customFormats ) {
+            if ( xmlFormat.getBoundClass() == cls ) {
+                return xmlFormat;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings( "unchecked" )
