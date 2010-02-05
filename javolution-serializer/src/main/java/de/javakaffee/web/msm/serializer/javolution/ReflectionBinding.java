@@ -39,6 +39,7 @@ import javolution.lang.Reflection;
 import javolution.text.CharArray;
 import javolution.xml.XMLBinding;
 import javolution.xml.XMLFormat;
+import javolution.xml.XMLSerializable;
 import javolution.xml.stream.XMLStreamException;
 import javolution.xml.stream.XMLStreamReader;
 import javolution.xml.stream.XMLStreamWriter;
@@ -139,6 +140,8 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Character.class
                 || cls == Byte.class
                 || cls == Class.class ) {
+            return super.getFormat( cls );
+        } else if (XMLSerializable.class.isAssignableFrom( cls )) {
             return super.getFormat( cls );
         } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
