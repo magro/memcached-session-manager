@@ -16,8 +16,10 @@
  */
 package de.javakaffee.web.msm.serializer.javolution;
 
+import javolution.xml.XMLFormat;
 import net.spy.memcached.transcoders.Transcoder;
 
+import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 
 import de.javakaffee.web.msm.TranscoderFactory;
@@ -30,12 +32,32 @@ import de.javakaffee.web.msm.TranscoderFactory;
 public class JavolutionTranscoderFactory implements TranscoderFactory {
 
     private boolean _copyCollectionsForSerialization;
+    private String[] _customConverterClassNames;
 
     /**
      * {@inheritDoc}
      */
     public Transcoder<Object> createTranscoder( final Manager manager ) {
-        return new JavolutionTranscoder( manager, _copyCollectionsForSerialization );
+        final XMLFormat<?>[] customFormats = loadCustomFormats( manager );
+        return new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
+    }
+
+    private XMLFormat<?>[] loadCustomFormats( final Manager manager ) {
+        if ( _customConverterClassNames == null || _customConverterClassNames.length == 0 ) {
+            return null;
+        }
+        final XMLFormat<?>[] customFormats = new XMLFormat<?>[ _customConverterClassNames.length ];
+        final Loader loader = manager.getContainer().getLoader();
+        for ( int i = 0; i < _customConverterClassNames.length; i++ ) {
+            final String className = _customConverterClassNames[i];
+            try {
+                final XMLFormat<?> xmlFormat = Class.forName( className, true, loader.getClassLoader() ).asSubclass( XMLFormat.class ).newInstance();
+                customFormats[i] = xmlFormat;
+            } catch ( final Exception e ) {
+                throw new RuntimeException( "Could not load custom xml format " + className, e );
+            }
+        }
+        return customFormats;
     }
 
     /**
@@ -43,6 +65,13 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
      */
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
+        _customConverterClassNames = customConverterClassNames;
     }
 
 }

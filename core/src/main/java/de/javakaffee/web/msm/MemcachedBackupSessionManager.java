@@ -172,6 +172,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * </p>
      */
     private boolean _copyCollectionsForSerialization = false;
+    
+    private String _customConverterClassNames;
 
     // -------------------- END configuration properties --------------------
 
@@ -295,6 +297,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
             final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
             transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
+            if ( _customConverterClassNames != null ) {
+                _logger.info( "Loading custom converter classes " + _customConverterClassNames );
+                transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ", " ) );
+            }
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
                             _sessionIdFormat, transcoderFactory ), addresses );
@@ -903,6 +909,32 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
+    }
+    
+    /**
+     * Custom converter allow you to provide custom serialization of application specific
+     * types. Multiple converter classes are separated by comma (with optional space following the comma).
+     * <p>
+     * This option is useful if reflection based serialization is very verbose and you want
+     * to provide a more efficient serialization for a specific type.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This must be supported by the {@link TranscoderFactory}
+     * specified via {@link #setTranscoderFactoryClass(String)}: after the {@link TranscoderFactory} instance
+     * was created from the specified class, {@link TranscoderFactory#setCustomConverterClassNames(String[])}
+     * is invoked with the provided custom converter class names.
+     * </p>
+     * <p>Requirements regarding the specific custom converter classes depend on the
+     * actual serialization strategy, but a common requirement would be that they must
+     * provide a default/no-args constructor.<br/>
+     * For more details have a look at
+     * <a href="http://code.google.com/p/memcached-session-manager/wiki/SerializationStrategies">SerializationStrategies</a>.
+     * </p>
+     * 
+     * @param customConverterClassNames a list of class names separated by comma
+     */
+    public void setCustomConverter( final String customConverterClassNames ) {
+        _customConverterClassNames = customConverterClassNames;
     }
 
     /**

@@ -49,4 +49,16 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
         }
     }
 
+    /**
+     * Throws an {@link UnsupportedOperationException}, as java serialization
+     * does not support custom xml format.
+     * 
+     * @param customConverterClassNames a list of class names or <code>null</code>.
+     */
+    public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
+        if ( customConverterClassNames != null && customConverterClassNames.length > 0 ) {
+            throw new UnsupportedOperationException( "Java serialization does not support custom converter." );
+        }
+    }
+
 }
