@@ -14,6 +14,7 @@ MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4.2').from(file('lib/memc
 TC_COYOTE = transitive( 'org.apache.tomcat:coyote:jar:6.0.18' )
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
+JODA_TIME = 'joda-time:joda-time:jar:1.6'
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.6' ).reject { |a| a.group == 'org.slf4j' }
@@ -58,6 +59,14 @@ define 'msm' do
     test.with( compile.dependencies, CLANG, JMOCK_CGLIB )
     test.using :testng
     package :jar, :javadoc, :id => 'msm-javolution-serializer'
+  end
+
+  desc 'Converter for Joda DateTime instances for javolution serialization strategy'
+  define 'javolution-serializer-jodatime' do |project|
+    compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
+    test.with( compile.dependencies )
+    test.using :testng
+    package :jar, :javadoc, :id => 'msm-javolution-serializer-jodatime'
   end
 
   desc 'XStream/xml based serialization strategy'
