@@ -6,6 +6,7 @@ repositories.remote << 'http://repo2.maven.org/maven2'
 repositories.remote << 'http://www.ibiblio.org/maven2'
 repositories.remote << 'http://thimbleware.com/maven'
 repositories.remote << 'http://repository.jboss.com/maven2'
+#repositories.remote << 'http://powermock.googlecode.com/svn/repo'
 
 SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 CATALINA = 'org.apache.tomcat:catalina:jar:6.0.18'
@@ -22,6 +23,11 @@ HTTP_CLIENT = transitive( 'commons-httpclient:commons-httpclient:jar:3.1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 CLANG = 'commons-lang:commons-lang:jar:2.4' # tests of javolution-serializer, xstream-serializer
+MOCKITO = transitive( 'org.mockito:mockito-core:jar:1.8.1' )
+#POWERMOCK_CORE = 'org.powermock:powermock-core:jar:1.3.5'
+#POWERMOCK_JUNIT = 'org.powermock.modules:powermock-module-junit4:jar:1.3.5'
+#POWERMOCK_JUNIT_COMMON = 'org.powermock.modules:powermock-module-junit4-common:jar:1.3.5'
+#POWERMOCK_MOCKITO = 'org.powermock.api:powermock-api-mockito:jar:1.3.5'
 
 # Dependencies
 require 'etc/tools'
@@ -64,7 +70,8 @@ define 'msm' do
   desc 'Converter for Joda DateTime instances for javolution serialization strategy'
   define 'javolution-serializer-jodatime' do |project|
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
-    test.with( compile.dependencies )
+    test.with( compile.dependencies, MOCKITO )
+    #test.with( compile.dependencies, MOCKITO, POWERMOCK_CORE, POWERMOCK_MOCKITO, POWERMOCK_JUNIT, POWERMOCK_JUNIT_COMMON )
     test.using :testng
     package :jar, :javadoc, :id => 'msm-javolution-serializer-jodatime'
   end
