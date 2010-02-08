@@ -32,6 +32,7 @@ import org.joda.time.format.ISODateTimeFormat;
  */
 public class JodaDateTimeFormat extends XMLFormat<DateTime> {
 
+    static final String ATTRIBUTE_NAME = "datetime";
     private static final DateTimeFormatter FORMAT = ISODateTimeFormat.basicDateTime();
 
     /**
@@ -46,7 +47,7 @@ public class JodaDateTimeFormat extends XMLFormat<DateTime> {
      */
     @Override
     public DateTime newInstance( final Class<DateTime> cls, final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
-        final String string = input.getAttribute( "datetime" ).toString();
+        final String string = input.getAttribute( ATTRIBUTE_NAME ).toString();
         return FORMAT.parseDateTime( string );
     }
 
@@ -63,7 +64,7 @@ public class JodaDateTimeFormat extends XMLFormat<DateTime> {
      */
     @Override
     public void write( final DateTime obj, final javolution.xml.XMLFormat.OutputElement output ) throws XMLStreamException {
-        output.setAttribute( "datetime", obj.toString( FORMAT ) );
+        output.setAttribute( ATTRIBUTE_NAME, obj.toString( FORMAT ) );
     }
 
 
