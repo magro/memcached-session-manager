@@ -71,11 +71,11 @@ public class ReflectionBinding extends XMLBinding {
     private final XMLFormat<?>[] _customFormats;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
-        this( classLoader, false, null );
+        this( classLoader, false );
     }
 
     public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization,
-            final XMLFormat<?>[] customFormats ) {
+            final XMLFormat<?> ... customFormats ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
