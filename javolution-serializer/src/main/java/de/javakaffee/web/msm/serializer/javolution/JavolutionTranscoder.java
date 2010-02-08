@@ -66,7 +66,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      *            the manager
      */
     public JavolutionTranscoder( final Manager manager ) {
-        this( manager, false, null );
+        this( manager, false );
     }
 
     /**
@@ -80,7 +80,7 @@ public class JavolutionTranscoder extends SerializingTranscoder {
      * @param customFormats a list of custom {@link XMLFormat}s or <code>null</code>.
      */
     public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization,
-            final XMLFormat<?>[] customFormats ) {
+            final XMLFormat<?> ... customFormats ) {
         super.setCompressionThreshold( 1000 * 1000 );
         _manager = manager;
         final Loader loader = _manager.getContainer().getLoader();
