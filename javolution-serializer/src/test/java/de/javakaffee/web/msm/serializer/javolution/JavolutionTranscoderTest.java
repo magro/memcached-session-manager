@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Currency;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -98,6 +99,39 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager, true );
+    }
+
+    /**
+     * This is test for issue #34:
+     * msm-javolution-serializer: java.util.Currency gets deserialized with ReflectionFormat
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=34
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testCurrency() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        
+        final Currency orig = Currency.getInstance( "EUR" );
+        session.setAttribute( "currency1", orig );
+        session.setAttribute( "currency2", orig );
+        
+        final MemcachedBackupSession deserialized =
+                (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );
+        
+        assertDeepEquals( deserialized, session );
+        
+        // Check that the transient field defaultFractionDigits is initialized correctly (that was the bug)
+        final Currency currency1 = (Currency) deserialized.getSession().getAttribute( "currency1" );
+        Assert.assertEquals( currency1.getCurrencyCode(), orig.getCurrencyCode() );
+        Assert.assertEquals( currency1.getDefaultFractionDigits(), orig.getDefaultFractionDigits() );
+        
+        // Check that for each currency code there's only a single currency instance
+        // this check is useful for the case that the currency format is not handled by the
+        // reference resolver
+        Assert.assertTrue( currency1 == deserialized.getSession().getAttribute( "currency2" ) );
     }
 
     /**
