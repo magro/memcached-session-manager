@@ -25,6 +25,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -60,6 +61,8 @@ public class ReflectionBinding extends XMLBinding {
     private static final Object[] INITARGS = new Object[0];
     
     private static final XMLCalendarFormat CALENDAR_FORMAT = new XMLCalendarFormat();
+
+    private static final XMLCurrencyFormat CURRENCY_FORMAT = new XMLCurrencyFormat();
 
     private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
 
@@ -157,6 +160,8 @@ public class ReflectionBinding extends XMLBinding {
             return _enumFormat;
         } else if ( Calendar.class.isAssignableFrom( cls ) ) {
             return CALENDAR_FORMAT;
+        } else if ( Currency.class.isAssignableFrom( cls ) ) {
+            return CURRENCY_FORMAT;
         } else if ( Proxy.isProxyClass( cls ) || cls == Proxy.class ) {
             /* the Proxy.isProxyClass check is required for serialization,
              * Proxy.class is required for deserialization
@@ -400,6 +405,28 @@ public class ReflectionBinding extends XMLBinding {
 
     }
 
+    public static class XMLCurrencyFormat extends XMLFormat<Currency> {
+        
+        public XMLCurrencyFormat() {
+            super( Currency.class );
+        }
+
+        @Override
+        public Currency newInstance( final Class<Currency> cls, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            
+            return Currency.getInstance(xml.getAttribute("code", ""));
+        }
+
+        public void write(Currency currency, OutputElement xml) throws XMLStreamException {
+            
+            xml.setAttribute("code", currency.getCurrencyCode());
+        }
+        public void read(InputElement xml, Currency pos) {
+            // Immutable, deserialization occurs at creation, ref. newIntance(...) 
+        }
+        
+    }
+    
     /**
      * An {@link XMLFormat} for {@link Calendar} that serialized those calendar
      * fields that contain actual data (these fields also are used by
