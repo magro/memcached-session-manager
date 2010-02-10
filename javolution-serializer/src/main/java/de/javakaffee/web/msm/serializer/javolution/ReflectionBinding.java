@@ -410,6 +410,17 @@ public class ReflectionBinding extends XMLBinding {
         public XMLCurrencyFormat() {
             super( Currency.class );
         }
+        
+        /**
+         * Currency instance do not have to be handled by the reference resolver, as we're using
+         * Currency.getInstance for retrieving an instance.
+         * 
+         * @return <code>false</code>
+         */
+        @Override
+        public boolean isReferenceable() {
+            return false;
+        }
 
         @Override
         public Currency newInstance( final Class<Currency> cls, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
