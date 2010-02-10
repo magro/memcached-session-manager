@@ -128,10 +128,6 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertEquals( currency1.getCurrencyCode(), orig.getCurrencyCode() );
         Assert.assertEquals( currency1.getDefaultFractionDigits(), orig.getDefaultFractionDigits() );
         
-        // Check that for each currency code there's only a single currency instance
-        // this check is useful for the case that the currency format is not handled by the
-        // reference resolver
-        Assert.assertTrue( currency1 == deserialized.getSession().getAttribute( "currency2" ) );
     }
 
     /**
@@ -340,6 +336,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 { Integer[].class, new Integer[] { 42 } },
                 { Date.class, new Date( System.currentTimeMillis() - 10000 ) },
                 { Calendar.class, Calendar.getInstance() },
+                { Currency.class, Currency.getInstance( "EUR" ) },
                 { ArrayList.class, new ArrayList<String>( Arrays.asList( "foo" ) ) },
                 { int[].class, new int[] { 1, 2 } },
                 { long[].class, new long[] { 1, 2 } },
@@ -579,6 +576,14 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         if ( Number.class.isAssignableFrom( one.getClass() ) ) {
             Assert.assertEquals( ( (Number) one ).longValue(), ( (Number) another ).longValue() );
             return;
+        }
+        
+        if ( one instanceof Currency ) {
+            // Check that the transient field defaultFractionDigits is initialized correctly (that was issue #34)
+            final Currency currency1 = ( Currency) one;
+            final Currency currency2 = ( Currency) another;
+            Assert.assertEquals( currency1.getCurrencyCode(), currency2.getCurrencyCode() );
+            Assert.assertEquals( currency1.getDefaultFractionDigits(), currency2.getDefaultFractionDigits() );
         }
 
         Class<? extends Object> clazz = one.getClass();
