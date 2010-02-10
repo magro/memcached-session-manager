@@ -34,6 +34,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javolution.xml.XMLFormat;
+import javolution.xml.XMLSerializable;
+import javolution.xml.stream.XMLStreamException;
+
 import org.apache.commons.lang.mutable.MutableInt;
 
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
@@ -122,6 +126,41 @@ public class TestClasses {
          */
         public String hello() {
             return "hi";
+        }
+        
+    }
+    
+    /**
+     * A class with a transient field that must be initialized after deserialization,
+     * this is a way to test if the XMLFormat defined in this XMLSerializable implementation
+     * is used and if XMLSerializable is honored at all.
+     */
+    public static class MyXMLSerializable implements XMLSerializable {
+        
+        private static final long serialVersionUID = -3392119483974151376L;
+        
+        protected static final XMLFormat<MyXMLSerializable> XML = new XMLFormat<MyXMLSerializable>(MyXMLSerializable.class) {
+            public MyXMLSerializable newInstance( final Class<MyXMLSerializable> cls, final InputElement xml ) throws XMLStreamException {
+                return new MyXMLSerializable( Runtime.getRuntime() );
+            }
+            public void write( final MyXMLSerializable obj, final OutputElement xml ) throws XMLStreamException {
+                // nothing to do
+            }
+            public void read( final InputElement xml, final MyXMLSerializable obj ) {
+                // Immutable, deserialization occurs at creation, ref. newIntance(...) 
+             }
+        };
+        
+        // Just some field that should not be serialized,
+        // but which must be available after deserialization
+        private transient final Runtime _runtime;
+        
+        public MyXMLSerializable( final Runtime runtime ) {
+            _runtime = runtime;
+        }
+
+        public Runtime getRuntime() {
+            return _runtime;
         }
         
     }

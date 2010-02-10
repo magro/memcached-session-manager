@@ -65,6 +65,7 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.Holder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderList;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.MyContainer;
+import de.javakaffee.web.msm.serializer.javolution.TestClasses.MyXMLSerializable;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.SomeInterface;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
@@ -97,6 +98,31 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager, true );
+    }
+
+    /**
+     * This is test for issue #33:
+     * msm-javolution-serializer: ReflectionBinding does not honor XMLSerializable interface
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=33
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testXMLSerializableSupport() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        
+        final String attributeName = "myxmlserializable";
+        session.setAttribute( attributeName, new MyXMLSerializable( Runtime.getRuntime() ) );
+        
+        final MemcachedBackupSession deserialized =
+                (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );
+        
+        assertDeepEquals( deserialized, session );
+        final MyXMLSerializable myXMLSerializable = (MyXMLSerializable) deserialized.getSession().getAttribute( attributeName );
+        Assert.assertNotNull( myXMLSerializable.getRuntime(), "Transient field runtime should be initialized by XMLFormat" +
+        		" used due to implementation of XMLSerializable." );
     }
 
     /**
