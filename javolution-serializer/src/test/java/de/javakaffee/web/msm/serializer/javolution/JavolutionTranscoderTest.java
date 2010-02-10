@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Currency;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -98,6 +99,35 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager, true );
+    }
+
+    /**
+     * This is test for issue #34:
+     * msm-javolution-serializer: java.util.Currency gets deserialized with ReflectionFormat
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=34
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testCurrency() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        
+        final Currency orig = Currency.getInstance( "EUR" );
+        session.setAttribute( "currency1", orig );
+        session.setAttribute( "currency2", orig );
+        
+        final MemcachedBackupSession deserialized =
+                (MemcachedBackupSession) _transcoder.deserialize( _transcoder.serialize( session ) );
+        
+        assertDeepEquals( deserialized, session );
+        
+        // Check that the transient field defaultFractionDigits is initialized correctly (that was the bug)
+        final Currency currency1 = (Currency) deserialized.getSession().getAttribute( "currency1" );
+        Assert.assertEquals( currency1.getCurrencyCode(), orig.getCurrencyCode() );
+        Assert.assertEquals( currency1.getDefaultFractionDigits(), orig.getDefaultFractionDigits() );
+        
     }
 
     /**
@@ -306,6 +336,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 { Integer[].class, new Integer[] { 42 } },
                 { Date.class, new Date( System.currentTimeMillis() - 10000 ) },
                 { Calendar.class, Calendar.getInstance() },
+                { Currency.class, Currency.getInstance( "EUR" ) },
                 { ArrayList.class, new ArrayList<String>( Arrays.asList( "foo" ) ) },
                 { int[].class, new int[] { 1, 2 } },
                 { long[].class, new long[] { 1, 2 } },
@@ -545,6 +576,14 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         if ( Number.class.isAssignableFrom( one.getClass() ) ) {
             Assert.assertEquals( ( (Number) one ).longValue(), ( (Number) another ).longValue() );
             return;
+        }
+        
+        if ( one instanceof Currency ) {
+            // Check that the transient field defaultFractionDigits is initialized correctly (that was issue #34)
+            final Currency currency1 = ( Currency) one;
+            final Currency currency2 = ( Currency) another;
+            Assert.assertEquals( currency1.getCurrencyCode(), currency2.getCurrencyCode() );
+            Assert.assertEquals( currency1.getDefaultFractionDigits(), currency2.getDefaultFractionDigits() );
         }
 
         Class<? extends Object> clazz = one.getClass();

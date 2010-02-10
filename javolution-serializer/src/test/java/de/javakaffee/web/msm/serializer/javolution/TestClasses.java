@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -494,15 +495,13 @@ public class TestClasses {
         }
     }
 
+    @SuppressWarnings( "unused" )
     public static class MyContainer {
 
         private int _int;
         private long _long;
-        @SuppressWarnings( "unused" )
         private final boolean _boolean;
-        @SuppressWarnings( "unused" )
         private final Boolean _Boolean;
-        @SuppressWarnings( "unused" )
         private final Class<?> _Class;
         private String _String;
         private Long _Long;
@@ -519,6 +518,7 @@ public class TestClasses {
         private Integer[] _IntegerArray;
         private Date _Date;
         private Calendar _Calendar;
+        private Currency _Currency;
         private List<String> _ArrayList;
         private final Set<String> _HashSet;
         private final Map<String, Integer> _HashMap;
@@ -554,6 +554,7 @@ public class TestClasses {
             _IntegerArray = new Integer[] { 42 };
             _Date = new Date( System.currentTimeMillis() - 10000 );
             _Calendar = Calendar.getInstance();
+            _Currency = Currency.getInstance( "EUR" );
             _ArrayList = new ArrayList<String>( Arrays.asList( "foo" ) );
             _HashSet = new HashSet<String>();
             _HashSet.add( "42" );
