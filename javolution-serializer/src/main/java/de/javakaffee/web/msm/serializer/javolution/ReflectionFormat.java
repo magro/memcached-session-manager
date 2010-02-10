@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -158,7 +159,8 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 } else {
 
                     if ( fieldType == String.class || fieldType == Character.class || fieldType == Boolean.class
-                            || Number.class.isAssignableFrom( fieldType ) ) {
+                            || Number.class.isAssignableFrom( fieldType )
+                            || fieldType == Currency.class ) {
                         attributes.add( new ToStringAttributeHandler( field ) );
                     } else if ( fieldType.isEnum() ) {
                         attributes.add( new EnumAttributeHandler( field ) );
@@ -181,7 +183,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     protected static boolean isAttribute( final Class<?> clazz ) {
         return clazz.isPrimitive() || clazz.isEnum() || clazz == String.class || clazz == Boolean.class || clazz == Integer.class
                 || clazz == Long.class || clazz == Short.class || clazz == Double.class || clazz == Float.class
-                || clazz == Character.class || clazz == Byte.class;
+                || clazz == Character.class || clazz == Byte.class || clazz == Currency.class;
     }
 
     /**
@@ -469,6 +471,8 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                         @SuppressWarnings( "unchecked" )
                         final XMLNumberFormat<?> format = getNumberFormat( (Class<? extends Number>) fieldType );
                         field.set( obj, format.newInstanceFromAttribute( input, fieldName ) );
+                    } else if ( fieldType == Currency.class ) {
+                        field.set( obj, Currency.getInstance( object.toString() ) );
                     } else {
                         throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
                     }
