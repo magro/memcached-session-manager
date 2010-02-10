@@ -141,7 +141,7 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Byte.class
                 || cls == Class.class ) {
             return super.getFormat( cls );
-        } else if (XMLSerializable.class.isAssignableFrom( cls )) {
+        } else if ( XMLSerializable.class.isAssignableFrom( cls ) ) {
             return super.getFormat( cls );
         } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
