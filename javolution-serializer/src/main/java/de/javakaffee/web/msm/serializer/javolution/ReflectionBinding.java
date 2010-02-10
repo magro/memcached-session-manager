@@ -413,15 +413,14 @@ public class ReflectionBinding extends XMLBinding {
 
         @Override
         public Currency newInstance( final Class<Currency> cls, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
-            
-            return Currency.getInstance(xml.getAttribute("code", ""));
+            return Currency.getInstance( xml.getAttribute( "code", "" ) );
         }
-
-        public void write(Currency currency, OutputElement xml) throws XMLStreamException {
-            
-            xml.setAttribute("code", currency.getCurrencyCode());
+        
+        public void write( final Currency currency, final OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "code", currency.getCurrencyCode() );
         }
-        public void read(InputElement xml, Currency pos) {
+        
+        public void read( final InputElement xml, final Currency pos ) {
             // Immutable, deserialization occurs at creation, ref. newIntance(...) 
         }
         
