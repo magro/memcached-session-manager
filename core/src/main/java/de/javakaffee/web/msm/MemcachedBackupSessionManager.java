@@ -30,8 +30,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,6 +45,8 @@ import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.LifecycleSupport;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
@@ -90,7 +90,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private final Random _random = new Random();
 
-    private final Logger _logger = Logger.getLogger( MemcachedBackupSessionManager.class.getName() );
+    private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
 
     private final LifecycleSupport _lifecycle = new LifecycleSupport( this );
 
@@ -247,7 +247,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void init() {
-        _logger.info( getClass().getSimpleName() + " starts initialization..." );
+        _log.info( getClass().getSimpleName() + " starts initialization..." );
 
         if ( initialized ) {
             return;
@@ -298,7 +298,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
             transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
             if ( _customConverterClassNames != null ) {
-                _logger.info( "Loading custom converter classes " + _customConverterClassNames );
+                _log.info( "Loading custom converter classes " + _customConverterClassNames );
                 transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ", " ) );
             }
             _memcached =
@@ -396,7 +396,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void expireSession( final String sessionId ) {
-        _logger.fine( "expireSession invoked: " + sessionId );
+        _log.debug( "expireSession invoked: " + sessionId );
         super.expireSession( sessionId );
         _memcached.delete( sessionId );
     }
@@ -441,7 +441,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public Session createSession( final String sessionId ) {
-        _logger.fine( "createSession invoked: " + sessionId );
+        _log.debug( "createSession invoked: " + sessionId );
 
         Session session = null;
 
@@ -458,8 +458,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             session.setMaxInactiveInterval( this.maxInactiveInterval );
             session.setId( generateSessionId() );
 
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                _logger.fine( "Created new session with id " + session.getId() );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Created new session with id " + session.getId() );
             }
 
         }
@@ -486,13 +486,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResult}
      */
     public BackupResult backupSession( final Session session ) {
-        if ( _logger.isLoggable( Level.INFO ) ) {
-            _logger.fine( "Trying to store session in memcached: " + session.getId() );
+        if ( _log.isInfoEnabled() ) {
+            _log.debug( "Trying to store session in memcached: " + session.getId() );
         }
         try {
 
             if ( session.getNote( RELOCATE_SESSION_ID ) != null ) {
-                _logger.info( "Found relocate session id, setting new id on session..." );
+                _log.info( "Found relocate session id, setting new id on session..." );
                 session.setNote( NODE_FAILURE, Boolean.TRUE );
                 ( (MemcachedBackupSession) session ).setIdForRelocate( session.getNote( RELOCATE_SESSION_ID ).toString() );
                 session.removeNote( RELOCATE_SESSION_ID );
@@ -501,8 +501,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             storeSessionInMemcached( session );
             return BackupResult.SUCCESS;
         } catch ( final NodeFailureException e ) {
-            if ( _logger.isLoggable( Level.INFO ) ) {
-                _logger.info( "Could not store session in memcached (" + session.getId() + ")" );
+            if ( _log.isInfoEnabled() ) {
+                _log.info( "Could not store session in memcached (" + session.getId() + ")" );
             }
 
             /*
@@ -515,7 +515,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
             if ( targetNodeId == null ) {
 
-                _logger.warning( "The node " + nodeId
+                _log.warn( "The node " + nodeId
                         + " is not available and there's no node for relocation left, omitting session backup." );
 
                 noFailoverNodeLeft( backupSession );
@@ -586,7 +586,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 session.setNote( RELOCATE_SESSION_ID, newSessionId );
                 return newSessionId;
             } else {
-                _logger.warning( "The node " + nodeId + " is not available and there's no node for relocation left." );
+                _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
             }
         }
         return null;
@@ -729,8 +729,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             try {
                 future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
             } catch ( final Exception e ) {
-                if ( _logger.isLoggable( Level.INFO ) ) {
-                    _logger.info( "Could not store session " + session.getId() + " in memcached: " + e );
+                if ( _log.isInfoEnabled() ) {
+                    _log.info( "Could not store session " + session.getId() + " in memcached: " + e );
                 }
                 final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
@@ -745,26 +745,26 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
         if ( !_nodeAvailabilityCache.isNodeAvailable( nodeId ) ) {
-            _logger.fine( "Asked for session " + sessionId + ", but the related"
+            _log.debug( "Asked for session " + sessionId + ", but the related"
                     + " memcached node is still marked as unavailable (won't load from memcached)." );
         } else {
-            _logger.fine( "Loading session from memcached: " + sessionId );
+            _log.debug( "Loading session from memcached: " + sessionId );
             try {
                 final Session session = (Session) _memcached.get( sessionId );
-                if ( _logger.isLoggable( Level.FINE ) ) {
+                if ( _log.isDebugEnabled() ) {
                     if ( session == null ) {
-                        _logger.fine( "Session " + sessionId + " not found in memcached." );
+                        _log.debug( "Session " + sessionId + " not found in memcached." );
                     } else {
-                        _logger.fine( "Found session with id " + sessionId );
+                        _log.debug( "Found session with id " + sessionId );
                     }
                 }
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, true );
                 return session;
             } catch ( final NodeFailureException e ) {
-                _logger.warning( "Could not load session with id " + sessionId + " from memcached." );
+                _log.warn( "Could not load session with id " + sessionId + " from memcached." );
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
             } catch ( final Exception e ) {
-                _logger.warning( "Could not load session with id " + sessionId + " from memcached: " + e );
+                _log.warn( "Could not load session with id " + sessionId + " from memcached: " + e );
             }
         }
         return null;
@@ -775,12 +775,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void remove( final Session session ) {
-        _logger.fine( "remove invoked," + " session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE )
+        _log.debug( "remove invoked," + " session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE )
                 + ", node failure: " + session.getNote( NODE_FAILURE ) + ", node failure != TRUE: "
                 + ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) + ", id: " + session.getId() );
         if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
             try {
-                _logger.fine( "Deleting session from memcached: " + session.getId() );
+                _log.debug( "Deleting session from memcached: " + session.getId() );
                 _memcached.delete( session.getId() );
             } catch ( final NodeFailureException e ) {
                 /* We can ignore this */
@@ -879,7 +879,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         try {
             _transcoderFactoryClass = Class.forName( transcoderFactoryClassName ).asSubclass( TranscoderFactory.class );
         } catch ( final ClassNotFoundException e ) {
-            _logger.severe( "The transcoderFactoryClass (" + transcoderFactoryClassName + ") could not be found" );
+            _log.error( "The transcoderFactoryClass (" + transcoderFactoryClassName + ") could not be found" );
             throw new RuntimeException( e );
         }
     }
@@ -992,7 +992,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             try {
                 setMaxInactiveInterval( ( (Integer) event.getNewValue() ).intValue() * 60 );
             } catch ( final NumberFormatException e ) {
-                _logger.warning( "standardManager.sessionTimeout: " + event.getNewValue().toString() );
+                _log.warn( "standardManager.sessionTimeout: " + event.getNewValue().toString() );
             }
         }
 

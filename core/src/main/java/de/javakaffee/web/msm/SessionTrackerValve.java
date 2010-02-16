@@ -17,8 +17,6 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
@@ -29,6 +27,8 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.coyote.ActionHook;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
 
@@ -45,7 +45,7 @@ class SessionTrackerValve extends ValveBase {
 
     static final String RELOCATE = "session.relocate";
 
-    private final Logger _logger = Logger.getLogger( SessionTrackerValve.class.getName() );
+    private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
 
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
@@ -61,7 +61,7 @@ class SessionTrackerValve extends ValveBase {
      */
     public SessionTrackerValve( final String ignorePattern, final SessionBackupService sessionBackupService ) {
         if ( ignorePattern != null ) {
-            _logger.info( "Setting ignorePattern to " + ignorePattern );
+            _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
         } else {
             _ignorePattern = null;
@@ -100,8 +100,8 @@ class SessionTrackerValve extends ValveBase {
             final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
                 ? request.getSessionInternal( false )
                 : null;
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                _logger.fine( "Have a session: " + ( session != null ) );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Have a session: " + ( session != null ) );
             }
             if ( session != null ) {
                 backupSession( request, response, session );
@@ -117,17 +117,17 @@ class SessionTrackerValve extends ValveBase {
         final BackupResult result = _sessionBackupService.backupSession( session );
 
         if ( result == BackupResult.RELOCATED ) {
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                _logger.fine( "Session got relocated, setting a cookie: " + session.getId() );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
             }
             setSessionIdCookie( response, request, session );
         }
     }
 
     private void logDebugResponseCookie( final Response response ) {
-        if ( _logger.isLoggable( Level.FINE ) ) {
+        if ( _log.isDebugEnabled() ) {
             final Cookie respCookie = getCookie( response, JSESSIONID );
-            _logger.fine( "Finished, " + ( respCookie != null
+            _log.debug( "Finished, " + ( respCookie != null
                 ? toString( respCookie )
                 : null ) );
         }

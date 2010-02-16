@@ -33,8 +33,6 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javolution.lang.Reflection;
 import javolution.text.CharArray;
@@ -44,6 +42,10 @@ import javolution.xml.XMLSerializable;
 import javolution.xml.stream.XMLStreamException;
 import javolution.xml.stream.XMLStreamReader;
 import javolution.xml.stream.XMLStreamWriter;
+
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 import sun.reflect.ReflectionFactory;
 
 /**
@@ -55,7 +57,7 @@ public class ReflectionBinding extends XMLBinding {
     
     private static final long serialVersionUID = -7047053153745571559L;
 
-    private static final Logger _log = Logger.getLogger( ReflectionBinding.class.getName() );
+    private static final Log LOG = LogFactory.getLog( ReflectionBinding.class );
     
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
     private static final Object[] INITARGS = new Object[0];
@@ -278,7 +280,7 @@ public class ReflectionBinding extends XMLBinding {
                 final int length = input.getAttribute( "length", 0 );
                 return (Object[]) Array.newInstance( Class.forName( componentType, false, _classLoader ), length );
             } catch ( final Exception e ) {
-                _log.log( Level.SEVERE, "caught exception", e );
+                LOG.error( "caught exception", e );
                 throw new XMLStreamException( e );
             }
         }
