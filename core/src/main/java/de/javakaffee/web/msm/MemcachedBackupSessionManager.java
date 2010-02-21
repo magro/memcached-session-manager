@@ -172,7 +172,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * </p>
      */
     private boolean _copyCollectionsForSerialization = false;
-    
+
     private String _customConverterClassNames;
 
     // -------------------- END configuration properties --------------------
@@ -294,19 +294,23 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private void initMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids ) {
         try {
-            log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
-            final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
-            transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
-            if ( _customConverterClassNames != null ) {
-                _log.info( "Loading custom converter classes " + _customConverterClassNames );
-                transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ", " ) );
-            }
             _memcached =
                     new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
-                            _sessionIdFormat, transcoderFactory ), addresses );
+                            _sessionIdFormat, createTranscoderFactory() ), addresses );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
+    }
+
+    private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException {
+        log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
+        final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
+        transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
+        if ( _customConverterClassNames != null ) {
+            _log.info( "Loading custom converter classes " + _customConverterClassNames );
+            transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ", " ) );
+        }
+        return transcoderFactory;
     }
 
     private NodeAvailabilityCache<String> createNodeAvailabilityCache( final long ttlInMillis ) {
@@ -489,6 +493,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( _log.isInfoEnabled() ) {
             _log.debug( "Trying to store session in memcached: " + session.getId() );
         }
+
         try {
 
             if ( session.getNote( RELOCATE_SESSION_ID ) != null ) {
@@ -910,7 +915,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
     }
-    
+
     /**
      * Custom converter allow you to provide custom serialization of application specific
      * types. Multiple converter classes are separated by comma (with optional space following the comma).
@@ -930,7 +935,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * For more details have a look at
      * <a href="http://code.google.com/p/memcached-session-manager/wiki/SerializationStrategies">SerializationStrategies</a>.
      * </p>
-     * 
+     *
      * @param customConverterClassNames a list of class names separated by comma
      */
     public void setCustomConverter( final String customConverterClassNames ) {
@@ -1056,6 +1061,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         private static final long serialVersionUID = 1L;
 
+        /*
+         * The hash code of the serialized byte[] of this session that is
+         * used to determine, if the session was modified.
+         */
+        private transient int _dataHashCode;
+
         /**
          * Creates a new instance without a given manager. This has to be
          * assigned via {@link #setManager(Manager)} before this session is
@@ -1117,6 +1128,55 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             if ( notes == null ) {
                 notes = new Hashtable<Object, Object>();
             }
+        }
+
+        /**
+         * The hash code of the serialized byte[] of this session that is
+         * used to determine, if the session was modified.
+         * @return
+         */
+        public int getDataHashCode() {
+            return _dataHashCode;
+        }
+
+        protected long getCreationTimeInternal() {
+            return super.creationTime;
+        }
+
+        protected void setCreationTimeInternal( final long creationTime ) {
+            super.creationTime = creationTime;
+        }
+
+        protected boolean isNewInternal() {
+            return super.isNew;
+        }
+
+        protected void setIsNewInternal( final boolean isNew ) {
+            super.isNew = isNew;
+        }
+
+        protected boolean isValidInternal() {
+            return super.isValid;
+        }
+
+        protected void setIsValidInternal( final boolean isValid ) {
+            super.isValid = isValid;
+        }
+
+        protected long getThisAccessedTimeInternal() {
+            return super.thisAccessedTime;
+        }
+
+        protected void setThisAccessedTimeInternal( final long thisAccessedTime ) {
+            super.thisAccessedTime = thisAccessedTime;
+        }
+
+        protected void setLastAccessedTimeInternal( final long lastAccessedTime ) {
+            super.lastAccessedTime = lastAccessedTime;
+        }
+
+        protected void setIdInternal( final String id ) {
+            super.id = id;
         }
 
     }

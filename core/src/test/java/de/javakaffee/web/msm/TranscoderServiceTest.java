@@ -1,0 +1,87 @@
+/*
+ * Copyright 2009 Martin Grotzke
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+package de.javakaffee.web.msm;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.apache.catalina.core.StandardContext;
+import org.apache.catalina.core.StandardEngine;
+import org.apache.catalina.core.StandardHost;
+import org.apache.catalina.loader.WebappLoader;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
+
+/**
+ * Test the {@link TranscoderService}.
+ *
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ */
+public class TranscoderServiceTest {
+
+    private static MemcachedBackupSessionManager _manager;
+
+    @BeforeClass
+    public static void setup() {
+
+        _manager = new MemcachedBackupSessionManager();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+
+        final StandardContext container = new StandardContext();
+        container.setPath( "/" );
+        final StandardHost host = new StandardHost();
+        host.setParent( new StandardEngine() );
+        container.setParent( host );
+        _manager.setContainer( container );
+
+        final WebappLoader webappLoader = mock( WebappLoader.class );
+        // webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
+        when( webappLoader.getClassLoader() ).thenReturn( Thread.currentThread().getContextClassLoader() );
+        Assert.assertNotNull( "Webapp Classloader is null.", webappLoader.getClassLoader() );
+
+        _manager.getContainer().setLoader( webappLoader );
+        _manager.init();
+
+    }
+
+    @Test
+    public void testCopy() {
+        final byte[] dest = new byte[10];
+        TranscoderService.copy( new byte[] { '1', '2', '3' }, dest, 5 );
+        //Assert.assert
+    }
+
+    @Test
+    public void testSerialized() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        final byte[] data = TranscoderService.serialize( session );
+        final MemcachedBackupSession deserialized = TranscoderService.deserialize( data );
+
+        Assert.assertEquals( session.getCreationTimeInternal(), deserialized.getCreationTimeInternal() );
+        Assert.assertEquals( session.getLastAccessedTimeInternal(), deserialized.getLastAccessedTimeInternal() );
+        Assert.assertEquals( session.getMaxInactiveInterval(), deserialized.getMaxInactiveInterval() );
+        Assert.assertEquals( session.isNewInternal(), deserialized.isNewInternal() );
+        Assert.assertEquals( session.isValidInternal(), deserialized.isValidInternal() );
+        Assert.assertEquals( session.getThisAccessedTimeInternal(), deserialized.getThisAccessedTimeInternal() );
+        Assert.assertEquals( session.getIdInternal(), deserialized.getIdInternal() );
+
+    }
+
+}

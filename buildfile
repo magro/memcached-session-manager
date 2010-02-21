@@ -55,7 +55,7 @@ define 'msm' do
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
-    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB )
+    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO )
     package :jar, :javadoc, :id => 'memcached-session-manager'
   end
 
