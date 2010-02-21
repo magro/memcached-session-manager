@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,14 +77,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private static final String NODES_REGEX = NODE_REGEX + "(?:\\s+" + NODE_REGEX + ")*";
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
-
-    private static final String NODES_TESTED = "nodes.tested";
-
-    private static final String NODE_FAILURE = "node.failure";
-
-    private static final String ORIG_SESSION_ID = "orig.sid";
-
-    private static final String RELOCATE_SESSION_ID = "relocate.sid";
 
     private final Random _random = new Random();
 
@@ -483,6 +473,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String sessionNeedsRelocate( final Session session ) {
+        final BackupSessionTask task = getOrCreateBackupSessionTask( (MemcachedBackupSession) session );
+        return task.sessionNeedsRelocate();
+    }
+
+    /**
      * Store the provided session in memcached.
      *
      * @param session
@@ -494,254 +493,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _log.debug( "Trying to store session in memcached: " + session.getId() );
         }
 
-        try {
+        final BackupSessionTask task = getOrCreateBackupSessionTask( (MemcachedBackupSession) session );
+        return task.backupSession();
+    }
 
-            if ( session.getNote( RELOCATE_SESSION_ID ) != null ) {
-                _log.info( "Found relocate session id, setting new id on session..." );
-                session.setNote( NODE_FAILURE, Boolean.TRUE );
-                ( (MemcachedBackupSession) session ).setIdForRelocate( session.getNote( RELOCATE_SESSION_ID ).toString() );
-                session.removeNote( RELOCATE_SESSION_ID );
-            }
-
-            storeSessionInMemcached( session );
-            return BackupResult.SUCCESS;
-        } catch ( final NodeFailureException e ) {
-            if ( _log.isInfoEnabled() ) {
-                _log.info( "Could not store session in memcached (" + session.getId() + ")" );
-            }
-
-            /*
-             * get the next memcached node to try
-             */
-            final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-            final String targetNodeId = getNextNodeId( nodeId, getTestedNodes( session ) );
-
-            final MemcachedBackupSession backupSession = (MemcachedBackupSession) session;
-
-            if ( targetNodeId == null ) {
-
-                _log.warn( "The node " + nodeId
-                        + " is not available and there's no node for relocation left, omitting session backup." );
-
-                noFailoverNodeLeft( backupSession );
-
-                return BackupResult.FAILURE;
-
-            } else {
-
-                if ( getTestedNodes( session ) == null ) {
-                    setTestedNodes( session, new HashSet<String>() );
-                }
-
-                final BackupResult backupResult = failover( backupSession, getTestedNodes( session ), targetNodeId );
-
-                return handleAndTranslateBackupResult( backupResult, session );
-            }
+    private BackupSessionTask getOrCreateBackupSessionTask( final MemcachedBackupSession session ) {
+        if ( session.getBackupTask() == null ) {
+            session.setBackupTask( new BackupSessionTask( session, _sessionBackupAsync, _sessionBackupTimeout,
+                    _memcached, _nodeAvailabilityCache, _nodeIds, _failoverNodeIds ) );
         }
-    }
-
-    private BackupResult handleAndTranslateBackupResult( final BackupResult backupResult, final Session session ) {
-        switch ( backupResult ) {
-            case SUCCESS:
-
-                //_relocatedSessions.put( session.getNote( ORIG_SESSION_ID ).toString(), session.getId() );
-
-                /*
-                 * cleanup
-                 */
-                session.removeNote( ORIG_SESSION_ID );
-                session.removeNote( NODE_FAILURE );
-                session.removeNote( NODES_TESTED );
-
-                /*
-                 * and tell our client to do his part as well
-                 */
-                return BackupResult.RELOCATED;
-            default:
-                /*
-                 * just pass it up
-                 */
-                return backupResult;
-
-        }
-    }
-
-    private void setTestedNodes( final Session session, final Set<String> testedNodes ) {
-        session.setNote( NODES_TESTED, testedNodes );
-    }
-
-    @SuppressWarnings( "unchecked" )
-    private Set<String> getTestedNodes( final Session session ) {
-        return (Set<String>) session.getNote( NODES_TESTED );
-    }
-
-    /**
-     * Returns the new session id if the provided session has to be relocated.
-     *
-     * @param session
-     *            the session to check, never null.
-     * @return the new session id, if this session has to be relocated.
-     */
-    public String sessionNeedsRelocate( final Session session ) {
-        final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-        if ( nodeId != null && !_nodeAvailabilityCache.isNodeAvailable( nodeId ) ) {
-            final String nextNodeId = getNextNodeId( nodeId, _nodeAvailabilityCache.getUnavailableNodes() );
-            if ( nextNodeId != null ) {
-                final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), nextNodeId );
-                session.setNote( RELOCATE_SESSION_ID, newSessionId );
-                return newSessionId;
-            } else {
-                _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
-            }
-        }
-        return null;
-    }
-
-    private BackupResult failover( final MemcachedBackupSession session, final Set<String> testedNodes, final String targetNodeId ) {
-
-        final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-
-        testedNodes.add( nodeId );
-
-        /*
-         * we must store the original session id so that we can set this if no
-         * memcached node is left for taking over
-         */
-        if ( session.getNote( ORIG_SESSION_ID ) == null ) {
-            session.setNote( ORIG_SESSION_ID, session.getId() );
-        }
-
-        /*
-         * relocate session to our memcached node...
-         *
-         * and mark it as a node-failure-session, so that remove(session) does
-         * not try to remove it from memcached... (the session is removed and
-         * added when the session id is changed)
-         */
-        session.setNote( NODE_FAILURE, Boolean.TRUE );
-        session.setIdForRelocate( _sessionIdFormat.createNewSessionId( session.getId(), targetNodeId ) );
-
-        /*
-         * invoke backup again, until we have a success or a failure
-         */
-        final BackupResult backupResult = backupSession( session );
-
-        return backupResult;
-    }
-
-    private void noFailoverNodeLeft( final MemcachedBackupSession session ) {
-
-        /*
-         * we must set the original session id in case we changed it already
-         */
-        final String origSessionId = (String) session.getNote( ORIG_SESSION_ID );
-        if ( origSessionId != null && !origSessionId.equals( session.getId() ) ) {
-            session.setIdForRelocate( origSessionId );
-        }
-
-        /*
-         * cleanup
-         */
-        session.removeNote( ORIG_SESSION_ID );
-        session.removeNote( NODE_FAILURE );
-        session.removeNote( NODES_TESTED );
-    }
-
-    /**
-     * Get the next memcached node id for session backup. The active node ids
-     * are preferred, if no active node id is left to try, a failover node id is
-     * picked. If no failover node id is left, this method returns just null.
-     *
-     * @param nodeId
-     *            the current node id
-     * @param excludedNodeIds
-     *            the node ids that were already tested and shall not be used
-     *            again. Can be null.
-     * @return the next node id or null, if no node is left.
-     */
-    protected String getNextNodeId( final String nodeId, final Set<String> excludedNodeIds ) {
-
-        String result = null;
-
-        /*
-         * first check regular nodes
-         */
-        result = getNextNodeId( nodeId, _nodeIds, excludedNodeIds );
-
-        /*
-         * we got no node from the first nodes list, so we must check the
-         * alternative node list
-         */
-        if ( result == null && _failoverNodeIds != null && !_failoverNodeIds.isEmpty() ) {
-            result = getNextNodeId( nodeId, _failoverNodeIds, excludedNodeIds );
-        }
-
-        return result;
-    }
-
-    /**
-     * Determines the next available node id from the provided node ids. The
-     * returned node id will be different from the provided nodeId and will not
-     * be contained in the excludedNodeIds.
-     *
-     * @param nodeId
-     *            the original id
-     * @param nodeIds
-     *            the node ids to choose from
-     * @param excludedNodeIds
-     *            the set of invalid node ids
-     * @return an available node or null
-     */
-    protected static String getNextNodeId( final String nodeId, final List<String> nodeIds, final Set<String> excludedNodeIds ) {
-
-        String result = null;
-
-        final int origIdx = nodeIds.indexOf( nodeId );
-        final int nodeIdsSize = nodeIds.size();
-
-        int idx = origIdx;
-        while ( result == null && !loopFinished( origIdx, idx, nodeIdsSize ) ) {
-
-            final int checkIdx = roll( idx, nodeIdsSize );
-            final String checkNodeId = nodeIds.get( checkIdx );
-
-            if ( excludedNodeIds != null && excludedNodeIds.contains( checkNodeId ) ) {
-                idx = checkIdx;
-            } else {
-                result = checkNodeId;
-            }
-
-        }
-
-        return result;
-    }
-
-    private static boolean loopFinished( final int origIdx, final int idx, final int nodeIdsSize ) {
-        return origIdx == -1
-            ? idx + 1 == nodeIdsSize
-            : roll( idx, nodeIdsSize ) == origIdx;
-    }
-
-    protected static int roll( final int idx, final int size ) {
-        return idx + 1 >= size
-            ? 0
-            : idx + 1;
-    }
-
-    private void storeSessionInMemcached( final Session session ) throws NodeFailureException {
-        final Future<Boolean> future = _memcached.set( session.getId(), getMaxInactiveInterval(), session );
-        if ( !_sessionBackupAsync ) {
-            try {
-                future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
-            } catch ( final Exception e ) {
-                if ( _log.isInfoEnabled() ) {
-                    _log.info( "Could not store session " + session.getId() + " in memcached: " + e );
-                }
-                final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-                _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
-                throw new NodeFailureException( "Could not store session in memcached.", nodeId );
-            }
-        }
+        return session.getBackupTask();
     }
 
     private Session loadFromMemcached( final String sessionId ) {
@@ -780,10 +541,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void remove( final Session session ) {
-        _log.debug( "remove invoked," + " session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE )
-                + ", node failure: " + session.getNote( NODE_FAILURE ) + ", node failure != TRUE: "
-                + ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) + ", id: " + session.getId() );
-        if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "remove invoked, session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE ) +
+                    ", node failure: " + session.getNote( BackupSessionTask.NODE_FAILURE ) +
+                    ", id: " + session.getId() );
+        }
+        if ( session.getNote( BackupSessionTask.NODE_FAILURE ) != Boolean.TRUE ) {
             try {
                 _log.debug( "Deleting session from memcached: " + session.getId() );
                 _memcached.delete( session.getId() );
@@ -1003,16 +766,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     }
 
-    // ===========================  for testing  ==============================
-
-    protected void setNodeIds( final List<String> nodeIds ) {
-        _nodeIds = nodeIds;
-    }
-
-    protected void setFailoverNodeIds( final List<String> failoverNodeIds ) {
-        _failoverNodeIds = failoverNodeIds;
-    }
-
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
      * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
@@ -1060,6 +813,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public static final class MemcachedBackupSession extends StandardSession {
 
         private static final long serialVersionUID = 1L;
+
+        private volatile transient BackupSessionTask _backupTask;
 
         /*
          * The hash code of the serialized byte[] of this session that is
@@ -1177,6 +932,25 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         protected void setIdInternal( final String id ) {
             super.id = id;
+        }
+
+        /**
+         * The backup task associated with this session if it was already set
+         * via {@link #setBackupTask(BackupSessionTask)}.
+         *
+         * @return the {@link BackupSessionTask} or <code>null</code>.
+         */
+        BackupSessionTask getBackupTask() {
+            return _backupTask;
+        }
+
+        /**
+         * Set the {@link BackupSessionTask} to use for this session.
+         *
+         * @param backupTask an instance of {@link BackupSessionTask}, never <code>null</code>.
+         */
+        void setBackupTask( final BackupSessionTask backupTask ) {
+            _backupTask = backupTask;
         }
 
     }

@@ -16,22 +16,24 @@
  */
 package de.javakaffee.web.msm;
 
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.jmock.MockObjectTestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Tests the {@link MemcachedBackupSessionManager}.
- * 
+ * Tests the {@link BackupSessionTask}.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
- * @version $Id$
  */
-public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
+public class BackupSessionTaskTest {
 
     @Before
     public void setUp() throws Exception {
@@ -43,14 +45,14 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
 
     @Test
     public final void testRoll() {
-        assertEquals( 0, MemcachedBackupSessionManager.roll( 0, 1 ) );
-        assertEquals( 1, MemcachedBackupSessionManager.roll( 0, 2 ) );
-        assertEquals( 0, MemcachedBackupSessionManager.roll( 1, 2 ) );
+        assertEquals( 0, BackupSessionTask.roll( 0, 1 ) );
+        assertEquals( 1, BackupSessionTask.roll( 0, 2 ) );
+        assertEquals( 0, BackupSessionTask.roll( 1, 2 ) );
     }
 
     @Test
     public final void testGetNextNodeId_SingleNode() {
-        String actual = MemcachedBackupSessionManager.getNextNodeId( "n1", Arrays.asList( "n1" ), null );
+        final String actual = BackupSessionTask.getNextNodeId( "n1", Arrays.asList( "n1" ), null );
         assertNull( "For a sole existing node we cannot get a next node", actual );
     }
 
@@ -59,20 +61,20 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
      * - node n1 is the currently used node, which failed
      * - node n2 must be the next node
      * - node n2 must be recorded as beeing tested
-     * 
+     *
      * Also test that if the current node is n2, then n1 must be chosen.
      */
     @Test
     public final void testGetNextNodeId_TwoNodes() {
         final String nodeId1 = "n1";
         final String nodeId2 = "n2";
-        
-        String actual = MemcachedBackupSessionManager.getNextNodeId( nodeId1, Arrays.asList( nodeId1, nodeId2 ), null );
+
+        String actual = BackupSessionTask.getNextNodeId( nodeId1, Arrays.asList( nodeId1, nodeId2 ), null );
         assertEquals( nodeId2, actual );
-        
+
         /* let's switch nodes, so that the session is bound to node 2
          */
-        actual = MemcachedBackupSessionManager.getNextNodeId( nodeId2, Arrays.asList( nodeId1, nodeId2 ), null );
+        actual = BackupSessionTask.getNextNodeId( nodeId2, Arrays.asList( nodeId1, nodeId2 ), null );
         assertEquals( nodeId1, actual );
     }
 
@@ -86,7 +88,7 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
     public final void testGetNextNodeId_TwoNodes_NoNodeLeft() {
         final String nodeId1 = "n1";
         final String nodeId2 = "n2";
-        String actual = MemcachedBackupSessionManager.getNextNodeId( nodeId2, Arrays.asList( nodeId1, nodeId2 ), asSet( nodeId1 ) );
+        final String actual = BackupSessionTask.getNextNodeId( nodeId2, Arrays.asList( nodeId1, nodeId2 ), asSet( nodeId1 ) );
         assertNull( actual );
     }
 
@@ -96,15 +98,12 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
      */
     @Test
     public final void testGetNextNodeId_RegularNode_NoRegularNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
+
         final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
         final String nodeId2 = "n2";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2 ) );
-        
-        String actual = cut.getNextNodeId( nodeId1, null );
+        final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
+
+        final String actual = cut.getNextNodeId( nodeId1, null );
         assertEquals( "The failover node is not chosen", nodeId2, actual );
     }
 
@@ -112,20 +111,17 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
      * Test two memcached nodes:
      * - with the current node beeing a failover node
      * - regular nodes present
-     * 
+     *
      * A regular node shall be chosen
      */
     @Test
     public final void testGetNextNodeId_FailoverNode_RegularNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
+
         final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
         final String nodeId2 = "n2";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2 ) );
-        
-        String actual = cut.getNextNodeId( nodeId2, null );
+        final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
+
+        final String actual = cut.getNextNodeId( nodeId2, null );
         assertEquals( "The regular node is not chosen", nodeId1, actual );
     }
 
@@ -133,20 +129,17 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
      * Test two memcached nodes:
      * - with the current node beeing a failover node
      * - no regular nodes left
-     * 
+     *
      *  no node can be chosen
      */
     @Test
     public final void testGetNextNodeId_FailoverNode_NoRegularNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
+
         final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
         final String nodeId2 = "n2";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2 ) );
-        
-        String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
+        final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
+
+        final String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
         assertNull( actual );
     }
 
@@ -155,27 +148,24 @@ public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
      * - with the current node beeing the first failover node
      * - no regular nodes left
      * - another failover node left
-     * 
+     *
      *  the second failover node must be chosen
      */
     @Test
     public final void testGetNextNodeId_FailoverNode_NoRegularNodeButAnotherFailoverNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
+
         final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
         final String nodeId2 = "n2";
         final String nodeId3 = "n3";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2, nodeId3 ) );
-        
-        String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
+        final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2, nodeId3 ) );
+
+        final String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
         assertEquals( "The second failover node is not chosen", nodeId3, actual );
     }
 
-    private Set<String> asSet( String ... vals ) {
+    private Set<String> asSet( final String ... vals ) {
         final Set<String> result = new HashSet<String>( vals.length );
-        for ( String val : vals ) {
+        for ( final String val : vals ) {
             result.add( val );
         }
         return result;
