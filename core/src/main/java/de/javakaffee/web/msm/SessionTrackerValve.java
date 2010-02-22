@@ -30,12 +30,12 @@ import org.apache.coyote.ActionHook;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * This valve is used for tracking requests for that the session must be sent to
  * memcached.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -53,7 +53,7 @@ class SessionTrackerValve extends ValveBase {
     /**
      * Creates a new instance with the given ignore pattern and
      * {@link SessionBackupService}.
-     * 
+     *
      * @param ignorePattern
      *            the regular expression for request uris to ignore
      * @param sessionBackupService
@@ -92,7 +92,7 @@ class SessionTrackerValve extends ValveBase {
 
             /*
              * Do we have a session?
-             * 
+             *
              * Prior check for requested sessionId or response cookie before
              * invoking getSessionInternal, as getSessionInternal triggers a
              * memcached lookup if the session is not available locally.
@@ -114,9 +114,9 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private void backupSession( final Request request, final Response response, final Session session ) {
-        final BackupResult result = _sessionBackupService.backupSession( session );
+        final BackupResultStatus result = _sessionBackupService.backupSession( session );
 
-        if ( result == BackupResult.RELOCATED ) {
+        if ( result == BackupResultStatus.RELOCATED ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
             }
@@ -197,7 +197,7 @@ class SessionTrackerValve extends ValveBase {
         /**
          * Returns the new session id if the provided session has to be
          * relocated.
-         * 
+         *
          * @param session
          *            the session to check, never null.
          * @return the new session id, if this session has to be relocated.
@@ -206,20 +206,33 @@ class SessionTrackerValve extends ValveBase {
 
         /**
          * Backup the provided session in memcached.
-         * 
+         *
          * @param session
          *            the session to backup
-         * @return a {@link BackupResult}
+         * @return a {@link BackupResultStatus}
          */
-        BackupResult backupSession( Session session );
+        BackupResultStatus backupSession( Session session );
 
         /**
          * The enumeration of possible backup results.
          */
-        static enum BackupResult {
+        static enum BackupResultStatus {
+                /**
+                 * The session was successfully stored in the sessions default memcached node.
+                 */
                 SUCCESS,
+                /**
+                 * The session could not be stored in any memcached node.
+                 */
                 FAILURE,
-                RELOCATED
+                /**
+                 * The session was moved to another memcached node and stored successfully therein.
+                 */
+                RELOCATED,
+                /**
+                 * The session was not modified and therefore the backup was skipped.
+                 */
+                SKIPPED
         }
 
     }

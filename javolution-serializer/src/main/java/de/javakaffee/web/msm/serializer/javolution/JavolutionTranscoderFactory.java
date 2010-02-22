@@ -22,6 +22,7 @@ import net.spy.memcached.transcoders.Transcoder;
 import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -37,7 +38,7 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    public Transcoder<Object> createTranscoder( final Manager manager ) {
+    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
         final XMLFormat<?>[] customFormats = loadCustomFormats( manager );
         return new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
     }

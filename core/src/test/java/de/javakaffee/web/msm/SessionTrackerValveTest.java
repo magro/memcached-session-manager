@@ -32,7 +32,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * Test the {@link SessionTrackerValve}.
@@ -122,7 +122,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ) )
-            .will( returnValue( BackupResult.SUCCESS ) );
+            .will( returnValue( BackupResultStatus.SUCCESS ) );
 
         _sessionTrackerValve.invoke( _request, _response );
         
@@ -142,7 +142,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ) )
-            .will( returnValue( BackupResult.RELOCATED ) );
+            .will( returnValue( BackupResultStatus.RELOCATED ) );
         sessionControl.expects( once() ).method( "getId" ).will( returnValue( sessionId ) );
         _requestControl.expects( once() ).method( "getContextPath" );
         _responseControl.expects( once() ).method( "addCookieInternal" ).with(

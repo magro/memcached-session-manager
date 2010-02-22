@@ -20,27 +20,52 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-
-import net.spy.memcached.transcoders.SerializingTranscoder;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
+import org.apache.catalina.session.Constants;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
+import org.apache.catalina.util.StringManager;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
+import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
- * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
- * {@link StandardSession}s using java serialization (and the serialization of
- * {@link StandardSession} via {@link StandardSession#writeObjectData(ObjectOutputStream)}
- * and {@link StandardSession#readObjectData(ObjectInputStream)}).
+ * A {@link SessionAttributesTranscoder} that serializes catalina {@link StandardSession}s using
+ * java serialization (and the serialization logic of {@link StandardSession} as
+ * found in {@link StandardSession#writeObjectData(ObjectOutputStream)} and
+ * {@link StandardSession#readObjectData(ObjectInputStream)}).
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class JavaSerializationTranscoder extends SerializingTranscoder {
+public class JavaSerializationTranscoder implements SessionAttributesTranscoder {
+
+    private static final Log LOG = LogFactory.getLog( JavaSerializationTranscoder.class );
+
+    private static final String EMPTY_ARRAY[] = new String[0];
+
+    /**
+     * The dummy attribute value serialized when a NotSerializableException is
+     * encountered in <code>writeObject()</code>.
+     */
+    protected static final String NOT_SERIALIZED = "___NOT_SERIALIZABLE_EXCEPTION___";
+
+    /**
+     * The string manager for this package.
+     */
+    protected static StringManager sm = StringManager.getManager( Constants.Package );
 
     private final Manager _manager;
 
@@ -58,8 +83,8 @@ public class JavaSerializationTranscoder extends SerializingTranscoder {
      * {@inheritDoc}
      */
     @Override
-    protected byte[] serialize( final Object o ) {
-        if ( o == null ) {
+    public byte[] serialize( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+        if ( attributes == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
 
@@ -68,7 +93,9 @@ public class JavaSerializationTranscoder extends SerializingTranscoder {
         try {
             bos = new ByteArrayOutputStream();
             oos = new ObjectOutputStream( bos );
-            ( (StandardSession) o ).writeObjectData( oos );
+
+            writeAttributes( session, attributes, oos );
+
             return bos.toByteArray();
         } catch ( final IOException e ) {
             throw new IllegalArgumentException( "Non-serializable object", e );
@@ -79,24 +106,44 @@ public class JavaSerializationTranscoder extends SerializingTranscoder {
 
     }
 
-    private void closeSilently( final OutputStream os ) {
-        if ( os != null ) {
-            try {
-                os.close();
-            } catch ( final IOException f ) {
-                // fail silently
-            }
-        }
-    }
+    private void writeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes,
+            final ObjectOutputStream oos ) throws IOException {
 
-    private void closeSilently( final InputStream is ) {
-        if ( is != null ) {
-            try {
-                is.close();
-            } catch ( final IOException f ) {
-                // fail silently
+        // Accumulate the names of serializable and non-serializable attributes
+        final String keys[] = attributes.keySet().toArray( EMPTY_ARRAY );
+        final List<String> saveNames = new ArrayList<String>();
+        final List<Object> saveValues = new ArrayList<Object>();
+        for ( int i = 0; i < keys.length; i++ ) {
+            final Object value = attributes.get( keys[i] );
+            if ( value == null ) {
+                continue;
+            } else if ( ( value instanceof Serializable ) && ( !session.exclude( keys[i] ) ) ) {
+                saveNames.add( keys[i] );
+                saveValues.add( value );
+            } else {
+                session.removeAttributeInternal( keys[i], true );
             }
         }
+
+        // Serialize the attribute count and the Serializable attributes
+        final int n = saveNames.size();
+        oos.writeObject( new Integer( n ) );
+        for ( int i = 0; i < n; i++ ) {
+            oos.writeObject( saveNames.get( i ) );
+            try {
+                oos.writeObject( saveValues.get( i ) );
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug( "  storing attribute '" + saveNames.get( i ) + "' with value '" + saveValues.get( i ) + "'" );
+                }
+            } catch ( final NotSerializableException e ) {
+                LOG.warn( sm.getString( "standardSession.notSerializable", saveNames.get( i ), session.getIdInternal() ), e );
+                oos.writeObject( NOT_SERIALIZED );
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug( "  storing attribute '" + saveNames.get( i ) + "' with value NOT_SERIALIZED" );
+                }
+            }
+        }
+
     }
 
     /**
@@ -107,21 +154,33 @@ public class JavaSerializationTranscoder extends SerializingTranscoder {
      * @return the resulting object
      */
     @Override
-    protected Object deserialize( final byte[] in ) {
+    public Map<String, Object> deserialize( final byte[] in ) {
         ByteArrayInputStream bis = null;
         ObjectInputStream ois = null;
         try {
             bis = new ByteArrayInputStream( in );
             ois = createObjectInputStream( bis );
-            final StandardSession session = (StandardSession) _manager.createEmptySession();
-            session.readObjectData( ois );
-            session.setManager( _manager );
-            return session;
+
+            final Map<String, Object> attributes = new ConcurrentHashMap<String, Object>();
+            final int n = ( (Integer) ois.readObject() ).intValue();
+            for ( int i = 0; i < n; i++ ) {
+                final String name = (String) ois.readObject();
+                final Object value = ois.readObject();
+                if ( ( value instanceof String ) && ( value.equals( NOT_SERIALIZED ) ) ) {
+                    continue;
+                }
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug( "  loading attribute '" + name + "' with value '" + value + "'" );
+                }
+                attributes.put( name, value );
+            }
+
+            return attributes;
         } catch ( final ClassNotFoundException e ) {
-            getLogger().warn( "Caught CNFE decoding %d bytes of data", in.length, e );
+            LOG.warn( "Caught CNFE decoding "+ in.length +" bytes of data", e );
             throw new RuntimeException( "Caught CNFE decoding data", e );
         } catch ( final IOException e ) {
-            getLogger().warn( "Caught IOException decoding %d bytes of data", in.length, e );
+            LOG.warn( "Caught IOException decoding "+ in.length +" bytes of data", e );
             throw new RuntimeException( "Caught IOException decoding data", e );
         } finally {
             closeSilently( bis );
@@ -145,6 +204,26 @@ public class JavaSerializationTranscoder extends SerializingTranscoder {
             ois = new ObjectInputStream( bis );
         }
         return ois;
+    }
+
+    private void closeSilently( final OutputStream os ) {
+        if ( os != null ) {
+            try {
+                os.close();
+            } catch ( final IOException f ) {
+                // fail silently
+            }
+        }
+    }
+
+    private void closeSilently( final InputStream is ) {
+        if ( is != null ) {
+            try {
+                is.close();
+            } catch ( final IOException f ) {
+                // fail silently
+            }
+        }
     }
 
 }

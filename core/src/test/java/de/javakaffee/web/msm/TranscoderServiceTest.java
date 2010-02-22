@@ -62,18 +62,40 @@ public class TranscoderServiceTest {
     }
 
     @Test
-    public void testCopy() {
-        final byte[] dest = new byte[10];
-        TranscoderService.copy( new byte[] { '1', '2', '3' }, dest, 5 );
-        //Assert.assert
+    public void testSerializeSessionFields() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        final byte[] data = TranscoderService.serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data ).getSession();
+
+        assertSessionFields( session, deserialized );
     }
 
     @Test
-    public void testSerialized() {
+    public void testSerializeSessionWithoutAttributes() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
-        final byte[] data = TranscoderService.serialize( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserialize( data );
+        final TranscoderService transcoderService = new TranscoderService( new JavaSerializationTranscoder( _manager ) );
+        final byte[] data = transcoderService.serialize( session );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data );
 
+        assertSessionFields( session, deserialized );
+    }
+
+    @Test
+    public void testSerializeSessionWithAttributes() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        final TranscoderService transcoderService = new TranscoderService( new JavaSerializationTranscoder( _manager ) );
+
+        final String value = "bar";
+        session.setAttribute( "foo", value );
+
+        final byte[] data = transcoderService.serialize( session );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data );
+
+        assertSessionFields( session, deserialized );
+        Assert.assertEquals( value, deserialized.getAttribute( "foo" ) );
+    }
+
+    private void assertSessionFields( final MemcachedBackupSession session, final MemcachedBackupSession deserialized ) {
         Assert.assertEquals( session.getCreationTimeInternal(), deserialized.getCreationTimeInternal() );
         Assert.assertEquals( session.getLastAccessedTimeInternal(), deserialized.getLastAccessedTimeInternal() );
         Assert.assertEquals( session.getMaxInactiveInterval(), deserialized.getMaxInactiveInterval() );
@@ -81,7 +103,6 @@ public class TranscoderServiceTest {
         Assert.assertEquals( session.isValidInternal(), deserialized.isValidInternal() );
         Assert.assertEquals( session.getThisAccessedTimeInternal(), deserialized.getThisAccessedTimeInternal() );
         Assert.assertEquals( session.getIdInternal(), deserialized.getIdInternal() );
-
     }
 
 }

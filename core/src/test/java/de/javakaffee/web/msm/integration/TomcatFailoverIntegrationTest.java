@@ -18,7 +18,9 @@ package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
-import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
+import static de.javakaffee.web.msm.integration.TestUtils.get;
+import static de.javakaffee.web.msm.integration.TestUtils.post;
+import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -40,12 +42,12 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
+import de.javakaffee.web.msm.integration.TestUtils.Response;
 
 /**
  * Integration test testing tomcat failover (tomcats failing).
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -90,8 +92,8 @@ public class TomcatFailoverIntegrationTest {
         }
 
         _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), NodeIdResolver.node(
-                        _nodeId, address ).build(), new SessionIdFormat(), new JavaSerializationTranscoderFactory() ),
+                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+                        _nodeId, address ).build(), new SessionIdFormat() ),
                         Arrays.asList( address ) );
     }
 
@@ -106,7 +108,7 @@ public class TomcatFailoverIntegrationTest {
     /**
      * Tests that when two tomcats are running and one tomcat fails the other
      * tomcat can take over the session.
-     * 
+     *
      * @throws IOException
      * @throws InterruptedException
      */
@@ -116,16 +118,68 @@ public class TomcatFailoverIntegrationTest {
         try {
             final HttpClient client = new HttpClient( connectionManager );
 
-            final String sessionId1 = makeRequest( client, _portTomcat1, null );
+            final String key = "foo";
+            final String value = "bar";
+            final String sessionId1 = post( client, _portTomcat1, null, key, value );
 
             Thread.sleep( 10 );
 
             final Object session = _client.get( sessionId1 );
             Assert.assertNotNull( session );
 
-            final String sessionId2 = makeRequest( client, _portTomcat2, sessionId1 );
+            final Response response = get( client, _portTomcat2, sessionId1 );
+            final String sessionId2 = response.getSessionId();
 
             Assert.assertEquals( sessionId1, sessionId2 );
+
+            /* check session attributes could be read
+             */
+            final String actualValue = response.get( key );
+            assertEquals( value, actualValue );
+
+            Thread.sleep( 10 );
+
+        } finally {
+            connectionManager.shutdown();
+        }
+
+    }
+
+    /**
+     * Tests that the session that was taken over by another tomcat is not
+     * sent again by this tomcat if it was not modified.
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Test
+    public void testLoadedSessionOnlySentIfModified() throws IOException, InterruptedException {
+        final SimpleHttpConnectionManager connectionManager = new SimpleHttpConnectionManager( true );
+        try {
+            final HttpClient client = new HttpClient( connectionManager );
+
+            /* create a session on tomcat1
+             */
+            final String key = "foo";
+            final String value = "bar";
+            final String sessionId1 = post( client, _portTomcat1, null, key, value );
+            Assert.assertEquals( 1, _daemon.getCache().getSetCmds() );
+
+            /* request the session on tomcat2
+             */
+            final Response response = get( client, _portTomcat2, sessionId1 );
+            Assert.assertEquals( sessionId1, response.getSessionId() );
+            Assert.assertEquals( 1, _daemon.getCache().getSetCmds() );
+
+            /* post key/value already stored in the session again (on tomcat2)
+             */
+            post( client, _portTomcat2, sessionId1, key, value );
+            Assert.assertEquals( 1, _daemon.getCache().getSetCmds() );
+
+            /* post another key/value pair (on tomcat2)
+             */
+            post( client, _portTomcat2, sessionId1, "bar", "baz" );
+            Assert.assertEquals( 2, _daemon.getCache().getSetCmds() );
 
             Thread.sleep( 10 );
 

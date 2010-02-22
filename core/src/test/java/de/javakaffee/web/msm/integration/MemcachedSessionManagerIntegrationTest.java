@@ -44,7 +44,6 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 
 /**
@@ -92,8 +91,8 @@ public class MemcachedSessionManagerIntegrationTest {
         }
 
         _memcached =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( _tomcat1.getContainer().getManager(), NodeIdResolver.node(
-                        _memcachedNodeId, address ).build(), new SessionIdFormat(), new JavaSerializationTranscoderFactory() ),
+                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+                        _memcachedNodeId, address ).build(), new SessionIdFormat() ),
                         Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
 
         _connectionManager = new SimpleHttpConnectionManager( true );

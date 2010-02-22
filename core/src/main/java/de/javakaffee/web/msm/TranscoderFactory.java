@@ -16,8 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import net.spy.memcached.transcoders.Transcoder;
-
 import org.apache.catalina.Manager;
 
 /**
@@ -31,13 +29,13 @@ import org.apache.catalina.Manager;
 public interface TranscoderFactory {
 
     /**
-     * Creates a new {@link Transcoder} with the given manager.
+     * Creates a new {@link SessionAttributesTranscoder} with the given manager.
      *
      * @param manager
      *            the manager that needs to be set on deserialized sessions.
-     * @return an implementation of {@link Transcoder}.
+     * @return an implementation of {@link SessionAttributesTranscoder}.
      */
-    Transcoder<Object> createTranscoder( Manager manager );
+    SessionAttributesTranscoder createTranscoder( Manager manager );
 
     /**
      * Specifies, if iterating over collection elements shall be done on a copy

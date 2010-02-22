@@ -29,7 +29,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * This {@link Manager} stores session in configured memcached nodes after the
@@ -56,6 +56,7 @@ public class BackupSessionTask {
     private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
 
     private final MemcachedBackupSession _session;
+    private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
     private final MemcachedClient _memcached;
@@ -81,10 +82,11 @@ public class BackupSessionTask {
      * @param nodeIds
      * @param failoverNodeIds
      */
-    public BackupSessionTask( final MemcachedBackupSession session, final boolean sessionBackupAsync, final int sessionBackupTimeout,
+    public BackupSessionTask( final MemcachedBackupSession session, final TranscoderService transcoderService, final boolean sessionBackupAsync, final int sessionBackupTimeout,
             final MemcachedClient memcached, final NodeAvailabilityCache<String> nodeAvailabilityCache, final List<String> nodeIds,
             final List<String> failoverNodeIds ) {
         _session = session;
+        _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
         _memcached = memcached;
@@ -101,15 +103,17 @@ public class BackupSessionTask {
      */
     BackupSessionTask( final List<String> nodeIds,
             final List<String> failoverNodeIds ) {
-        this( null, false, -1, null, null, nodeIds, failoverNodeIds );
+        this( null, null, false, -1, null, null, nodeIds, failoverNodeIds );
     }
 
     /**
      * Store the provided session in memcached.
+     * @param data the serialized session data (session fields and session attributes).
+     * @param attributesData just the serialized session attributes.
      *
-     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResult}
+     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public BackupResult backupSession( ) {
+    public BackupResult backupSession( final byte[] data, final byte[] attributesData ) {
         if ( _log.isInfoEnabled() ) {
             _log.debug( "Trying to store session in memcached: " + _session.getId() );
         }
@@ -126,8 +130,9 @@ public class BackupSessionTask {
                 _relocateSessionId = null;
             }
 
-            storeSessionInMemcached();
-            return BackupResult.SUCCESS;
+            storeSessionInMemcached( data );
+
+            return new BackupResult( BackupResultStatus.SUCCESS, attributesData );
         } catch ( final NodeFailureException e ) {
             if ( _log.isInfoEnabled() ) {
                 _log.info( "Could not store session in memcached (" + _session.getId() + ")" );
@@ -146,7 +151,7 @@ public class BackupSessionTask {
 
                 noFailoverNodeLeft();
 
-                return BackupResult.FAILURE;
+                return new BackupResult( BackupResultStatus.FAILURE, null );
 
             } else {
 
@@ -155,13 +160,14 @@ public class BackupSessionTask {
                 }
 
                 final BackupResult backupResult = failover( _testedNodes, targetNodeId );
+                final BackupResultStatus translatedStatus = handleAndTranslateFailoverBackupResult( backupResult.getStatus() );
 
-                return handleAndTranslateBackupResult( backupResult );
+                return new BackupResult( translatedStatus, backupResult.getAttributesData() );
             }
         }
     }
 
-    private BackupResult handleAndTranslateBackupResult( final BackupResult backupResult ) {
+    private BackupResultStatus handleAndTranslateFailoverBackupResult( final BackupResultStatus backupResult ) {
         switch ( backupResult ) {
             case SUCCESS:
 
@@ -177,7 +183,7 @@ public class BackupSessionTask {
                 /*
                  * and tell our client to do his part as well
                  */
-                return BackupResult.RELOCATED;
+                return BackupResultStatus.RELOCATED;
             default:
                 /*
                  * just pass it up
@@ -209,6 +215,15 @@ public class BackupSessionTask {
         return null;
     }
 
+    /**
+     * Specifies if previously {@link #sessionNeedsRelocate()} returned a new session id
+     * to be sent to the client.
+     * @return <code>true</code> if this session needs to be relocated.
+     */
+    public boolean sessionCookieWasRelocated() {
+        return _relocateSessionId != null;
+    }
+
     private BackupResult failover( final Set<String> testedNodes, final String targetNodeId ) {
 
         final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
@@ -233,10 +248,15 @@ public class BackupSessionTask {
         _session.setNote( NODE_FAILURE, Boolean.TRUE );
         _session.setIdForRelocate( _sessionIdFormat.createNewSessionId( _session.getId(), targetNodeId ) );
 
+        /* the serialized session data needs to be recreated as it changed.
+         */
+        final byte[] attributesData = _transcoderService.serializeAttributes( _session, _session.getAttributesInternal() );
+        final byte[] data = _transcoderService.serialize( _session, attributesData );
+
         /*
          * invoke backup again, until we have a success or a failure
          */
-        final BackupResult backupResult = backupSession();
+        final BackupResult backupResult = backupSession( data, attributesData );
 
         return backupResult;
     }
@@ -339,19 +359,45 @@ public class BackupSessionTask {
             : idx + 1;
     }
 
-    private void storeSessionInMemcached() throws NodeFailureException {
-        final Future<Boolean> future = _memcached.set( _session.getId(), _session.getMaxInactiveInterval(), _session );
+    private void storeSessionInMemcached( final byte[] data) throws NodeFailureException {
+        final Future<Boolean> future = _memcached.set( _session.getId(), _session.getMaxInactiveInterval(), data );
         if ( !_sessionBackupAsync ) {
             try {
                 future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
             } catch ( final Exception e ) {
                 if ( _log.isInfoEnabled() ) {
-                    _log.info( "Could not store session " + _session.getId() + " in memcached: " + e );
+                    _log.info( "Could not store session " + _session.getId() + " in memcached.", e );
                 }
                 final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
                 throw new NodeFailureException( "Could not store session in memcached.", nodeId );
             }
+        }
+    }
+
+    static final class BackupResult {
+        private final BackupResultStatus _status;
+        private final byte[] _attributesData;
+        public BackupResult( final BackupResultStatus status, final byte[] attributesData ) {
+            _status = status;
+            _attributesData = attributesData;
+        }
+        /**
+         * The status/result of the backup operation.
+         * @return the status
+         */
+        BackupResultStatus getStatus() {
+            return _status;
+        }
+        /**
+         * The serialized attributes that were actually stored in memcached with the
+         * full serialized session data. This can be <code>null</code>, e.g. if
+         * {@link #getStatus()} is {@link BackupResultStatus#FAILURE}.
+         *
+         * @return the attributesData
+         */
+        byte[] getAttributesData() {
+            return _attributesData;
         }
     }
 

@@ -21,6 +21,7 @@ import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -46,9 +47,11 @@ import org.apache.catalina.util.LifecycleSupport;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
+import de.javakaffee.web.msm.TranscoderService.DeserializationResult;
 
 /**
  * This {@link Manager} stores session in configured memcached nodes after the
@@ -210,6 +213,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private List<String> _failoverNodeIds;
 
+    private TranscoderService _transcoderService;
+
     /**
      * Return descriptive information about this Manager implementation and the
      * corresponding version number, in the format
@@ -237,7 +242,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void init() {
-        _log.info( getClass().getSimpleName() + " starts initialization..." );
+        init( null );
+    }
+
+    /**
+     * Initialize this manager. The memcachedClient parameter is there for testing
+     * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
+     * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
+     *
+     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
+     */
+    void init( final MemcachedClient memcachedClient ) {
+        _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
+        		" nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
 
         if ( initialized ) {
             return;
@@ -273,20 +290,32 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
         }
 
-        initMemcachedClient( addresses, address2Ids );
+        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( addresses, address2Ids );
 
         /* create the missing sessions cache
          */
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
         _nodeAvailabilityCache = createNodeAvailabilityCache( 1000 );
 
+        _transcoderService = createTranscoderService();
+
+        _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + _nodeIds + " and failover node ids " + _failoverNodeIds );
+
     }
 
-    private void initMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids ) {
+    private TranscoderService createTranscoderService() {
+        final TranscoderFactory transcoderFactory;
         try {
-            _memcached =
-                    new MemcachedClient( new SuffixLocatorConnectionFactory( this, new MapBasedResolver( address2Ids ),
-                            _sessionIdFormat, createTranscoderFactory() ), addresses );
+            transcoderFactory = createTranscoderFactory();
+        } catch ( final Exception e ) {
+            throw new RuntimeException( "Could not create transcoder factory.", e );
+        }
+        return new TranscoderService( transcoderFactory.createTranscoder( this ) );
+    }
+
+    private MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids ) {
+        try {
+            return new MemcachedClient( new SuffixLocatorConnectionFactory( new MapBasedResolver( address2Ids ), _sessionIdFormat ), addresses );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
@@ -482,24 +511,44 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
-     * Store the provided session in memcached.
+     * Store the provided session in memcached if the session was modified
+     * or if the session needs to be relocated.
      *
      * @param session
      *            the session to save
-     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResult}
+     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public BackupResult backupSession( final Session session ) {
+    public BackupResultStatus backupSession( final Session session ) {
         if ( _log.isInfoEnabled() ) {
             _log.debug( "Trying to store session in memcached: " + session.getId() );
         }
 
-        final BackupSessionTask task = getOrCreateBackupSessionTask( (MemcachedBackupSession) session );
-        return task.backupSession();
+        final MemcachedBackupSession backupSession = (MemcachedBackupSession) session;
+
+        final BackupSessionTask task = getOrCreateBackupSessionTask( backupSession );
+
+        final Map<String, Object> attributes = backupSession.getAttributesInternal();
+
+        final byte[] attributesData = _transcoderService.serializeAttributes( backupSession, attributes );
+        final int hashCode = Arrays.hashCode( attributesData );
+        if ( backupSession.getDataHashCode() != hashCode
+                || task.sessionCookieWasRelocated() ) {
+            final byte[] data = _transcoderService.serialize( backupSession, attributesData );
+
+            final BackupResult result = task.backupSession( data, attributesData );
+            if ( result.getAttributesData() != null ) {
+                backupSession.setDataHashCode( Arrays.hashCode( result.getAttributesData() ) );
+            }
+
+            return result.getStatus();
+        } else {
+            return BackupResultStatus.SKIPPED;
+        }
     }
 
     private BackupSessionTask getOrCreateBackupSessionTask( final MemcachedBackupSession session ) {
         if ( session.getBackupTask() == null ) {
-            session.setBackupTask( new BackupSessionTask( session, _sessionBackupAsync, _sessionBackupTimeout,
+            session.setBackupTask( new BackupSessionTask( session, _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                     _memcached, _nodeAvailabilityCache, _nodeIds, _failoverNodeIds ) );
         }
         return session.getBackupTask();
@@ -516,21 +565,35 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         } else {
             _log.debug( "Loading session from memcached: " + sessionId );
             try {
-                final Session session = (Session) _memcached.get( sessionId );
+                final byte[] data = (byte[]) _memcached.get( sessionId );
                 if ( _log.isDebugEnabled() ) {
-                    if ( session == null ) {
+                    if ( data == null ) {
                         _log.debug( "Session " + sessionId + " not found in memcached." );
                     } else {
                         _log.debug( "Found session with id " + sessionId );
                     }
                 }
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, true );
+
+                final MemcachedBackupSession session;
+                if ( data != null ) {
+                    final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data );
+                    final byte[] attributesData = deserializationResult.getAttributesData();
+                    final Map<String, Object> attributes = _transcoderService.deserializeAttributes( attributesData );
+                    session = deserializationResult.getSession();
+                    session.setAttributesInternal( attributes );
+                    session.setDataHashCode( Arrays.hashCode( attributesData ) );
+                    session.setManager( this );
+                    session.doAfterDeserialization();
+                } else {
+                    session = null;
+                }
                 return session;
             } catch ( final NodeFailureException e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached." );
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
             } catch ( final Exception e ) {
-                _log.warn( "Could not load session with id " + sessionId + " from memcached: " + e );
+                _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
             }
         }
         return null;
@@ -886,12 +949,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
 
         /**
-         * The hash code of the serialized byte[] of this session that is
+         * The hash code of the serialized byte[] of this sessions attributes that is
          * used to determine, if the session was modified.
          * @return
          */
         public int getDataHashCode() {
             return _dataHashCode;
+        }
+
+        /**
+         * Set the hash code of the serialized session attributes.
+         */
+        public void setDataHashCode( final int attributesDataHashCode ) {
+            _dataHashCode = attributesDataHashCode;
         }
 
         protected long getCreationTimeInternal() {
@@ -951,6 +1021,31 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         void setBackupTask( final BackupSessionTask backupTask ) {
             _backupTask = backupTask;
+        }
+
+        @SuppressWarnings( "unchecked" )
+        public Map<String, Object> getAttributesInternal() {
+            return super.attributes;
+        }
+
+        void setAttributesInternal( final Map<String, Object> attributes ) {
+            super.attributes = attributes;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void removeAttributeInternal( final String name, final boolean notify ) {
+            super.removeAttributeInternal( name, notify );
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        protected boolean exclude( final String name ) {
+            return super.exclude( name );
         }
 
     }

@@ -16,8 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import net.spy.memcached.transcoders.Transcoder;
-
 import org.apache.catalina.Manager;
 
 /**
@@ -31,7 +29,7 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    public Transcoder<Object> createTranscoder( final Manager manager ) {
+    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
         return new JavaSerializationTranscoder( manager );
     }
 
@@ -52,7 +50,7 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
     /**
      * Throws an {@link UnsupportedOperationException}, as java serialization
      * does not support custom xml format.
-     * 
+     *
      * @param customConverterClassNames a list of class names or <code>null</code>.
      */
     public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
