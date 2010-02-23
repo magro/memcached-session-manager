@@ -33,5 +33,3 @@ the tomcat on which the session was created and see that the session is taken
 over by the second tomcat.
 
 Now relax or go and grab a coffee :)
-
-
