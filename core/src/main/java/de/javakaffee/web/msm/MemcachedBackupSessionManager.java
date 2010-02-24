@@ -525,25 +525,51 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         final MemcachedBackupSession backupSession = (MemcachedBackupSession) session;
 
-        final BackupSessionTask task = getOrCreateBackupSessionTask( backupSession );
+        /* Check if the session was accessed at all since the last backup/check.
+         * If this is not the case, we even don't have to check if attributes
+         * have changed (and can skip serialization and hash calucation)
+         */
+        if ( !backupSession.wasAccessedSinceLastBackupCheck() ) {
+            _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
+            return BackupResultStatus.SKIPPED;
+        }
 
         final Map<String, Object> attributes = backupSession.getAttributesInternal();
 
         final byte[] attributesData = _transcoderService.serializeAttributes( backupSession, attributes );
         final int hashCode = Arrays.hashCode( attributesData );
+        final BackupSessionTask task = getOrCreateBackupSessionTask( backupSession );
+        final BackupResultStatus result;
         if ( backupSession.getDataHashCode() != hashCode
                 || task.sessionCookieWasRelocated() ) {
             final byte[] data = _transcoderService.serialize( backupSession, attributesData );
 
-            final BackupResult result = task.backupSession( data, attributesData );
-            if ( result.getAttributesData() != null ) {
-                backupSession.setDataHashCode( Arrays.hashCode( result.getAttributesData() ) );
+            final BackupResult backupResult = task.backupSession( data, attributesData );
+            if ( backupResult.isSuccess() || backupResult.isRelocated() ) {
+                /* we can use the already calculated hashcode if we have still the same
+                 * attributes data, which is the case for the most common case SUCCESS
+                 */
+                final int newHashCode = backupResult.getAttributesData() == attributesData
+                    ? hashCode
+                    : Arrays.hashCode( backupResult.getAttributesData() );
+                backupSession.setDataHashCode( newHashCode );
             }
 
-            return result.getStatus();
+            result = backupResult.getStatus();
         } else {
-            return BackupResultStatus.SKIPPED;
+            result = BackupResultStatus.SKIPPED;
         }
+
+        /* Store the current value of {@link #getThisAccessedTimeInternal()} in a private,
+         * transient field so that we can check above (before computing the hash of the
+         * session attributes) if the session was accessed since this backup/check.
+         */
+        if ( result != BackupResultStatus.FAILURE ) {
+            backupSession.storeThisAccessedTimeFromLastBackupCheck();
+        }
+
+        return result;
+
     }
 
     private BackupSessionTask getOrCreateBackupSessionTask( final MemcachedBackupSession session ) {
@@ -868,6 +894,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _sessionBackupTimeout = sessionBackupTimeout;
     }
 
+    // ----------------------- protected setters for testing ------------------
+
+    /**
+     * Set the {@link TranscoderService} that is used by this manager and the {@link BackupSessionTask}.
+     *
+     * @param transcoderService the transcoder service to use.
+     */
+    void setTranscoderService( final TranscoderService transcoderService ) {
+        _transcoderService = transcoderService;
+    }
+
+    // ---------------------- END setters for testing
+
     /**
      * The session class used by this manager, to be able to change the session
      * id without the whole notification lifecycle (which includes the
@@ -885,6 +924,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         private transient int _dataHashCode;
 
+        /*
+         * Used to determine, if the session was #accessed since it was
+         * last backup'ed (or checked if it needs to be backup'ed)
+         */
+        private transient long _thisAccessedTimeFromLastBackupCheck;
+
         /**
          * Creates a new instance without a given manager. This has to be
          * assigned via {@link #setManager(Manager)} before this session is
@@ -893,6 +938,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         public MemcachedBackupSession() {
             super( null );
+        }
+
+        /**
+         * Stores the current value of {@link #getThisAccessedTimeInternal()} in a private,
+         * transient field. You can check with {@link #wasAccessedSinceLastBackupCheck()}
+         * if the current {@link #getThisAccessedTimeInternal()} value is different
+         * from the previously stored value to see if the session was accessed in
+         * the meantime.
+         */
+        public void storeThisAccessedTimeFromLastBackupCheck() {
+            _thisAccessedTimeFromLastBackupCheck = super.thisAccessedTime;
+        }
+
+        /**
+         * Determines, if the current value of {@link #getThisAccessedTimeInternal()}
+         * differs from the value stored by {@link #storeThisAccessedTimeFromLastBackupCheck()}.
+         * This indicates, if the session was accessed in the meantime.
+         * @return <code>true</code> if the session was accessed since the invocation
+         * of {@link #storeThisAccessedTimeFromLastBackupCheck()}.
+         */
+        public boolean wasAccessedSinceLastBackupCheck() {
+            return _thisAccessedTimeFromLastBackupCheck != super.thisAccessedTime;
         }
 
         /**
@@ -988,6 +1055,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             super.isValid = isValid;
         }
 
+        /**
+         * The timestamp (System.currentTimeMillis) of the last {@link #access()} invocation,
+         * this is the timestamp when the application requested the session.
+         *
+         * @return the timestamp of the last {@link #access()} invocation.
+         */
         protected long getThisAccessedTimeInternal() {
             return super.thisAccessedTime;
         }

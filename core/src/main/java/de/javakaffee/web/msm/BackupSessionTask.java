@@ -399,6 +399,20 @@ public class BackupSessionTask {
         byte[] getAttributesData() {
             return _attributesData;
         }
+        /**
+         * @return <code>true</code> if the status is {@link BackupResultStatus#SUCCESS},
+         * otherwise <code>false</code>.
+         */
+        public boolean isSuccess() {
+            return _status == BackupResultStatus.SUCCESS;
+        }
+        /**
+         * @return <code>true</code> if the status is {@link BackupResultStatus#RELOCATED},
+         * otherwise <code>false</code>.
+         */
+        public boolean isRelocated() {
+            return _status == BackupResultStatus.RELOCATED;
+        }
     }
 
 //    // ===========================  for testing  ==============================

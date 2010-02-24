@@ -24,6 +24,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -80,21 +81,61 @@ public class MemcachedBackupSessionManagerTest {
 
     }
 
+    /**
+     * Test that sessions are only backuped if they are modified.
+     */
     @Test
     public void testOnlySendModifiedSessions() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
+        /* simulate the first request, with session access
+         */
+        session.access();
         session.setAttribute( "foo", "bar" );
         _manager.backupSession( session );
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
+        /* simulate the second request, with session access
+         */
+        session.access();
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
         _manager.backupSession( session );
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
+        /* simulate the third request, without session access
+         */
         _manager.backupSession( session );
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
+
+    }
+
+    /**
+     * Test that session attribute serialization and hash calculation is only
+     * performed if the session was accessed since the last backup/backup check.
+     * Otherwise this computing time shall be saved for a better world :-)
+     */
+    @Test
+    public void testOnlyHashAttributesOfAccessedSessions() {
+
+        final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
+        @SuppressWarnings( "unchecked" )
+        final Map<String, Object> anyMap = any( Map.class );
+        when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
+        _manager.setTranscoderService( transcoderServiceMock );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        session.setAttribute( "foo", "bar" );
+        _manager.backupSession( session );
+        verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
+        session.access();
+        _manager.backupSession( session );
+        verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
+        _manager.backupSession( session );
+        verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
 
