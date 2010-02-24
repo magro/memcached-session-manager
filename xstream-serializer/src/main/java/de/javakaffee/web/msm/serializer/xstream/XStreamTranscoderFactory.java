@@ -16,10 +16,9 @@
  */
 package de.javakaffee.web.msm.serializer.xstream;
 
-import net.spy.memcached.transcoders.Transcoder;
-
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -33,8 +32,8 @@ public class XStreamTranscoderFactory implements TranscoderFactory {
      * {@inheritDoc}
      */
     @Override
-    public Transcoder<Object> createTranscoder( final Manager manager ) {
-        return new XStreamTranscoder( manager );
+    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
+        return new XStreamTranscoder();
     }
 
     /**

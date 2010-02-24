@@ -20,13 +20,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Map;
 
-import net.spy.memcached.transcoders.SerializingTranscoder;
-
-import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 import com.thoughtworks.xstream.XStream;
+
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -34,9 +37,10 @@ import com.thoughtworks.xstream.XStream;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class XStreamTranscoder extends SerializingTranscoder {
+public class XStreamTranscoder implements SessionAttributesTranscoder {
 
-    private final Manager _manager;
+    private static final Log LOG = LogFactory.getLog( XStreamTranscoder.class );
+    
     private final XStream _xstream;
 
     /**
@@ -45,8 +49,7 @@ public class XStreamTranscoder extends SerializingTranscoder {
      * @param manager
      *            the manager
      */
-    public XStreamTranscoder( final Manager manager ) {
-        _manager = manager;
+    public XStreamTranscoder() {
         _xstream = new XStream();
     }
 
@@ -54,14 +57,14 @@ public class XStreamTranscoder extends SerializingTranscoder {
      * {@inheritDoc}
      */
     @Override
-    protected byte[] serialize( final Object o ) {
-        if ( o == null ) {
+    public byte[] serialize( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+        if ( attributes == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
 
         final ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try {
-            _xstream.toXML( o, bos );
+            _xstream.toXML( attributes, bos );
             return bos.toByteArray();
         } catch ( final Exception e ) {
             throw new IllegalArgumentException( "Non-serializable object", e );
@@ -79,14 +82,14 @@ public class XStreamTranscoder extends SerializingTranscoder {
      * @return the resulting object
      */
     @Override
-    protected Object deserialize( final byte[] in ) {
+    public Map<String, Object> deserialize( final byte[] in ) {
         final ByteArrayInputStream bis = new ByteArrayInputStream( in );
         try {
-            final StandardSession session = (StandardSession) _manager.createEmptySession();
-            _xstream.fromXML( bis, session );
-            return session;
+            @SuppressWarnings( "unchecked" )
+            final Map<String, Object> result = (Map<String, Object>) _xstream.fromXML( bis );
+            return result;
         } catch ( final RuntimeException e ) {
-            getLogger().warn( "Caught Exception decoding %d bytes of data", in.length, e );
+            LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
             throw e ;
         } finally {
             closeSilently( bis );
