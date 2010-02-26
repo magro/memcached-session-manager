@@ -14,7 +14,7 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
@@ -42,13 +42,9 @@ import org.junit.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
-import de.javakaffee.web.msm.NodeIdResolver;
-import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
-
 /**
  * Integration test testing basic session manager functionality.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -131,7 +127,7 @@ public class MemcachedSessionManagerIntegrationTest {
      * Tests, that session ids with an invalid format (not containing the
      * memcached id) do not cause issues. Instead, we want to retrieve a new
      * session id.
-     * 
+     *
      * @throws IOException
      * @throws InterruptedException
      */
@@ -182,7 +178,7 @@ public class MemcachedSessionManagerIntegrationTest {
     /**
      * Tests, that relocated sessions are no longer available under the
      * old/former session id.
-     * 
+     *
      * @throws IOException
      * @throws InterruptedException
      */

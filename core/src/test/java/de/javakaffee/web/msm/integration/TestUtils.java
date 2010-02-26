@@ -233,6 +233,10 @@ public class TestUtils {
         return catalina;
     }
 
+    public static MemcachedBackupSessionManager getManager( final Embedded tomcat ) {
+        return (MemcachedBackupSessionManager) tomcat.getContainer().getManager();
+    }
+
     /**
      * A helper class for a response with a body containing key=value pairs
      * each in one line.

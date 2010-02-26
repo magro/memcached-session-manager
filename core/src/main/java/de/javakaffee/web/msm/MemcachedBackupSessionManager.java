@@ -47,7 +47,6 @@ import org.apache.catalina.util.LifecycleSupport;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
@@ -80,6 +79,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private static final String NODES_REGEX = NODE_REGEX + "(?:\\s+" + NODE_REGEX + ")*";
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
+
+    protected static final String NODE_FAILURE = "node.failure";
 
     private final Random _random = new Random();
 
@@ -505,9 +506,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public String sessionNeedsRelocate( final Session session ) {
+    public String determineSessionIdForBackup( final Session session ) {
         final BackupSessionTask task = getOrCreateBackupSessionTask( (MemcachedBackupSession) session );
-        return task.sessionNeedsRelocate();
+        final String sessionNeedsRelocate = task.determineSessionIdForBackup();
+        _log.info( "[" +Thread.currentThread().getName() +  "] Returning session id for relocate: " + sessionNeedsRelocate );
+        return sessionNeedsRelocate;
     }
 
     /**
@@ -519,56 +522,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
     public BackupResultStatus backupSession( final Session session ) {
-        if ( _log.isInfoEnabled() ) {
-            _log.debug( "Trying to store session in memcached: " + session.getId() );
-        }
-
-        final MemcachedBackupSession backupSession = (MemcachedBackupSession) session;
-
-        /* Check if the session was accessed at all since the last backup/check.
-         * If this is not the case, we even don't have to check if attributes
-         * have changed (and can skip serialization and hash calucation)
-         */
-        if ( !backupSession.wasAccessedSinceLastBackupCheck() ) {
-            _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
-            return BackupResultStatus.SKIPPED;
-        }
-
-        final Map<String, Object> attributes = backupSession.getAttributesInternal();
-
-        final byte[] attributesData = _transcoderService.serializeAttributes( backupSession, attributes );
-        final int hashCode = Arrays.hashCode( attributesData );
-        final BackupSessionTask task = getOrCreateBackupSessionTask( backupSession );
-        final BackupResultStatus result;
-        if ( backupSession.getDataHashCode() != hashCode
-                || task.sessionCookieWasRelocated() ) {
-            final byte[] data = _transcoderService.serialize( backupSession, attributesData );
-
-            final BackupResult backupResult = task.backupSession( data, attributesData );
-            if ( backupResult.isSuccess() || backupResult.isRelocated() ) {
-                /* we can use the already calculated hashcode if we have still the same
-                 * attributes data, which is the case for the most common case SUCCESS
-                 */
-                final int newHashCode = backupResult.getAttributesData() == attributesData
-                    ? hashCode
-                    : Arrays.hashCode( backupResult.getAttributesData() );
-                backupSession.setDataHashCode( newHashCode );
-            }
-
-            result = backupResult.getStatus();
-        } else {
-            result = BackupResultStatus.SKIPPED;
-        }
-
-        /* Store the current value of {@link #getThisAccessedTimeInternal()} in a private,
-         * transient field so that we can check above (before computing the hash of the
-         * session attributes) if the session was accessed since this backup/check.
-         */
-        if ( result != BackupResultStatus.FAILURE ) {
-            backupSession.storeThisAccessedTimeFromLastBackupCheck();
-        }
-
-        return result;
+        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).backupSession( session );
 
     }
 
@@ -632,10 +586,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void remove( final Session session ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "remove invoked, session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE ) +
-                    ", node failure: " + session.getNote( BackupSessionTask.NODE_FAILURE ) +
+                    ", node failure: " + session.getNote( NODE_FAILURE ) +
                     ", id: " + session.getId() );
         }
-        if ( session.getNote( BackupSessionTask.NODE_FAILURE ) != Boolean.TRUE ) {
+        if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
             try {
                 _log.debug( "Deleting session from memcached: " + session.getId() );
                 _memcached.delete( session.getId() );
@@ -990,7 +944,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 throw new IllegalStateException( "There's no manager set." );
             }
 
+            /*
+             * and mark it as a node-failure-session, so that remove(session) does
+             * not try to remove it from memcached... (the session is removed and
+             * added when the session id is changed)
+             */
+            setNote( NODE_FAILURE, Boolean.TRUE );
             manager.remove( this );
+            removeNote( NODE_FAILURE );
             this.id = id;
             manager.add( this );
 
@@ -1085,6 +1046,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         BackupSessionTask getBackupTask() {
             return _backupTask;
+        }
+
+        /**
+         * Removes the backup task from this session, so that {@link #getBackupTask()} will
+         * return <code>null</code>.
+         */
+        void removeBackupTask() {
+            _backupTask = null;
         }
 
         /**

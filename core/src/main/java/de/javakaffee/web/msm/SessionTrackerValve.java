@@ -152,7 +152,7 @@ class SessionTrackerValve extends ValveBase {
                 //_logger.info( " CommitInterceptingActionHook executing before commit..." );
                 final Session session = request.getSessionInternal( false );
                 if ( session != null ) {
-                    final String newSessionId = _sessionBackupService.sessionNeedsRelocate( session );
+                    final String newSessionId = _sessionBackupService.determineSessionIdForBackup( session );
                     //_logger.info( "CommitInterceptingActionHook before commit got new session id: " + newSessionId );
                     if ( newSessionId != null ) {
                         setSessionIdCookie( response, request, newSessionId );
@@ -195,14 +195,17 @@ class SessionTrackerValve extends ValveBase {
     public static interface SessionBackupService {
 
         /**
-         * Returns the new session id if the provided session has to be
-         * relocated.
+         * Returns the new session id if the provided session will be relocated
+         * with the next {@link #backupSession(Session)}.
+         * This is used to determine during the (directly before) response.commit,
+         * if the session will be relocated so that a new session cookie can be
+         * added to the response headers.
          *
          * @param session
          *            the session to check, never null.
          * @return the new session id, if this session has to be relocated.
          */
-        String sessionNeedsRelocate( final Session session );
+        String determineSessionIdForBackup( final Session session );
 
         /**
          * Backup the provided session in memcached.
@@ -226,7 +229,10 @@ class SessionTrackerValve extends ValveBase {
                  */
                 FAILURE,
                 /**
-                 * The session was moved to another memcached node and stored successfully therein.
+                 * The session was moved to another memcached node and stored successfully therein,
+                 * a new session cookie must be sent to the client.
+                 * If the necessary relocation was detected with {@link SessionBackupService#sessionNeedsRelocate(Session)}
+                 * before, {@link #SUCCESS} must be returned.
                  */
                 RELOCATED,
                 /**

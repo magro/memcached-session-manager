@@ -122,10 +122,8 @@ public class TomcatFailoverIntegrationTest {
             final String value = "bar";
             final String sessionId1 = post( client, _portTomcat1, null, key, value );
 
-            Thread.sleep( 10 );
-
             final Object session = _client.get( sessionId1 );
-            Assert.assertNotNull( session );
+            Assert.assertNotNull( "Session not found in memcached: " + sessionId1, session );
 
             final Response response = get( client, _portTomcat2, sessionId1 );
             final String sessionId2 = response.getSessionId();
