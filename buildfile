@@ -18,7 +18,7 @@ XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
 
 # Testing
-JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.6' ).reject { |a| a.group == 'org.slf4j' }
+JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
 HTTP_CLIENT = transitive( 'commons-httpclient:commons-httpclient:jar:3.1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )

@@ -40,9 +40,11 @@ import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 
-import com.thimbleware.jmemcached.Cache;
+import com.thimbleware.jmemcached.CacheImpl;
+import com.thimbleware.jmemcached.LocalCacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
-import com.thimbleware.jmemcached.storage.hash.LRUCacheStorageDelegate;
+import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap;
+import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap.EvictionPolicy;
 
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 
@@ -167,12 +169,13 @@ public class TestUtils {
         return null;
     }
 
-    public static MemCacheDaemon createDaemon( final InetSocketAddress address ) throws IOException {
-        final MemCacheDaemon daemon = new MemCacheDaemon();
-        final LRUCacheStorageDelegate cacheStorage = new LRUCacheStorageDelegate(100000, 1024*1024, 1024000);
-        daemon.setCache(new Cache(cacheStorage));
+    public static MemCacheDaemon<?> createDaemon( final InetSocketAddress address ) throws IOException {
+        final MemCacheDaemon<LocalCacheElement> daemon = new MemCacheDaemon<LocalCacheElement>();
+        final ConcurrentLinkedHashMap<String, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(
+                EvictionPolicy.LRU, 100000, 1024*1024 );
+        daemon.setCache(new CacheImpl( cacheStorage ));
         daemon.setAddr( address );
-        daemon.setVerbose( false );
+        daemon.setVerbose( true );
         return daemon;
     }
 
