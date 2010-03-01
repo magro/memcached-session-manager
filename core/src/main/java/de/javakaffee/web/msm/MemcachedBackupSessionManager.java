@@ -505,12 +505,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    @Override
     public String determineSessionIdForBackup( final Session session ) {
-        final BackupSessionTask task = getOrCreateBackupSessionTask( (MemcachedBackupSession) session );
-        final String sessionNeedsRelocate = task.determineSessionIdForBackup();
-        _log.info( "[" +Thread.currentThread().getName() +  "] Returning session id for relocate: " + sessionNeedsRelocate );
-        return sessionNeedsRelocate;
+        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).determineSessionIdForBackup();
     }
 
     /**
@@ -522,7 +518,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
     public BackupResultStatus backupSession( final Session session ) {
-        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).backupSession( session );
+        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).backupSession();
 
     }
 
@@ -791,6 +787,44 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
+    @Override
+    public void backgroundProcess() {
+        updateExpirationInMemcached();
+        super.backgroundProcess();
+    }
+
+    private void updateExpirationInMemcached() {
+        final Session[] sessions = findSessions();
+        final int delay = getContainer().getBackgroundProcessorDelay();
+        for ( final Session s : sessions ) {
+            final MemcachedBackupSession session = (MemcachedBackupSession) s;
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Checking session " + session.getId() + ": " +
+                        "\n- isValid: " + session.isValidInternal() +
+                        "\n- isExpiring: " + session.isExpiring() +
+                        "\n- isBackupRunning: " + session.isBackupRunning() +
+                        "\n- isExpirationUpdateRunning: " + session.isExpirationUpdateRunning() +
+                        "\n- wasAccessedSinceLastBackup: " + session.wasAccessedSinceLastBackup() +
+                        "\n- memcachedExpirationTime: " + session.getMemcachedExpirationTime() );
+            }
+            if ( session.isValidInternal()
+                    && !session.isExpiring()
+                    && !session.isBackupRunning()
+                    && !session.isExpirationUpdateRunning()
+                    && session.wasAccessedSinceLastBackup()
+                    && session.getMemcachedExpirationTime() <= 2 * delay ) {
+                try {
+                    getOrCreateBackupSessionTask( session ).updateExpiration();
+                } catch ( final Throwable e ) {
+                    _log.info( "Could not update expiration in memcached for session " + session.getId() );
+                }
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public void propertyChange( final PropertyChangeEvent event ) {
 
         // Validate the source of this event
@@ -870,7 +904,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         private static final long serialVersionUID = 1L;
 
-        private volatile transient BackupSessionTask _backupTask;
+        private transient BackupSessionTask _backupTask;
 
         /*
          * The hash code of the serialized byte[] of this session that is
@@ -884,6 +918,26 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         private transient long _thisAccessedTimeFromLastBackupCheck;
 
+        /*
+         * Stores the time in millis when this session was stored in memcached
+         */
+        private transient long _lastBackupTimestamp;
+
+        /*
+         * The expiration time that was sent to memcached with the last backup/touch.
+         */
+        private transient int _lastMemcachedExpirationTime;
+
+        /*
+         * Stores, if the sessions expiration is just being updated in memcached
+         */
+        private volatile transient boolean _expirationUpdateRunning;
+
+        /*
+         * Stores, if the sessions is just being backuped
+         */
+        private volatile transient boolean _backupRunning;
+
         /**
          * Creates a new instance without a given manager. This has to be
          * assigned via {@link #setManager(Manager)} before this session is
@@ -895,28 +949,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
 
         /**
-         * Stores the current value of {@link #getThisAccessedTimeInternal()} in a private,
-         * transient field. You can check with {@link #wasAccessedSinceLastBackupCheck()}
-         * if the current {@link #getThisAccessedTimeInternal()} value is different
-         * from the previously stored value to see if the session was accessed in
-         * the meantime.
-         */
-        public void storeThisAccessedTimeFromLastBackupCheck() {
-            _thisAccessedTimeFromLastBackupCheck = super.thisAccessedTime;
-        }
-
-        /**
-         * Determines, if the current value of {@link #getThisAccessedTimeInternal()}
-         * differs from the value stored by {@link #storeThisAccessedTimeFromLastBackupCheck()}.
-         * This indicates, if the session was accessed in the meantime.
-         * @return <code>true</code> if the session was accessed since the invocation
-         * of {@link #storeThisAccessedTimeFromLastBackupCheck()}.
-         */
-        public boolean wasAccessedSinceLastBackupCheck() {
-            return _thisAccessedTimeFromLastBackupCheck != super.thisAccessedTime;
-        }
-
-        /**
          * Creates a new instance with the given manager.
          *
          * @param manager
@@ -924,6 +956,135 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         public MemcachedBackupSession( final Manager manager ) {
             super( manager );
+        }
+
+        /**
+         * Calculates the expiration time that must be sent to memcached,
+         * based on the sessions maxInactiveInterval and the time the session
+         * is already idle (based on thisAccessedTime).
+         * <p>
+         * Calculating this time instead of just using maxInactiveInterval is
+         * important for the update of the expiration time: if we would just use
+         * maxInactiveInterval, the session would exist longer in memcached than it would
+         * be valid in tomcat.
+         * </p>
+         *
+         * @return the expiration time in seconds
+         */
+        int getMemcachedExpirationTimeToSet() {
+            final long timeIdleInMillis = System.currentTimeMillis() - getThisAccessedTimeInternal();
+            /* rounding is just for tests, as they are using actually seconds for testing.
+             * with a default setup 1 second difference wouldn't matter...
+             */
+            final int timeIdle = Math.round( (float)timeIdleInMillis / 1000L );
+            final int expirationTime = getMaxInactiveInterval() - timeIdle;
+            return expirationTime;
+        }
+
+        /**
+         * Gets the time in seconds when this session will expire in memcached.
+         *
+         * @return the time in seconds
+         */
+        int getMemcachedExpirationTime() {
+            final long timeIdleInMillis = System.currentTimeMillis() - _lastBackupTimestamp;
+            /* rounding is just for tests, as they are using actually seconds for testing.
+             * with a default setup 1 second difference wouldn't matter...
+             */
+            final int timeIdle = Math.round( (float)timeIdleInMillis / 1000L );
+            final int expirationTime = _lastMemcachedExpirationTime - timeIdle;
+            return expirationTime;
+        }
+
+        /**
+         * Store the time in millis when this session was successfully stored in memcached.
+         * @param lastBackupTimestamp the lastBackupTimestamp to set
+         */
+        void setLastBackupTimestamp( final long lastBackupTimestamp ) {
+            _lastBackupTimestamp = lastBackupTimestamp;
+        }
+
+        /**
+         * The expiration time that was sent to memcached with the last backup/touch.
+         *
+         * @return the lastMemcachedExpirationTime
+         */
+        int getLastMemcachedExpirationTime() {
+            return _lastMemcachedExpirationTime;
+        }
+
+        /**
+         * Set the expiration time that was sent to memcached with this backup/touch.
+         * @param lastMemcachedExpirationTime the lastMemcachedExpirationTime to set
+         */
+        void setLastMemcachedExpirationTime( final int lastMemcachedExpirationTime ) {
+            _lastMemcachedExpirationTime = lastMemcachedExpirationTime;
+        }
+
+        /**
+         * Determines, if the session was accessed since the last backup.
+         * @return <code>true</code>, if <code>thisAccessedTime > lastBackupTimestamp</code>.
+         */
+        boolean wasAccessedSinceLastBackup() {
+            return super.thisAccessedTime > _lastBackupTimestamp;
+        }
+
+        /**
+         * Stores the current value of {@link #getThisAccessedTimeInternal()} in a private,
+         * transient field. You can check with {@link #wasAccessedSinceLastBackupCheck()}
+         * if the current {@link #getThisAccessedTimeInternal()} value is different
+         * from the previously stored value to see if the session was accessed in
+         * the meantime.
+         */
+        void storeThisAccessedTimeFromLastBackupCheck() {
+            _thisAccessedTimeFromLastBackupCheck = super.thisAccessedTime;
+        }
+
+        /**
+         * Determines, if the current request accessed the session. This is provided,
+         * if the current value of {@link #getThisAccessedTimeInternal()}
+         * differs from the value stored by {@link #storeThisAccessedTimeFromLastBackupCheck()}.
+         * @return <code>true</code> if the session was accessed since the invocation
+         * of {@link #storeThisAccessedTimeFromLastBackupCheck()}.
+         */
+        boolean wasAccessedSinceLastBackupCheck() {
+            return _thisAccessedTimeFromLastBackupCheck != super.thisAccessedTime;
+        }
+
+        /**
+         * Determines, if the sessions expiration is just being updated in memcached.
+         *
+         * @return the expirationUpdateRunning
+         */
+        boolean isExpirationUpdateRunning() {
+            return _expirationUpdateRunning;
+        }
+
+        /**
+         * Store, if the sessions expiration is just being updated in memcached.
+         *
+         * @param expirationUpdateRunning the expirationUpdateRunning to set
+         */
+        void setExpirationUpdateRunning( final boolean expirationUpdateRunning ) {
+            _expirationUpdateRunning = expirationUpdateRunning;
+        }
+
+        /**
+         * Determines, if the sessions is just being backuped.
+         *
+         * @return the backupRunning
+         */
+        boolean isBackupRunning() {
+            return _backupRunning;
+        }
+
+        /**
+         * Store, if the sessions is just being backuped.
+         *
+         * @param backupRunning the backupRunning to set
+         */
+        void setBackupRunning( final boolean backupRunning ) {
+            _backupRunning = backupRunning;
         }
 
         /**
@@ -957,11 +1118,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         }
 
-        @Override
-        public void setId( final String id ) {
-            super.setId( id );
-        }
-
         /**
          * Performs some initialization of this session that is required after
          * deserialization. This must be invoked by custom serialization strategies
@@ -979,32 +1135,34 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         /**
          * The hash code of the serialized byte[] of this sessions attributes that is
          * used to determine, if the session was modified.
-         * @return
+         * @return the hashCode
          */
-        public int getDataHashCode() {
+        int getDataHashCode() {
             return _dataHashCode;
         }
 
         /**
          * Set the hash code of the serialized session attributes.
+         *
+         * @param attributesDataHashCode the hashCode of the serialized byte[].
          */
-        public void setDataHashCode( final int attributesDataHashCode ) {
+        void setDataHashCode( final int attributesDataHashCode ) {
             _dataHashCode = attributesDataHashCode;
         }
 
-        protected long getCreationTimeInternal() {
+        long getCreationTimeInternal() {
             return super.creationTime;
         }
 
-        protected void setCreationTimeInternal( final long creationTime ) {
+        void setCreationTimeInternal( final long creationTime ) {
             super.creationTime = creationTime;
         }
 
-        protected boolean isNewInternal() {
+        boolean isNewInternal() {
             return super.isNew;
         }
 
-        protected void setIsNewInternal( final boolean isNew ) {
+        void setIsNewInternal( final boolean isNew ) {
             super.isNew = isNew;
         }
 
@@ -1012,7 +1170,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             return super.isValid;
         }
 
-        protected void setIsValidInternal( final boolean isValid ) {
+        void setIsValidInternal( final boolean isValid ) {
             super.isValid = isValid;
         }
 
@@ -1022,20 +1180,24 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          *
          * @return the timestamp of the last {@link #access()} invocation.
          */
-        protected long getThisAccessedTimeInternal() {
+        long getThisAccessedTimeInternal() {
             return super.thisAccessedTime;
         }
 
-        protected void setThisAccessedTimeInternal( final long thisAccessedTime ) {
+        void setThisAccessedTimeInternal( final long thisAccessedTime ) {
             super.thisAccessedTime = thisAccessedTime;
         }
 
-        protected void setLastAccessedTimeInternal( final long lastAccessedTime ) {
+        void setLastAccessedTimeInternal( final long lastAccessedTime ) {
             super.lastAccessedTime = lastAccessedTime;
         }
 
-        protected void setIdInternal( final String id ) {
+        void setIdInternal( final String id ) {
             super.id = id;
+        }
+
+        boolean isExpiring() {
+            return super.expiring;
         }
 
         /**

@@ -18,6 +18,7 @@ package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -28,9 +29,11 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 import net.spy.memcached.MemcachedClient;
 
+import org.apache.catalina.Container;
 import org.apache.catalina.startup.Embedded;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
@@ -52,7 +55,7 @@ public class MemcachedSessionManagerIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( MemcachedSessionManagerIntegrationTest.class );
 
-    private MemCacheDaemon _daemon;
+    private MemCacheDaemon<?> _daemon;
     private MemcachedClient _memcached;
 
     private Embedded _tomcat1;
@@ -98,9 +101,9 @@ public class MemcachedSessionManagerIntegrationTest {
     @After
     public void tearDown() throws Exception {
         _memcached.shutdown();
-        _daemon.stop();
         _tomcat1.stop();
         _connectionManager.shutdown();
+        _daemon.stop();
     }
 
     @Test
@@ -155,7 +158,10 @@ public class MemcachedSessionManagerIntegrationTest {
          * wait some time, as processExpires runs every second and the
          * maxInactiveTime is set to 1 sec...
          */
-        Thread.sleep( 2100 );
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        final Container container = manager.getContainer();
+        final long timeout = TimeUnit.SECONDS.toMillis( container.getBackgroundProcessorDelay() + manager.getMaxInactiveInterval() ) + 100;
+        Thread.sleep( timeout );
 
         assertNull( "Expired sesion still existing in memcached", _memcached.get( sessionId1 ) );
     }
@@ -184,6 +190,7 @@ public class MemcachedSessionManagerIntegrationTest {
      */
     @Test
     public void testRelocateSession() throws IOException, InterruptedException {
+        // FIXME implementation does not match docs
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
 
@@ -195,6 +202,90 @@ public class MemcachedSessionManagerIntegrationTest {
 
         final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
         assertNotSame( "Expired session returned", sessionId1, sessionId2 );
+    }
+
+    /**
+     * Tests, that for a session that was not sent to memcached (because it's attributes
+     * were not modified), the expiration is updated so that they don't expire in memcached
+     * before they expire in tomcat.
+     *
+     * @throws Exception if something goes wrong with the http communication with tomcat
+     */
+    @Test
+    public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple() throws Exception {
+
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        // set to 1 sec above (in setup), default is 10 seconds
+        final int delay = manager.getContainer().getBackgroundProcessorDelay();
+        manager.setMaxInactiveInterval( delay * 4 );
+
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
+        assertNotNull( "Session not available in memcached.", _memcached.get( sessionId1 ) );
+
+        /* after 2 seconds make another request without changing the session, so that
+         * it's not sent to memcached
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 2 ) );
+        makeRequest( _httpClient, _portTomcat1, sessionId1 );
+
+        /* after another 3 seconds check that the session is still alive in memcached,
+         * this would have been expired without an updated expiration
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 3 ) );
+        assertNotNull( "Session expired in memcached.", _memcached.get( sessionId1 ) );
+
+        /* after another >1 second (4 seconds since the last request)
+         * the session must be expired in memcached
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 1000 ); // +1000 just to be sure that we're >4 secs
+        assertNull( "Session not expired in memcached.", _memcached.get( sessionId1 ) );
+
+    }
+
+    /**
+     * Tests update of session expiration in memcached (like {@link #testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple()})
+     * but for the scenario where many readonly requests occur: in this case, we cannot just use
+     * <em>maxInactiveInterval - secondsSinceLastBackup</em> (in {@link MemcachedBackupSessionManager#updateExpirationInMemcached})
+     * to determine if an expiration update is required, but we must use the last expiration time sent to memcached.
+     *
+     * @throws Exception if something goes wrong with the http communication with tomcat
+     */
+    @Test
+    public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedManyReadonlyRequests() throws Exception {
+
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        // set to 1 sec above (in setup), default is 10 seconds
+        final int delay = manager.getContainer().getBackgroundProcessorDelay();
+        manager.setMaxInactiveInterval( delay * 4 );
+
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( "No session created.", sessionId1 );
+        assertNotNull( "Session not available in memcached.", _memcached.get( sessionId1 ) );
+
+        /* after 3 seconds make another request without changing the session, so that
+         * it's not sent to memcached
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 3 ) );
+        makeRequest( _httpClient, _portTomcat1, sessionId1 );
+
+        /* after another 3 seconds make another request without changing the session
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 3 ) );
+        makeRequest( _httpClient, _portTomcat1, sessionId1 );
+
+        /* after another nearly 4 seconds check that the session is still alive in memcached,
+         * this would have been expired without an updated expiration
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 4 ) - 200 );
+        assertNotNull( "Session expired in memcached.", _memcached.get( sessionId1 ) );
+
+        /* after another second (more than 4 seconds since the last request)
+         * the session must be expired in memcached
+         */
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 200 );
+        assertNull( "Session not expired in memcached.", _memcached.get( sessionId1 ) );
+
     }
 
 }
