@@ -31,7 +31,6 @@ import org.apache.catalina.Session;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**

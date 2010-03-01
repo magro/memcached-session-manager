@@ -27,8 +27,8 @@ import org.apache.catalina.session.StandardSession;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 import de.javakaffee.web.msm.serializer.xstream.XStreamTranscoderTest.Person.Gender;
 
 /**

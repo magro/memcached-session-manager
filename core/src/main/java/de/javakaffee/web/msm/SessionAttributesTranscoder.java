@@ -18,7 +18,6 @@ package de.javakaffee.web.msm;
 
 import java.util.Map;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * The {@link SessionAttributesTranscoder} is responsible for serializing/deserializing the

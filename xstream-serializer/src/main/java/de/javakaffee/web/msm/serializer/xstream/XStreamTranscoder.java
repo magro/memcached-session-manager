@@ -28,8 +28,8 @@ import org.apache.juli.logging.LogFactory;
 
 import com.thoughtworks.xstream.XStream;
 
+import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina

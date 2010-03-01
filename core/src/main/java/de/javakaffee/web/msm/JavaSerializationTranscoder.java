@@ -39,7 +39,6 @@ import org.apache.catalina.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * A {@link SessionAttributesTranscoder} that serializes catalina {@link StandardSession}s using

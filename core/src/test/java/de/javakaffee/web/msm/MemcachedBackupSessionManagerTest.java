@@ -38,7 +38,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * Test the {@link MemcachedBackupSessionManager}.

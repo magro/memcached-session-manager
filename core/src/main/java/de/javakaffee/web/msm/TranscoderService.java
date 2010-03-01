@@ -20,7 +20,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.Map;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 
 /**
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>

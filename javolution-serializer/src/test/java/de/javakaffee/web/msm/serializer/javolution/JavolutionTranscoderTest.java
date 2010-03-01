@@ -55,8 +55,8 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.MemcachedBackupSession;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Container;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolderArray;
