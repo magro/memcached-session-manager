@@ -55,7 +55,7 @@ public class TomcatFailoverIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( TomcatFailoverIntegrationTest.class );
 
-    private MemCacheDaemon _daemon;
+    private MemCacheDaemon<?> _daemon;
     private MemcachedClient _client;
 
     private Embedded _tomcat1;

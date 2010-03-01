@@ -56,9 +56,9 @@ public class MemcachedFailoverIntegrationTest {
     private static final Log LOG = LogFactory
             .getLog( MemcachedFailoverIntegrationTest.class );
 
-    private MemCacheDaemon _daemon1;
-    private MemCacheDaemon _daemon2;
-    private MemCacheDaemon _daemon3;
+    private MemCacheDaemon<?> _daemon1;
+    private MemCacheDaemon<?> _daemon2;
+    private MemCacheDaemon<?> _daemon3;
 
     private Embedded _tomcat1;
 

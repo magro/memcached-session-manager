@@ -173,9 +173,9 @@ public class TestUtils {
         final MemCacheDaemon<LocalCacheElement> daemon = new MemCacheDaemon<LocalCacheElement>();
         final ConcurrentLinkedHashMap<String, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(
                 EvictionPolicy.LRU, 100000, 1024*1024 );
-        daemon.setCache(new CacheImpl( cacheStorage ));
+        daemon.setCache( new CacheImpl( cacheStorage ) );
         daemon.setAddr( address );
-        daemon.setVerbose( true );
+        daemon.setVerbose( false );
         return daemon;
     }
 
