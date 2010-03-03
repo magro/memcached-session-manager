@@ -16,15 +16,34 @@
  */
 package de.javakaffee.web.msm;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.security.Principal;
 import java.util.Date;
 import java.util.Map;
+
+import org.apache.catalina.Realm;
+import org.apache.catalina.Session;
+import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.ha.session.SerializablePrincipal;
+import org.apache.catalina.realm.GenericPrincipal;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 
 /**
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class TranscoderService {
+
+    @SuppressWarnings( "unused" )
+    private static final Log LOG = LogFactory.getLog( TranscoderService.class );
 
     static final int NUM_BYTES = 8 // creationTime: long
             + 8 // lastAccessedTime: long
@@ -57,11 +76,11 @@ public class TranscoderService {
      * <pre><code>final byte[] attributesData = serializeAttributes( session, session.getAttributes() );
 serialize( session, attributesData );
      * </code></pre>
-     * The returned byte array can be deserialized using {@link #deserialize(byte[])}.
+     * The returned byte array can be deserialized using {@link #deserialize(byte[], Realm)}.
      *
      * @see #serializeAttributes(MemcachedBackupSession, Map)
      * @see #serialize(MemcachedBackupSession, byte[])
-     * @see #deserialize(byte[])
+     * @see #deserialize(byte[], Realm)
      * @param session the session to serialize.
      * @return the serialized session data.
      */
@@ -79,10 +98,11 @@ serialize( session, attributesData );
      * {@link MemcachedBackupSession#doAfterDeserialization()} invoked.
      * </p>
      * @param data the byte array of the serialized session and its session attributes.
+     * @param realm the realm that is used to reconstruct the principal if there was any stored in the session.
      * @return the deserialized {@link MemcachedBackupSession}.
      */
-    public MemcachedBackupSession deserialize( final byte[] data ) {
-        final DeserializationResult deserializationResult = deserializeSessionFields( data );
+    public MemcachedBackupSession deserialize( final byte[] data, final Realm realm ) {
+        final DeserializationResult deserializationResult = deserializeSessionFields( data, realm );
         final Map<String, Object> attributes = _attributesTranscoder.deserialize( deserializationResult.getAttributesData() );
         final MemcachedBackupSession result = deserializationResult.getSession();
         result.setAttributesInternal( attributes );
@@ -127,15 +147,19 @@ serialize( session, attributesData );
 
 
     static byte[] serializeSessionFields( final MemcachedBackupSession session ) {
-        byte[] idData = null;
-        try {
-            idData = session.getIdInternal().getBytes( "UTF-8" );
-        } catch ( final UnsupportedEncodingException e ) {
-            throw new RuntimeException( e );
-        }
+
+        final byte[] idData = serializeId( session.getIdInternal() );
+
+        final byte[] principalData = session.getPrincipal() != null ? serializePrincipal( session.getPrincipal() ) : null;
+        final int principalDataLength = principalData != null ? principalData.length : 0;
+
         final int sessionFieldsDataLength = 2 // short value that stores the dataLength
                 + NUM_BYTES // bytes that store all session attributes but the id
-                + idData.length; // the number of bytes for the id
+                + 2 // short value that stores the idData length
+                + idData.length // the number of bytes for the id
+                + 2 // short value for the authType
+                + 2 // short value that stores the principalData length
+                + principalDataLength; // the number of bytes for the principal
         final byte[] data = new byte[sessionFieldsDataLength];
 
         int idx = 0;
@@ -146,12 +170,16 @@ serialize( session, attributesData );
         idx = encodeBoolean( session.isNewInternal(), data, idx );
         idx = encodeBoolean( session.isValidInternal(), data, idx );
         idx = encodeNum( session.getThisAccessedTimeInternal(), data, idx, 8 );
-        copy( idData, data, idx );
+        idx = encodeNum( idData.length, data, idx, 2 );
+        idx = copy( idData, data, idx );
+        idx = encodeNum( AuthType.valueOfValue( session.getAuthType() ).getId(), data, idx, 2 );
+        idx = encodeNum( principalDataLength, data, idx, 2 );
+        copy( principalData, data, idx );
 
         return data;
     }
 
-    static DeserializationResult deserializeSessionFields( final byte[] data ) {
+    static DeserializationResult deserializeSessionFields( final byte[] data, final Realm realm ) {
         final MemcachedBackupSession result = new MemcachedBackupSession();
 
         final short sessionFieldsDataLength = (short) decodeNum( data, 0, 2 );
@@ -163,9 +191,19 @@ serialize( session, attributesData );
         result.setIsValidInternal( decodeBoolean( data, 23 ) );
         result.setThisAccessedTimeInternal( decodeNum( data, 24, 8 ) );
 
-        final int currentIdx = 32; // 24 + 8
-        final int idLength = sessionFieldsDataLength - currentIdx;
-        result.setIdInternal( decodeString( data, 32, idLength ) );
+        final short idLength = (short) decodeNum( data, 32, 2 );
+        result.setIdInternal( decodeString( data, 34, idLength ) );
+
+        final short authTypeId = (short)decodeNum( data, 34 + idLength, 2 );
+        result.setAuthType( AuthType.valueOfId( authTypeId ).getValue() );
+
+        final int currentIdx = 34 + idLength + 2;
+        final short principalDataLength = (short) decodeNum( data, currentIdx, 2 );
+        if ( principalDataLength > 0 ) {
+            final byte[] principalData = new byte[principalDataLength];
+            System.arraycopy( data, currentIdx + 2, principalData, 0, principalDataLength );
+            result.setPrincipal( deserializePrincipal( principalData, realm ) );
+        }
 
         final byte[] attributesData = new byte[ data.length - sessionFieldsDataLength ];
         System.arraycopy( data, sessionFieldsDataLength, attributesData, 0, data.length - sessionFieldsDataLength );
@@ -192,6 +230,48 @@ serialize( session, attributesData );
          */
         byte[] getAttributesData() {
             return _attributesData;
+        }
+    }
+
+    private static byte[] serializeId( final String id ) {
+        try {
+            return id.getBytes( "UTF-8" );
+        } catch ( final UnsupportedEncodingException e ) {
+            throw new RuntimeException( e );
+        }
+    }
+
+    private static byte[] serializePrincipal( final Principal principal ) {
+        ByteArrayOutputStream bos = null;
+        ObjectOutputStream oos = null;
+        try {
+            bos = new ByteArrayOutputStream();
+            oos = new ObjectOutputStream( bos );
+            SerializablePrincipal.writePrincipal((GenericPrincipal) principal, oos );
+            oos.flush();
+            return bos.toByteArray();
+        } catch ( final IOException e ) {
+            throw new IllegalArgumentException( "Non-serializable object", e );
+        } finally {
+            closeSilently( bos );
+            closeSilently( oos );
+        }
+    }
+
+    private static Principal deserializePrincipal( final byte[] data, final Realm realm ) {
+        ByteArrayInputStream bis = null;
+        ObjectInputStream ois = null;
+        try {
+            bis = new ByteArrayInputStream( data );
+            ois = new ObjectInputStream( bis );
+            return SerializablePrincipal.readPrincipal( ois, realm );
+        } catch ( final IOException e ) {
+            throw new IllegalArgumentException( "Could not deserialize principal", e );
+        } catch ( final ClassNotFoundException e ) {
+            throw new IllegalArgumentException( "Could not deserialize principal", e );
+        } finally {
+            closeSilently( bis );
+            closeSilently( ois );
         }
     }
 
@@ -258,8 +338,87 @@ serialize( session, attributesData );
         }
     }
 
-    protected static void copy( final byte[] src, final byte[] dest, final int destBeginIndex ) {
+    protected static int copy( final byte[] src, final byte[] dest, final int destBeginIndex ) {
+        if ( src == null ) {
+            return destBeginIndex;
+        }
         System.arraycopy( src, 0, dest, destBeginIndex, src.length );
+        return destBeginIndex + src.length;
+    }
+
+    private static void closeSilently( final OutputStream os ) {
+        if ( os != null ) {
+            try {
+                os.close();
+            } catch ( final IOException f ) {
+                // fail silently
+            }
+        }
+    }
+
+    private static void closeSilently( final InputStream is ) {
+        if ( is != null ) {
+            try {
+                is.close();
+            } catch ( final IOException f ) {
+                // fail silently
+            }
+        }
+    }
+
+    /**
+     * The enum representing id/string mappings for the {@link Session#getAuthType()}
+     * with values defined in {@link Constants}.
+     */
+    private static enum AuthType {
+
+        NONE( (short)0, null ),
+        BASIC( (short)1, Constants.BASIC_METHOD ),
+        CLIENT_CERT( (short)2, Constants.CERT_METHOD ),
+        DIGEST( (short)3, Constants.DIGEST_METHOD ),
+        FORM( (short)4, Constants.FORM_METHOD );
+
+        private final short _id;
+        private final String _value;
+
+        private AuthType( final short id, final String value ) {
+            _id = id;
+            _value = value;
+        }
+
+        static AuthType valueOfId( final short id ) {
+            for( final AuthType authType : values() ) {
+                if ( id == authType._id ) {
+                    return authType;
+                }
+            }
+            throw new IllegalArgumentException( "No AuthType found for id " + id );
+        }
+
+        static AuthType valueOfValue( final String value ) {
+            for( final AuthType authType : values() ) {
+                if ( value == null && authType._value == null
+                        || value != null && value.equals( authType._value )) {
+                    return authType;
+                }
+            }
+            throw new IllegalArgumentException( "No AuthType found for value " + value );
+        }
+
+        /**
+         * @return the id
+         */
+        short getId() {
+            return _id;
+        }
+
+        /**
+         * @return the value
+         */
+        String getValue() {
+            return _value;
+        }
+
     }
 
 }

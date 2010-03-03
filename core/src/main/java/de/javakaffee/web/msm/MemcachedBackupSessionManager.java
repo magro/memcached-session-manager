@@ -551,7 +551,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
                 final MemcachedBackupSession session;
                 if ( data != null ) {
-                    final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data );
+                    final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, getContainer().getRealm() );
                     final byte[] attributesData = deserializationResult.getAttributesData();
                     final Map<String, Object> attributes = _transcoderService.deserializeAttributes( attributesData );
                     session = deserializationResult.getSession();

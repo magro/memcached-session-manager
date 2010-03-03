@@ -16,12 +16,15 @@
  */
 package de.javakaffee.web.msm;
 
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Map;
 
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
+
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * The session class used by the {@link MemcachedBackupSessionManager}.
@@ -74,6 +77,8 @@ public final class MemcachedBackupSession extends StandardSession {
      * Stores, if the sessions is just being backuped
      */
     private volatile transient boolean _backupRunning;
+
+    private transient boolean _authenticationChanged;
 
     /**
      * Creates a new instance without a given manager. This has to be
@@ -387,6 +392,49 @@ public final class MemcachedBackupSession extends StandardSession {
     @Override
     protected boolean exclude( final String name ) {
         return super.exclude( name );
+    }
+
+    /**
+     * Determines, if either the {@link #getAuthType()} or {@link #getPrincipal()}
+     * properties have changed.
+     * @return <code>true</code> if authentication details have changed.
+     */
+    boolean authenticationChanged() {
+        return _authenticationChanged;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setAuthType( final String authType ) {
+        if ( !equals( authType, super.authType ) ) {
+            _authenticationChanged = true;
+        }
+        super.setAuthType( authType );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setPrincipal( final Principal principal ) {
+        if ( !equals( principal, super.principal ) ) {
+            _authenticationChanged = true;
+        }
+        super.setPrincipal( principal );
+    }
+
+    private static boolean equals( final Object one, final Object another ) {
+        return one == null && another == null || one != null && one.equals( another );
+    }
+
+    /**
+     * Is invoked after this session has been successfully stored with
+     * {@link BackupResultStatus#SUCCESS} or {@link BackupResultStatus#RELOCATED}.
+     */
+    public void backupFinished() {
+        _authenticationChanged = false;
     }
 
 }

@@ -172,7 +172,8 @@ public class BackupSessionTask {
             final BackupResultStatus result;
             if ( _session.getDataHashCode() != hashCode
                     || sessionCookieWasRelocated()
-                    || sessionWouldBeRelocated() ) {
+                    || sessionWouldBeRelocated()
+                    || _session.authenticationChanged() ) {
                 final byte[] data = _transcoderService.serialize( _session, attributesData );
 
                 final BackupResult backupResult = doBackupSession( data, attributesData );
@@ -191,12 +192,22 @@ public class BackupSessionTask {
                 result = BackupResultStatus.SKIPPED;
             }
 
-            /* Store the current value of {@link #getThisAccessedTimeInternal()} in a private,
-             * transient field so that we can check above (before computing the hash of the
-             * session attributes) if the session was accessed since this backup/check.
-             */
             if ( result != BackupResultStatus.FAILURE ) {
+
+                /* Store the current value of {@link #getThisAccessedTimeInternal()} in a private,
+                 * transient field so that we can check above (before computing the hash of the
+                 * session attributes) if the session was accessed since this backup/check.
+                 */
                 _session.storeThisAccessedTimeFromLastBackupCheck();
+
+                /* Tell the session, that it has been stored, so that e.g. the
+                 * authenticationChanged property can be reset.
+                 */
+                if ( result == BackupResultStatus.SUCCESS
+                        || result == BackupResultStatus.RELOCATED ) {
+                    _session.backupFinished();
+                }
+
             }
 
             if ( _log.isDebugEnabled() ) {

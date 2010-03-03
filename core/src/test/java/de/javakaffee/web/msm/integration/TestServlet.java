@@ -37,6 +37,11 @@ import org.apache.juli.logging.LogFactory;
  */
 public class TestServlet extends HttpServlet {
 
+    /**
+     * The key of the id in the response body.
+     */
+    public static final String ID = "id";
+
     private static final long serialVersionUID = 7954803132860358448L;
 
     private static final Log LOG = LogFactory.getLog( TestServlet.class );
@@ -48,12 +53,13 @@ public class TestServlet extends HttpServlet {
     protected void doGet( final HttpServletRequest request, final HttpServletResponse response )
             throws ServletException, IOException {
 
+        final HttpSession session = request.getSession( false );
         LOG.info( "invoked" );
 
         final PrintWriter out = response.getWriter();
-        out.println( "id=" + request.getSession().getId() );
+        out.println( ID + "=" + request.getSession().getId() );
 
-        final HttpSession session = request.getSession( false );
+        // final HttpSession session = request.getSession( false );
         if ( session != null ) {
             final Enumeration<?> attributeNames = session.getAttributeNames();
             while ( attributeNames.hasMoreElements() ) {

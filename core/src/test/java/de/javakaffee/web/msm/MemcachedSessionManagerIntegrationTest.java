@@ -68,20 +68,22 @@ public class MemcachedSessionManagerIntegrationTest {
 
     private HttpClient _httpClient;
 
+    private int _memcachedPort;
+
     @Before
     public void setUp() throws Throwable {
 
         _portTomcat1 = 18888;
 
-        final int port = 21211;
+        _memcachedPort = 21211;
 
-        final InetSocketAddress address = new InetSocketAddress( "localhost", port );
+        final InetSocketAddress address = new InetSocketAddress( "localhost", _memcachedPort );
         _daemon = createDaemon( address );
         _daemon.start();
 
         try {
             _memcachedNodeId = "n1";
-            final String memcachedNodes = _memcachedNodeId + ":localhost:" + port;
+            final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
             _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
             _tomcat1.start();
         } catch ( final Throwable e ) {
@@ -92,7 +94,7 @@ public class MemcachedSessionManagerIntegrationTest {
         _memcached =
                 new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
                         _memcachedNodeId, address ).build(), new SessionIdFormat() ),
-                        Arrays.asList( new InetSocketAddress( "localhost", port ) ) );
+                        Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
 
         _connectionManager = new SimpleHttpConnectionManager( true );
         _httpClient = new HttpClient( _connectionManager );
