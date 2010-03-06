@@ -20,9 +20,9 @@ import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.get;
 import static de.javakaffee.web.msm.integration.TestUtils.post;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -42,9 +42,9 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
@@ -79,7 +79,7 @@ public class TomcatFailoverIntegrationTest {
 
     private DefaultHttpClient _httpClient;
 
-    @Before
+    @BeforeMethod
     public void setUp() throws Throwable {
 
         final InetSocketAddress address = new InetSocketAddress( "localhost", MEMCACHED_PORT );
@@ -112,7 +112,7 @@ public class TomcatFailoverIntegrationTest {
         return tomcat;
     }
 
-    @After
+    @AfterMethod
     public void tearDown() throws Exception {
         _client.shutdown();
         _daemon.stop();

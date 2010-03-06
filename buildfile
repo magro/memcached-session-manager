@@ -47,6 +47,7 @@ define 'msm' do
   project.version = '1.2-SNAPSHOT'
 
   compile.using :source=>'1.5', :target=>'1.5'
+  test.using :testng
   package :sources
 
   checkstyle.config 'etc/checkstyle-checks.xml'
@@ -62,8 +63,7 @@ define 'msm' do
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
-    test.with( compile.dependencies, JMEMCACHED, HTTP_CLIENT, CLANG, JMOCK_CGLIB )
-    test.using :testng
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :javadoc, :id => 'msm-javolution-serializer'
   end
 
@@ -72,15 +72,13 @@ define 'msm' do
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
     test.with( compile.dependencies, MOCKITO )
     #test.with( compile.dependencies, MOCKITO, POWERMOCK_CORE, POWERMOCK_MOCKITO, POWERMOCK_JUNIT, POWERMOCK_JUNIT_COMMON )
-    test.using :testng
     package :jar, :javadoc, :id => 'msm-javolution-serializer-jodatime'
   end
 
   desc 'XStream/xml based serialization strategy'
   define 'xstream-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, XSTREAM )
-    test.with( compile.dependencies, JMEMCACHED, HTTP_CLIENT, CLANG )
-    test.using :testng
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :javadoc, :id => 'msm-xstream-serializer'
   end
 

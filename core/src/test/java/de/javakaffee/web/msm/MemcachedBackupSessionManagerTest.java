@@ -34,9 +34,9 @@ import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.loader.WebappLoader;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 
 /**
@@ -49,7 +49,7 @@ public class MemcachedBackupSessionManagerTest {
     private MemcachedBackupSessionManager _manager;
     private MemcachedClient _memcachedMock;
 
-    @Before
+    @BeforeMethod
     public void setup() throws Exception {
 
         _manager = new MemcachedBackupSessionManager();
@@ -65,7 +65,7 @@ public class MemcachedBackupSessionManagerTest {
         final WebappLoader webappLoader = mock( WebappLoader.class );
         // webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
         when( webappLoader.getClassLoader() ).thenReturn( Thread.currentThread().getContextClassLoader() );
-        Assert.assertNotNull( "Webapp Classloader is null.", webappLoader.getClassLoader() );
+        Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
 
         _manager.getContainer().setLoader( webappLoader );
 

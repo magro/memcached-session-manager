@@ -27,9 +27,9 @@ import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.realm.GenericPrincipal;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
@@ -57,7 +57,7 @@ public class TranscoderServiceTest {
         final WebappLoader webappLoader = mock( WebappLoader.class );
         // webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
         when( webappLoader.getClassLoader() ).thenReturn( Thread.currentThread().getContextClassLoader() );
-        Assert.assertNotNull( "Webapp Classloader is null.", webappLoader.getClassLoader() );
+        Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
 
         _manager.getContainer().setLoader( webappLoader );
         _manager.init();

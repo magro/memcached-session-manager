@@ -20,9 +20,9 @@ import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -38,9 +38,9 @@ import org.apache.catalina.startup.Embedded;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
@@ -75,7 +75,7 @@ public class MemcachedFailoverIntegrationTest {
 
     private InetSocketAddress _address3;
 
-    @Before
+    @BeforeMethod
     public void setUp() throws Throwable {
 
         _portTomcat1 = 18888;
@@ -114,7 +114,7 @@ public class MemcachedFailoverIntegrationTest {
         return nodeId + ":" + address.getHostName() + ":" + address.getPort();
     }
 
-    @After
+    @AfterMethod
     public void tearDown() throws Exception {
         if ( _daemon1.isRunning() ) {
             _daemon1.stop();
@@ -159,15 +159,16 @@ public class MemcachedFailoverIntegrationTest {
         final String secondNode = sid2.substring( sid2.lastIndexOf( '-' ) + 1 );
         final String expectedNode = info.nextNodeId;
 
-        assertEquals( "Unexpected nodeId.", expectedNode, secondNode );
+        assertEquals( expectedNode, secondNode, "Unexpected nodeId." );
 
-        assertEquals( "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2,
+        assertEquals(
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
-                sid2 );
+                sid2,
+                "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
         final Session session = getManager( _tomcat1 ).findSession( sid2 );
-        assertNotNull( "Session not found by new id " + sid2, session );
-        assertFalse( "Some notes are set: " + toArray( session.getNoteNames() ), session.getNoteNames().hasNext() );
+        assertNotNull( session, "Session not found by new id " + sid2 );
+        assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
 
     }
 
@@ -202,14 +203,15 @@ public class MemcachedFailoverIntegrationTest {
         final String secondNode = sid2.substring( sid2.lastIndexOf( '-' ) + 1 );
         final String expectedNode = info.failoverNodeId;
 
-        assertEquals( "Unexpected nodeId.", expectedNode, secondNode );
+        assertEquals( expectedNode, secondNode, "Unexpected nodeId." );
 
-        assertEquals( "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2,
+        assertEquals(
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
-                sid2 );
+                sid2,
+                "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
         final Session session = getManager( _tomcat1 ).findSession( sid2 );
-        assertFalse( "Some notes are set: " + toArray( session.getNoteNames() ), session.getNoteNames().hasNext() );
+        assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
 
     }
 
@@ -241,12 +243,12 @@ public class MemcachedFailoverIntegrationTest {
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
 
-        assertEquals( "SessionId changed.", sid1, sid2 );
+        assertEquals( sid1, sid2, "SessionId changed." );
 
-        assertNotNull( "Session "+ sid1 +" not existing.", getSessions().get( sid1 ) );
+        assertNotNull( getSessions().get( sid1 ), "Session "+ sid1 +" not existing." );
 
         final Session session = getManager( _tomcat1 ).findSession( sid2 );
-        assertFalse( "Some notes are set: " + toArray( session.getNoteNames() ), session.getNoteNames().hasNext() );
+        assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
 
     }
 

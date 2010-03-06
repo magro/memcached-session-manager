@@ -17,16 +17,14 @@
 package de.javakaffee.web.msm;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.testng.annotations.Test;
 
 /**
  * Tests the {@link BackupSessionTask}.
@@ -34,14 +32,6 @@ import org.junit.Test;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class BackupSessionTaskTest {
-
-    @Before
-    public void setUp() throws Exception {
-    }
-
-    @After
-    public void tearDown() throws Exception {
-    }
 
     @Test
     public final void testRoll() {
@@ -53,7 +43,7 @@ public class BackupSessionTaskTest {
     @Test
     public final void testGetNextNodeId_SingleNode() {
         final String actual = BackupSessionTask.getNextNodeId( "n1", Arrays.asList( "n1" ), null );
-        assertNull( "For a sole existing node we cannot get a next node", actual );
+        assertNull( actual, "For a sole existing node we cannot get a next node" );
     }
 
     /**
@@ -104,7 +94,7 @@ public class BackupSessionTaskTest {
         final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
 
         final String actual = cut.getNextNodeId( nodeId1, null );
-        assertEquals( "The failover node is not chosen", nodeId2, actual );
+        assertEquals( nodeId2, actual, "The failover node is not chosen" );
     }
 
     /**
@@ -122,7 +112,7 @@ public class BackupSessionTaskTest {
         final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
 
         final String actual = cut.getNextNodeId( nodeId2, null );
-        assertEquals( "The regular node is not chosen", nodeId1, actual );
+        assertEquals( nodeId1, actual, "The regular node is not chosen" );
     }
 
     /**
@@ -160,7 +150,7 @@ public class BackupSessionTaskTest {
         final BackupSessionTask cut = new BackupSessionTask( Arrays.asList( nodeId1 ), Arrays.asList( nodeId2, nodeId3 ) );
 
         final String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
-        assertEquals( "The second failover node is not chosen", nodeId3, actual );
+        assertEquals( nodeId3, actual, "The second failover node is not chosen" );
     }
 
     private Set<String> asSet( final String ... vals ) {

@@ -27,16 +27,16 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.jmock.Mock;
 import org.jmock.cglib.MockObjectTestCase;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * Test the {@link SessionTrackerValve}.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -51,7 +51,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     private Response _response;
     private Mock _responseControl;
 
-    @Before
+    @BeforeMethod
     public void setUp() throws Exception {
         _sessionBackupServiceControl = mock( SessionBackupService.class );
         _service = (SessionBackupService) _sessionBackupServiceControl.proxy();
@@ -65,22 +65,22 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _response = (Response) _responseControl.proxy();
     }
 
-    @After
+    @AfterMethod
     public void tearDown() throws Exception {
         _sessionBackupServiceControl.reset();
         _nextValve.reset();
         _requestControl.reset();
         _responseControl.reset();
     }
-    
+
     @Test
     public final void testGetSessionInternalNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getCookies" ).will( returnValue( null ) );
-        _sessionTrackerValve.invoke( _request, _response );     
-        
+        _sessionTrackerValve.invoke( _request, _response );
+
     }
 
     @Test
@@ -92,8 +92,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( null ) );
-        _sessionTrackerValve.invoke( _request, _response );     
-        
+        _sessionTrackerValve.invoke( _request, _response );
+
     }
 
     @Test
@@ -107,12 +107,12 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
-        
+
     }
 
     @Test
     public final void testBackupSessionInvokedWhenSessionExisting() throws IOException, ServletException {
-        
+
         final Session session = (Session) mock( Session.class ).proxy();
 
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( "foo" ) );
@@ -125,12 +125,12 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
             .will( returnValue( BackupResultStatus.SUCCESS ) );
 
         _sessionTrackerValve.invoke( _request, _response );
-        
+
     }
 
     @Test
     public final void testResponseCookieForRelocatedSession() throws IOException, ServletException {
-        
+
         final Mock sessionControl = mock( Session.class );
         final Session session = (Session) sessionControl.proxy();
         final String sessionId = "bar";
@@ -150,7 +150,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
                      hasProperty( "value", eq( sessionId ) ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
-        
+
     }
 
 }

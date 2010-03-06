@@ -71,7 +71,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
 import org.apache.naming.NamingContext;
-import org.junit.Assert;
+import org.testng.Assert;
 
 import com.thimbleware.jmemcached.CacheImpl;
 import com.thimbleware.jmemcached.LocalCacheElement;
