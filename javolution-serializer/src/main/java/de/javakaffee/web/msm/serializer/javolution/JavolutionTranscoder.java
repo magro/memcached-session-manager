@@ -123,7 +123,7 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
             writer.setBinding( _xmlBinding );
             writer.write( object, name );
             writer.flush();
-            getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
+            // getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
             return bos.toByteArray();
         } catch ( final Exception e ) {
             LOG.error( "caught exception", e );
