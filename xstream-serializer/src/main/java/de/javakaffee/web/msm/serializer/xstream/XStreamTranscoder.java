@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
 
+import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -30,6 +31,7 @@ import com.thoughtworks.xstream.XStream;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.SessionTranscoder;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -37,10 +39,11 @@ import de.javakaffee.web.msm.SessionAttributesTranscoder;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class XStreamTranscoder implements SessionAttributesTranscoder {
+public class XStreamTranscoder extends SessionTranscoder implements SessionAttributesTranscoder {
 
     private static final Log LOG = LogFactory.getLog( XStreamTranscoder.class );
-    
+
+    private final Manager _manager;
     private final XStream _xstream;
 
     /**
@@ -49,7 +52,8 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
      * @param manager
      *            the manager
      */
-    public XStreamTranscoder() {
+    public XStreamTranscoder( final Manager manager ) {
+        _manager = manager;
         _xstream = new XStream();
     }
 
@@ -57,21 +61,25 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
      * {@inheritDoc}
      */
     @Override
-    public byte[] serialize( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
-        if ( attributes == null ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+        return doSerialize( attributes );
+
+    }
+
+    private byte[] doSerialize( final Object object ) {
+        if ( object == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
 
         final ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try {
-            _xstream.toXML( attributes, bos );
+            _xstream.toXML( object, bos );
             return bos.toByteArray();
         } catch ( final Exception e ) {
             throw new IllegalArgumentException( "Non-serializable object", e );
         } finally {
             closeSilently( bos );
         }
-
     }
 
     /**
@@ -82,7 +90,7 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
      * @return the resulting object
      */
     @Override
-    public Map<String, Object> deserialize( final byte[] in ) {
+    public Map<String, Object> deserializeAttributes( final byte[] in ) {
         final ByteArrayInputStream bis = new ByteArrayInputStream( in );
         try {
             @SuppressWarnings( "unchecked" )
@@ -90,6 +98,36 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
             return result;
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
+            throw e ;
+        } finally {
+            closeSilently( bis );
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected byte[] serialize( final Object o ) {
+        return doSerialize( o );
+    }
+
+    /**
+     * Get the object represented by the given serialized bytes.
+     * 
+     * @param in
+     *            the bytes to deserialize
+     * @return the resulting object
+     */
+    @Override
+    protected MemcachedBackupSession deserialize( final byte[] in ) {
+        final ByteArrayInputStream bis = new ByteArrayInputStream( in );
+        try {
+            final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createEmptySession();
+            _xstream.fromXML( bis, session );
+            return session;
+        } catch ( final RuntimeException e ) {
+            getLogger().warn( "Caught Exception decoding %d bytes of data", in.length, e );
             throw e ;
         } finally {
             closeSilently( bis );

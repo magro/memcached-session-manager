@@ -19,7 +19,7 @@ JODA_TIME = 'joda-time:joda-time:jar:1.6'
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
-HTTP_CLIENT = transitive( 'commons-httpclient:commons-httpclient:jar:3.1' )
+HTTP_CLIENT = transitive( 'org.apache.httpcomponents:httpclient:jar:4.1-alpha1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 CLANG = 'commons-lang:commons-lang:jar:2.4' # tests of javolution-serializer, xstream-serializer
@@ -51,7 +51,7 @@ define 'msm' do
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'
-  
+
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
@@ -62,7 +62,7 @@ define 'msm' do
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
-    test.with( compile.dependencies, CLANG, JMOCK_CGLIB )
+    test.with( compile.dependencies, JMEMCACHED, HTTP_CLIENT, CLANG, JMOCK_CGLIB )
     test.using :testng
     package :jar, :javadoc, :id => 'msm-javolution-serializer'
   end
@@ -79,7 +79,7 @@ define 'msm' do
   desc 'XStream/xml based serialization strategy'
   define 'xstream-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, XSTREAM )
-    test.with( compile.dependencies, CLANG )
+    test.with( compile.dependencies, JMEMCACHED, HTTP_CLIENT, CLANG )
     test.using :testng
     package :jar, :javadoc, :id => 'msm-xstream-serializer'
   end

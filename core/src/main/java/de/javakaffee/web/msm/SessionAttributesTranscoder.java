@@ -17,6 +17,9 @@
 package de.javakaffee.web.msm;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.catalina.session.StandardSession;
 
 
 /**
@@ -27,8 +30,25 @@ import java.util.Map;
  */
 public interface SessionAttributesTranscoder {
 
-    byte[] serialize( final MemcachedBackupSession session, final Map<String, Object> attributes );
+    /**
+     * Serialize the given attributes to a byte array. The provided session is the
+     * session the attributes were retrieved from. The serialized byte[] can be
+     * deserialized using {@link #deserializeAttributes(byte[])}.
+     *
+     * @param session the session that owns the given attributes.
+     * @param attributes the attributes to serialize.
+     * @return a byte array representing the serialized attributes.
+     */
+    byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes );
 
-    Map<String, Object> deserialize( final byte[] data );
+    /**
+     * Deserialize the given byte array to session attributes. The map implementation
+     * should be a {@link ConcurrentHashMap} as this is the implementation currently used
+     * by the {@link StandardSession}.
+     *
+     * @param data the serialized attributes
+     * @return the deserialized attributes
+     */
+    Map<String, Object> deserializeAttributes( final byte[] data );
 
 }

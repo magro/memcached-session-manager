@@ -45,6 +45,8 @@ public class TranscoderService {
     @SuppressWarnings( "unused" )
     private static final Log LOG = LogFactory.getLog( TranscoderService.class );
 
+    private static final short CURRENT_VERSION = 1;
+
     static final int NUM_BYTES = 8 // creationTime: long
             + 8 // lastAccessedTime: long
             + 4 // maxInactiveInterval: int
@@ -103,7 +105,7 @@ serialize( session, attributesData );
      */
     public MemcachedBackupSession deserialize( final byte[] data, final Realm realm ) {
         final DeserializationResult deserializationResult = deserializeSessionFields( data, realm );
-        final Map<String, Object> attributes = _attributesTranscoder.deserialize( deserializationResult.getAttributesData() );
+        final Map<String, Object> attributes = _attributesTranscoder.deserializeAttributes( deserializationResult.getAttributesData() );
         final MemcachedBackupSession result = deserializationResult.getSession();
         result.setAttributesInternal( attributes );
         return result;
@@ -113,10 +115,10 @@ serialize( session, attributesData );
      * @param session
      * @param attributes
      * @return
-     * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serialize(MemcachedBackupSession, Map)
+     * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, Map)
      */
     public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
-        return _attributesTranscoder.serialize( session, attributes );
+        return _attributesTranscoder.serializeAttributes( session, attributes );
     }
 
 
@@ -124,10 +126,10 @@ serialize( session, attributesData );
     /**
      * @param data
      * @return
-     * @see de.javakaffee.web.msm.SessionAttributesTranscoder#deserialize(byte[])
+     * @see de.javakaffee.web.msm.SessionAttributesTranscoder#deserializeAttributes(byte[])
      */
     public Map<String, Object> deserializeAttributes( final byte[] data ) {
-        return _attributesTranscoder.deserialize( data );
+        return _attributesTranscoder.deserializeAttributes( data );
     }
 
     /**
@@ -153,7 +155,9 @@ serialize( session, attributesData );
         final byte[] principalData = session.getPrincipal() != null ? serializePrincipal( session.getPrincipal() ) : null;
         final int principalDataLength = principalData != null ? principalData.length : 0;
 
-        final int sessionFieldsDataLength = 2 // short value that stores the dataLength
+        final int sessionFieldsDataLength = 2 // short value for the version
+        // the following might change with other versions, refactoring needed then
+                + 2 // short value that stores the dataLength
                 + NUM_BYTES // bytes that store all session attributes but the id
                 + 2 // short value that stores the idData length
                 + idData.length // the number of bytes for the id
@@ -163,6 +167,7 @@ serialize( session, attributesData );
         final byte[] data = new byte[sessionFieldsDataLength];
 
         int idx = 0;
+        idx = encodeNum( CURRENT_VERSION, data, idx, 2 );
         idx = encodeNum( sessionFieldsDataLength, data, idx, 2 );
         idx = encodeNum( session.getCreationTimeInternal(), data, idx, 8 );
         idx = encodeNum( session.getLastAccessedTimeInternal(), data, idx, 8 );
@@ -179,25 +184,31 @@ serialize( session, attributesData );
         return data;
     }
 
-    static DeserializationResult deserializeSessionFields( final byte[] data, final Realm realm ) {
+    static DeserializationResult deserializeSessionFields( final byte[] data, final Realm realm ) throws InvalidVersionException {
         final MemcachedBackupSession result = new MemcachedBackupSession();
 
-        final short sessionFieldsDataLength = (short) decodeNum( data, 0, 2 );
+        final short version = (short) decodeNum( data, 0, 2 );
 
-        result.setCreationTimeInternal( decodeNum( data, 2, 8 ) );
-        result.setLastAccessedTimeInternal( decodeNum( data, 10, 8 ) );
-        result.setMaxInactiveInterval( (int) decodeNum( data, 18, 4 ) );
-        result.setIsNewInternal( decodeBoolean( data, 22 ) );
-        result.setIsValidInternal( decodeBoolean( data, 23 ) );
-        result.setThisAccessedTimeInternal( decodeNum( data, 24, 8 ) );
+        if ( version != CURRENT_VERSION ) {
+            throw new InvalidVersionException( "The version " + version + " does not match the current version " + CURRENT_VERSION, version );
+        }
 
-        final short idLength = (short) decodeNum( data, 32, 2 );
-        result.setIdInternal( decodeString( data, 34, idLength ) );
+        final short sessionFieldsDataLength = (short) decodeNum( data, 2, 2 );
 
-        final short authTypeId = (short)decodeNum( data, 34 + idLength, 2 );
+        result.setCreationTimeInternal( decodeNum( data, 4, 8 ) );
+        result.setLastAccessedTimeInternal( decodeNum( data, 12, 8 ) );
+        result.setMaxInactiveInterval( (int) decodeNum( data, 20, 4 ) );
+        result.setIsNewInternal( decodeBoolean( data, 24 ) );
+        result.setIsValidInternal( decodeBoolean( data, 25 ) );
+        result.setThisAccessedTimeInternal( decodeNum( data, 26, 8 ) );
+
+        final short idLength = (short) decodeNum( data, 34, 2 );
+        result.setIdInternal( decodeString( data, 36, idLength ) );
+
+        final short authTypeId = (short)decodeNum( data, 36 + idLength, 2 );
         result.setAuthType( AuthType.valueOfId( authTypeId ).getValue() );
 
-        final int currentIdx = 34 + idLength + 2;
+        final int currentIdx = 36 + idLength + 2;
         final short principalDataLength = (short) decodeNum( data, currentIdx, 2 );
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];

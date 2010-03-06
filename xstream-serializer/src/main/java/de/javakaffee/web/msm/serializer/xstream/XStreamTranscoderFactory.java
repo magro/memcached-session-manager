@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.serializer.xstream;
 import org.apache.catalina.Manager;
 
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -28,12 +29,29 @@ import de.javakaffee.web.msm.TranscoderFactory;
  */
 public class XStreamTranscoderFactory implements TranscoderFactory {
 
+    private XStreamTranscoder _transcoder;
+
     /**
      * {@inheritDoc}
      */
     @Override
     public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
-        return new XStreamTranscoder();
+        return getTranscoder( manager );
+    }
+
+    private XStreamTranscoder getTranscoder( final Manager manager ) {
+        if ( _transcoder == null ) {
+            _transcoder = new XStreamTranscoder( manager );
+        }
+        return _transcoder;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
     }
 
     /**

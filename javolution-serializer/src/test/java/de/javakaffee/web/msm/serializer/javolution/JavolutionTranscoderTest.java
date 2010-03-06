@@ -118,7 +118,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( "currency2", orig );
         
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         
         assertDeepEquals( deserialized, session.getAttributesInternal() );
         
@@ -146,7 +146,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( attributeName, new MyXMLSerializable( Runtime.getRuntime() ) );
         
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         
         assertDeepEquals( deserialized, session.getAttributesInternal() );
         final MyXMLSerializable myXMLSerializable = (MyXMLSerializable) deserialized.get( attributeName );
@@ -173,7 +173,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( "unmodifiableList", Collections.unmodifiableMap( m ) );
 
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
@@ -196,7 +196,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( "arraysAsList", Arrays.asList( "foo", "bar" ) );
 
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
@@ -217,7 +217,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( "hashMap", new HashMap<String, String>() );
 
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
@@ -254,7 +254,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( "hh", holderHolder );
         
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
 
         final CounterHolderArray hhd = (CounterHolderArray) deserialized.get( "hh" );
@@ -276,7 +276,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( name, holderHolder );
 
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
 
         @SuppressWarnings( "unchecked" )
@@ -299,7 +299,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( name, holderHolder );
 
         final Map<String, Object> deserialized =
-                _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
 
         @SuppressWarnings( "unchecked" )
@@ -351,8 +351,8 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( type.getSimpleName(), instance );
 
-        final byte[] bytes = _transcoder.serialize( session, session.getAttributesInternal() );
-        assertDeepEquals( _transcoder.deserialize( bytes ), session.getAttributesInternal());
+        final byte[] bytes = _transcoder.serializeAttributes( session, session.getAttributesInternal() );
+        assertDeepEquals( _transcoder.deserializeAttributes( bytes ), session.getAttributesInternal());
     }
 
     @Test( enabled = true )
@@ -362,7 +362,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( MyContainer.class.getSimpleName(), new MyContainer() );
 
-        final Map<String, Object> deserialized = _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+        final Map<String, Object> deserialized = _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
@@ -373,7 +373,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( "no-default constructor", TestClasses.createClassWithoutDefaultConstructor( "foo" ) );
 
-        final Map<String, Object> deserialized = _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+        final Map<String, Object> deserialized = _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
@@ -384,7 +384,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( "pc", TestClasses.createPrivateClass( "foo" ) );
 
-        final Map<String, Object> deserialized = _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+        final Map<String, Object> deserialized = _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
@@ -394,7 +394,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setValid( true );
         session.setAttribute( "foo", new EntityWithCollections() );
 
-        final Map<String, Object> deserialized = _transcoder.deserialize( _transcoder.serialize( session, session.getAttributesInternal() ) );
+        final Map<String, Object> deserialized = _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
@@ -414,8 +414,8 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         session.setAttribute( "person1", p1 );
         session.setAttribute( "person2", p2 );
 
-        final byte[] bytes = _transcoder.serialize( session, session.getAttributesInternal() );
-        assertDeepEquals( session.getAttributesInternal(), _transcoder.deserialize( bytes ) );
+        final byte[] bytes = _transcoder.serializeAttributes( session, session.getAttributesInternal() );
+        assertDeepEquals( session.getAttributesInternal(), _transcoder.deserializeAttributes( bytes ) );
 
     }
 

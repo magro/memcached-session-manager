@@ -33,6 +33,7 @@ import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.SessionTranscoder;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -50,7 +51,7 @@ import de.javakaffee.web.msm.SessionAttributesTranscoder;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class JavolutionTranscoder implements SessionAttributesTranscoder {
+public class JavolutionTranscoder extends SessionTranscoder implements SessionAttributesTranscoder {
 
     static final String REFERENCE_ATTRIBUTE_ID = "__id";
     static final String REFERENCE_ATTRIBUTE_REF_ID = "__ref";
@@ -91,8 +92,23 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
      * {@inheritDoc}
      */
     @Override
-    public byte[] serialize( MemcachedBackupSession session, Map<String, Object> attributes ) {
-        if ( attributes == null ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+        return doSerialize( attributes, "attributes" );
+    }
+    
+    /**
+     * This is there just for testing, so that we can serialize sessions using
+     * the former serialization strategy (the whole session, not just attribtes).
+     * @param session the session to serialize.
+     * @return the serialized session data
+     */
+    @Override
+    protected byte[] serialize( final Object session ) {
+        return doSerialize( session, "session" );
+    }
+
+    private byte[] doSerialize( final Object object, final String name ) {
+        if ( object == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
 
@@ -105,9 +121,9 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
             xmlReferenceResolver.setReferenceAttribute( REFERENCE_ATTRIBUTE_REF_ID );
             writer.setReferenceResolver( xmlReferenceResolver );
             writer.setBinding( _xmlBinding );
-            writer.write( attributes, "attributes" );
+            writer.write( object, name );
             writer.flush();
-            // getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
+            getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
             return bos.toByteArray();
         } catch ( final Exception e ) {
             LOG.error( "caught exception", e );
@@ -115,7 +131,6 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
         } finally {
             closeSilently( writer );
         }
-
     }
 
     /**
@@ -126,7 +141,25 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
      * @return the resulting object
      */
     @Override
-    public Map<String, Object> deserialize( final byte[] in ) {
+    public Map<String, Object> deserializeAttributes( final byte[] in ) {
+        return doDeserialize( in, "attributes" );
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected MemcachedBackupSession deserialize( byte[] in ) {
+        /* "session" is exactly the name that was used by the former transcoder.
+         * We need to use the same name so that we can deserialize old session data.
+         */
+        final MemcachedBackupSession result = doDeserialize( in, "session" );
+        result.setManager( _manager );
+        result.doAfterDeserialization();
+        return result;
+    }
+
+    private <T> T doDeserialize( final byte[] in, String name ) {
         // getLogger().info( "Loading serialized:\n" + new String( in ) );
         XMLObjectReader reader = null;
         try {
@@ -140,7 +173,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
             if ( !reader.hasNext() ) {
                 throw new IllegalStateException( "reader has no input" );
             }
-            return reader.read( "attributes" );
+            return reader.read( name );
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
             throw e;

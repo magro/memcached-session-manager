@@ -18,7 +18,7 @@ package de.javakaffee.web.msm;
 
 /**
  * This exception is thrown when a node is not available.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -30,7 +30,7 @@ public class NodeFailureException extends RuntimeException {
 
     /**
      * Creates a new instance with the given msg and nodeId.
-     * 
+     *
      * @param msg
      *            the error message
      * @param nodeId
@@ -52,7 +52,7 @@ public class NodeFailureException extends RuntimeException {
 
     /**
      * The id of the node that failed.
-     * 
+     *
      * @return the node id.
      */
     public String getNodeId() {

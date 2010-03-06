@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.integration.TestUtils.assertDeepEquals;
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.getManager;
@@ -29,14 +30,17 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
+import org.apache.catalina.Session;
 import org.apache.catalina.startup.Embedded;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
+import org.apache.http.HttpException;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.junit.After;
@@ -64,9 +68,7 @@ public class MemcachedSessionManagerIntegrationTest {
 
     private String _memcachedNodeId;
 
-    private SimpleHttpConnectionManager _connectionManager;
-
-    private HttpClient _httpClient;
+    private DefaultHttpClient _httpClient;
 
     private int _memcachedPort;
 
@@ -96,20 +98,22 @@ public class MemcachedSessionManagerIntegrationTest {
                         _memcachedNodeId, address ).build(), new SessionIdFormat() ),
                         Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
 
-        _connectionManager = new SimpleHttpConnectionManager( true );
-        _httpClient = new HttpClient( _connectionManager );
+        // Wait a little bit, so that the memcached client can connect and is ready when test starts
+        Thread.sleep( 100 );
+
+        _httpClient = new DefaultHttpClient();
     }
 
     @After
     public void tearDown() throws Exception {
         _memcached.shutdown();
         _tomcat1.stop();
-        _connectionManager.shutdown();
+        _httpClient.getConnectionManager().shutdown();
         _daemon.stop();
     }
 
     @Test
-    public void testConfiguredMemcachedNodeId() throws IOException, InterruptedException {
+    public void testConfiguredMemcachedNodeId() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
         /*
@@ -121,7 +125,7 @@ public class MemcachedSessionManagerIntegrationTest {
     }
 
     @Test
-    public void testSessionIdJvmRouteCompatibility() throws IOException, InterruptedException {
+    public void testSessionIdJvmRouteCompatibility() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
         assertTrue( "Invalid session format, must be <sid>-<memcachedId>[.<jvmRoute>].",
@@ -135,16 +139,17 @@ public class MemcachedSessionManagerIntegrationTest {
      *
      * @throws IOException
      * @throws InterruptedException
+     * @throws HttpException
      */
     @Test
-    public void testInvalidSessionId() throws IOException, InterruptedException {
+    public void testInvalidSessionId() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, "12345" );
         assertNotNull( "No session created.", sessionId1 );
         assertTrue( "Invalid session id format", sessionId1.indexOf( '-' ) > -1 );
     }
 
     @Test
-    public void testSessionAvailableInMemcached() throws IOException, InterruptedException {
+    public void testSessionAvailableInMemcached() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
         Thread.sleep( 50 );
@@ -152,7 +157,7 @@ public class MemcachedSessionManagerIntegrationTest {
     }
 
     @Test
-    public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException {
+    public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
 
@@ -169,7 +174,7 @@ public class MemcachedSessionManagerIntegrationTest {
     }
 
     @Test
-    public void testInvalidSessionNotFound() throws IOException, InterruptedException {
+    public void testInvalidSessionNotFound() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
 
@@ -189,9 +194,10 @@ public class MemcachedSessionManagerIntegrationTest {
      *
      * @throws IOException
      * @throws InterruptedException
+     * @throws HttpException
      */
     @Test
-    public void testRelocateSession() throws IOException, InterruptedException {
+    public void testRelocateSession() throws IOException, InterruptedException, HttpException {
         // FIXME implementation does not match docs
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sessionId1 );
@@ -279,15 +285,34 @@ public class MemcachedSessionManagerIntegrationTest {
         /* after another nearly 4 seconds check that the session is still alive in memcached,
          * this would have been expired without an updated expiration
          */
-        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 4 ) - 200 );
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 4 ) - 500 );
         assertNotNull( "Session expired in memcached.", _memcached.get( sessionId1 ) );
 
         /* after another second (more than 4 seconds since the last request)
          * the session must be expired in memcached
          */
-        Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 200 );
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 500 );
         assertNull( "Session not expired in memcached.", _memcached.get( sessionId1 ) );
 
+    }
+
+    /**
+     * Test that a session that has been serialized with the old serialization
+     * format (the complete session was serialized by one serialization strategy)
+     * can be loaded from memcached.
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    @Test
+    public void testLoadFromMemcachedOldSessionSerializationFormat() throws InterruptedException, ExecutionException {
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        final Session session = manager.createSession( null );
+        final SessionTranscoder oldSessionTranscoder = manager.getTranscoderFactory().createSessionTranscoder( manager );
+        final Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
+        assertTrue( future.get() );
+        final Session loadedFromMemcached = manager.loadFromMemcached( session.getId() );
+        assertNotNull( loadedFromMemcached );
+        assertDeepEquals( session, loadedFromMemcached );
     }
 
 }

@@ -35,8 +35,7 @@ import java.util.Set;
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.startup.Embedded;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.junit.After;
@@ -64,9 +63,7 @@ public class MemcachedFailoverIntegrationTest {
 
     private int _portTomcat1;
 
-    private SimpleHttpConnectionManager _connectionManager;
-
-    private HttpClient _httpClient;
+    private DefaultHttpClient _httpClient;
 
     private String _nodeId1;
     private String _nodeId2;
@@ -110,8 +107,7 @@ public class MemcachedFailoverIntegrationTest {
             throw e;
         }
 
-        _connectionManager = new SimpleHttpConnectionManager( true );
-        _httpClient = new HttpClient( _connectionManager );
+        _httpClient = new DefaultHttpClient();
     }
 
     private String toString( final String nodeId, final InetSocketAddress address ) {
@@ -130,7 +126,7 @@ public class MemcachedFailoverIntegrationTest {
             _daemon3.stop();
         }
         _tomcat1.stop();
-        _connectionManager.shutdown();
+        _httpClient.getConnectionManager().shutdown();
     }
 
     /**
@@ -259,7 +255,7 @@ public class MemcachedFailoverIntegrationTest {
         final Field field = ManagerBase.class.getDeclaredField( "sessions" );
         field.setAccessible( true );
         @SuppressWarnings("unchecked")
-        final Map<String,Session> sessions = (Map<String, Session>)field.get( _tomcat1.getContainer().getManager() );
+        final Map<String,Session> sessions = (Map<String, Session>)field.get( getManager( _tomcat1 ) );
         return sessions;
     }
 
@@ -277,12 +273,12 @@ public class MemcachedFailoverIntegrationTest {
     }
 
     static class FailoverInfo {
-        MemCacheDaemon activeNode;
-        MemCacheDaemon nextNode;
+        MemCacheDaemon<?> activeNode;
+        MemCacheDaemon<?> nextNode;
         String nextNodeId;
         String failoverNodeId;
-        public FailoverInfo(final MemCacheDaemon first,
-                final MemCacheDaemon second,
+        public FailoverInfo(final MemCacheDaemon<?> first,
+                final MemCacheDaemon<?> second,
                 final String nextNodeId,
                 final String failoverNodeId) {
             this.activeNode = first;

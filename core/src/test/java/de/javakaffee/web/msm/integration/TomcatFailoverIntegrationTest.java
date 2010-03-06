@@ -37,9 +37,9 @@ import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Embedded;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
+import org.apache.http.HttpException;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.junit.After;
@@ -77,9 +77,7 @@ public class TomcatFailoverIntegrationTest {
     private static final int MEMCACHED_PORT = 21211;
     private static final String MEMCACHED_NODES = NODE_ID + ":localhost:" + MEMCACHED_PORT;
 
-    private SimpleHttpConnectionManager _connectionManager;
-
-    private HttpClient _httpClient;
+    private DefaultHttpClient _httpClient;
 
     @Before
     public void setUp() throws Throwable {
@@ -101,8 +99,7 @@ public class TomcatFailoverIntegrationTest {
                         NODE_ID, address ).build(), new SessionIdFormat() ),
                         Arrays.asList( address ) );
 
-        _connectionManager = new SimpleHttpConnectionManager( true );
-        _httpClient = new HttpClient( _connectionManager );
+        _httpClient = new DefaultHttpClient();
     }
 
     private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
@@ -121,7 +118,7 @@ public class TomcatFailoverIntegrationTest {
         _daemon.stop();
         _tomcat1.stop();
         _tomcat2.stop();
-        _connectionManager.shutdown();
+        _httpClient.getConnectionManager().shutdown();
     }
 
     /**
@@ -130,9 +127,10 @@ public class TomcatFailoverIntegrationTest {
      *
      * @throws IOException
      * @throws InterruptedException
+     * @throws HttpException
      */
     @Test
-    public void testTomcatFailover() throws IOException, InterruptedException {
+    public void testTomcatFailover() throws IOException, InterruptedException, HttpException {
 
         final String key = "foo";
         final String value = "bar";
@@ -161,9 +159,10 @@ public class TomcatFailoverIntegrationTest {
      *
      * @throws IOException
      * @throws InterruptedException
+     * @throws HttpException
      */
     @Test
-    public void testLoadedSessionOnlySentIfModified() throws IOException, InterruptedException {
+    public void testLoadedSessionOnlySentIfModified() throws IOException, InterruptedException, HttpException {
 
         /* create a session on tomcat1
          */

@@ -16,8 +16,11 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.InetAddress;
@@ -25,11 +28,13 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.naming.NamingException;
@@ -48,15 +53,23 @@ import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.realm.UserDatabaseRealm;
 import org.apache.catalina.startup.Embedded;
 import org.apache.catalina.users.MemoryUserDatabase;
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HeaderElement;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.http.Header;
+import org.apache.http.HeaderElement;
+import org.apache.http.HttpException;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.HTTP;
 import org.apache.naming.NamingContext;
 import org.junit.Assert;
 
@@ -66,6 +79,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap;
 import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap.EvictionPolicy;
 
+import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 
 /**
@@ -74,6 +88,10 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class TestUtils {
+
+    private static final String CONTEXT_PATH = "/";
+    private static final String DEFAULT_HOST = "localhost";
+    private static final String DEFAULT_TRANSCODER_FACTORY = JavaSerializationTranscoderFactory.class.getName();
 
     private static final String USER_DATABASE = "UserDatabase";
     protected static final String PASSWORD = "secret";
@@ -84,101 +102,106 @@ public class TestUtils {
             HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
         String responseSessionId;
-        final HttpMethod method = new GetMethod("http://localhost:"+ port +"/");
-        try {
-            if ( rsessionId != null ) {
-                method.setRequestHeader( "Cookie", "JSESSIONID=" + rsessionId );
-            }
-
-            // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
-            //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
-            client.executeMethod( method );
-
-            if ( method.getStatusCode() != 200 ) {
-                throw new RuntimeException( "GET did not return status 200, but " + method.getStatusLine() );
-            }
-
-            // System.out.println( ">>>>>>>>>>: " + method.getResponseBodyAsString() );
-            responseSessionId = getSessionIdFromResponse( method );
-            // System.out.println( "response cookie: " + responseSessionId );
-
-            return responseSessionId == null ? rsessionId : responseSessionId;
-
-        } finally {
-            method.releaseConnection();
-            // System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Client Finished <<<<<<<<<<<<<<<<<<<<<<<");
+        final HttpGet method = new HttpGet("http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH);
+        if ( rsessionId != null ) {
+            method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
         }
+
+        // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
+        //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
+        final HttpResponse response = client.execute( method );
+
+        if ( response.getStatusLine().getStatusCode() != 200 ) {
+            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() );
+        }
+
+        // System.out.println( ">>>>>>>>>>: " + method.getResponseBodyAsString() );
+        responseSessionId = getSessionIdFromResponse( response );
+        // System.out.println( "response cookie: " + responseSessionId );
+
+        // We must consume the content so that the connection will be released
+        response.getEntity().consumeContent();
+
+        return responseSessionId == null ? rsessionId : responseSessionId;
     }
 
-    public static Response get( final HttpClient client, final int port, final String rsessionId )
+    public static Response get( final DefaultHttpClient client, final int port, final String rsessionId )
         throws IOException, HttpException {
         return get( client, port, null, rsessionId );
     }
 
-    public static Response get( final HttpClient client, final int port, final String rsessionId,
+    public static Response get( final DefaultHttpClient client, final int port, final String rsessionId,
             final Credentials credentials )
         throws IOException, HttpException {
         return get( client, port, null, rsessionId, credentials );
     }
 
-    public static Response get( final HttpClient client, final int port, final String path, final String rsessionId ) throws IOException,
+    public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId ) throws IOException,
             HttpException {
         return get( client, port, path, rsessionId, null );
     }
 
-    public static Response get( final HttpClient client, final int port, final String path, final String rsessionId,
+    public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
             final Credentials credentials ) throws IOException,
             HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://localhost:"+ port +"/";
+        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH;
         final String url = baseUri + ( path != null ? path : "" );
-        final HttpMethod method = new GetMethod( url );
-        try {
-            if ( rsessionId != null ) {
-                method.setRequestHeader( "Cookie", "JSESSIONID=" + rsessionId );
-            }
-
-            if ( credentials != null ) {
-                client.getState().setCredentials( AuthScope.ANY, credentials );
-                method.setDoAuthentication( true );
-            }
-
-            // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
-            //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
-            client.executeMethod( method );
-
-            if ( method.getStatusCode() != 200 ) {
-                throw new RuntimeException( "GET did not return status 200, but " + method.getStatusLine() );
-            }
-
-            return readResponse( rsessionId, method );
-
-        } finally {
-            method.releaseConnection();
-            // System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Client Finished <<<<<<<<<<<<<<<<<<<<<<<");
+        final HttpGet method = new HttpGet( url );
+        if ( rsessionId != null ) {
+            method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
         }
+
+        final HttpResponse response = credentials == null
+            ? client.execute( method )
+            : executeRequestWithAuth( client, method, credentials );
+
+        if ( response.getStatusLine().getStatusCode() != 200 ) {
+            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() );
+        }
+
+        return readResponse( rsessionId, response );
     }
 
-    private static Response readResponse( final String rsessionId, final HttpMethod method ) throws IOException {
-        final String responseSessionId = getSessionIdFromResponse( method );
+    private static HttpResponse executeRequestWithAuth( final DefaultHttpClient client, final HttpGet method,
+            final Credentials credentials ) throws IOException, ClientProtocolException {
+        client.getCredentialsProvider().setCredentials( AuthScope.ANY, credentials );
+
+        final BasicHttpContext localcontext = new BasicHttpContext();
+
+        // Generate BASIC scheme object and stick it to the local
+        // execution context
+        final BasicScheme basicAuth = new BasicScheme();
+        localcontext.setAttribute( "preemptive-auth", basicAuth );
+
+        // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
+        //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
+        return client.execute( method, localcontext );
+    }
+
+    private static Response readResponse( final String rsessionId, final HttpResponse response ) throws IOException {
+        final String responseSessionId = getSessionIdFromResponse( response );
         // System.out.println( "response cookie: " + responseSessionId );
 
-        final String bodyAsString = method.getResponseBodyAsString();
-        final String[] lines = bodyAsString.split( "\r\n" );
-
         final Map<String, String> keyValues = new LinkedHashMap<String, String>();
-        for ( final String line : lines ) {
-            final String[] keyValue = line.split( "=" );
-            if ( keyValue.length > 0 ) {
-                keyValues.put( keyValue[0], keyValue.length > 1 ? keyValue[1] : null );
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader( new InputStreamReader( response.getEntity().getContent() ) );
+            String line = null;
+            while ( ( line = reader.readLine() ) != null ) {
+                final String[] keyValue = line.split( "=" );
+                if ( keyValue.length > 0 ) {
+                    keyValues.put( keyValue[0], keyValue.length > 1 ? keyValue[1] : null );
+                }
             }
+        } finally {
+            reader.close();
         }
 
-        final Response response = new Response( responseSessionId == null ? rsessionId : responseSessionId, keyValues );
-        return response;
+        return new Response( responseSessionId == null ? rsessionId : responseSessionId, keyValues );
     }
 
-    public static Response post( final HttpClient client,
+    public static Response post( final DefaultHttpClient client,
             final int port,
             final String rsessionId,
             final String paramName,
@@ -188,52 +211,65 @@ public class TestUtils {
         return post( client, port, null, rsessionId, params );
     }
 
-    public static Response post( final HttpClient client,
+    public static Response post( final DefaultHttpClient client,
             final int port,
             final String path,
             final String rsessionId,
             final Map<String, String> params ) throws IOException, HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://localhost:"+ port +"/";
+        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH;
         final String url = baseUri + ( path != null ? path : "" );
-        final PostMethod method = new PostMethod( url );
-        try {
-            if ( rsessionId != null ) {
-                method.setRequestHeader( "Cookie", "JSESSIONID=" + rsessionId );
-            }
-
-            for( final Map.Entry<String, String> param : params.entrySet() ) {
-                method.addParameter( param.getKey(), param.getValue() );
-            }
-
-            // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
-            //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
-            client.executeMethod( method );
-
-            if ( method.getStatusCode() == 302 ) {
-                final String location = method.getResponseHeader( "Location" ).getValue();
-                if ( !location.startsWith( baseUri ) ) {
-                    throw new RuntimeException( "There's s.th. wrong, the location header should start with the base URI " + baseUri +
-                            ". The location header: " + location );
-                }
-                final String redirectPath = location.substring( baseUri.length(), location.length() );
-                return get( client, port, redirectPath, rsessionId );
-            }
-
-            if ( method.getStatusCode() != 200 ) {
-                throw new RuntimeException( "GET did not return status 200, but " + method.getStatusLine() );
-            }
-
-            return readResponse( rsessionId, method );
-
-        } finally {
-            method.releaseConnection();
-            // System.out.println( port + " <<<<<<<<<<<<<<<<<<<<<< Client Finished <<<<<<<<<<<<<<<<<<<<<<<");
+        final HttpPost method = new HttpPost( url );
+        if ( rsessionId != null ) {
+            method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
         }
+
+        method.setEntity( createFormEntity( params ) );
+
+        // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
+        //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
+        final HttpResponse response = client.execute( method );
+
+        final int statusCode = response.getStatusLine().getStatusCode();
+        if ( statusCode == 302 ) {
+            return redirect( response, client, port, rsessionId, baseUri );
+        }
+
+        if ( statusCode != 200 ) {
+            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() );
+        }
+
+        return readResponse( rsessionId, response );
     }
 
-    public static String getSessionIdFromResponse( final HttpMethod method ) {
-        final Header cookie = method.getResponseHeader( "Set-Cookie" );
+    private static Response redirect( final HttpResponse response, final DefaultHttpClient client, final int port,
+            final String rsessionId, final String baseUri ) throws IOException, HttpException {
+        final String location = response.getFirstHeader( "Location" ).getValue();
+        if ( !location.startsWith( baseUri ) ) {
+            throw new RuntimeException( "There's s.th. wrong, the location header should start with the base URI " + baseUri +
+                    ". The location header: " + location );
+        }
+        /* consume content so that the connection can be released
+         */
+        response.getEntity().consumeContent();
+
+        /* redirect
+         */
+        final String redirectPath = location.substring( baseUri.length(), location.length() );
+        return get( client, port, redirectPath, rsessionId );
+    }
+
+    private static UrlEncodedFormEntity createFormEntity( final Map<String, String> params ) throws UnsupportedEncodingException {
+        final List<NameValuePair> parameters = new ArrayList <NameValuePair>();
+        for( final Map.Entry<String, String> param : params.entrySet() ) {
+            parameters.add( new BasicNameValuePair( param.getKey(), param.getValue() ) );
+        }
+        final UrlEncodedFormEntity entity = new UrlEncodedFormEntity( parameters, HTTP.UTF_8 );
+        return entity;
+    }
+
+    public static String getSessionIdFromResponse( final HttpResponse response ) {
+        final Header cookie = response.getFirstHeader( "Set-Cookie" );
         if ( cookie != null ) {
             for ( final HeaderElement header : cookie.getElements() ) {
                 if ( "JSESSIONID".equals( header.getName() ) ) {
@@ -261,26 +297,33 @@ public class TestUtils {
 
     public static Embedded createCatalina( final int port, final String memcachedNodes, final LoginType loginType ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, null, loginType );
+        return createCatalina( port, 1, memcachedNodes, null, loginType, DEFAULT_TRANSCODER_FACTORY );
     }
 
     public static Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, null );
+        return createCatalina( port, 1, memcachedNodes, jvmRoute, null, DEFAULT_TRANSCODER_FACTORY );
+    }
+
+    public static Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute,
+            final String transcoderFactoryClassName ) throws MalformedURLException,
+            UnknownHostException, LifecycleException {
+        return createCatalina( port, 1, memcachedNodes, jvmRoute, null, transcoderFactoryClassName );
     }
 
     public static Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute, final LoginType loginType ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, loginType );
+        return createCatalina( port, 1, memcachedNodes, jvmRoute, loginType, DEFAULT_TRANSCODER_FACTORY );
     }
 
     public static Embedded createCatalina( final int port, final int sessionTimeout, final String memcachedNodes ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
-        return createCatalina( port, sessionTimeout, memcachedNodes, null, null );
+        return createCatalina( port, sessionTimeout, memcachedNodes, null, null, DEFAULT_TRANSCODER_FACTORY );
     }
 
     public static Embedded createCatalina( final int port, final int sessionTimeout, final String memcachedNodes, final String jvmRoute,
-            final LoginType loginType ) throws MalformedURLException,
+            final LoginType loginType,
+            final String transcoderFactoryClassName ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
         final Embedded catalina = new Embedded();
 
@@ -296,10 +339,12 @@ public class TestUtils {
         }
 
         final Engine engine = catalina.createEngine();
+        catalina.addEngine( engine );
+
         /* we must have a unique name for mbeans
          */
         engine.setName( "engine-" + port );
-        engine.setDefaultHost( "localhost" );
+        engine.setDefaultHost( DEFAULT_HOST );
         engine.setJvmRoute( jvmRoute );
 
         final UserDatabaseRealm realm = new UserDatabaseRealm();
@@ -309,14 +354,14 @@ public class TestUtils {
         final URL root = new URL( TestUtils.class.getResource( "/" ), "../resources" );
 
         final String docBase = root.getFile() + File.separator + TestUtils.class.getPackage().getName().replaceAll( "\\.", File.separator );
-        final Host host = catalina.createHost( "localhost", docBase );
+        final Host host = catalina.createHost( DEFAULT_HOST, docBase );
         engine.addChild( host );
         new File( docBase ).mkdirs();
 
-        final MemcachedBackupSessionManager sessionManager = new MemcachedBackupSessionManager();
-        engine.setManager( sessionManager );
+        final Context context = catalina.createContext( CONTEXT_PATH, "webapp" );
+        host.addChild( context );
 
-        final Context context = catalina.createContext( "/", "webapp" );
+        final MemcachedBackupSessionManager sessionManager = new MemcachedBackupSessionManager();
         context.setManager( sessionManager );
         context.setBackgroundProcessorDelay( 1 );
         new File( docBase + File.separator + "webapp" ).mkdirs();
@@ -331,16 +376,13 @@ public class TestUtils {
                 context.setLoginConfig( loginConfig );
         }
 
-        host.addChild( context );
-
         /* we must set the maxInactiveInterval after the context,
          * as setContainer(context) uses the session timeout set on the context
          */
         sessionManager.setMemcachedNodes( memcachedNodes );
         sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
-
-        catalina.addEngine( engine );
+        sessionManager.setTranscoderFactoryClass( transcoderFactoryClassName );
 
         final Connector connector = catalina.createConnector( InetAddress.getLocalHost(), port, false );
         catalina.addConnector( connector );
@@ -372,7 +414,7 @@ public class TestUtils {
     }
 
     public static MemcachedBackupSessionManager getManager( final Embedded tomcat ) {
-        return (MemcachedBackupSessionManager) tomcat.getContainer().getManager();
+        return (MemcachedBackupSessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
     }
 
     /**

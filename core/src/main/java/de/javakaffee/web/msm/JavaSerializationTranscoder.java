@@ -82,7 +82,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      * {@inheritDoc}
      */
     @Override
-    public byte[] serialize( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
         if ( attributes == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
@@ -153,7 +153,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      * @return the resulting object
      */
     @Override
-    public Map<String, Object> deserialize( final byte[] in ) {
+    public Map<String, Object> deserializeAttributes( final byte[] in ) {
         ByteArrayInputStream bis = null;
         ObjectInputStream ois = null;
         try {

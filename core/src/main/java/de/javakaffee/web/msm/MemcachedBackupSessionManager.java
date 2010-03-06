@@ -214,6 +214,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private TranscoderService _transcoderService;
 
+    private TranscoderFactory _transcoderFactory;
+
+    private DelegatingSerializingTranscoder _upgradeSupportTranscoder;
+
     /**
      * Return descriptive information about this Manager implementation and the
      * corresponding version number, in the format
@@ -298,18 +302,26 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         _transcoderService = createTranscoderService();
 
+        final SessionTranscoder sessionTranscoder = getTranscoderFactory().createSessionTranscoder( this );
+        _upgradeSupportTranscoder = new DelegatingSerializingTranscoder( sessionTranscoder );
+
         _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + _nodeIds + " and failover node ids " + _failoverNodeIds );
 
     }
 
     private TranscoderService createTranscoderService() {
-        final TranscoderFactory transcoderFactory;
-        try {
-            transcoderFactory = createTranscoderFactory();
-        } catch ( final Exception e ) {
-            throw new RuntimeException( "Could not create transcoder factory.", e );
+        return new TranscoderService( getTranscoderFactory().createTranscoder( this ) );
+    }
+
+    protected TranscoderFactory getTranscoderFactory() {
+        if ( _transcoderFactory == null ) {
+            try {
+                _transcoderFactory = createTranscoderFactory();
+            } catch ( final Exception e ) {
+                throw new RuntimeException( "Could not create transcoder factory.", e );
+            }
         }
-        return new TranscoderService( transcoderFactory.createTranscoder( this ) );
+        return _transcoderFactory;
     }
 
     private MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids ) {
@@ -528,7 +540,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return session.getBackupTask();
     }
 
-    private Session loadFromMemcached( final String sessionId ) {
+    protected Session loadFromMemcached( final String sessionId ) {
         if ( !isValidSessionIdFormat( sessionId ) ) {
             return null;
         }
@@ -539,9 +551,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         } else {
             _log.debug( "Loading session from memcached: " + sessionId );
             try {
-                final byte[] data = (byte[]) _memcached.get( sessionId );
+                /* In the previous version (<1.2) the session was completely serialized by
+                 * custom Transcoder implementations.
+                 * Such sessions have set the SERIALIZED flag (from SerializingTranscoder) so that
+                 * they get deserialized by BaseSerializingTranscoder.deserialize or the appropriate
+                 * specializations.
+                 */
+                final Object object = _memcached.get( sessionId, _upgradeSupportTranscoder );
+
                 if ( _log.isDebugEnabled() ) {
-                    if ( data == null ) {
+                    if ( object == null ) {
                         _log.debug( "Session " + sessionId + " not found in memcached." );
                     } else {
                         _log.debug( "Found session with id " + sessionId );
@@ -549,20 +568,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 }
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, true );
 
-                final MemcachedBackupSession session;
-                if ( data != null ) {
-                    final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, getContainer().getRealm() );
-                    final byte[] attributesData = deserializationResult.getAttributesData();
-                    final Map<String, Object> attributes = _transcoderService.deserializeAttributes( attributesData );
-                    session = deserializationResult.getSession();
-                    session.setAttributesInternal( attributes );
-                    session.setDataHashCode( Arrays.hashCode( attributesData ) );
-                    session.setManager( this );
-                    session.doAfterDeserialization();
-                } else {
-                    session = null;
+                if ( object instanceof MemcachedBackupSession ) {
+                    return (Session) object;
                 }
-                return session;
+                else {
+                    return deserialize( (byte[]) object );
+                }
             } catch ( final NodeFailureException e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached." );
                 _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
@@ -571,6 +582,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             }
         }
         return null;
+    }
+
+    private MemcachedBackupSession deserialize( final byte[] data ) {
+        if ( data == null ) {
+            return null;
+        }
+        try {
+            final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, getContainer().getRealm() );
+            final byte[] attributesData = deserializationResult.getAttributesData();
+            final Map<String, Object> attributes = _transcoderService.deserializeAttributes( attributesData );
+            final MemcachedBackupSession session = deserializationResult.getSession();
+            session.setAttributesInternal( attributes );
+            session.setDataHashCode( Arrays.hashCode( attributesData ) );
+            session.setManager( this );
+            session.doAfterDeserialization();
+            return session;
+        } catch( final InvalidVersionException e ) {
+            _log.info( "Got session data from memcached with an unsupported version: " + e.getVersion() );
+            // for versioning probably there will be changes in the design,
+            // with the first change and version 2 we'll see what we need
+            return null;
+        }
     }
 
     /**

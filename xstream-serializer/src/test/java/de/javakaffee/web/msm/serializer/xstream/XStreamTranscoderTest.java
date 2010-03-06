@@ -42,7 +42,7 @@ public class XStreamTranscoderTest {
     public void testReadValueIntoObject() throws Exception {
         final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
         manager.setContainer( new StandardContext() );
-        final XStreamTranscoder transcoder = new XStreamTranscoder();
+        final XStreamTranscoder transcoder = new XStreamTranscoder( manager );
 
         final MemcachedBackupSession session = manager.createEmptySession();
         session.setValid( true );
@@ -56,16 +56,16 @@ public class XStreamTranscoderTest {
         session.setAttribute( "person2", createPerson( "bar baz", Gender.FEMALE, "bar.baz@example.org", "bar.baz@example.com" ) );
 
         final long start1 = System.nanoTime();
-        transcoder.serialize( session, session.getAttributesInternal() );
+        transcoder.serializeAttributes( session, session.getAttributesInternal() );
         System.out.println("xstream-ser took " + (System.nanoTime() - start1)/1000);
 
         final long start2 = System.nanoTime();
-        transcoder.serialize( session, session.getAttributesInternal() );
+        transcoder.serializeAttributes( session, session.getAttributesInternal() );
         System.out.println("xstream-ser took " + (System.nanoTime() - start2)/1000);
         
         final long start3 = System.nanoTime();
-        final byte[] json = transcoder.serialize( session, session.getAttributesInternal() );
-        final Map<String, Object> readValue = (Map<String, Object>) transcoder.deserialize( json );
+        final byte[] json = transcoder.serializeAttributes( session, session.getAttributesInternal() );
+        final Map<String, Object> readValue = (Map<String, Object>) transcoder.deserializeAttributes( json );
         System.out.println("xstream-round took " + (System.nanoTime() - start3)/1000);
 
         //System.out.println( "Have json: " + new String(json) );

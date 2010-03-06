@@ -34,6 +34,14 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
+        return new JavaSessionSerializationTranscoder( manager );
+    }
+
+    /**
      * If <code>copyCollectionsForSerialization</code> is set to <code>true</code>,
      * an {@link UnsupportedOperationException} will be thrown, as java serialization
      * cannot be changed and it does not copy collections for serialization.
