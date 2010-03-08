@@ -17,10 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -60,9 +57,7 @@ public class BackupSessionTask {
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
     private final MemcachedClient _memcached;
-    private final NodeAvailabilityCache<String> _nodeAvailabilityCache;
-    private final List<String> _nodeIds;
-    private final List<String> _failoverNodeIds;
+    private final NodeIdService _nodeIdService;
 
     /* the original session id is stored so that we can set this if no
      * memcached node is left for taking over
@@ -72,7 +67,6 @@ public class BackupSessionTask {
     /* The new session id for a session that needs to be relocated
      */
     private String _relocateSessionIdForBackup;
-    private Set<String> _testedNodes;
 
     /**
      * @param session
@@ -84,27 +78,13 @@ public class BackupSessionTask {
      * @param failoverNodeIds
      */
     public BackupSessionTask( final MemcachedBackupSession session, final TranscoderService transcoderService, final boolean sessionBackupAsync, final int sessionBackupTimeout,
-            final MemcachedClient memcached, final NodeAvailabilityCache<String> nodeAvailabilityCache, final List<String> nodeIds,
-            final List<String> failoverNodeIds ) {
+            final MemcachedClient memcached, final NodeIdService nodeIdService ) {
         _session = session;
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
         _memcached = memcached;
-        _nodeAvailabilityCache = nodeAvailabilityCache;
-        _nodeIds = nodeIds;
-        _failoverNodeIds = failoverNodeIds;
-    }
-
-    /**
-     * A special constructor used for testing of {@link #getNextNodeId(String, Set)}.
-     *
-     * @param nodeIds
-     * @param failoverNodeIds
-     */
-    BackupSessionTask( final List<String> nodeIds,
-            final List<String> failoverNodeIds ) {
-        this( null, null, false, -1, null, null, nodeIds, failoverNodeIds );
+        _nodeIdService = nodeIdService;
     }
 
     /**
@@ -127,6 +107,11 @@ public class BackupSessionTask {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Updating expiration time for session " + _session.getId() );
         }
+
+        if ( !hasMemcachedIdSet() ) {
+            return;
+        }
+
         _session.setExpirationUpdateRunning( true );
         try {
             final Map<String, Object> attributes = _session.getAttributesInternal();
@@ -149,6 +134,10 @@ public class BackupSessionTask {
     public BackupResultStatus backupSession() {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Starting for session id " + _session.getId() );
+        }
+
+        if ( !hasMemcachedIdSet() ) {
+            return BackupResultStatus.FAILURE;
         }
 
         _session.setBackupRunning( true );
@@ -223,6 +212,10 @@ public class BackupSessionTask {
 
     }
 
+    private boolean hasMemcachedIdSet() {
+        return _sessionIdFormat.isValid( _session.getId() );
+    }
+
     private boolean sessionCookieWasRelocated( final MemcachedBackupSession backupSession ) {
         return backupSession.getBackupTask() != null
         && backupSession.getBackupTask().sessionCookieWasRelocated();
@@ -268,7 +261,7 @@ public class BackupSessionTask {
              * get the next memcached node to try
              */
             final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-            final String targetNodeId = getNextNodeId( nodeId, _testedNodes );
+            final String targetNodeId = _nodeIdService.getAvailableNodeId( nodeId );
 
             if ( targetNodeId == null ) {
 
@@ -283,11 +276,7 @@ public class BackupSessionTask {
 
             } else {
 
-                if ( _testedNodes == null ) {
-                    _testedNodes = new HashSet<String>();
-                }
-
-                final BackupResult backupResult = failover( _testedNodes, targetNodeId );
+                final BackupResult backupResult = failover( targetNodeId );
                 final BackupResultStatus translatedStatus = handleAndTranslateFailoverBackupResult( backupResult.getStatus() );
 
                 return new BackupResult( translatedStatus, backupResult.getAttributesData() );
@@ -305,7 +294,6 @@ public class BackupSessionTask {
                  * cleanup
                  */
                 _origSessionId = null;
-                _testedNodes = null;
 
                 /*
                  * and tell our client to do his part as well
@@ -333,8 +321,8 @@ public class BackupSessionTask {
      */
     public String determineSessionIdForBackup() {
         final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-        if ( nodeId != null && !_nodeAvailabilityCache.isNodeAvailable( nodeId ) ) {
-            final String nextNodeId = getNextNodeId( nodeId, _nodeAvailabilityCache.getUnavailableNodes() );
+        if ( nodeId != null && !_nodeIdService.isNodeAvailable( nodeId ) ) {
+            final String nextNodeId = _nodeIdService.getAvailableNodeId( nodeId );
             if ( nextNodeId != null ) {
                 final String newSessionId = _sessionIdFormat.createNewSessionId( _session.getId(), nextNodeId );
                 _relocateSessionIdForBackup = newSessionId;
@@ -355,7 +343,7 @@ public class BackupSessionTask {
      */
     private boolean sessionWouldBeRelocated() {
         final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-        return nodeId != null && !_nodeAvailabilityCache.isNodeAvailable( nodeId );
+        return nodeId != null && !_nodeIdService.isNodeAvailable( nodeId );
     }
 
     /**
@@ -367,12 +355,7 @@ public class BackupSessionTask {
         return _relocateSessionIdForBackup != null;
     }
 
-    private BackupResult failover( final Set<String> testedNodes, final String targetNodeId ) {
-
-        final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-
-        testedNodes.add( nodeId );
-
+    private BackupResult failover( final String targetNodeId ) {
         /*
          * we must store the original session id so that we can set this if no
          * memcached node is left for taking over
@@ -412,88 +395,6 @@ public class BackupSessionTask {
          * cleanup
          */
         _origSessionId = null;
-        _testedNodes = null;
-    }
-
-    /**
-     * Get the next memcached node id for session backup. The active node ids
-     * are preferred, if no active node id is left to try, a failover node id is
-     * picked. If no failover node id is left, this method returns just null.
-     *
-     * @param nodeId
-     *            the current node id
-     * @param excludedNodeIds
-     *            the node ids that were already tested and shall not be used
-     *            again. Can be null.
-     * @return the next node id or null, if no node is left.
-     */
-    protected String getNextNodeId( final String nodeId, final Set<String> excludedNodeIds ) {
-
-        String result = null;
-
-        /*
-         * first check regular nodes
-         */
-        result = getNextNodeId( nodeId, _nodeIds, excludedNodeIds );
-
-        /*
-         * we got no node from the first nodes list, so we must check the
-         * alternative node list
-         */
-        if ( result == null && _failoverNodeIds != null && !_failoverNodeIds.isEmpty() ) {
-            result = getNextNodeId( nodeId, _failoverNodeIds, excludedNodeIds );
-        }
-
-        return result;
-    }
-
-    /**
-     * Determines the next available node id from the provided node ids. The
-     * returned node id will be different from the provided nodeId and will not
-     * be contained in the excludedNodeIds.
-     *
-     * @param nodeId
-     *            the original id
-     * @param nodeIds
-     *            the node ids to choose from
-     * @param excludedNodeIds
-     *            the set of invalid node ids
-     * @return an available node or null
-     */
-    protected static String getNextNodeId( final String nodeId, final List<String> nodeIds, final Set<String> excludedNodeIds ) {
-
-        String result = null;
-
-        final int origIdx = nodeIds.indexOf( nodeId );
-        final int nodeIdsSize = nodeIds.size();
-
-        int idx = origIdx;
-        while ( result == null && !loopFinished( origIdx, idx, nodeIdsSize ) ) {
-
-            final int checkIdx = roll( idx, nodeIdsSize );
-            final String checkNodeId = nodeIds.get( checkIdx );
-
-            if ( excludedNodeIds != null && excludedNodeIds.contains( checkNodeId ) ) {
-                idx = checkIdx;
-            } else {
-                result = checkNodeId;
-            }
-
-        }
-
-        return result;
-    }
-
-    private static boolean loopFinished( final int origIdx, final int idx, final int nodeIdsSize ) {
-        return origIdx == -1
-            ? idx + 1 == nodeIdsSize
-            : roll( idx, nodeIdsSize ) == origIdx;
-    }
-
-    protected static int roll( final int idx, final int size ) {
-        return idx + 1 >= size
-            ? 0
-            : idx + 1;
     }
 
     private void storeSessionInMemcached( final byte[] data) throws NodeFailureException {
@@ -515,7 +416,7 @@ public class BackupSessionTask {
                     _log.info( "Could not store session " + _session.getId() + " in memcached.", e );
                 }
                 final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-                _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
+                _nodeIdService.setNodeAvailable( nodeId, false );
                 throw new NodeFailureException( "Could not store session in memcached.", nodeId );
             }
         }

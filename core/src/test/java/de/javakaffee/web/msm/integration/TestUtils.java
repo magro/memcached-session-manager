@@ -73,6 +73,7 @@ import org.apache.http.protocol.HTTP;
 import org.apache.naming.NamingContext;
 import org.testng.Assert;
 
+import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.CacheImpl;
 import com.thimbleware.jmemcached.LocalCacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
@@ -198,7 +199,7 @@ public class TestUtils {
             reader.close();
         }
 
-        return new Response( responseSessionId == null ? rsessionId : responseSessionId, keyValues );
+        return new Response( responseSessionId == null ? rsessionId : responseSessionId, responseSessionId, keyValues );
     }
 
     public static Response post( final DefaultHttpClient client,
@@ -280,7 +281,7 @@ public class TestUtils {
         return null;
     }
 
-    public static MemCacheDaemon<?> createDaemon( final InetSocketAddress address ) throws IOException {
+    public static MemCacheDaemon<? extends CacheElement> createDaemon( final InetSocketAddress address ) throws IOException {
         final MemCacheDaemon<LocalCacheElement> daemon = new MemCacheDaemon<LocalCacheElement>();
         final ConcurrentLinkedHashMap<String, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(
                 EvictionPolicy.LRU, 100000, 1024*1024 );
@@ -381,6 +382,8 @@ public class TestUtils {
          */
         sessionManager.setMemcachedNodes( memcachedNodes );
         sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
+        sessionManager.setSessionBackupAsync( false );
+        sessionManager.setSessionBackupTimeout( 100 );
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         sessionManager.setTranscoderFactoryClass( transcoderFactoryClassName );
 
@@ -424,13 +427,18 @@ public class TestUtils {
     public static class Response {
 
         private final String _sessionId;
+        private final String _responseSessionId;
         private final Map<String, String> _keyValues;
-        public Response( final String sessionId, final Map<String, String> keyValues ) {
+        public Response( final String sessionId, final String responseSessionId, final Map<String, String> keyValues ) {
             _sessionId = sessionId;
+            _responseSessionId = responseSessionId;
             _keyValues = keyValues;
         }
         String getSessionId() {
             return _sessionId;
+        }
+        String getResponseSessionId() {
+            return _responseSessionId;
         }
         Map<String, String> getKeyValues() {
             return _keyValues;
@@ -439,6 +447,16 @@ public class TestUtils {
             return _keyValues.get( key );
         }
 
+    }
+
+    /**
+     * Extracts the memcached node id from the provided session id.
+     * @param sessionId the session id, that may contain the node id, e.g. as <code>${origsessionid}-${nodeid}</code>
+     * @return the extracted node id or <code>null</code>, if no node information was found.
+     */
+    public static String extractNodeId( final String sessionId ) {
+        final int idx = sessionId.lastIndexOf( '-' );
+        return idx > -1 ? sessionId.substring( idx + 1 ) : null;
     }
 
     public static void assertDeepEquals( final Object one, final Object another ) {

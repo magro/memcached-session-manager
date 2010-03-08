@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,8 +77,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
 
     protected static final String NODE_FAILURE = "node.failure";
-
-    private final Random _random = new Random();
 
     private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
 
@@ -183,21 +180,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     private LRUCache<String, Boolean> _missingSessionsCache;
 
-    /*
-     * remove may be called with sessionIds that already failed before (probably
-     * because the browser makes subsequent requests with the old sessionId -
-     * the exact reason needs to be verified). These failed sessionIds should If
-     * a session is requested that we don't have locally stored each findSession
-     * invocation would trigger a memcached request - this would open the door
-     * for DOS attacks...
-     *
-     * this solution: use a LRUCache with a timeout to store, which session had
-     * been requested in the last <n> millis.
-     *
-     * Updated: the node status cache holds the status of each node for the
-     * configured TTL.
-     */
-    private NodeAvailabilityCache<String> _nodeAvailabilityCache;
+    private NodeIdService _nodeIdService;
 
     //private LRUCache<String, String> _relocatedSessions;
 
@@ -205,11 +188,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * we have to implement rejectedSessions - not sure why
      */
     private int _rejectedSessions;
-
-    private Set<String> _allNodeIds;
-    private List<String> _nodeIds;
-
-    private List<String> _failoverNodeIds;
 
     private TranscoderService _transcoderService;
 
@@ -276,18 +254,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             throw new IllegalArgumentException( "Configured memcachedNodes attribute has wrong format, must match " + NODES_REGEX );
         }
 
-        _nodeIds = new ArrayList<String>();
-        _allNodeIds = new HashSet<String>();
+        final List<String> nodeIds = new ArrayList<String>();
+        final Set<String> allNodeIds = new HashSet<String>();
         final Matcher matcher = NODE_PATTERN.matcher( _memcachedNodes );
         final List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
         final Map<InetSocketAddress, String> address2Ids = new HashMap<InetSocketAddress, String>();
         while ( matcher.find() ) {
-            initHandleNodeDefinitionMatch( matcher, addresses, address2Ids );
+            initHandleNodeDefinitionMatch( matcher, addresses, address2Ids, nodeIds, allNodeIds );
         }
 
-        initFailoverNodes();
+        final List<String> failoverNodeIds = initFailoverNodes( nodeIds );
 
-        if ( _nodeIds.isEmpty() ) {
+        if ( nodeIds.isEmpty() ) {
             throw new IllegalArgumentException( "All nodes are also configured as failover nodes,"
                     + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
         }
@@ -297,13 +275,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         /* create the missing sessions cache
          */
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
-        _nodeAvailabilityCache = createNodeAvailabilityCache( 1000 );
+        _nodeIdService = new NodeIdService( createNodeAvailabilityCache( allNodeIds.size(), 1000 ), nodeIds, failoverNodeIds );
 
         _transcoderService = createTranscoderService();
 
         _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( this );
 
-        _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + _nodeIds + " and failover node ids " + _failoverNodeIds );
+        _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + nodeIds + " and failover node ids " + failoverNodeIds );
 
     }
 
@@ -341,8 +319,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return transcoderFactory;
     }
 
-    private NodeAvailabilityCache<String> createNodeAvailabilityCache( final long ttlInMillis ) {
-        return new NodeAvailabilityCache<String>( _allNodeIds.size(), ttlInMillis, new CacheLoader<String>() {
+    private NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis ) {
+        return new NodeAvailabilityCache<String>( size, ttlInMillis, new CacheLoader<String>() {
 
             public boolean isNodeAvailable( final String key ) {
                 try {
@@ -356,26 +334,27 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         } );
     }
 
-    private void initFailoverNodes() {
-        _failoverNodeIds = new ArrayList<String>();
+    private List<String> initFailoverNodes( final List<String> nodeIds ) {
+        final List<String> failoverNodeIds = new ArrayList<String>();
         if ( _failoverNodes != null && _failoverNodes.trim().length() != 0 ) {
             final String[] failoverNodes = _failoverNodes.split( " " );
             for ( final String failoverNode : failoverNodes ) {
                 final String nodeId = failoverNode.trim();
-                if ( !_nodeIds.remove( nodeId ) ) {
+                if ( !nodeIds.remove( nodeId ) ) {
                     throw new IllegalArgumentException( "Invalid failover node id " + nodeId + ": "
                             + "not existing in memcachedNodes '" + _memcachedNodes + "'." );
                 }
-                _failoverNodeIds.add( nodeId );
+                failoverNodeIds.add( nodeId );
             }
         }
+        return failoverNodeIds;
     }
 
     private void initHandleNodeDefinitionMatch( final Matcher matcher, final List<InetSocketAddress> addresses,
-            final Map<InetSocketAddress, String> address2Ids ) {
+            final Map<InetSocketAddress, String> address2Ids, final List<String> nodeIds, final Set<String> allNodeIds ) {
         final String nodeId = matcher.group( 1 );
-        _nodeIds.add( nodeId );
-        _allNodeIds.add( nodeId );
+        nodeIds.add( nodeId );
+        allNodeIds.add( nodeId );
 
         final String hostname = matcher.group( 2 );
         final int port = Integer.parseInt( matcher.group( 3 ) );
@@ -412,15 +391,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     protected synchronized String generateSessionId() {
-        return _sessionIdFormat.createSessionId( super.generateSessionId(), getMemcachedNodeId() );
-    }
-
-    private String getMemcachedNodeId() {
-        return _nodeIds.get( _random.nextInt( _nodeIds.size() ) );
-    }
-
-    private boolean isValidSessionIdFormat( final String sessionId ) {
-        return _sessionIdFormat.isValid( sessionId );
+        return _sessionIdFormat.createSessionId( super.generateSessionId(), _nodeIdService.getMemcachedNodeId() );
     }
 
     /**
@@ -430,7 +401,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void expireSession( final String sessionId ) {
         _log.debug( "expireSession invoked: " + sessionId );
         super.expireSession( sessionId );
-        _memcached.delete( sessionId );
+        if ( _sessionIdFormat.isValid( sessionId ) ) {
+            _memcached.delete( sessionId );
+        }
     }
 
     /**
@@ -533,17 +506,17 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private BackupSessionTask getOrCreateBackupSessionTask( final MemcachedBackupSession session ) {
         if ( session.getBackupTask() == null ) {
             session.setBackupTask( new BackupSessionTask( session, _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                    _memcached, _nodeAvailabilityCache, _nodeIds, _failoverNodeIds ) );
+                    _memcached, _nodeIdService ) );
         }
         return session.getBackupTask();
     }
 
     protected Session loadFromMemcached( final String sessionId ) {
-        if ( !isValidSessionIdFormat( sessionId ) ) {
+        if ( !_sessionIdFormat.isValid( sessionId ) ) {
             return null;
         }
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
-        if ( !_nodeAvailabilityCache.isNodeAvailable( nodeId ) ) {
+        if ( !_nodeIdService.isNodeAvailable( nodeId ) ) {
             _log.debug( "Asked for session " + sessionId + ", but the related"
                     + " memcached node is still marked as unavailable (won't load from memcached)." );
         } else {
@@ -564,7 +537,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                         _log.debug( "Found session with id " + sessionId );
                     }
                 }
-                _nodeAvailabilityCache.setNodeAvailable( nodeId, true );
+                _nodeIdService.setNodeAvailable( nodeId, true );
 
                 if ( object instanceof MemcachedBackupSession ) {
                     return (Session) object;
@@ -574,7 +547,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 }
             } catch ( final NodeFailureException e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached." );
-                _nodeAvailabilityCache.setNodeAvailable( nodeId, false );
+                _nodeIdService.setNodeAvailable( nodeId, false );
             } catch ( final Exception e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
             }
@@ -592,7 +565,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     ", node failure: " + session.getNote( NODE_FAILURE ) +
                     ", id: " + session.getId() );
         }
-        if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
+        if ( _sessionIdFormat.isValid( session.getId() )
+                && session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
             try {
                 _log.debug( "Deleting session from memcached: " + session.getId() );
                 _memcached.delete( session.getId() );

@@ -18,23 +18,30 @@ package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.extractNodeId;
+import static de.javakaffee.web.msm.integration.TestUtils.get;
 import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertNull;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.startup.Embedded;
+import org.apache.http.HttpException;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -42,7 +49,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
+
+import de.javakaffee.web.msm.integration.TestUtils.Response;
 
 /**
  * Integration test testing memcached failover.
@@ -55,9 +65,9 @@ public class MemcachedFailoverIntegrationTest {
     private static final Log LOG = LogFactory
             .getLog( MemcachedFailoverIntegrationTest.class );
 
-    private MemCacheDaemon<?> _daemon1;
-    private MemCacheDaemon<?> _daemon2;
-    private MemCacheDaemon<?> _daemon3;
+    private MemCacheDaemon<? extends CacheElement> _daemon1;
+    private MemCacheDaemon<? extends CacheElement> _daemon2;
+    private MemCacheDaemon<? extends CacheElement> _daemon3;
 
     private Embedded _tomcat1;
 
@@ -132,12 +142,6 @@ public class MemcachedFailoverIntegrationTest {
     /**
      * Tests, that on a memcached failover sessions are relocated to another node and that
      * the session id reflects this.
-     *
-     * This test asumes/knows, that the "next" node is selected in the case of a node failure.
-     * @throws IOException
-     * @throws InterruptedException
-     * @throws InterruptedException
-     * @throws Throwable
      */
     @SuppressWarnings("unchecked")
     @Test
@@ -145,7 +149,7 @@ public class MemcachedFailoverIntegrationTest {
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
-        final String firstNode = sid1.substring( sid1.lastIndexOf( '-' ) + 1 );
+        final String firstNode = extractNodeId( sid1 );
         assertNotNull( "No node id encoded in session id.", firstNode );
 
         Thread.sleep( 50 );
@@ -156,14 +160,13 @@ public class MemcachedFailoverIntegrationTest {
         Thread.sleep( 50 );
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
-        final String secondNode = sid2.substring( sid2.lastIndexOf( '-' ) + 1 );
-        final String expectedNode = info.nextNodeId;
+        final String secondNode = extractNodeId( sid2 );
 
-        assertEquals( expectedNode, secondNode, "Unexpected nodeId." );
+        assertNotSame( secondNode, firstNode, "First node again selected" );
 
         assertEquals(
-                sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 sid2,
+                sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + secondNode,
                 "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
         final Session session = getManager( _tomcat1 ).findSession( sid2 );
@@ -174,11 +177,6 @@ public class MemcachedFailoverIntegrationTest {
 
     /**
      * Tests that multiple memcached nodes can fail and backup/relocation handles this.
-     *
-     * This test asumes/knows, that the "next" node is selected in the case of a node failure.
-     *
-     * @throws InterruptedException
-     * @throws Throwable
      */
     @SuppressWarnings("unchecked")
     @Test
@@ -186,28 +184,30 @@ public class MemcachedFailoverIntegrationTest {
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
-        final String firstNode = sid1.substring( sid1.lastIndexOf( '-' ) + 1 );
+        final String firstNode = extractNodeId( sid1 );
+        LOG.debug( "Have firstNode " + firstNode );
         assertNotNull( "No node id encoded in session id.", firstNode );
 
-        Thread.sleep( 50 );
-
-        /* shutdown appropriate memcached node
+        /* shutdown active and another memcached node
          */
         final FailoverInfo info = getFailoverInfo( firstNode );
         info.activeNode.stop();
-        info.nextNode.stop();
+        final Map.Entry<String, MemCacheDaemon<?>> otherNodeWithId = info.otherNode();
+        otherNodeWithId.getValue().stop();
+        LOG.debug( "Stopping otherNode " + otherNodeWithId.getKey() );
 
-        Thread.sleep( 50 );
+        Thread.sleep( 1000 );
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
-        final String secondNode = sid2.substring( sid2.lastIndexOf( '-' ) + 1 );
-        final String expectedNode = info.failoverNodeId;
+        final String secondNode = extractNodeId( sid2 );
+        LOG.debug( "Have secondNode " + secondNode );
+        final String expectedNode = info.otherNodeExcept( otherNodeWithId.getKey() ).getKey();
 
-        assertEquals( expectedNode, secondNode, "Unexpected nodeId." );
+        assertEquals( secondNode, expectedNode, "Unexpected nodeId: " + secondNode + "." );
 
         assertEquals(
-                sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 sid2,
+                sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
         final Session session = getManager( _tomcat1 ).findSession( sid2 );
@@ -252,6 +252,59 @@ public class MemcachedFailoverIntegrationTest {
 
     }
 
+    @Test
+    public void testCookieNotSetWhenAllMemcachedsDownIssue40() throws IOException, HttpException {
+        /* shutdown all memcached nodes
+         */
+        _daemon1.stop();
+        _daemon2.stop();
+        _daemon3.stop();
+
+        final Response response1 = get( _httpClient, _portTomcat1, null );
+        final String sessionId = response1.getSessionId();
+        assertNotNull( sessionId );
+        assertNotNull( response1.getResponseSessionId() );
+
+        final String nodeId = extractNodeId( response1.getResponseSessionId() );
+        assertNull( nodeId, "NodeId should be null, but is " + nodeId + "." );
+
+        final Response response2 = get( _httpClient, _portTomcat1, sessionId );
+        assertEquals( response2.getSessionId(), sessionId, "SessionId changed" );
+        assertNull( response2.getResponseSessionId() );
+
+    }
+
+    @Test
+    public void testCookieNotSetWhenRegularMemcachedDownIssue40() throws Exception {
+
+        /* reconfigure tomcat with failover node
+         */
+        _tomcat1.stop();
+        Thread.sleep( 500 );
+        final String memcachedNodes = toString( _nodeId1, _address1 ) +
+            " " + toString( _nodeId2, _address2 );
+        _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
+        getManager( _tomcat1 ).setFailoverNodes( _nodeId1 );
+        _tomcat1.start();
+
+        /* shutdown regular memcached node
+         */
+        _daemon2.stop();
+
+        final Response response1 = get( _httpClient, _portTomcat1, null );
+        final String sessionId = response1.getSessionId();
+        assertNotNull( sessionId );
+        assertNotNull( response1.getResponseSessionId() );
+
+        final String nodeId = extractNodeId( response1.getResponseSessionId() );
+        assertEquals( nodeId, _nodeId1 );
+
+        final Response response2 = get( _httpClient, _portTomcat1, sessionId );
+        assertEquals( response2.getSessionId(), sessionId, "SessionId changed" );
+        assertNull( response2.getResponseSessionId() );
+
+    }
+
     private Map<String, Session> getSessions() throws NoSuchFieldException,
             IllegalAccessException {
         final Field field = ManagerBase.class.getDeclaredField( "sessions" );
@@ -265,28 +318,41 @@ public class MemcachedFailoverIntegrationTest {
      */
     private FailoverInfo getFailoverInfo( final String nodeId ) {
         if ( _nodeId1.equals( nodeId ) ) {
-            return new FailoverInfo( _daemon1, _daemon2, _nodeId2, _nodeId3 );
+            return new FailoverInfo( _daemon1, asMap( _nodeId2, _daemon2, _nodeId3, _daemon3 ) );
         } else if ( _nodeId2.equals( nodeId ) ) {
-            return new FailoverInfo( _daemon2, _daemon3, _nodeId3, _nodeId1 );
+            return new FailoverInfo( _daemon2, asMap( _nodeId3, _daemon3, _nodeId1, _daemon1 ) );
         } else if ( _nodeId3.equals( nodeId ) ) {
-            return new FailoverInfo( _daemon3, _daemon1, _nodeId1, _nodeId2 );
+            return new FailoverInfo( _daemon3, asMap( _nodeId1, _daemon1, _nodeId2, _daemon2 ) );
         }
         throw new IllegalArgumentException( "Node " + nodeId + " is not a valid node id." );
     }
 
+    private Map<String, MemCacheDaemon<?>> asMap( final String nodeId1, final MemCacheDaemon<?> daemon1,
+            final String nodeId2, final MemCacheDaemon<?> daemon2 ) {
+        final Map<String, MemCacheDaemon<?>> result = new HashMap<String, MemCacheDaemon<?>>( 2 );
+        result.put( nodeId1, daemon1 );
+        result.put( nodeId2, daemon2 );
+        return result;
+    }
+
     static class FailoverInfo {
         MemCacheDaemon<?> activeNode;
-        MemCacheDaemon<?> nextNode;
-        String nextNodeId;
-        String failoverNodeId;
+        Map<String, MemCacheDaemon<?>> otherNodes;
         public FailoverInfo(final MemCacheDaemon<?> first,
-                final MemCacheDaemon<?> second,
-                final String nextNodeId,
-                final String failoverNodeId) {
+                final Map<String, MemCacheDaemon<?>> otherNodes ) {
             this.activeNode = first;
-            this.nextNode = second;
-            this.nextNodeId = nextNodeId;
-            this.failoverNodeId = failoverNodeId;
+            this.otherNodes = otherNodes;
+        }
+        public Entry<String, MemCacheDaemon<?>> otherNode() {
+            return otherNodes.entrySet().iterator().next();
+        }
+        public Entry<String, MemCacheDaemon<?>> otherNodeExcept( final String key ) {
+            for( final Map.Entry<String, MemCacheDaemon<?>> entry : otherNodes.entrySet() ) {
+                if ( !entry.getKey().equals( key ) ) {
+                    return entry;
+                }
+            }
+            throw new IllegalStateException();
         }
     }
 
