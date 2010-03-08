@@ -30,12 +30,12 @@ import org.apache.coyote.ActionHook;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * This valve is used for tracking requests for that the session must be sent to
  * memcached.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -53,7 +53,7 @@ class SessionTrackerValve extends ValveBase {
     /**
      * Creates a new instance with the given ignore pattern and
      * {@link SessionBackupService}.
-     * 
+     *
      * @param ignorePattern
      *            the regular expression for request uris to ignore
      * @param sessionBackupService
@@ -92,7 +92,7 @@ class SessionTrackerValve extends ValveBase {
 
             /*
              * Do we have a session?
-             * 
+             *
              * Prior check for requested sessionId or response cookie before
              * invoking getSessionInternal, as getSessionInternal triggers a
              * memcached lookup if the session is not available locally.
@@ -114,9 +114,9 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private void backupSession( final Request request, final Response response, final Session session ) {
-        final BackupResult result = _sessionBackupService.backupSession( session );
+        final BackupResultStatus result = _sessionBackupService.backupSession( session );
 
-        if ( result == BackupResult.RELOCATED ) {
+        if ( result == BackupResultStatus.RELOCATED ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
             }
@@ -152,7 +152,7 @@ class SessionTrackerValve extends ValveBase {
                 //_logger.info( " CommitInterceptingActionHook executing before commit..." );
                 final Session session = request.getSessionInternal( false );
                 if ( session != null ) {
-                    final String newSessionId = _sessionBackupService.sessionNeedsRelocate( session );
+                    final String newSessionId = _sessionBackupService.determineSessionIdForBackup( session );
                     //_logger.info( "CommitInterceptingActionHook before commit got new session id: " + newSessionId );
                     if ( newSessionId != null ) {
                         setSessionIdCookie( response, request, newSessionId );
@@ -195,31 +195,50 @@ class SessionTrackerValve extends ValveBase {
     public static interface SessionBackupService {
 
         /**
-         * Returns the new session id if the provided session has to be
-         * relocated.
-         * 
+         * Returns the new session id if the provided session will be relocated
+         * with the next {@link #backupSession(Session)}.
+         * This is used to determine during the (directly before) response.commit,
+         * if the session will be relocated so that a new session cookie can be
+         * added to the response headers.
+         *
          * @param session
          *            the session to check, never null.
          * @return the new session id, if this session has to be relocated.
          */
-        String sessionNeedsRelocate( final Session session );
+        String determineSessionIdForBackup( final Session session );
 
         /**
          * Backup the provided session in memcached.
-         * 
+         *
          * @param session
          *            the session to backup
-         * @return a {@link BackupResult}
+         * @return a {@link BackupResultStatus}
          */
-        BackupResult backupSession( Session session );
+        BackupResultStatus backupSession( Session session );
 
         /**
          * The enumeration of possible backup results.
          */
-        static enum BackupResult {
+        static enum BackupResultStatus {
+                /**
+                 * The session was successfully stored in the sessions default memcached node.
+                 */
                 SUCCESS,
+                /**
+                 * The session could not be stored in any memcached node.
+                 */
                 FAILURE,
-                RELOCATED
+                /**
+                 * The session was moved to another memcached node and stored successfully therein,
+                 * a new session cookie must be sent to the client.
+                 * If the necessary relocation was detected with {@link SessionBackupService#sessionNeedsRelocate(Session)}
+                 * before, {@link #SUCCESS} must be returned.
+                 */
+                RELOCATED,
+                /**
+                 * The session was not modified and therefore the backup was skipped.
+                 */
+                SKIPPED
         }
 
     }

@@ -18,8 +18,8 @@ XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
 
 # Testing
-JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.6' ).reject { |a| a.group == 'org.slf4j' }
-HTTP_CLIENT = transitive( 'commons-httpclient:commons-httpclient:jar:3.1' )
+JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
+HTTP_CLIENT = transitive( 'org.apache.httpcomponents:httpclient:jar:4.1-alpha1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 CLANG = 'commons-lang:commons-lang:jar:2.4' # tests of javolution-serializer, xstream-serializer
@@ -47,23 +47,23 @@ define 'msm' do
   project.version = '1.2-SNAPSHOT'
 
   compile.using :source=>'1.5', :target=>'1.5'
+  test.using :testng
   package :sources
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'
-  
+
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
-    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB )
+    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO )
     package :jar, :javadoc, :id => 'memcached-session-manager'
   end
 
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
-    test.with( compile.dependencies, CLANG, JMOCK_CGLIB )
-    test.using :testng
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :javadoc, :id => 'msm-javolution-serializer'
   end
 
@@ -72,15 +72,13 @@ define 'msm' do
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
     test.with( compile.dependencies, MOCKITO )
     #test.with( compile.dependencies, MOCKITO, POWERMOCK_CORE, POWERMOCK_MOCKITO, POWERMOCK_JUNIT, POWERMOCK_JUNIT_COMMON )
-    test.using :testng
     package :jar, :javadoc, :id => 'msm-javolution-serializer-jodatime'
   end
 
   desc 'XStream/xml based serialization strategy'
   define 'xstream-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, XSTREAM )
-    test.with( compile.dependencies, CLANG )
-    test.using :testng
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :javadoc, :id => 'msm-xstream-serializer'
   end
 

@@ -16,11 +16,6 @@
  */
 package de.javakaffee.web.msm.serializer.xstream;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -29,10 +24,10 @@ import java.util.Map;
 
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.session.StandardSession;
-import org.apache.commons.lang.builder.ToStringBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.serializer.xstream.XStreamTranscoderTest.Person.Gender;
 
@@ -49,7 +44,7 @@ public class XStreamTranscoderTest {
         manager.setContainer( new StandardContext() );
         final XStreamTranscoder transcoder = new XStreamTranscoder( manager );
 
-        final StandardSession session = manager.createEmptySession();
+        final MemcachedBackupSession session = manager.createEmptySession();
         session.setValid( true );
         session.setCreationTime( System.currentTimeMillis() );
         getField( StandardSession.class, "lastAccessedTime" ).set( session, System.currentTimeMillis() + 100 );
@@ -61,31 +56,20 @@ public class XStreamTranscoderTest {
         session.setAttribute( "person2", createPerson( "bar baz", Gender.FEMALE, "bar.baz@example.org", "bar.baz@example.com" ) );
 
         final long start1 = System.nanoTime();
-        transcoder.serialize( session );
+        transcoder.serializeAttributes( session, session.getAttributesInternal() );
         System.out.println("xstream-ser took " + (System.nanoTime() - start1)/1000);
 
         final long start2 = System.nanoTime();
-        transcoder.serialize( session );
+        transcoder.serializeAttributes( session, session.getAttributesInternal() );
         System.out.println("xstream-ser took " + (System.nanoTime() - start2)/1000);
         
         final long start3 = System.nanoTime();
-        final byte[] json = transcoder.serialize( session );
-        final StandardSession readJSONValue = (StandardSession) transcoder.deserialize( json );
+        final byte[] json = transcoder.serializeAttributes( session, session.getAttributesInternal() );
+        final Map<String, Object> readValue = (Map<String, Object>) transcoder.deserializeAttributes( json );
         System.out.println("xstream-round took " + (System.nanoTime() - start3)/1000);
 
         //System.out.println( "Have json: " + new String(json) );
-        assertEquals( readJSONValue, session );
-
-        final long start4 = System.nanoTime();
-        final StandardSession readJavaValue = javaRoundtrip( session, manager );
-        System.out.println("java-round took " + (System.nanoTime() - start4)/1000);
-        assertEquals( readJavaValue, session );
-
-        assertEquals( readJSONValue, readJavaValue );
-
-        System.out.println( ToStringBuilder.reflectionToString( session ) );
-        System.out.println( ToStringBuilder.reflectionToString( readJSONValue ) );
-        System.out.println( ToStringBuilder.reflectionToString( readJavaValue ) );
+        assertEquals( readValue, session.getAttributesInternal() );
 
     }
 
@@ -156,27 +140,6 @@ public class XStreamTranscoderTest {
                 assertEquals( field.get( one ), field.get( another ) );
             }
         }
-    }
-
-    private StandardSession javaRoundtrip( final StandardSession session, final MemcachedBackupSessionManager manager )
-        throws IOException, ClassNotFoundException {
-
-        final long start1 = System.nanoTime();
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        final ObjectOutputStream oos = new ObjectOutputStream( bos );
-        session.writeObjectData( oos );
-        oos.close();
-        bos.close();
-        System.out.println("java-ser took " + (System.nanoTime() - start1)/1000);
-
-        final ByteArrayInputStream bis = new ByteArrayInputStream( bos.toByteArray() );
-        final ObjectInputStream ois = new ObjectInputStream( bis );
-        final StandardSession readSession = manager.createEmptySession();
-        readSession.readObjectData( ois );
-        ois.close();
-        bis.close();
-
-        return readSession;
     }
 
     static class Person implements Serializable {

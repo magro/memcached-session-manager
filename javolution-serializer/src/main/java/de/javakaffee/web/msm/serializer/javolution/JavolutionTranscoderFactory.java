@@ -17,11 +17,12 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import javolution.xml.XMLFormat;
-import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -33,13 +34,36 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
 
     private boolean _copyCollectionsForSerialization;
     private String[] _customConverterClassNames;
+    private JavolutionTranscoder _transcoder;
 
     /**
      * {@inheritDoc}
      */
-    public Transcoder<Object> createTranscoder( final Manager manager ) {
-        final XMLFormat<?>[] customFormats = loadCustomFormats( manager );
-        return new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
+    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
+    }
+
+    /**
+     * Gets/creates a single instance of {@link JavolutionTranscoder}. We need to have a single
+     * instance so that {@link XMLFormat}s are not created twice which would lead to errors.
+     * 
+     * @param manager the manager that will be passed to the transcoder.
+     * @return for all invocations the same instance of {@link JavolutionTranscoder}.
+     */
+    private JavolutionTranscoder getTranscoder( final Manager manager ) {
+        if ( _transcoder == null ) {
+            final XMLFormat<?>[] customFormats = loadCustomFormats( manager );
+            _transcoder = new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
+        }
+        return _transcoder;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
     }
 
     private XMLFormat<?>[] loadCustomFormats( final Manager manager ) {

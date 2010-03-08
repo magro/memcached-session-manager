@@ -16,169 +16,126 @@
  */
 package de.javakaffee.web.msm;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import org.jmock.MockObjectTestCase;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import java.util.Map;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import net.spy.memcached.MemcachedClient;
+
+import org.apache.catalina.core.StandardContext;
+import org.apache.catalina.core.StandardEngine;
+import org.apache.catalina.core.StandardHost;
+import org.apache.catalina.loader.WebappLoader;
+import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
 
 /**
- * Tests the {@link MemcachedBackupSessionManager}.
- * 
+ * Test the {@link MemcachedBackupSessionManager}.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
- * @version $Id$
  */
-public class MemcachedBackupSessionManagerTest extends MockObjectTestCase {
+public class MemcachedBackupSessionManagerTest {
 
-    @Before
-    public void setUp() throws Exception {
-    }
+    private MemcachedBackupSessionManager _manager;
+    private MemcachedClient _memcachedMock;
 
-    @After
-    public void tearDown() throws Exception {
-    }
+    @BeforeMethod
+    public void setup() throws Exception {
 
-    @Test
-    public final void testRoll() {
-        assertEquals( 0, MemcachedBackupSessionManager.roll( 0, 1 ) );
-        assertEquals( 1, MemcachedBackupSessionManager.roll( 0, 2 ) );
-        assertEquals( 0, MemcachedBackupSessionManager.roll( 1, 2 ) );
-    }
+        _manager = new MemcachedBackupSessionManager();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
 
-    @Test
-    public final void testGetNextNodeId_SingleNode() {
-        String actual = MemcachedBackupSessionManager.getNextNodeId( "n1", Arrays.asList( "n1" ), null );
-        assertNull( "For a sole existing node we cannot get a next node", actual );
+        final StandardContext container = new StandardContext();
+        container.setPath( "/" );
+        final StandardHost host = new StandardHost();
+        host.setParent( new StandardEngine() );
+        container.setParent( host );
+        _manager.setContainer( container );
+
+        final WebappLoader webappLoader = mock( WebappLoader.class );
+        // webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
+        when( webappLoader.getClassLoader() ).thenReturn( Thread.currentThread().getContextClassLoader() );
+        Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
+
+        _manager.getContainer().setLoader( webappLoader );
+
+        _memcachedMock = mock( MemcachedClient.class );
+
+        @SuppressWarnings( "unchecked" )
+        final Future<Boolean> futureMock = mock( Future.class );
+        when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
+        when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
+
+        _manager.init( _memcachedMock );
+
     }
 
     /**
-     * Test two memcached nodes:
-     * - node n1 is the currently used node, which failed
-     * - node n2 must be the next node
-     * - node n2 must be recorded as beeing tested
-     * 
-     * Also test that if the current node is n2, then n1 must be chosen.
+     * Test that sessions are only backuped if they are modified.
      */
     @Test
-    public final void testGetNextNodeId_TwoNodes() {
-        final String nodeId1 = "n1";
-        final String nodeId2 = "n2";
-        
-        String actual = MemcachedBackupSessionManager.getNextNodeId( nodeId1, Arrays.asList( nodeId1, nodeId2 ), null );
-        assertEquals( nodeId2, actual );
-        
-        /* let's switch nodes, so that the session is bound to node 2
+    public void testOnlySendModifiedSessions() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        /* simulate the first request, with session access
          */
-        actual = MemcachedBackupSessionManager.getNextNodeId( nodeId2, Arrays.asList( nodeId1, nodeId2 ), null );
-        assertEquals( nodeId1, actual );
+        session.access();
+        session.setAttribute( "foo", "bar" );
+        _manager.backupSession( session );
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
+
+        /* simulate the second request, with session access
+         */
+        session.access();
+        session.setAttribute( "foo", "bar" );
+        session.setAttribute( "bar", "baz" );
+        _manager.backupSession( session );
+        verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
+
+        /* simulate the third request, without session access
+         */
+        _manager.backupSession( session );
+        verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
+
     }
 
     /**
-     * Test two memcached nodes:
-     * - node n2 is the currently used node, which failed
-     * - node n1 was already tested and is excluded therefore
-     * - the result must be null
+     * Test that session attribute serialization and hash calculation is only
+     * performed if the session was accessed since the last backup/backup check.
+     * Otherwise this computing time shall be saved for a better world :-)
      */
     @Test
-    public final void testGetNextNodeId_TwoNodes_NoNodeLeft() {
-        final String nodeId1 = "n1";
-        final String nodeId2 = "n2";
-        String actual = MemcachedBackupSessionManager.getNextNodeId( nodeId2, Arrays.asList( nodeId1, nodeId2 ), asSet( nodeId1 ) );
-        assertNull( actual );
-    }
+    public void testOnlyHashAttributesOfAccessedSessions() {
 
-    /**
-     * Test two memcached nodes with no regular nodes left, so that a failover
-     * node is chosen
-     */
-    @Test
-    public final void testGetNextNodeId_RegularNode_NoRegularNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
-        final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
-        final String nodeId2 = "n2";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2 ) );
-        
-        String actual = cut.getNextNodeId( nodeId1, null );
-        assertEquals( "The failover node is not chosen", nodeId2, actual );
-    }
+        final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
+        @SuppressWarnings( "unchecked" )
+        final Map<String, Object> anyMap = any( Map.class );
+        when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
+        _manager.setTranscoderService( transcoderServiceMock );
 
-    /**
-     * Test two memcached nodes:
-     * - with the current node beeing a failover node
-     * - regular nodes present
-     * 
-     * A regular node shall be chosen
-     */
-    @Test
-    public final void testGetNextNodeId_FailoverNode_RegularNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
-        final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
-        final String nodeId2 = "n2";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2 ) );
-        
-        String actual = cut.getNextNodeId( nodeId2, null );
-        assertEquals( "The regular node is not chosen", nodeId1, actual );
-    }
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
-    /**
-     * Test two memcached nodes:
-     * - with the current node beeing a failover node
-     * - no regular nodes left
-     * 
-     *  no node can be chosen
-     */
-    @Test
-    public final void testGetNextNodeId_FailoverNode_NoRegularNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
-        final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
-        final String nodeId2 = "n2";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2 ) );
-        
-        String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
-        assertNull( actual );
-    }
+        session.setAttribute( "foo", "bar" );
+        _manager.backupSession( session );
+        verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-    /**
-     * Test three memcached nodes:
-     * - with the current node beeing the first failover node
-     * - no regular nodes left
-     * - another failover node left
-     * 
-     *  the second failover node must be chosen
-     */
-    @Test
-    public final void testGetNextNodeId_FailoverNode_NoRegularNodeButAnotherFailoverNodeLeft() {
-        final MemcachedBackupSessionManager cut = new MemcachedBackupSessionManager();
-        
-        final String nodeId1 = "n1";
-        cut.setNodeIds( Arrays.asList( nodeId1 ) );
-        
-        final String nodeId2 = "n2";
-        final String nodeId3 = "n3";
-        cut.setFailoverNodeIds( Arrays.asList( nodeId2, nodeId3 ) );
-        
-        String actual = cut.getNextNodeId( nodeId2, asSet( nodeId1 ) );
-        assertEquals( "The second failover node is not chosen", nodeId3, actual );
-    }
+        session.access();
+        _manager.backupSession( session );
+        verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-    private Set<String> asSet( String ... vals ) {
-        final Set<String> result = new HashSet<String>( vals.length );
-        for ( String val : vals ) {
-            result.add( val );
-        }
-        return result;
+        _manager.backupSession( session );
+        verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
     }
 
 }
