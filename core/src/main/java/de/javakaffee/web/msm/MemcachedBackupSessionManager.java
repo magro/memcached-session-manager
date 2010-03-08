@@ -31,6 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.transcoders.SerializingTranscoder;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -214,7 +215,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private TranscoderFactory _transcoderFactory;
 
-    private DelegatingSerializingTranscoder _upgradeSupportTranscoder;
+    private SerializingTranscoder _upgradeSupportTranscoder;
 
     /**
      * Return descriptive information about this Manager implementation and the
@@ -300,8 +301,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         _transcoderService = createTranscoderService();
 
-        final SessionTranscoder sessionTranscoder = getTranscoderFactory().createSessionTranscoder( this );
-        _upgradeSupportTranscoder = new DelegatingSerializingTranscoder( sessionTranscoder );
+        _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( this );
 
         _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + _nodeIds + " and failover node ids " + _failoverNodeIds );
 

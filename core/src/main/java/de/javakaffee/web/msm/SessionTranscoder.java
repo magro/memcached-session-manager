@@ -19,14 +19,10 @@ package de.javakaffee.web.msm;
 import net.spy.memcached.transcoders.SerializingTranscoder;
 
 /**
- * A subclass of {@link SerializingTranscoder} so that the protected method
- * {@link #deserialize} is visible locally.
- * <p>
- * This {@link SessionTranscoder} is used to deserialize
+ * A subclass of {@link SerializingTranscoder} that is used to deserialize
  * sessions that are still stored in memcached with the old serialization
  * format (the whole session was serialized by the serialization strategy,
  * not only attributes).
- * </p>
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
