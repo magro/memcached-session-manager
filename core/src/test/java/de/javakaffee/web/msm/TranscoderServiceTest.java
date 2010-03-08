@@ -68,7 +68,7 @@ public class TranscoderServiceTest {
     public void testSerializeSessionFields() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
         final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data, _manager.getContainer().getRealm() ).getSession();
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager.getContainer().getRealm() ).getSession();
 
         assertSessionFields( session, deserialized );
     }
@@ -93,7 +93,7 @@ public class TranscoderServiceTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
         final TranscoderService transcoderService = new TranscoderService( new JavaSerializationTranscoder( _manager ) );
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm() );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm(), _manager );
 
         assertSessionFields( session, deserialized );
     }
@@ -107,7 +107,7 @@ public class TranscoderServiceTest {
         session.setAttribute( "foo", value );
 
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm() );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm(), _manager );
 
         assertSessionFields( session, deserialized );
         Assert.assertEquals( value, deserialized.getAttribute( "foo" ) );

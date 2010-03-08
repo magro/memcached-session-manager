@@ -25,9 +25,10 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.Principal;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.Map;
 
+import org.apache.catalina.Manager;
 import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
@@ -36,13 +37,14 @@ import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-
 /**
+ * This service is responsible for serializing/deserializing session data
+ * so that this can be stored in / loaded from memcached.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class TranscoderService {
 
-    @SuppressWarnings( "unused" )
     private static final Log LOG = LogFactory.getLog( TranscoderService.class );
 
     private static final short CURRENT_VERSION = 1;
@@ -57,32 +59,25 @@ public class TranscoderService {
     private final SessionAttributesTranscoder _attributesTranscoder;
 
     /**
-     * @param createTranscoder
+     * Creates a new {@link TranscoderService}.
+     *
+     * @param attributesTranscoder the {@link SessionAttributesTranscoder} strategy to use.
      */
     public TranscoderService( final SessionAttributesTranscoder attributesTranscoder ) {
         _attributesTranscoder = attributesTranscoder;
     }
 
-    public static void main( final String[] args ) throws UnsupportedEncodingException {
-        System.out.println( "42 as byte[]: " + Integer.toBinaryString( Integer.MAX_VALUE ) );
-        System.out.println( "date: " + new Date( Integer.MAX_VALUE ).toString() );
-        System.out.println( "diff: " + ( System.currentTimeMillis() - Integer.MAX_VALUE ) );
-        System.out.println( "length of foo.getBytes, foobar.getBytes: " + "foo".getBytes().length + ", "
-                + "foobar".getBytes().length );
-
-        //Long.valueOf( 42L )
-    }
-
     /**
      * Serialize the given session to a byte array. This is a shortcut for
-     * <pre><code>final byte[] attributesData = serializeAttributes( session, session.getAttributes() );
-serialize( session, attributesData );
-     * </code></pre>
-     * The returned byte array can be deserialized using {@link #deserialize(byte[], Realm)}.
+     * <code><pre>
+     * final byte[] attributesData = serializeAttributes( session, session.getAttributes() );
+     * serialize( session, attributesData );
+     * </pre></code>
+     * The returned byte array can be deserialized using {@link #deserialize(byte[], Realm, Manager)}.
      *
      * @see #serializeAttributes(MemcachedBackupSession, Map)
      * @see #serialize(MemcachedBackupSession, byte[])
-     * @see #deserialize(byte[], Realm)
+     * @see #deserialize(byte[], Realm, Manager)
      * @param session the session to serialize.
      * @return the serialized session data.
      */
@@ -96,25 +91,49 @@ serialize( session, attributesData );
      * (or a combination of {@link #serializeAttributes(MemcachedBackupSession, Map)} and
      * {@link #serialize(MemcachedBackupSession, byte[])}).
      * <p>
-     * Note: the returned session does not yet have the manager set neither was
-     * {@link MemcachedBackupSession#doAfterDeserialization()} invoked.
+     * Note: the returned session already has the manager set and
+     * {@link MemcachedBackupSession#doAfterDeserialization()} is invoked. Additionally
+     * the attributes hash is set (via {@link MemcachedBackupSession#setDataHashCode(int)}).
      * </p>
-     * @param data the byte array of the serialized session and its session attributes.
+     *
+     * @param data the byte array of the serialized session and its session attributes. Can be <code>null</code>.
      * @param realm the realm that is used to reconstruct the principal if there was any stored in the session.
-     * @return the deserialized {@link MemcachedBackupSession}.
+     * @param manager the manager to set on the deserialized session.
+     *
+     * @return the deserialized {@link MemcachedBackupSession}
+     *  or <code>null</code> if the provided <code>byte[] data</code> was <code>null</code>.
      */
-    public MemcachedBackupSession deserialize( final byte[] data, final Realm realm ) {
-        final DeserializationResult deserializationResult = deserializeSessionFields( data, realm );
-        final Map<String, Object> attributes = _attributesTranscoder.deserializeAttributes( deserializationResult.getAttributesData() );
-        final MemcachedBackupSession result = deserializationResult.getSession();
-        result.setAttributesInternal( attributes );
-        return result;
+    public MemcachedBackupSession deserialize( final byte[] data, final Realm realm, final Manager manager ) {
+        if ( data == null ) {
+            return null;
+        }
+        try {
+            final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, realm );
+            final byte[] attributesData = deserializationResult.getAttributesData();
+            final Map<String, Object> attributes = deserializeAttributes( attributesData );
+            final MemcachedBackupSession session = deserializationResult.getSession();
+            session.setAttributesInternal( attributes );
+            session.setDataHashCode( Arrays.hashCode( attributesData ) );
+            session.setManager( manager );
+            session.doAfterDeserialization();
+            return session;
+        } catch( final InvalidVersionException e ) {
+            LOG.info( "Got session data from memcached with an unsupported version: " + e.getVersion() );
+            // for versioning probably there will be changes in the design,
+            // with the first change and version 2 we'll see what we need
+            return null;
+        }
     }
 
     /**
-     * @param session
-     * @param attributes
-     * @return
+     * Serialize the given session attributes to a byte array, this is delegated
+     * to {@link SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, Map)} (using
+     * the {@link SessionAttributesTranscoder} provided in the constructor of this class).
+     *
+     * @param session the session that owns the given attributes.
+     * @param attributes the attributes to serialize.
+     * @return a byte array representing the serialized attributes.
+     *
      * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, Map)
      */
     public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
@@ -124,8 +143,13 @@ serialize( session, attributesData );
 
 
     /**
-     * @param data
-     * @return
+     * Deserialize the given byte array to session attributes, this is delegated
+     * to {@link SessionAttributesTranscoder#deserializeAttributes(byte[])} (using
+     * the {@link SessionAttributesTranscoder} provided in the constructor of this class).
+     *
+     * @param data the serialized attributes
+     * @return the deserialized attributes
+     *
      * @see de.javakaffee.web.msm.SessionAttributesTranscoder#deserializeAttributes(byte[])
      */
     public Map<String, Object> deserializeAttributes( final byte[] data ) {
@@ -133,9 +157,13 @@ serialize( session, attributesData );
     }
 
     /**
-     * @param session
-     * @param attributesData
-     * @return
+     * Serialize session fields to a byte[] and create a byte[] containing both the
+     * serialized byte[] of the session fields and the provided byte[] of the serialized
+     * session attributes.
+     *
+     * @param session its fields will be serialized to a byte[]
+     * @param attributesData the serialized session attributes (e.g. from {@link #serializeAttributes(MemcachedBackupSession, Map)})
+     * @return a byte[] containing both the serialized session fields and the provided serialized session attributes
      */
     public byte[] serialize( final MemcachedBackupSession session, final byte[] attributesData ) {
         final byte[] sessionData = serializeSessionFields( session );

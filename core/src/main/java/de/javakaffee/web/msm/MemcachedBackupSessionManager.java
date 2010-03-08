@@ -21,7 +21,6 @@ import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,7 +47,6 @@ import org.apache.juli.logging.LogFactory;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
-import de.javakaffee.web.msm.TranscoderService.DeserializationResult;
 
 /**
  * This {@link Manager} stores session in configured memcached nodes after the
@@ -572,7 +570,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     return (Session) object;
                 }
                 else {
-                    return deserialize( (byte[]) object );
+                    return _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
                 }
             } catch ( final NodeFailureException e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached." );
@@ -582,28 +580,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             }
         }
         return null;
-    }
-
-    private MemcachedBackupSession deserialize( final byte[] data ) {
-        if ( data == null ) {
-            return null;
-        }
-        try {
-            final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, getContainer().getRealm() );
-            final byte[] attributesData = deserializationResult.getAttributesData();
-            final Map<String, Object> attributes = _transcoderService.deserializeAttributes( attributesData );
-            final MemcachedBackupSession session = deserializationResult.getSession();
-            session.setAttributesInternal( attributes );
-            session.setDataHashCode( Arrays.hashCode( attributesData ) );
-            session.setManager( this );
-            session.doAfterDeserialization();
-            return session;
-        } catch( final InvalidVersionException e ) {
-            _log.info( "Got session data from memcached with an unsupported version: " + e.getVersion() );
-            // for versioning probably there will be changes in the design,
-            // with the first change and version 2 we'll see what we need
-            return null;
-        }
     }
 
     /**
