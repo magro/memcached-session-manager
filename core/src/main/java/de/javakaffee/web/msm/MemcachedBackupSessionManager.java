@@ -73,7 +73,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private static final String NODE_REGEX = "([\\w]+):([^:]+):([\\d]+)";
     private static final Pattern NODE_PATTERN = Pattern.compile( NODE_REGEX );
 
-    private static final String NODES_REGEX = NODE_REGEX + "(?:\\s+" + NODE_REGEX + ")*";
+    private static final String NODES_REGEX = NODE_REGEX + "(?:(?:\\s+|,)" + NODE_REGEX + ")*";
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
 
     protected static final String NODE_FAILURE = "node.failure";
@@ -337,7 +337,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private List<String> initFailoverNodes( final List<String> nodeIds ) {
         final List<String> failoverNodeIds = new ArrayList<String>();
         if ( _failoverNodes != null && _failoverNodes.trim().length() != 0 ) {
-            final String[] failoverNodes = _failoverNodes.split( " " );
+            final String[] failoverNodes = _failoverNodes.split( " |," );
             for ( final String failoverNode : failoverNodes ) {
                 final String nodeId = failoverNode.trim();
                 if ( !nodeIds.remove( nodeId ) ) {
@@ -863,7 +863,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _sessionBackupTimeout = sessionBackupTimeout;
     }
 
-    // ----------------------- protected setters for testing ------------------
+    // ----------------------- protected getters/setters for testing ------------------
 
     /**
      * Set the {@link TranscoderService} that is used by this manager and the {@link BackupSessionTask}.
@@ -872,6 +872,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
+    }
+
+    /**
+     * Just for testing, DON'T USE THIS OTHERWISE!
+     */
+    void resetInitialized() {
+        initialized = false;
+    }
+
+    /**
+     * Return the currently configured node ids - just for testing.
+     * @return the list of node ids.
+     */
+    List<String> getNodeIds() {
+        return _nodeIdService.getNodeIds();
+    }
+    /**
+     * Return the currently configured failover node ids - just for testing.
+     * @return the list of failover node ids.
+     */
+    List<String> getFailoverNodeIds() {
+        return _nodeIdService.getFailoverNodeIds();
     }
 
 }

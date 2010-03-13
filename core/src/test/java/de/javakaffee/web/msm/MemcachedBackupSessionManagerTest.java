@@ -24,6 +24,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -78,6 +79,45 @@ public class MemcachedBackupSessionManagerTest {
 
         _manager.init( _memcachedMock );
 
+    }
+
+    @Test
+    public void testConfigurationFormatMemcachedNodesFeature44() {
+        _manager.resetInitialized();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _manager.init();
+        Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
+
+        _manager.resetInitialized();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
+        _manager.init();
+        Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
+
+        _manager.resetInitialized();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211,n2:127.0.0.1:11212" );
+        _manager.init();
+        Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
+    }
+
+    @Test
+    public void testConfigurationFormatFailoverNodesFeature44() {
+        _manager.resetInitialized();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
+        _manager.setFailoverNodes( "n1" );
+        _manager.init();
+        Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1" ) );
+
+        _manager.resetInitialized();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
+        _manager.setFailoverNodes( "n1 n2" );
+        _manager.init();
+        Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
+
+        _manager.resetInitialized();
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
+        _manager.setFailoverNodes( "n1,n2" );
+        _manager.init();
+        Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
     /**

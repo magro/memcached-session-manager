@@ -160,4 +160,15 @@ public class NodeIdService {
         return isNodeAvailable( nodeId ) ? nodeId : getAvailableNodeId( nodeId );
     }
 
+    /* Just for testing
+     */
+    List<String> getNodeIds() {
+        return new ArrayList<String>( _nodeIds );
+    }
+    /* Just for testing
+     */
+    List<String> getFailoverNodeIds() {
+        return new ArrayList<String>( _failoverNodeIds );
+    }
+
 }
