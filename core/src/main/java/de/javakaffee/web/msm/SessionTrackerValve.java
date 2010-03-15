@@ -49,6 +49,7 @@ class SessionTrackerValve extends ValveBase {
 
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
+    private final Statistics _statistics;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -59,7 +60,8 @@ class SessionTrackerValve extends ValveBase {
      * @param sessionBackupService
      *            the service that actually backups sessions
      */
-    public SessionTrackerValve( final String ignorePattern, final SessionBackupService sessionBackupService ) {
+    public SessionTrackerValve( final String ignorePattern, final SessionBackupService sessionBackupService,
+            final Statistics statistics ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -67,6 +69,7 @@ class SessionTrackerValve extends ValveBase {
             _ignorePattern = null;
         }
         _sessionBackupService = sessionBackupService;
+        _statistics = statistics;
     }
 
     /**
@@ -90,22 +93,7 @@ class SessionTrackerValve extends ValveBase {
 
             getNext().invoke( request, response );
 
-            /*
-             * Do we have a session?
-             *
-             * Prior check for requested sessionId or response cookie before
-             * invoking getSessionInternal, as getSessionInternal triggers a
-             * memcached lookup if the session is not available locally.
-             */
-            final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
-                ? request.getSessionInternal( false )
-                : null;
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Have a session: " + ( session != null ) );
-            }
-            if ( session != null ) {
-                backupSession( request, response, session );
-            }
+            backupSession( request, response );
 
             logDebugResponseCookie( response );
 
@@ -113,15 +101,38 @@ class SessionTrackerValve extends ValveBase {
 
     }
 
-    private void backupSession( final Request request, final Response response, final Session session ) {
-        final BackupResultStatus result = _sessionBackupService.backupSession( session );
+    private void backupSession( final Request request, final Response response ) {
 
-        if ( result == BackupResultStatus.RELOCATED ) {
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
-            }
-            setSessionIdCookie( response, request, session );
+        /*
+         * Do we have a session?
+         *
+         * Prior check for requested sessionId or response cookie before
+         * invoking getSessionInternal, as getSessionInternal triggers a
+         * memcached lookup if the session is not available locally.
+         */
+        final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
+            ? request.getSessionInternal( false )
+            : null;
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "Have a session: " + ( session != null ) );
         }
+        if ( session != null ) {
+
+            _statistics.requestWithSession();
+
+            final BackupResultStatus result = _sessionBackupService.backupSession( session );
+
+            if ( result == BackupResultStatus.RELOCATED ) {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
+                }
+                setSessionIdCookie( response, request, session );
+            }
+        }
+        else {
+            _statistics.requestWithoutSession();
+        }
+
     }
 
     private void logDebugResponseCookie( final Response response ) {

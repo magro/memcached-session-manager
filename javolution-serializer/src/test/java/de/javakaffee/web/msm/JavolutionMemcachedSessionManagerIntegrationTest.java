@@ -88,7 +88,7 @@ public class JavolutionMemcachedSessionManagerIntegrationTest {
 
         _memcached =
                 new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
-                        _memcachedNodeId, address ).build(), new SessionIdFormat() ),
+                        _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
                         Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
 
         // Wait a little bit, so that the memcached client can connect and is ready when test starts

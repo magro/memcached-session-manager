@@ -55,7 +55,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     public void setUp() throws Exception {
         _sessionBackupServiceControl = mock( SessionBackupService.class );
         _service = (SessionBackupService) _sessionBackupServiceControl.proxy();
-        _sessionTrackerValve = new SessionTrackerValve( null, _service );
+        _sessionTrackerValve = new SessionTrackerValve( null, _service, Statistics.create() );
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( (Valve) _nextValve.proxy() );
 

@@ -58,6 +58,7 @@ public class BackupSessionTask {
     private final int _sessionBackupTimeout;
     private final MemcachedClient _memcached;
     private final NodeIdService _nodeIdService;
+    private final Statistics _statistics;
 
     /* the original session id is stored so that we can set this if no
      * memcached node is left for taking over
@@ -78,13 +79,15 @@ public class BackupSessionTask {
      * @param failoverNodeIds
      */
     public BackupSessionTask( final MemcachedBackupSession session, final TranscoderService transcoderService, final boolean sessionBackupAsync, final int sessionBackupTimeout,
-            final MemcachedClient memcached, final NodeIdService nodeIdService ) {
+            final MemcachedClient memcached, final NodeIdService nodeIdService,
+            final Statistics statistics ) {
         _session = session;
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
         _memcached = memcached;
         _nodeIdService = nodeIdService;
+        _statistics = statistics;
     }
 
     /**
@@ -137,6 +140,7 @@ public class BackupSessionTask {
         }
 
         if ( !hasMemcachedIdSet() ) {
+            _statistics.requestWithBackupFailure();
             return BackupResultStatus.FAILURE;
         }
 
@@ -151,12 +155,15 @@ public class BackupSessionTask {
                     && !sessionCookieWasRelocated( _session )
                     && !sessionWouldBeRelocated() ) {
                 _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
+                _statistics.requestWithoutSessionAccess();
                 return BackupResultStatus.SKIPPED;
             }
 
+            final long startBackup = System.currentTimeMillis();
+
             final Map<String, Object> attributes = _session.getAttributesInternal();
 
-            final byte[] attributesData = _transcoderService.serializeAttributes( _session, attributes );
+            final byte[] attributesData = serializeAttributes( attributes );
             final int hashCode = Arrays.hashCode( attributesData );
             final BackupResultStatus result;
             if ( _session.getDataHashCode() != hashCode
@@ -181,22 +188,26 @@ public class BackupSessionTask {
                 result = BackupResultStatus.SKIPPED;
             }
 
-            if ( result != BackupResultStatus.FAILURE ) {
-
-                /* Store the current value of {@link #getThisAccessedTimeInternal()} in a private,
-                 * transient field so that we can check above (before computing the hash of the
-                 * session attributes) if the session was accessed since this backup/check.
-                 */
-                _session.storeThisAccessedTimeFromLastBackupCheck();
-
-                /* Tell the session, that it has been stored, so that e.g. the
-                 * authenticationChanged property can be reset.
-                 */
-                if ( result == BackupResultStatus.SUCCESS
-                        || result == BackupResultStatus.RELOCATED ) {
+            switch ( result ) {
+                case FAILURE:
+                    _statistics.requestWithBackupFailure();
+                    break;
+                case SKIPPED:
+                    _statistics.requestWithoutSessionModification();
+                    _session.storeThisAccessedTimeFromLastBackupCheck();
+                    break;
+                case SUCCESS:
+                    _statistics.requestWithBackup();
+                    _statistics.getBackupProbe().registerSince( startBackup );
+                    _session.storeThisAccessedTimeFromLastBackupCheck();
                     _session.backupFinished();
-                }
-
+                    break;
+                case RELOCATED:
+                    _statistics.requestWithBackupRelocation();
+                    _statistics.getBackupRelocationProbe().registerSince( startBackup );
+                    _session.storeThisAccessedTimeFromLastBackupCheck();
+                    _session.backupFinished();
+                    break;
             }
 
             if ( _log.isDebugEnabled() ) {
@@ -210,6 +221,13 @@ public class BackupSessionTask {
             _session.setBackupRunning( false );
         }
 
+    }
+
+    private byte[] serializeAttributes( final Map<String, Object> attributes ) {
+        final long start = System.currentTimeMillis();
+        final byte[] attributesData = _transcoderService.serializeAttributes( _session, attributes );
+        _statistics.getAttributesSerializationProbe().registerSince( start );
+        return attributesData;
     }
 
     private boolean hasMemcachedIdSet() {
@@ -371,7 +389,7 @@ public class BackupSessionTask {
 
         /* the serialized session data needs to be recreated as it changed.
          */
-        final byte[] attributesData = _transcoderService.serializeAttributes( _session, _session.getAttributesInternal() );
+        final byte[] attributesData = serializeAttributes( _session.getAttributesInternal() );
         final byte[] data = _transcoderService.serialize( _session, attributesData );
 
         /*
@@ -405,26 +423,31 @@ public class BackupSessionTask {
          * be valid in tomcat
          */
         final int expirationTime = _session.getMemcachedExpirationTimeToSet();
-        final Future<Boolean> future = _memcached.set( _session.getId(), expirationTime, data );
-        if ( !_sessionBackupAsync ) {
-            try {
-                future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
+        final long start = System.currentTimeMillis();
+        try {
+            final Future<Boolean> future = _memcached.set( _session.getId(), expirationTime, data );
+            if ( !_sessionBackupAsync ) {
+                try {
+                    future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
+                    _session.setLastMemcachedExpirationTime( expirationTime );
+                    _session.setLastBackupTimestamp( System.currentTimeMillis() );
+                } catch ( final Exception e ) {
+                    if ( _log.isInfoEnabled() ) {
+                        _log.info( "Could not store session " + _session.getId() + " in memcached." );
+                    }
+                    final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
+                    _nodeIdService.setNodeAvailable( nodeId, false );
+                    throw new NodeFailureException( "Could not store session in memcached.", nodeId );
+                }
+            }
+            else {
+                /* in async mode, we asume the session was stored successfully
+                 */
                 _session.setLastMemcachedExpirationTime( expirationTime );
                 _session.setLastBackupTimestamp( System.currentTimeMillis() );
-            } catch ( final Exception e ) {
-                if ( _log.isInfoEnabled() ) {
-                    _log.info( "Could not store session " + _session.getId() + " in memcached.", e );
-                }
-                final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-                _nodeIdService.setNodeAvailable( nodeId, false );
-                throw new NodeFailureException( "Could not store session in memcached.", nodeId );
             }
-        }
-        else {
-            /* in async mode, we asume the session was stored successfully
-             */
-            _session.setLastMemcachedExpirationTime( expirationTime );
-            _session.setLastBackupTimestamp( System.currentTimeMillis() );
+        } finally {
+            _statistics.getMemcachedUpdateProbe().registerSince( start );
         }
     }
 

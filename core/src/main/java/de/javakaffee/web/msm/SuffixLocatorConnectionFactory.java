@@ -36,6 +36,7 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
 
     private final SessionIdFormat _sessionIdFormat;
     private final NodeIdResolver _resolver;
+    private final Statistics _statistics;
 
     /**
      * Creates a new instance.
@@ -44,9 +45,11 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
      * @param sessionIdFormat
      *            the {@link SessionIdFormat}
      */
-    public SuffixLocatorConnectionFactory( final NodeIdResolver resolver, final SessionIdFormat sessionIdFormat ) {
+    public SuffixLocatorConnectionFactory( final NodeIdResolver resolver, final SessionIdFormat sessionIdFormat,
+            final Statistics statistics ) {
         _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
+        _statistics = statistics;
     }
 
     /**
@@ -62,9 +65,9 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
      */
     @Override
     public Transcoder<Object> getDefaultTranscoder() {
-        final SerializingTranscoder result = new SerializingTranscoder();
-        result.setCompressionThreshold( SerializingTranscoder.DEFAULT_COMPRESSION_THRESHOLD );
-        return result;
+        final SerializingTranscoder transcoder = new SerializingTranscoder();
+        transcoder.setCompressionThreshold( SerializingTranscoder.DEFAULT_COMPRESSION_THRESHOLD );
+        return new TranscoderWrapperStatisticsSupport( _statistics, transcoder );
     }
 
 }

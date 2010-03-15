@@ -163,7 +163,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private String _customConverterClassNames;
 
+    private boolean _enableStatistics = true;
+
     // -------------------- END configuration properties --------------------
+
+    private Statistics _statistics;
 
     /*
      * the memcached client
@@ -242,10 +246,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         super.init();
 
+        _statistics = Statistics.create( _enableStatistics );
+
         /* add the valve for tracking requests for that the session must be sent
          * to memcached
          */
-        getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern, this ) );
+        getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern, this, _statistics ) );
 
         /* init memcached
          */
@@ -270,14 +276,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
         }
 
-        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( addresses, address2Ids );
+        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( addresses, address2Ids, _statistics );
 
         /* create the missing sessions cache
          */
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
         _nodeIdService = new NodeIdService( createNodeAvailabilityCache( allNodeIds.size(), 1000 ), nodeIds, failoverNodeIds );
 
-        _transcoderService = createTranscoderService();
+        _transcoderService = createTranscoderService( _statistics );
 
         _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( this );
 
@@ -285,7 +291,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     }
 
-    private TranscoderService createTranscoderService() {
+    private TranscoderService createTranscoderService( final Statistics statistics ) {
         return new TranscoderService( getTranscoderFactory().createTranscoder( this ) );
     }
 
@@ -300,9 +306,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _transcoderFactory;
     }
 
-    private MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids ) {
+    private MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses,
+            final Map<InetSocketAddress, String> address2Ids,
+            final Statistics statistics ) {
         try {
-            return new MemcachedClient( new SuffixLocatorConnectionFactory( new MapBasedResolver( address2Ids ), _sessionIdFormat ), addresses );
+            return new MemcachedClient( new SuffixLocatorConnectionFactory(
+                    new MapBasedResolver( address2Ids ), _sessionIdFormat, statistics ), addresses );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
@@ -506,7 +515,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private BackupSessionTask getOrCreateBackupSessionTask( final MemcachedBackupSession session ) {
         if ( session.getBackupTask() == null ) {
             session.setBackupTask( new BackupSessionTask( session, _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                    _memcached, _nodeIdService ) );
+                    _memcached, _nodeIdService, _statistics ) );
         }
         return session.getBackupTask();
     }
@@ -522,6 +531,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         } else {
             _log.debug( "Loading session from memcached: " + sessionId );
             try {
+
+                final long start = System.currentTimeMillis();
+
                 /* In the previous version (<1.2) the session was completely serialized by
                  * custom Transcoder implementations.
                  * Such sessions have set the SERIALIZED flag (from SerializingTranscoder) so that
@@ -540,10 +552,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 _nodeIdService.setNodeAvailable( nodeId, true );
 
                 if ( object instanceof MemcachedBackupSession ) {
+                    _statistics.getLoadFromMemcachedProbe().registerSince( start );
                     return (Session) object;
                 }
                 else {
-                    return _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
+                    final MemcachedBackupSession result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
+                    if ( object != null ) {
+                        _statistics.getLoadFromMemcachedProbe().registerSince( start );
+                    }
+                    return result;
                 }
             } catch ( final NodeFailureException e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached." );
@@ -726,6 +743,22 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * Specifies if statistics (like number of requests with/without session) shall be
+     * gathered. Default value of this property is <code>true</code>.
+     * <p>
+     * Statistics will be available via jmx and the Manager mbean (
+     * e.g. in the jconsole mbean tab open the attributes node of the
+     * <em>Catalina/Manager/&lt;context-path&gt;/&lt;host name&gt;</em>
+     * mbean and check for <em>msmStat*</em> values.
+     * </p>
+     *
+     * @param enableStatistics <code>true</code> if statistics shall be gathered.
+     */
+    public void setEnableStatistics( final boolean enableStatistics ) {
+        _enableStatistics = enableStatistics;
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void addLifecycleListener( final LifecycleListener arg0 ) {
@@ -894,6 +927,128 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     List<String> getFailoverNodeIds() {
         return _nodeIdService.getFailoverNodeIds();
+    }
+
+    // -------------------------  statistics via jmx ----------------
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithBackup()
+     */
+    public long getMsmStatNumBackups() {
+        return _statistics.getRequestsWithBackup();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithBackupFailure()
+     */
+    public long getMsmStatNumBackupFailures() {
+        return _statistics.getRequestsWithBackupFailure();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithBackupRelocation()
+     */
+    public long getMsmStatBackupRelocations() {
+        return _statistics.getRequestsWithBackupRelocation();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithoutSession()
+     */
+    public long getMsmStatNumRequestsWithoutSession() {
+        return _statistics.getRequestsWithoutSession();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithoutSessionAccess()
+     */
+    public long getMsmStatNumNoSessionAccess() {
+        return _statistics.getRequestsWithoutSessionAccess();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithoutSessionModification()
+     */
+    public long getMsmStatNumNoSessionModification() {
+        return _statistics.getRequestsWithoutSessionModification();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithSession()
+     */
+    public long getMsmStatNumRequestsWithSession() {
+        return _statistics.getRequestsWithSession();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getSessionsLoadedFromMemcached()
+     */
+    public long getMsmStatNumSessionsLoadedFromMemcached() {
+        return _statistics.getSessionsLoadedFromMemcached();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that took the attributes serialization.
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatAttributesSerializationInfo() {
+        return _statistics.getAttributesSerializationProbe().getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that session backups took (excluding backups where a session
+     * was relocated).
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatBackupInfo() {
+        return _statistics.getBackupProbe().getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that session relocations took.
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatBackupRelocationInfo() {
+        return _statistics.getBackupRelocationProbe().getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that loading sessions from memcached took (including deserialization).
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatSessionsLoadedFromMemcachedInfo() {
+        return _statistics.getLoadFromMemcachedProbe().getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the size of the data that was sent to memcached.
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatCachedDataSizeInfo() {
+        return _statistics.getCachedDataSizeProbe().getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that storing data in memcached took (excluding serialization,
+     * including compression).
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatMemcachedUpdateInfo() {
+        return _statistics.getMemcachedUpdateProbe().getInfo();
     }
 
 }
