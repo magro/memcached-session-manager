@@ -185,6 +185,9 @@ class SessionTrackerValve extends ValveBase {
         final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
         newCookie.setMaxAge( -1 );
         newCookie.setPath( request.getContextPath() );
+        if ( request.isSecure() ) {
+            newCookie.setSecure( true );
+        }
         response.addCookieInternal( newCookie );
     }
 
