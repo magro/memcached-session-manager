@@ -184,11 +184,18 @@ class SessionTrackerValve extends ValveBase {
         //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
         final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
         newCookie.setMaxAge( -1 );
-        newCookie.setPath( request.getContextPath() );
+        newCookie.setPath( getContextPath( request ) );
         if ( request.isSecure() ) {
             newCookie.setSecure( true );
         }
         response.addCookieInternal( newCookie );
+    }
+
+    private String getContextPath( final Request request ) {
+        final String contextPath = request.getContext() != null
+            ? request.getContext().getEncodedPath()
+            : null;
+        return contextPath != null && contextPath.length() > 0 ? contextPath : "/";
     }
 
     private Cookie getCookie( final Response response, final String name ) {
