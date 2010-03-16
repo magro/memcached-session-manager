@@ -25,6 +25,7 @@ import org.apache.catalina.Session;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
+import org.apache.catalina.core.StandardContext;
 import org.jmock.Mock;
 import org.jmock.cglib.MockObjectTestCase;
 import org.testng.annotations.AfterMethod;
@@ -144,7 +145,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ) )
             .will( returnValue( BackupResultStatus.RELOCATED ) );
         sessionControl.expects( once() ).method( "getId" ).will( returnValue( sessionId ) );
-        _requestControl.expects( once() ).method( "getContextPath" );
+        _requestControl.expects( atLeastOnce() ).method( "getContext" ).will( returnValue( new StandardContext() ) );
+        _requestControl.expects( once() ).method( "isSecure" ).will( returnValue( false ) );
         _responseControl.expects( once() ).method( "addCookieInternal" ).with(
                 and( hasProperty( "name", eq( SessionTrackerValve.JSESSIONID ) ),
                      hasProperty( "value", eq( sessionId ) ) ) );
