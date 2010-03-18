@@ -185,7 +185,7 @@ public class MemcachedSessionManagerIntegrationTest {
         Thread.sleep( 2100 );
 
         final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
-        assertNotSame( sessionId1, sessionId2, "Expired session returned" );
+        assertNotSame( sessionId1, sessionId2, "Expired session returned." );
     }
 
     /**

@@ -65,10 +65,6 @@ public class BackupSessionTask {
      */
     private String _origSessionId;
 
-    /* The new session id for a session that needs to be relocated
-     */
-    private String _relocateSessionIdForBackup;
-
     /**
      * @param session
      * @param sessionBackupAsync
@@ -132,9 +128,13 @@ public class BackupSessionTask {
      *
      * @param session
      *            the session to save
+     * @param sessionRelocationRequired
+     *            specifies, if the session needs to be relocated to another memcached
+     *            node. The session id had been changed before.
+     *
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public BackupResultStatus backupSession() {
+    public BackupResultStatus backupSession( final boolean sessionRelocationRequired ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Starting for session id " + _session.getId() );
         }
@@ -152,8 +152,7 @@ public class BackupSessionTask {
              * have changed (and can skip serialization and hash calucation)
              */
             if ( !_session.wasAccessedSinceLastBackupCheck()
-                    && !sessionCookieWasRelocated( _session )
-                    && !sessionWouldBeRelocated() ) {
+                    && !sessionRelocationRequired ) {
                 _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
                 _statistics.requestWithoutSessionAccess();
                 return BackupResultStatus.SKIPPED;
@@ -167,8 +166,7 @@ public class BackupSessionTask {
             final int hashCode = Arrays.hashCode( attributesData );
             final BackupResultStatus result;
             if ( _session.getDataHashCode() != hashCode
-                    || sessionCookieWasRelocated()
-                    || sessionWouldBeRelocated()
+                    || sessionRelocationRequired
                     || _session.authenticationChanged() ) {
                 final byte[] data = _transcoderService.serialize( _session, attributesData );
 
@@ -234,11 +232,6 @@ public class BackupSessionTask {
         return _sessionIdFormat.isValid( _session.getId() );
     }
 
-    private boolean sessionCookieWasRelocated( final MemcachedBackupSession backupSession ) {
-        return backupSession.getBackupTask() != null
-        && backupSession.getBackupTask().sessionCookieWasRelocated();
-    }
-
     /**
      * Store the provided session in memcached.
      * @param data the serialized session data (session fields and session attributes).
@@ -252,19 +245,6 @@ public class BackupSessionTask {
         }
 
         try {
-
-            /* the new session id might have been set by #sessionNeedsRelocate() which
-             * was originally asked by the valve (before the response is committed).
-             */
-            if ( sessionCookieWasRelocated() ) {
-                if ( _relocateSessionIdForBackup.equals( _session.getId() ) ) {
-                    _log.warn( "Invalid state: the session has already set the new relocate session id." +
-                    		" It must be checked how this can be possible and fixed." );
-                }
-                _log.debug( "Found relocate session id, setting new id on session..." );
-                _session.setIdForRelocate( _relocateSessionIdForBackup );
-                _relocateSessionIdForBackup = null;
-            }
 
             storeSessionInMemcached( data );
 
@@ -324,53 +304,6 @@ public class BackupSessionTask {
                 return backupResult;
 
         }
-    }
-
-    /**
-     * Returns the new session id if the provided session will be relocated
-     * with the next {@link #backupSession(Session)}.
-     * This is used to determine during the (directly before) response.commit,
-     * if the session will be relocated so that a new session cookie can be
-     * added to the response headers.
-     *
-     * @param session
-     *            the session to check, never null.
-     * @return the new session id, if this session has to be relocated.
-     */
-    public String determineSessionIdForBackup() {
-        final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-        if ( nodeId != null && !_nodeIdService.isNodeAvailable( nodeId ) ) {
-            final String nextNodeId = _nodeIdService.getAvailableNodeId( nodeId );
-            if ( nextNodeId != null ) {
-                final String newSessionId = _sessionIdFormat.createNewSessionId( _session.getId(), nextNodeId );
-                _relocateSessionIdForBackup = newSessionId;
-                return newSessionId;
-            } else {
-                _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Determines, if the session would be relocated by {@link #doBackupSession(byte[], byte[])}.
-     * This is required, if {@link #determineSessionIdForBackup()} was not yet invoked, so
-     * {@link #doBackupSession(byte[], byte[])} is expected to return {@link BackupResultStatus#RELOCATED}.
-     *
-     * @return <code>true</code> if this session will be relocated.
-     */
-    private boolean sessionWouldBeRelocated() {
-        final String nodeId = _sessionIdFormat.extractMemcachedId( _session.getId() );
-        return nodeId != null && !_nodeIdService.isNodeAvailable( nodeId );
-    }
-
-    /**
-     * Specifies if previously {@link #determineSessionIdForBackup()} returned a new session id
-     * to be sent to the client.
-     * @return <code>true</code> if this session needs to be relocated.
-     */
-    private boolean sessionCookieWasRelocated() {
-        return _relocateSessionIdForBackup != null;
     }
 
     private BackupResult failover( final String targetNodeId ) {

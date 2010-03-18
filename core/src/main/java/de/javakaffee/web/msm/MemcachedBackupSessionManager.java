@@ -495,8 +495,36 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    public String determineSessionIdForBackup( final Session session ) {
-        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).determineSessionIdForBackup();
+    @Override
+    public String changeSessionIdIfRelocationRequired( final String requestedSessionId ) {
+
+        /* We can just lookup the session in the local session map, as we wouldn't get
+         * the session from memcached if the node was not available - or, the other way round,
+         * if we would get the session from memcached, the session would not have to be relocated.
+         */
+        try {
+            final MemcachedBackupSession session = (MemcachedBackupSession) super.findSession( requestedSessionId );
+
+            if ( session != null && session.isValid() ) {
+
+                final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+                if ( nodeId != null && !_nodeIdService.isNodeAvailable( nodeId ) ) {
+                    final String nextNodeId = _nodeIdService.getAvailableNodeId( nodeId );
+                    if ( nextNodeId != null ) {
+                        final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), nextNodeId );
+                        _log.debug( "Session needs to be relocated, setting new id on session..." );
+                        session.setIdForRelocate( newSessionId );
+                        return newSessionId;
+                    } else {
+                        _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
+                    }
+                }
+            }
+
+        } catch ( final IOException e ) {
+            _log.warn( "Could not find session in local session map.", e );
+        }
+        return null;
     }
 
     /**
@@ -505,10 +533,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *
      * @param session
      *            the session to save
+     * @param sessionRelocationRequired
+     *            specifies, if the session needs to be relocated to another memcached
+     *            node. The session id has been changed before via {@link #changeSessionIdIfRelocationRequired(String)}.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public BackupResultStatus backupSession( final Session session ) {
-        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).backupSession();
+    public BackupResultStatus backupSession( final Session session, final boolean sessionRelocationRequired ) {
+        return getOrCreateBackupSessionTask( (MemcachedBackupSession) session ).backupSession( sessionRelocationRequired );
 
     }
 

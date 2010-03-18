@@ -131,7 +131,7 @@ public class MemcachedBackupSessionManagerTest {
          */
         session.access();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session );
+        _manager.backupSession( session, false );
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the second request, with session access
@@ -139,12 +139,12 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
-        _manager.backupSession( session );
+        _manager.backupSession( session, false );
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the third request, without session access
          */
-        _manager.backupSession( session );
+        _manager.backupSession( session, false );
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
     }
@@ -166,14 +166,14 @@ public class MemcachedBackupSessionManagerTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session );
+        _manager.backupSession( session, false );
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
-        _manager.backupSession( session );
+        _manager.backupSession( session, false );
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        _manager.backupSession( session );
+        _manager.backupSession( session, false );
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
