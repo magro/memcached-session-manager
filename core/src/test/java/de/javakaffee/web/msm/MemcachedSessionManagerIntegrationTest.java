@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -112,7 +113,7 @@ public class MemcachedSessionManagerIntegrationTest {
         _daemon.stop();
     }
 
-    @Test
+    @Test( enabled = true )
     public void testConfiguredMemcachedNodeId() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
@@ -124,7 +125,7 @@ public class MemcachedSessionManagerIntegrationTest {
         assertEquals( _memcachedNodeId, nodeId, "Invalid memcached node id" );
     }
 
-    @Test
+    @Test( enabled = true )
     public void testSessionIdJvmRouteCompatibility() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
@@ -141,14 +142,14 @@ public class MemcachedSessionManagerIntegrationTest {
      * @throws InterruptedException
      * @throws HttpException
      */
-    @Test
+    @Test( enabled = true )
     public void testInvalidSessionId() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, "12345" );
         assertNotNull( sessionId1, "No session created." );
         assertTrue( sessionId1.indexOf( '-' ) > -1, "Invalid session id format" );
     }
 
-    @Test
+    @Test( enabled = true )
     public void testSessionAvailableInMemcached() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
@@ -156,7 +157,7 @@ public class MemcachedSessionManagerIntegrationTest {
         assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
     }
 
-    @Test
+    @Test( enabled = true )
     public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
@@ -173,7 +174,7 @@ public class MemcachedSessionManagerIntegrationTest {
         assertNull( _memcached.get( sessionId1 ), "Expired sesion still existing in memcached" );
     }
 
-    @Test
+    @Test( enabled = true )
     public void testInvalidSessionNotFound() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
@@ -196,7 +197,7 @@ public class MemcachedSessionManagerIntegrationTest {
      * @throws InterruptedException
      * @throws HttpException
      */
-    @Test
+    @Test( enabled = true )
     public void testRelocateSession() throws IOException, InterruptedException, HttpException {
         // FIXME implementation does not match docs
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -219,7 +220,7 @@ public class MemcachedSessionManagerIntegrationTest {
      *
      * @throws Exception if something goes wrong with the http communication with tomcat
      */
-    @Test
+    @Test( enabled = true )
     public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple() throws Exception {
 
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
@@ -259,7 +260,7 @@ public class MemcachedSessionManagerIntegrationTest {
      *
      * @throws Exception if something goes wrong with the http communication with tomcat
      */
-    @Test
+    @Test( enabled = true )
     public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedManyReadonlyRequests() throws Exception {
 
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
@@ -303,7 +304,7 @@ public class MemcachedSessionManagerIntegrationTest {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    @Test
+    @Test( enabled = true )
     public void testLoadFromMemcachedOldSessionSerializationFormat() throws InterruptedException, ExecutionException {
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
         final Session session = manager.createSession( null );
@@ -313,6 +314,37 @@ public class MemcachedSessionManagerIntegrationTest {
         final Session loadedFromMemcached = manager.loadFromMemcached( session.getId() );
         assertNotNull( loadedFromMemcached );
         assertDeepEquals( session, loadedFromMemcached );
+    }
+
+    /**
+     * Test for issue #49:
+     * Sessions not associated with a memcached node don't get associated as soon as a memcached is available
+     * @throws InterruptedException
+     * @throws IOException
+     * @throws TimeoutException
+     * @throws ExecutionException
+     */
+    @Test( enabled = true )
+    public void testNotAssociatedSessionGetsAssociatedIssue49() throws InterruptedException, IOException, ExecutionException, TimeoutException {
+        _daemon.stop();
+
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        manager.setMaxInactiveInterval( 5 );
+        final SessionIdFormat sessionIdFormat = new SessionIdFormat();
+
+        final Session session = manager.createSession( null );
+        assertNull( sessionIdFormat.extractMemcachedId( session.getId() ) );
+
+        _daemon.start();
+
+        // Wait so that the daemon will be available and the client can reconnect (async get didn't do the trick)
+        Thread.sleep( 2000 );
+
+        final String newSessionId = manager.changeSessionIdIfRelocationRequired( session.getId() );
+        assertNotNull( newSessionId );
+        assertEquals( newSessionId, session.getId() );
+        assertEquals( sessionIdFormat.extractMemcachedId( newSessionId ), _memcachedNodeId );
+
     }
 
 }

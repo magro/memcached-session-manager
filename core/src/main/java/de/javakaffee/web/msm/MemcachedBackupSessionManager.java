@@ -506,18 +506,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             final MemcachedBackupSession session = (MemcachedBackupSession) super.findSession( requestedSessionId );
 
             if ( session != null && session.isValid() ) {
-
                 final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-                if ( nodeId != null && !_nodeIdService.isNodeAvailable( nodeId ) ) {
-                    final String nextNodeId = _nodeIdService.getAvailableNodeId( nodeId );
-                    if ( nextNodeId != null ) {
-                        final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), nextNodeId );
-                        _log.debug( "Session needs to be relocated, setting new id on session..." );
-                        session.setIdForRelocate( newSessionId );
-                        return newSessionId;
-                    } else {
-                        _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
-                    }
+                final String newNodeId = getNewNodeIdIfUnavailable( nodeId );
+                if ( newNodeId != null ) {
+                    final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId );
+                    _log.debug( "Session needs to be relocated, setting new id on session..." );
+                    session.setIdForRelocate( newSessionId );
+                    return newSessionId;
                 }
             }
 
@@ -525,6 +520,30 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _log.warn( "Could not find session in local session map.", e );
         }
         return null;
+    }
+
+    /**
+     * Returns a new node id if the given one is <code>null</code> or not available.
+     * @param nodeId the node id that is checked for availability (if not <code>null</code>).
+     * @return a new node id if the given one is <code>null</code> or not available, otherwise <code>null</code>.
+     */
+    private String getNewNodeIdIfUnavailable( final String nodeId ) {
+        final String newNodeId;
+        if ( nodeId == null ) {
+            newNodeId = _nodeIdService.getMemcachedNodeId();
+        }
+        else {
+            if ( !_nodeIdService.isNodeAvailable( nodeId ) ) {
+                newNodeId = _nodeIdService.getAvailableNodeId( nodeId );
+                if ( newNodeId == null ) {
+                    _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
+                }
+            }
+            else {
+                newNodeId = null;
+            }
+        }
+        return newNodeId;
     }
 
     /**

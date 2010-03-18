@@ -60,11 +60,11 @@ public class SessionIdFormat {
     }
 
     /**
-     * Change the provided session id already including a memcachedId so that it
+     * Change the provided session id (optionally already including a memcachedId) so that it
      * contains the provided newMemcachedId.
      *
      * @param sessionId
-     *            the session id containing the former memcachedId.
+     *            the session id that may contain a former memcachedId.
      * @param newMemcachedId
      *            the new memcached id.
      * @return the sessionId which now contains the new memcachedId instead the
@@ -72,16 +72,17 @@ public class SessionIdFormat {
      */
     public String createNewSessionId( final String sessionId, final String newMemcachedId ) {
         final int idxDash = sessionId.indexOf( '-' );
+        final int idxDot = sessionId.indexOf( '.' );
+
+        final String sessionIdWithNewMemcachedId;
         if ( idxDash < 0 ) {
-            return sessionId + "-" + newMemcachedId;
+            final String plainSessionId = idxDot < 0 ? sessionId : sessionId.substring( 0, idxDot );
+            sessionIdWithNewMemcachedId = plainSessionId + "-" + newMemcachedId;
+        } else {
+            sessionIdWithNewMemcachedId = sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
         }
 
-        final int idxDot = sessionId.indexOf( '.' );
-        if ( idxDot < 0 ) {
-            return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
-        } else {
-            return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId + sessionId.substring( idxDot );
-        }
+        return idxDot < 0 ? sessionIdWithNewMemcachedId : sessionIdWithNewMemcachedId + sessionId.substring( idxDot );
     }
 
     /**

@@ -44,6 +44,7 @@ public class SessionIdFormatTest {
         assertEquals( "foo-n", cut.createNewSessionId( "foo", "n" ) );
         assertEquals( "foo-m", cut.createNewSessionId( "foo-n", "m" ) );
         assertEquals( "foo-m.jvm1", cut.createNewSessionId( "foo-n.jvm1", "m" ) );
+        assertEquals( "foo-m.jvm1", cut.createNewSessionId( "foo.jvm1", "m" ) );
 
     }
 
