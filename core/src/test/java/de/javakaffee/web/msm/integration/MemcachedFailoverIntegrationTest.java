@@ -144,7 +144,7 @@ public class MemcachedFailoverIntegrationTest {
      * the session id reflects this.
      */
     @SuppressWarnings("unchecked")
-    @Test
+    @Test( enabled = true )
     public void testRelocateSession() throws Throwable {
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -179,7 +179,7 @@ public class MemcachedFailoverIntegrationTest {
      * Tests that multiple memcached nodes can fail and backup/relocation handles this.
      */
     @SuppressWarnings("unchecked")
-    @Test
+    @Test( enabled = true )
     public void testMultipleMemcachedNodesFailure() throws Throwable {
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -229,7 +229,7 @@ public class MemcachedFailoverIntegrationTest {
      * @throws Throwable
      */
     @SuppressWarnings("unchecked")
-    @Test
+    @Test( enabled = true )
     public void testAllMemcachedNodesFailure() throws Throwable {
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -252,7 +252,7 @@ public class MemcachedFailoverIntegrationTest {
 
     }
 
-    @Test
+    @Test( enabled = true )
     public void testCookieNotSetWhenAllMemcachedsDownIssue40() throws IOException, HttpException {
         /* shutdown all memcached nodes
          */
@@ -274,18 +274,14 @@ public class MemcachedFailoverIntegrationTest {
 
     }
 
-    @Test
+    @Test( enabled = true )
     public void testCookieNotSetWhenRegularMemcachedDownIssue40() throws Exception {
 
         /* reconfigure tomcat with failover node
          */
-        _tomcat1.stop();
-        Thread.sleep( 500 );
         final String memcachedNodes = toString( _nodeId1, _address1 ) +
-            " " + toString( _nodeId2, _address2 );
-        _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
-        getManager( _tomcat1 ).setFailoverNodes( _nodeId1 );
-        _tomcat1.start();
+        " " + toString( _nodeId2, _address2 );
+        restartTomcat( memcachedNodes, _nodeId1 );
 
         /* shutdown regular memcached node
          */
@@ -303,6 +299,70 @@ public class MemcachedFailoverIntegrationTest {
         assertEquals( response2.getSessionId(), sessionId, "SessionId changed" );
         assertNull( response2.getResponseSessionId() );
 
+    }
+
+    @Test( enabled = true )
+    public void testReconfigureMemcachedNodesAtRuntimeFeature46() throws Exception {
+
+        /* reconfigure tomcat with only two memcached nodes
+         */
+        final String memcachedNodes1 = toString( _nodeId1, _address1 ) +
+        " " + toString( _nodeId2, _address2 );
+        restartTomcat( memcachedNodes1, _nodeId2 );
+
+        final Response response1 = get( _httpClient, _portTomcat1, null );
+        final String sessionId1 = response1.getSessionId();
+        assertNotNull( sessionId1 );
+        assertEquals( extractNodeId( sessionId1 ), _nodeId1 );
+
+        /* reconfigure tomcat with only third memcached nodes and stop
+         * the first one
+         */
+        final String memcachedNodes2 = toString( _nodeId1, _address1 ) +
+            " " + toString( _nodeId2, _address2 ) +
+            " " + toString( _nodeId3, _address3 );
+        getManager( _tomcat1 ).setMemcachedNodes( memcachedNodes2 );
+
+        _daemon1.stop();
+
+        /* Expect relocation to node3
+         */
+        final Response response2 = get( _httpClient, _portTomcat1, sessionId1 );
+        assertNotSame( response2.getSessionId(), sessionId1 );
+        final String sessionId2 = response2.getResponseSessionId();
+        assertNotNull( sessionId2 );
+        assertEquals( extractNodeId( sessionId2 ), _nodeId3 );
+
+    }
+
+    @Test( enabled = true )
+    public void testReconfigureFailoverNodesAtRuntimeFeature46() throws Exception {
+
+        /* set failover nodes n2 and n3
+         */
+        getManager( _tomcat1 ).setFailoverNodes( _nodeId2 + " " + _nodeId3 );
+        final Response response1 = get( _httpClient, _portTomcat1, null );
+        final String sessionId1 = response1.getSessionId();
+        assertNotNull( sessionId1 );
+        assertEquals( extractNodeId( sessionId1 ), _nodeId1 );
+
+        /* set failover nodes n1 and n2
+         */
+        getManager( _tomcat1 ).setFailoverNodes( _nodeId1 + " " + _nodeId2 );
+        // we need to use another http client, otherwise there's no response cookie.
+        final Response response2 = get( new DefaultHttpClient(), _portTomcat1, null );
+        final String sessionId2 = response2.getSessionId();
+        assertNotNull( sessionId2 );
+        assertEquals( extractNodeId( sessionId2 ), _nodeId3 );
+
+    }
+
+    private void restartTomcat( final String memcachedNodes, final String failoverNodes ) throws Exception {
+        _tomcat1.stop();
+        Thread.sleep( 500 );
+        _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
+        getManager( _tomcat1 ).setFailoverNodes( failoverNodes );
+        _tomcat1.start();
     }
 
     private Map<String, Session> getSessions() throws NoSuchFieldException,

@@ -58,6 +58,7 @@ public class TestServlet extends HttpServlet {
 
         final PrintWriter out = response.getWriter();
         out.println( ID + "=" + request.getSession().getId() );
+        System.out.println( "request.getSession().getId(): " + request.getSession().getId());
 
         // final HttpSession session = request.getSession( false );
         if ( session != null ) {

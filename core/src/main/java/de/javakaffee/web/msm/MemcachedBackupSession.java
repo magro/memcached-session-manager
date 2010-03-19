@@ -44,8 +44,6 @@ public final class MemcachedBackupSession extends StandardSession {
 
     private static final long serialVersionUID = 1L;
 
-    private transient BackupSessionTask _backupTask;
-
     /*
      * The hash code of the serialized byte[] of this session that is
      * used to determine, if the session was modified.
@@ -340,33 +338,6 @@ public final class MemcachedBackupSession extends StandardSession {
 
     boolean isExpiring() {
         return super.expiring;
-    }
-
-    /**
-     * The backup task associated with this session if it was already set
-     * via {@link #setBackupTask(BackupSessionTask)}.
-     *
-     * @return the {@link BackupSessionTask} or <code>null</code>.
-     */
-    BackupSessionTask getBackupTask() {
-        return _backupTask;
-    }
-
-    /**
-     * Removes the backup task from this session, so that {@link #getBackupTask()} will
-     * return <code>null</code>.
-     */
-    void removeBackupTask() {
-        _backupTask = null;
-    }
-
-    /**
-     * Set the {@link BackupSessionTask} to use for this session.
-     *
-     * @param backupTask an instance of {@link BackupSessionTask}, never <code>null</code>.
-     */
-    void setBackupTask( final BackupSessionTask backupTask ) {
-        _backupTask = backupTask;
     }
 
     @SuppressWarnings( "unchecked" )
