@@ -24,10 +24,6 @@ SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
 CLANG = 'commons-lang:commons-lang:jar:2.4' # tests of javolution-serializer, xstream-serializer
 MOCKITO = transitive( 'org.mockito:mockito-core:jar:1.8.1' )
-#POWERMOCK_CORE = 'org.powermock:powermock-core:jar:1.3.5'
-#POWERMOCK_JUNIT = 'org.powermock.modules:powermock-module-junit4:jar:1.3.5'
-#POWERMOCK_JUNIT_COMMON = 'org.powermock.modules:powermock-module-junit4-common:jar:1.3.5'
-#POWERMOCK_MOCKITO = 'org.powermock.api:powermock-api-mockito:jar:1.3.5'
 
 # Dependencies
 require 'etc/tools'
@@ -44,7 +40,7 @@ end
 desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
 define 'msm' do
   project.group = 'de.javakaffee.web.msm'
-  project.version = '1.2-SNAPSHOT'
+  project.version = '1.2.0'
 
   compile.using :source=>'1.5', :target=>'1.5'
   test.using :testng
@@ -71,7 +67,6 @@ define 'msm' do
   define 'javolution-serializer-jodatime' do |project|
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
     test.with( compile.dependencies, MOCKITO )
-    #test.with( compile.dependencies, MOCKITO, POWERMOCK_CORE, POWERMOCK_MOCKITO, POWERMOCK_JUNIT, POWERMOCK_JUNIT_COMMON )
     package :jar, :javadoc, :id => 'msm-javolution-serializer-jodatime'
   end
 
