@@ -151,11 +151,11 @@ public class MemcachedBackupSessionManagerTest {
 
     /**
      * Test that session attribute serialization and hash calculation is only
-     * performed if the session was accessed since the last backup/backup check.
+     * performed if session attributes were accessed since the last backup.
      * Otherwise this computing time shall be saved for a better world :-)
      */
     @Test
-    public void testOnlyHashAttributesOfAccessedSessions() {
+    public void testOnlyHashAttributesOfAccessedAttributes() {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
         @SuppressWarnings( "unchecked" )
@@ -170,6 +170,34 @@ public class MemcachedBackupSessionManagerTest {
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
+        session.endAccess();
+        _manager.backupSession( session, false );
+        verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
+    }
+
+    /**
+     * Test that session attribute serialization and hash calculation is only
+     * performed if the session and its attributes were accessed since the last backup/backup check.
+     * Otherwise this computing time shall be saved for a better world :-)
+     */
+    @Test
+    public void testOnlyHashAttributesOfAccessedSessionsAndAttributes() {
+
+        final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
+        @SuppressWarnings( "unchecked" )
+        final Map<String, Object> anyMap = any( Map.class );
+        when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
+        _manager.setTranscoderService( transcoderServiceMock );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        session.setAttribute( "foo", "bar" );
+        _manager.backupSession( session, false );
+        verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
+        session.access();
+        session.getAttribute( "foo" );
         _manager.backupSession( session, false );
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 

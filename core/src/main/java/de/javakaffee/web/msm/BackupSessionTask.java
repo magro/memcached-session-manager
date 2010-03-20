@@ -156,6 +156,15 @@ public class BackupSessionTask {
                 return BackupResultStatus.SKIPPED;
             }
 
+            if ( !session.attributesAccessedSinceLastBackup()
+                    && !sessionRelocationRequired
+                    && !session.authenticationChanged()
+                    && !session.isNewInternal() ) {
+                _log.debug( "Session attributes were not accessed since last backup/check, therefore we can skip this" );
+                _statistics.requestWithoutAttributesAccess();
+                return BackupResultStatus.SKIPPED;
+            }
+
             final long startBackup = System.currentTimeMillis();
 
             final Map<String, Object> attributes = session.getAttributesInternal();

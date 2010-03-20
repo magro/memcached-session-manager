@@ -30,6 +30,7 @@ public class Statistics {
     private final AtomicLong _numRequestsWithBackupRelocation = new AtomicLong();
     private final AtomicLong _numRequestsWithBackupFailure = new AtomicLong();
     private final AtomicLong _numRequestsWithoutSessionAccess = new AtomicLong();
+    private final AtomicLong _numRequestsWithoutAttributesAccess = new AtomicLong();
     private final AtomicLong _numRequestsWithoutSessionModification = new AtomicLong();
     private final AtomicLong _numSessionsLoadedFromMemcached = new AtomicLong();
 
@@ -97,6 +98,12 @@ public class Statistics {
     }
     public long getRequestsWithoutSessionAccess() {
         return _numRequestsWithoutSessionAccess.get();
+    }
+    public void requestWithoutAttributesAccess() {
+        _numRequestsWithoutAttributesAccess.incrementAndGet();
+    }
+    public long getRequestsWithoutAttributesAccess() {
+        return _numRequestsWithoutAttributesAccess.get();
     }
     public void requestWithoutSessionModification() {
         _numRequestsWithoutSessionModification.incrementAndGet();

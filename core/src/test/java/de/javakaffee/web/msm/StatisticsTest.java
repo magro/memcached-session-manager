@@ -40,6 +40,7 @@ public class StatisticsTest {
                 { "getRequestsWithBackupRelocation", "requestWithBackupRelocation" },
                 { "getRequestsWithoutSession", "requestWithoutSession" },
                 { "getRequestsWithoutSessionAccess", "requestWithoutSessionAccess" },
+                { "getRequestsWithoutAttributesAccess", "requestWithoutAttributesAccess" },
                 { "getRequestsWithoutSessionModification", "requestWithoutSessionModification" },
                 { "getRequestsWithSession", "requestWithSession" },
                 { "getSessionsLoadedFromMemcached", "sessionLoadedFromMemcached" }

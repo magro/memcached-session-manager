@@ -1096,6 +1096,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithoutAttributesAccess()
+     */
+    public long getMsmStatNumNoAttributesAccess() {
+        return _statistics.getRequestsWithoutAttributesAccess();
+    }
+
+    /**
+     * @return
      * @see de.javakaffee.web.msm.Statistics#getRequestsWithoutSessionModification()
      */
     public long getMsmStatNumNoSessionModification() {

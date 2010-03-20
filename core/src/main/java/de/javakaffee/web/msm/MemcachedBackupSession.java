@@ -78,6 +78,8 @@ public final class MemcachedBackupSession extends StandardSession {
 
     private transient boolean _authenticationChanged;
 
+    private transient boolean _attributesAccessed;
+
     /**
      * Creates a new instance without a given manager. This has to be
      * assigned via {@link #setManager(Manager)} before this session is
@@ -96,6 +98,33 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     public MemcachedBackupSession( final Manager manager ) {
         super( manager );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Object getAttribute( final String name ) {
+        _attributesAccessed = true;
+        return super.getAttribute( name );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setAttribute( final String name, final Object value ) {
+        _attributesAccessed = true;
+        super.setAttribute( name, value );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setAttribute( final String name, final Object value, final boolean notify ) {
+        _attributesAccessed = true;
+        super.setAttribute( name, value, notify );
     }
 
     /**
@@ -189,6 +218,17 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     boolean wasAccessedSinceLastBackupCheck() {
         return _thisAccessedTimeFromLastBackupCheck != super.thisAccessedTime;
+    }
+
+    /**
+     * Determines, if attributes were accessed via {@link #getAttribute(String)},
+     * {@link #setAttribute(String, Object)} or {@link #setAttribute(String, Object, boolean)}
+     * since the last request.
+     *
+     * @return <code>true</code> if attributes were accessed.
+     */
+    boolean attributesAccessedSinceLastBackup() {
+        return _attributesAccessed;
     }
 
     /**
@@ -406,6 +446,7 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     public void backupFinished() {
         _authenticationChanged = false;
+        _attributesAccessed = false;
     }
 
 }
