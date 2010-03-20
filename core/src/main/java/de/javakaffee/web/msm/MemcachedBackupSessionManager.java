@@ -188,9 +188,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     //private LRUCache<String, String> _relocatedSessions;
 
-    /*
-     * we have to implement rejectedSessions - not sure why
+    /**
+     * The maximum number of active Sessions allowed, or -1 for no limit.
      */
+    private int _maxActiveSessions = -1;
+
     private int _rejectedSessions;
 
     private TranscoderService _transcoderService;
@@ -464,7 +466,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public Session createSession( final String sessionId ) {
-        _log.debug( "createSession invoked: " + sessionId );
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "createSession invoked: " + sessionId );
+        }
+
+        if ( _maxActiveSessions >= 0 && sessions.size() >= _maxActiveSessions ) {
+            _rejectedSessions++;
+            throw new IllegalStateException
+                (sm.getString("standardManager.createSession.ise"));
+        }
 
         Session session = null;
 
@@ -643,6 +653,20 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             }
         }
         super.remove( session );
+    }
+
+    /**
+     * Set the maximum number of active Sessions allowed, or -1 for no limit.
+     *
+     * @param max
+     *            The new maximum number of sessions
+     */
+    public void setMaxActiveSessions( final int max ) {
+        final int oldMaxActiveSessions = _maxActiveSessions;
+        _maxActiveSessions = max;
+        support.firePropertyChange( "maxActiveSessions",
+                new Integer( oldMaxActiveSessions ),
+                new Integer( _maxActiveSessions ) );
     }
 
     /**
