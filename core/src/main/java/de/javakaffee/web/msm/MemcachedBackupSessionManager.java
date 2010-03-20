@@ -465,7 +465,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public Session createSession( final String sessionId ) {
+    public Session createSession( String sessionId ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "createSession invoked: " + sessionId );
         }
@@ -489,7 +489,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             session.setValid( true );
             session.setCreationTime( System.currentTimeMillis() );
             session.setMaxInactiveInterval( this.maxInactiveInterval );
-            session.setId( generateSessionId() );
+
+            if ( sessionId == null || !isNodeAvailableForSessionId( sessionId ) ) {
+                sessionId = generateSessionId();
+            }
+
+            session.setId( sessionId );
 
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Created new session with id " + session.getId() );
@@ -499,8 +504,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         sessionCounter++;
 
-        return ( session );
+        return session;
 
+    }
+
+    private boolean isNodeAvailableForSessionId( final String sessionId ) {
+        final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
+        return nodeId != null && _nodeIdService.isNodeAvailable( nodeId );
     }
 
     /**
