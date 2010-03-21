@@ -16,10 +16,13 @@
  */
 package de.javakaffee.web.msm.serializer.javolution;
 
-import net.spy.memcached.transcoders.Transcoder;
+import javolution.xml.XMLFormat;
 
+import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -30,12 +33,55 @@ import de.javakaffee.web.msm.TranscoderFactory;
 public class JavolutionTranscoderFactory implements TranscoderFactory {
 
     private boolean _copyCollectionsForSerialization;
+    private String[] _customConverterClassNames;
+    private JavolutionTranscoder _transcoder;
 
     /**
      * {@inheritDoc}
      */
-    public Transcoder<Object> createTranscoder( final Manager manager ) {
-        return new JavolutionTranscoder( manager, _copyCollectionsForSerialization );
+    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
+    }
+
+    /**
+     * Gets/creates a single instance of {@link JavolutionTranscoder}. We need to have a single
+     * instance so that {@link XMLFormat}s are not created twice which would lead to errors.
+     * 
+     * @param manager the manager that will be passed to the transcoder.
+     * @return for all invocations the same instance of {@link JavolutionTranscoder}.
+     */
+    private JavolutionTranscoder getTranscoder( final Manager manager ) {
+        if ( _transcoder == null ) {
+            final XMLFormat<?>[] customFormats = loadCustomFormats( manager );
+            _transcoder = new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
+        }
+        return _transcoder;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
+    }
+
+    private XMLFormat<?>[] loadCustomFormats( final Manager manager ) {
+        if ( _customConverterClassNames == null || _customConverterClassNames.length == 0 ) {
+            return null;
+        }
+        final XMLFormat<?>[] customFormats = new XMLFormat<?>[ _customConverterClassNames.length ];
+        final Loader loader = manager.getContainer().getLoader();
+        for ( int i = 0; i < _customConverterClassNames.length; i++ ) {
+            final String className = _customConverterClassNames[i];
+            try {
+                final XMLFormat<?> xmlFormat = Class.forName( className, true, loader.getClassLoader() ).asSubclass( XMLFormat.class ).newInstance();
+                customFormats[i] = xmlFormat;
+            } catch ( final Exception e ) {
+                throw new RuntimeException( "Could not load custom xml format " + className, e );
+            }
+        }
+        return customFormats;
     }
 
     /**
@@ -43,6 +89,13 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
      */
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
+        _customConverterClassNames = customConverterClassNames;
     }
 
 }

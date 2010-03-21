@@ -203,6 +203,11 @@
             <property name="ignoreComments" value="false"/>
             <property name="message" value="Bitte fehlende Implementierungen sinnvoll kommentieren."/>
         </module>
+        <module name="RegexpSinglelineJava">
+            <property name="format" value="import java.util.logging.Logger\W"/>
+            <property name="ignoreComments" value="true"/>
+            <property name="message" value="Don't use java.util.logging but org.apache.juli.logging instead."/>
+        </module>
     </module>
     <module name="FileLength"/>
     <module name="FileTabCharacter"/>

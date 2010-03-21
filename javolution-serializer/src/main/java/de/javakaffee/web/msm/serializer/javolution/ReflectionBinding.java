@@ -25,6 +25,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,16 +33,19 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javolution.lang.Reflection;
 import javolution.text.CharArray;
 import javolution.xml.XMLBinding;
 import javolution.xml.XMLFormat;
+import javolution.xml.XMLSerializable;
 import javolution.xml.stream.XMLStreamException;
 import javolution.xml.stream.XMLStreamReader;
 import javolution.xml.stream.XMLStreamWriter;
+
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 import sun.reflect.ReflectionFactory;
 
 /**
@@ -53,12 +57,14 @@ public class ReflectionBinding extends XMLBinding {
     
     private static final long serialVersionUID = -7047053153745571559L;
 
-    private static final Logger _log = Logger.getLogger( ReflectionBinding.class.getName() );
+    private static final Log LOG = LogFactory.getLog( ReflectionBinding.class );
     
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
     private static final Object[] INITARGS = new Object[0];
     
     private static final XMLCalendarFormat CALENDAR_FORMAT = new XMLCalendarFormat();
+
+    private static final XMLCurrencyFormat CURRENCY_FORMAT = new XMLCurrencyFormat();
 
     private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
 
@@ -68,18 +74,21 @@ public class ReflectionBinding extends XMLBinding {
     private final XMLCollectionFormat _collectionFormat;
     private final XMLMapFormat _mapFormat;
     private final XMLJdkProxyFormat _jdkProxyFormat;
+    private final XMLFormat<?>[] _customFormats;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
         this( classLoader, false );
     }
 
-    public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization ) {
+    public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization,
+            final XMLFormat<?> ... customFormats ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
         _collectionFormat = new XMLCollectionFormat( copyCollectionsForSerialization );
         _mapFormat = new XMLMapFormat( copyCollectionsForSerialization );
         _jdkProxyFormat = new XMLJdkProxyFormat( classLoader );
+        _customFormats = customFormats;
         
         Reflection.getInstance().add( classLoader );
     }
@@ -137,6 +146,8 @@ public class ReflectionBinding extends XMLBinding {
                 || cls == Byte.class
                 || cls == Class.class ) {
             return super.getFormat( cls );
+        } else if ( XMLSerializable.class.isAssignableFrom( cls ) ) {
+            return super.getFormat( cls );
         } else if ( cls.isArray() ) {
             return getArrayFormat( cls );
         } else if ( Collection.class.isAssignableFrom( cls )
@@ -151,11 +162,15 @@ public class ReflectionBinding extends XMLBinding {
             return _enumFormat;
         } else if ( Calendar.class.isAssignableFrom( cls ) ) {
             return CALENDAR_FORMAT;
+        } else if ( Currency.class.isAssignableFrom( cls ) ) {
+            return CURRENCY_FORMAT;
         } else if ( Proxy.isProxyClass( cls ) || cls == Proxy.class ) {
             /* the Proxy.isProxyClass check is required for serialization,
              * Proxy.class is required for deserialization
              */
             return _jdkProxyFormat;
+        } else if ( ( xmlFormat = getCustomFormat( cls ) ) != null ) {
+            return xmlFormat;
         } else {
             if ( xmlFormat == null ) {
                 if ( ReflectionFormat.isNumberFormat( cls ) ) {
@@ -167,6 +182,18 @@ public class ReflectionBinding extends XMLBinding {
             }
             return xmlFormat;
         }
+    }
+    
+    private XMLFormat<?> getCustomFormat( final Class<?> cls ) {
+        if ( _customFormats == null ) {
+            return null;
+        }
+        for( XMLFormat<?> xmlFormat : _customFormats ) {
+            if ( xmlFormat.getBoundClass() == cls ) {
+                return xmlFormat;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings( "unchecked" )
@@ -253,7 +280,7 @@ public class ReflectionBinding extends XMLBinding {
                 final int length = input.getAttribute( "length", 0 );
                 return (Object[]) Array.newInstance( Class.forName( componentType, false, _classLoader ), length );
             } catch ( final Exception e ) {
-                _log.log( Level.SEVERE, "caught exception", e );
+                LOG.error( "caught exception", e );
                 throw new XMLStreamException( e );
             }
         }
@@ -380,6 +407,38 @@ public class ReflectionBinding extends XMLBinding {
 
     }
 
+    public static class XMLCurrencyFormat extends XMLFormat<Currency> {
+        
+        public XMLCurrencyFormat() {
+            super( Currency.class );
+        }
+        
+        /**
+         * Currency instance do not have to be handled by the reference resolver, as we're using
+         * Currency.getInstance for retrieving an instance.
+         * 
+         * @return <code>false</code>
+         */
+        @Override
+        public boolean isReferenceable() {
+            return false;
+        }
+
+        @Override
+        public Currency newInstance( final Class<Currency> cls, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            return Currency.getInstance( xml.getAttribute( "code", "" ) );
+        }
+        
+        public void write( final Currency currency, final OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "code", currency.getCurrencyCode() );
+        }
+        
+        public void read( final InputElement xml, final Currency pos ) {
+            // Immutable, deserialization occurs at creation, ref. newIntance(...) 
+        }
+        
+    }
+    
     /**
      * An {@link XMLFormat} for {@link Calendar} that serialized those calendar
      * fields that contain actual data (these fields also are used by

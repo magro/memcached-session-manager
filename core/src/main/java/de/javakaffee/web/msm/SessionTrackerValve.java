@@ -17,25 +17,25 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
-import org.apache.coyote.ActionHook;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResult;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * This valve is used for tracking requests for that the session must be sent to
  * memcached.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -45,28 +45,31 @@ class SessionTrackerValve extends ValveBase {
 
     static final String RELOCATE = "session.relocate";
 
-    private final Logger _logger = Logger.getLogger( SessionTrackerValve.class.getName() );
+    private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
 
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
+    private final Statistics _statistics;
 
     /**
      * Creates a new instance with the given ignore pattern and
      * {@link SessionBackupService}.
-     * 
+     *
      * @param ignorePattern
      *            the regular expression for request uris to ignore
      * @param sessionBackupService
      *            the service that actually backups sessions
      */
-    public SessionTrackerValve( final String ignorePattern, final SessionBackupService sessionBackupService ) {
+    public SessionTrackerValve( final String ignorePattern, final SessionBackupService sessionBackupService,
+            final Statistics statistics ) {
         if ( ignorePattern != null ) {
-            _logger.info( "Setting ignorePattern to " + ignorePattern );
+            _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
         } else {
             _ignorePattern = null;
         }
         _sessionBackupService = sessionBackupService;
+        _statistics = statistics;
     }
 
     /**
@@ -79,33 +82,11 @@ class SessionTrackerValve extends ValveBase {
             getNext().invoke( request, response );
         } else {
 
-            /*
-             * add the commit intercepting action hook (only) if a session id
-             * was requested
-             */
-            if ( request.getRequestedSessionId() != null && response.getCoyoteResponse().getHook() != null ) {
-                final ActionHook hook = createCommitHook( request, response );
-                response.getCoyoteResponse().setHook( hook );
-            }
+            final boolean sessionRelocationRequired = setNewSessionIdOnSessionRelocation( request, response );
 
             getNext().invoke( request, response );
 
-            /*
-             * Do we have a session?
-             * 
-             * Prior check for requested sessionId or response cookie before
-             * invoking getSessionInternal, as getSessionInternal triggers a
-             * memcached lookup if the session is not available locally.
-             */
-            final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
-                ? request.getSessionInternal( false )
-                : null;
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                _logger.fine( "Have a session: " + ( session != null ) );
-            }
-            if ( session != null ) {
-                backupSession( request, response, session );
-            }
+            backupSession( request, response, sessionRelocationRequired );
 
             logDebugResponseCookie( response );
 
@@ -113,21 +94,79 @@ class SessionTrackerValve extends ValveBase {
 
     }
 
-    private void backupSession( final Request request, final Response response, final Session session ) {
-        final BackupResult result = _sessionBackupService.backupSession( session );
-
-        if ( result == BackupResult.RELOCATED ) {
-            if ( _logger.isLoggable( Level.FINE ) ) {
-                _logger.fine( "Session got relocated, setting a cookie: " + session.getId() );
+    /**
+     * If there's a session for a requested session id that will be located, the new
+     * session id will be set as requested session id on the request and a new
+     * session id cookie will be set (if the session id was requested via a cookie and
+     * if the context is configured to use cookies for session ids).
+     *
+     * @param request the request
+     * @param response the response
+     *
+     * @return <code>true</code> if an existing valid session has to be relocated and the session id was changed.
+     *
+     * @see Request#setRequestedSessionId(String)
+     * @see Request#isRequestedSessionIdFromCookie()
+     * @see Context#getCookies()
+     */
+    private boolean setNewSessionIdOnSessionRelocation( final Request request, final Response response ) {
+        /*
+         * Check for session relocation only if a session id was requested
+         */
+        if ( request.getRequestedSessionId() != null ) {
+            final String newSessionId = _sessionBackupService.changeSessionIdIfRelocationRequired( request.getRequestedSessionId() );
+            if ( newSessionId != null ) {
+                request.setRequestedSessionId( newSessionId );
+                if ( request.isRequestedSessionIdFromCookie() ) {
+                    setSessionIdCookie( response, request, newSessionId );
+                }
             }
-            setSessionIdCookie( response, request, session );
+            return newSessionId != null;
         }
+        return false;
+    }
+
+    private void backupSession( final Request request, final Response response, final boolean sessionRelocationRequired ) {
+
+        /*
+         * Do we have a session?
+         *
+         * Prior check for requested sessionId or response cookie before
+         * invoking getSessionInternal, as getSessionInternal triggers a
+         * memcached lookup if the session is not available locally.
+         */
+        final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
+            ? request.getSessionInternal( false )
+            : null;
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "Have a session: " + ( session != null ) );
+        }
+        if ( session != null ) {
+
+            _statistics.requestWithSession();
+
+            final BackupResultStatus result = _sessionBackupService.backupSession( session, sessionRelocationRequired );
+
+            // TODO: at the end of the request, the cookie probably can never be set, as
+            // the response mostly will already be committed. Therefor, we might drop support
+            // for session relocation that was not requested.
+            if ( result == BackupResultStatus.RELOCATED ) {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
+                }
+                setSessionIdCookie( response, request, session );
+            }
+        }
+        else {
+            _statistics.requestWithoutSession();
+        }
+
     }
 
     private void logDebugResponseCookie( final Response response ) {
-        if ( _logger.isLoggable( Level.FINE ) ) {
+        if ( _log.isDebugEnabled() ) {
             final Cookie respCookie = getCookie( response, JSESSIONID );
-            _logger.fine( "Finished, " + ( respCookie != null
+            _log.debug( "Finished, " + ( respCookie != null
                 ? toString( respCookie )
                 : null ) );
         }
@@ -140,41 +179,27 @@ class SessionTrackerValve extends ValveBase {
                 cookie.getVersion() ).toString();
     }
 
-    private ActionHook createCommitHook( final Request request, final Response response ) {
-        // TODO: check if we have already a CommitInterceptingActionHook here, as tomcat
-        // might reuse its internal stuff according to Bill Barker:
-        // http://www.nabble.com/Re:-How-to-set-header-(directly)-before-response-is-committed-p25217026.html
-        final ActionHook origHook = response.getCoyoteResponse().getHook();
-        final ActionHook hook = new CommitInterceptingActionHook( response.getCoyoteResponse(), origHook ) {
-
-            @Override
-            void beforeCommit() {
-                //_logger.info( " CommitInterceptingActionHook executing before commit..." );
-                final Session session = request.getSessionInternal( false );
-                if ( session != null ) {
-                    final String newSessionId = _sessionBackupService.sessionNeedsRelocate( session );
-                    //_logger.info( "CommitInterceptingActionHook before commit got new session id: " + newSessionId );
-                    if ( newSessionId != null ) {
-                        setSessionIdCookie( response, request, newSessionId );
-                    }
-                }
-                response.getCoyoteResponse().setHook( origHook );
-            }
-
-        };
-        return hook;
-    }
-
     private void setSessionIdCookie( final Response response, final Request request, final Session session ) {
         setSessionIdCookie( response, request, session.getId() );
     }
 
     private void setSessionIdCookie( final Response response, final Request request, final String sessionId ) {
         //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
-        final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
-        newCookie.setMaxAge( -1 );
-        newCookie.setPath( request.getContextPath() );
-        response.addCookieInternal( newCookie );
+        final Context context = request.getContext();
+        if ( context.getCookies() ) {
+            final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
+            newCookie.setMaxAge( -1 );
+            newCookie.setPath( getContextPath( request ) );
+            if ( request.isSecure() ) {
+                newCookie.setSecure( true );
+            }
+            response.addCookieInternal( newCookie );
+        }
+    }
+
+    private String getContextPath( final Request request ) {
+        final String contextPath = request.getContext().getEncodedPath();
+        return contextPath != null && contextPath.length() > 0 ? contextPath : "/";
     }
 
     private Cookie getCookie( final Response response, final String name ) {
@@ -195,31 +220,58 @@ class SessionTrackerValve extends ValveBase {
     public static interface SessionBackupService {
 
         /**
-         * Returns the new session id if the provided session has to be
-         * relocated.
-         * 
-         * @param session
-         *            the session to check, never null.
-         * @return the new session id, if this session has to be relocated.
+         * Check if the valid session associated with the provided
+         * requested session Id will be relocated with the next {@link #backupSession(Session, boolean)}
+         * and change the session id to the new one (containing the new memcached node). The
+         * new session id must be returned if the session will be relocated and the id was changed.
+         *
+         * @param requestedSessionId
+         *            the sessionId that was requested.
+         *
+         * @return the new session id if the session will be relocated and the id was changed.
+         *          Otherwise <code>null</code>.
+         *
+         * @see Request#getRequestedSessionId()
          */
-        String sessionNeedsRelocate( final Session session );
+        String changeSessionIdIfRelocationRequired( final String requestedSessionId );
 
         /**
-         * Backup the provided session in memcached.
-         * 
+         * Backup the provided session in memcached if the session was modified or
+         * if the session needs to be relocated.
+         *
          * @param session
          *            the session to backup
-         * @return a {@link BackupResult}
+         * @param sessionRelocationRequired
+         *            specifies, if the session needs to be relocated to another memcached
+         *            node. The session id has been changed before via {@link #changeSessionIdIfRelocationRequired(String)}.
+         *
+         * @return a {@link BackupResultStatus}
          */
-        BackupResult backupSession( Session session );
+        BackupResultStatus backupSession( Session session, boolean sessionRelocationRequired );
 
         /**
          * The enumeration of possible backup results.
          */
-        static enum BackupResult {
+        static enum BackupResultStatus {
+                /**
+                 * The session was successfully stored in the sessions default memcached node.
+                 */
                 SUCCESS,
+                /**
+                 * The session could not be stored in any memcached node.
+                 */
                 FAILURE,
-                RELOCATED
+                /**
+                 * The session was moved to another memcached node and stored successfully therein,
+                 * a new session cookie must be sent to the client.
+                 * If the necessary relocation was detected with {@link SessionBackupService#sessionNeedsRelocate(Session)}
+                 * before, {@link #SUCCESS} must be returned.
+                 */
+                RELOCATED,
+                /**
+                 * The session was not modified and therefore the backup was skipped.
+                 */
+                SKIPPED
         }
 
     }

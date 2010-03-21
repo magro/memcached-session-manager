@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  * The session id is of the following format:
  * <code>[^-.]+-[^.]+(\.[\w]+)?</code>
  * </p>
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -39,14 +39,18 @@ public class SessionIdFormat {
 
     /**
      * Create a session id including the provided memcachedId.
-     * 
+     *
      * @param sessionId
      *            the original session id, it might contain the jvm route
      * @param memcachedId
-     *            the memcached id to encode in the session id
-     * @return the sessionId which now contains the memcachedId.
+     *            the memcached id to encode in the session id, may be <code>null</code>.
+     * @return the sessionId which now contains the memcachedId if one was provided, otherwise
+     *  the sessionId unmodified.
      */
     public String createSessionId( final String sessionId, final String memcachedId ) {
+        if ( memcachedId == null ) {
+            return sessionId;
+        }
         final int idx = sessionId.indexOf( '.' );
         if ( idx < 0 ) {
             return sessionId + "-" + memcachedId;
@@ -56,11 +60,11 @@ public class SessionIdFormat {
     }
 
     /**
-     * Change the provided session id already including a memcachedId so that it
+     * Change the provided session id (optionally already including a memcachedId) so that it
      * contains the provided newMemcachedId.
-     * 
+     *
      * @param sessionId
-     *            the session id containing the former memcachedId.
+     *            the session id that may contain a former memcachedId.
      * @param newMemcachedId
      *            the new memcached id.
      * @return the sessionId which now contains the new memcachedId instead the
@@ -68,22 +72,23 @@ public class SessionIdFormat {
      */
     public String createNewSessionId( final String sessionId, final String newMemcachedId ) {
         final int idxDash = sessionId.indexOf( '-' );
+        final int idxDot = sessionId.indexOf( '.' );
+
+        final String sessionIdWithNewMemcachedId;
         if ( idxDash < 0 ) {
-            return sessionId + "-" + newMemcachedId;
+            final String plainSessionId = idxDot < 0 ? sessionId : sessionId.substring( 0, idxDot );
+            sessionIdWithNewMemcachedId = plainSessionId + "-" + newMemcachedId;
+        } else {
+            sessionIdWithNewMemcachedId = sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
         }
 
-        final int idxDot = sessionId.indexOf( '.' );
-        if ( idxDot < 0 ) {
-            return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
-        } else {
-            return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId + sessionId.substring( idxDot );
-        }
+        return idxDot < 0 ? sessionIdWithNewMemcachedId : sessionIdWithNewMemcachedId + sessionId.substring( idxDot );
     }
 
     /**
      * Checks if the given session id matches the pattern
      * <code>[^-.]+-[^.]+(\.[\w]+)?</code>.
-     * 
+     *
      * @param sessionId
      *            the session id
      * @return true if matching, otherwise false.
@@ -94,7 +99,7 @@ public class SessionIdFormat {
 
     /**
      * Extract the memcached id from the given session id.
-     * 
+     *
      * @param sessionId
      *            the session id including the memcached id and eventually the
      *            jvmRoute.

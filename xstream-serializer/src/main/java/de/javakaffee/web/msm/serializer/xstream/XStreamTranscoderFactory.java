@@ -16,10 +16,10 @@
  */
 package de.javakaffee.web.msm.serializer.xstream;
 
-import net.spy.memcached.transcoders.Transcoder;
-
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -29,12 +29,29 @@ import de.javakaffee.web.msm.TranscoderFactory;
  */
 public class XStreamTranscoderFactory implements TranscoderFactory {
 
+    private XStreamTranscoder _transcoder;
+
     /**
      * {@inheritDoc}
      */
     @Override
-    public Transcoder<Object> createTranscoder( final Manager manager ) {
-        return new XStreamTranscoder( manager );
+    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
+    }
+
+    private XStreamTranscoder getTranscoder( final Manager manager ) {
+        if ( _transcoder == null ) {
+            _transcoder = new XStreamTranscoder( manager );
+        }
+        return _transcoder;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
+        return getTranscoder( manager );
     }
 
     /**
@@ -46,6 +63,18 @@ public class XStreamTranscoderFactory implements TranscoderFactory {
             throw new UnsupportedOperationException( "XStream's CollectionConverter does not seem" +
                     " to be able to do this. See http://xstream.codehaus.org/converters.html" +
                     " for a list of xstream converters." );
+        }
+    }
+
+    /**
+     * Throws an {@link UnsupportedOperationException}, as java serialization
+     * does not support custom xml format.
+     * 
+     * @param customConverterClassNames a list of class names or <code>null</code>.
+     */
+    public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
+        if ( customConverterClassNames != null && customConverterClassNames.length > 0 ) {
+            throw new UnsupportedOperationException( "XStream based serialization does not support custom converter." );
         }
     }
 

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +34,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javolution.xml.XMLFormat;
+import javolution.xml.XMLSerializable;
+import javolution.xml.stream.XMLStreamException;
 
 import org.apache.commons.lang.mutable.MutableInt;
 
@@ -122,6 +127,41 @@ public class TestClasses {
          */
         public String hello() {
             return "hi";
+        }
+        
+    }
+    
+    /**
+     * A class with a transient field that must be initialized after deserialization,
+     * this is a way to test if the XMLFormat defined in this XMLSerializable implementation
+     * is used and if XMLSerializable is honored at all.
+     */
+    public static class MyXMLSerializable implements XMLSerializable {
+        
+        private static final long serialVersionUID = -3392119483974151376L;
+        
+        protected static final XMLFormat<MyXMLSerializable> XML = new XMLFormat<MyXMLSerializable>(MyXMLSerializable.class) {
+            public MyXMLSerializable newInstance( final Class<MyXMLSerializable> cls, final InputElement xml ) throws XMLStreamException {
+                return new MyXMLSerializable( Runtime.getRuntime() );
+            }
+            public void write( final MyXMLSerializable obj, final OutputElement xml ) throws XMLStreamException {
+                // nothing to do
+            }
+            public void read( final InputElement xml, final MyXMLSerializable obj ) {
+                // Immutable, deserialization occurs at creation, ref. newIntance(...) 
+             }
+        };
+        
+        // Just some field that should not be serialized,
+        // but which must be available after deserialization
+        private transient final Runtime _runtime;
+        
+        public MyXMLSerializable( final Runtime runtime ) {
+            _runtime = runtime;
+        }
+
+        public Runtime getRuntime() {
+            return _runtime;
         }
         
     }
@@ -455,15 +495,13 @@ public class TestClasses {
         }
     }
 
+    @SuppressWarnings( "unused" )
     public static class MyContainer {
 
         private int _int;
         private long _long;
-        @SuppressWarnings( "unused" )
         private final boolean _boolean;
-        @SuppressWarnings( "unused" )
         private final Boolean _Boolean;
-        @SuppressWarnings( "unused" )
         private final Class<?> _Class;
         private String _String;
         private Long _Long;
@@ -480,6 +518,7 @@ public class TestClasses {
         private Integer[] _IntegerArray;
         private Date _Date;
         private Calendar _Calendar;
+        private Currency _Currency;
         private List<String> _ArrayList;
         private final Set<String> _HashSet;
         private final Map<String, Integer> _HashMap;
@@ -515,6 +554,7 @@ public class TestClasses {
             _IntegerArray = new Integer[] { 42 };
             _Date = new Date( System.currentTimeMillis() - 10000 );
             _Calendar = Calendar.getInstance();
+            _Currency = Currency.getInstance( "EUR" );
             _ArrayList = new ArrayList<String>( Arrays.asList( "foo" ) );
             _HashSet = new HashSet<String>();
             _HashSet.add( "42" );

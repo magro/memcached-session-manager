@@ -21,43 +21,35 @@ import java.util.List;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
+import net.spy.memcached.transcoders.SerializingTranscoder;
 import net.spy.memcached.transcoders.Transcoder;
 
-import org.apache.catalina.Manager;
 
 /**
  * This {@link net.spy.memcached.ConnectionFactory} uses the
- * {@link SuffixBasedNodeLocator} as {@link NodeLocator} and the
- * {@link JavaSerializationTranscoder} as {@link Transcoder}.
+ * {@link SuffixBasedNodeLocator} as {@link NodeLocator}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public final class SuffixLocatorConnectionFactory extends DefaultConnectionFactory {
 
-    private final Manager _manager;
     private final SessionIdFormat _sessionIdFormat;
     private final NodeIdResolver _resolver;
-    private final TranscoderFactory _transcoderFactory;
+    private final Statistics _statistics;
 
     /**
      * Creates a new instance.
-     *
-     * @param manager
-     *            the manager
      * @param resolver
      *            the {@link NodeIdResolver}
      * @param sessionIdFormat
      *            the {@link SessionIdFormat}
-     * @param transcoderFactory
-     *            the {@link TranscoderFactory} to use to create the {@link Transcoder}
      */
-    public SuffixLocatorConnectionFactory( final Manager manager, final NodeIdResolver resolver,
-            final SessionIdFormat sessionIdFormat, final TranscoderFactory transcoderFactory ) {
-        _manager = manager;
+    public SuffixLocatorConnectionFactory( final NodeIdResolver resolver, final SessionIdFormat sessionIdFormat,
+            final Statistics statistics ) {
         _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
-        _transcoderFactory = transcoderFactory;
+        _statistics = statistics;
     }
 
     /**
@@ -73,7 +65,9 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
      */
     @Override
     public Transcoder<Object> getDefaultTranscoder() {
-        return _transcoderFactory.createTranscoder( _manager );
+        final SerializingTranscoder transcoder = new SerializingTranscoder();
+        transcoder.setCompressionThreshold( SerializingTranscoder.DEFAULT_COMPRESSION_THRESHOLD );
+        return new TranscoderWrapperStatisticsSupport( _statistics, transcoder );
     }
 
 }

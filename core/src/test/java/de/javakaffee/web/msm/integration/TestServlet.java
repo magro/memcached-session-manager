@@ -18,34 +18,81 @@ package de.javakaffee.web.msm.integration;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Enumeration;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * The servlet used for integration testing.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class TestServlet extends HttpServlet {
-    
+
+    /**
+     * The key of the id in the response body.
+     */
+    public static final String ID = "id";
+
     private static final long serialVersionUID = 7954803132860358448L;
+
+    private static final Log LOG = LogFactory.getLog( TestServlet.class );
 
     /* (non-Javadoc)
      * @see javax.servlet.http.HttpServlet#doGet(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)
      */
     @Override
-    protected void doGet( HttpServletRequest request, HttpServletResponse response )
+    protected void doGet( final HttpServletRequest request, final HttpServletResponse response )
             throws ServletException, IOException {
-        
-        log( "invoked" );
-        
+
+        final HttpSession session = request.getSession( false );
+        LOG.info( "invoked" );
+
         final PrintWriter out = response.getWriter();
-        out.println( "OK: " + request.getSession().getId() );
-        
+        out.println( ID + "=" + request.getSession().getId() );
+        System.out.println( "request.getSession().getId(): " + request.getSession().getId());
+
+        // final HttpSession session = request.getSession( false );
+        if ( session != null ) {
+            final Enumeration<?> attributeNames = session.getAttributeNames();
+            while ( attributeNames.hasMoreElements() ) {
+                final String name = attributeNames.nextElement().toString();
+                final Object value = session.getAttribute( name );
+                out.println( name + "=" + value );
+            }
+        }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void doPost( final HttpServletRequest request, final HttpServletResponse response ) throws ServletException, IOException {
+
+        LOG.info( "invoked" );
+
+        final PrintWriter out = response.getWriter();
+        final HttpSession session = request.getSession();
+
+        out.println( "OK: " + session.getId() );
+
+        @SuppressWarnings( "unchecked" )
+        final Enumeration<String> names = request.getParameterNames();
+        while ( names.hasMoreElements() ) {
+            final String name = names.nextElement();
+            final String value = request.getParameter( name );
+            session.setAttribute( name, value );
+        }
+
     }
 
 }

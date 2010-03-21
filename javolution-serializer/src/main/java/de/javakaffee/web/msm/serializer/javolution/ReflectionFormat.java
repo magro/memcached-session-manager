@@ -21,17 +21,20 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javolution.text.CharArray;
 import javolution.text.TypeFormat;
 import javolution.xml.XMLFormat;
 import javolution.xml.sax.Attributes;
 import javolution.xml.stream.XMLStreamException;
+
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 import sun.reflect.ReflectionFactory;
 
 /**
@@ -55,7 +58,7 @@ import sun.reflect.ReflectionFactory;
  */
 public class ReflectionFormat<T> extends XMLFormat<T> {
 
-    private static final Logger LOG = Logger.getLogger( ReflectionFormat.class.getName() );
+    private static final Log LOG = LogFactory.getLog( ReflectionFormat.class );
 
     private static final Map<Class<?>, XMLNumberFormat<?>> NUMBER_FORMATS = new ConcurrentHashMap<Class<?>, XMLNumberFormat<?>>();
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
@@ -158,7 +161,8 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 } else {
 
                     if ( fieldType == String.class || fieldType == Character.class || fieldType == Boolean.class
-                            || Number.class.isAssignableFrom( fieldType ) ) {
+                            || Number.class.isAssignableFrom( fieldType )
+                            || fieldType == Currency.class ) {
                         attributes.add( new ToStringAttributeHandler( field ) );
                     } else if ( fieldType.isEnum() ) {
                         attributes.add( new EnumAttributeHandler( field ) );
@@ -181,7 +185,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     protected static boolean isAttribute( final Class<?> clazz ) {
         return clazz.isPrimitive() || clazz.isEnum() || clazz == String.class || clazz == Boolean.class || clazz == Integer.class
                 || clazz == Long.class || clazz == Short.class || clazz == Double.class || clazz == Float.class
-                || clazz == Character.class || clazz == Byte.class;
+                || clazz == Character.class || clazz == Byte.class || clazz == Currency.class;
     }
 
     /**
@@ -214,7 +218,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 if ( field != null ) {
                     setFieldFromAttribute( obj, field, input );
                 } else {
-                    LOG.warning( "Did not find field " + name + ", attribute value is " + attributes.getValue( i ) );
+                    LOG.warn( "Did not find field " + name + ", attribute value is " + attributes.getValue( i ) );
                 }
             }
         }
@@ -226,7 +230,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 final Object value = input.get( field.getName() );
                 field.set( obj, value );
             } catch ( final Exception e ) {
-                LOG.log( Level.SEVERE, "Could not set field value for field " + field, e );
+                LOG.error( "Could not set field value for field " + field, e );
             }
         }
     }
@@ -245,7 +249,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             try {
                 handler.writeAttribute( obj, output );
             } catch ( final Exception e ) {
-                LOG.log( Level.SEVERE, "Could not set attribute from field value.", e );
+                LOG.error( "Could not set attribute from field value.", e );
             }
         }
     }
@@ -258,7 +262,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                     output.add( object, field.getName() );
                 }
             } catch ( final Exception e ) {
-                LOG.log( Level.SEVERE, "Could not write element for field.", e );
+                LOG.error( "Could not write element for field.", e );
             }
         }
     }
@@ -469,6 +473,8 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                         @SuppressWarnings( "unchecked" )
                         final XMLNumberFormat<?> format = getNumberFormat( (Class<? extends Number>) fieldType );
                         field.set( obj, format.newInstanceFromAttribute( input, fieldName ) );
+                    } else if ( fieldType == Currency.class ) {
+                        field.set( obj, Currency.getInstance( object.toString() ) );
                     } else {
                         throw new IllegalArgumentException( "Not yet supported as attribute: " + fieldType );
                     }
@@ -477,7 +483,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
         } catch ( final Exception e ) {
             try {
-                LOG.log( Level.SEVERE, "Caught exception when trying to set field ("+ field +") from attribute ("+ input.getAttribute( field.getName() )+").", e );
+                LOG.error( "Caught exception when trying to set field ("+ field +") from attribute ("+ input.getAttribute( field.getName() )+").", e );
             } catch ( final XMLStreamException e1 ) {
                 // fail silently
             }

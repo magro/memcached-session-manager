@@ -16,8 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import net.spy.memcached.transcoders.Transcoder;
-
 import org.apache.catalina.Manager;
 
 /**
@@ -31,13 +29,24 @@ import org.apache.catalina.Manager;
 public interface TranscoderFactory {
 
     /**
-     * Creates a new {@link Transcoder} with the given manager.
+     * Creates a new {@link SessionAttributesTranscoder} with the given manager.
      *
      * @param manager
      *            the manager that needs to be set on deserialized sessions.
-     * @return an implementation of {@link Transcoder}.
+     * @return an implementation of {@link SessionAttributesTranscoder}.
      */
-    Transcoder<Object> createTranscoder( Manager manager );
+    SessionAttributesTranscoder createTranscoder( Manager manager );
+
+    /**
+     * Create a {@link SessionTranscoder} that can be used to deserialize
+     * sessions that are still stored in memcached with the old serialization
+     * format (the whole session was serialized by the serialization strategy,
+     * not only attributes).
+     * @param manager
+     *            the manager that needs to be set on deserialized sessions.
+     * @return an implementation of {@link SessionTranscoder}.
+     */
+    SessionTranscoder createSessionTranscoder( Manager manager );
 
     /**
      * Specifies, if iterating over collection elements shall be done on a copy
@@ -51,5 +60,15 @@ public interface TranscoderFactory {
      *            the boolean value.
      */
     void setCopyCollectionsForSerialization( boolean copyCollectionsForSerialization );
+
+    /**
+     * An optional list of custom converter class names.
+     * <p>
+     * This will be called before {@link #createTranscoder(Manager)}, so that
+     * you can use this property in {@link #createTranscoder(Manager)}.
+     * </p>
+     * @param customConverterClassNames a list of class names or <code>null</code>.
+     */
+    void setCustomConverterClassNames( String[] customConverterClassNames );
 
 }
