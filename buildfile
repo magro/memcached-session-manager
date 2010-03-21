@@ -44,7 +44,7 @@ define 'msm' do
 
   compile.using :source=>'1.5', :target=>'1.5'
   test.using :testng
-  package :sources
+  package :sources, :javadoc
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'
@@ -53,28 +53,28 @@ define 'msm' do
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
     test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO )
-    package :jar, :javadoc, :id => 'memcached-session-manager'
+    package :jar, :id => 'memcached-session-manager'
   end
 
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
-    package :jar, :javadoc, :id => 'msm-javolution-serializer'
+    package :jar, :id => 'msm-javolution-serializer'
   end
 
   desc 'Converter for Joda DateTime instances for javolution serialization strategy'
   define 'javolution-serializer-jodatime' do |project|
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
     test.with( compile.dependencies, MOCKITO )
-    package :jar, :javadoc, :id => 'msm-javolution-serializer-jodatime'
+    package :jar, :id => 'msm-javolution-serializer-jodatime'
   end
 
   desc 'XStream/xml based serialization strategy'
   define 'xstream-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, XSTREAM )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
-    package :jar, :javadoc, :id => 'msm-xstream-serializer'
+    package :jar, :id => 'msm-xstream-serializer'
   end
 
 end
