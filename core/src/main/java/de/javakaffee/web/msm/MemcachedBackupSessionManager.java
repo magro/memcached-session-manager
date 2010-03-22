@@ -165,6 +165,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private boolean _enableStatistics = true;
 
+    private int _backupThreadCount = Runtime.getRuntime().availableProcessors();
+
     // -------------------- END configuration properties --------------------
 
     private Statistics _statistics;
@@ -201,7 +203,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private SerializingTranscoder _upgradeSupportTranscoder;
 
-    private BackupSessionTask _backupSessionService;
+    private BackupSessionService _backupSessionService;
 
     /**
      * Return descriptive information about this Manager implementation and the
@@ -273,7 +275,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( this );
 
-        _backupSessionService = new BackupSessionTask( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _memcached, _nodeIdService, _statistics );
+        _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
 
         _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + config.getNodeIds() + " and failover node ids " + config.getFailoverNodeIds() );
 
@@ -753,8 +755,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final NodeIdService nodeIdService = new NodeIdService(
                 createNodeAvailabilityCache( config.getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, memcachedClient ),
                 config.getNodeIds(), config.getFailoverNodeIds() );
-        final BackupSessionTask backupSessionService = new BackupSessionTask( _transcoderService, _sessionBackupAsync,
-                _sessionBackupTimeout, memcachedClient, nodeIdService, _statistics );
+        final BackupSessionService backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync,
+                _sessionBackupTimeout, _backupThreadCount, memcachedClient, nodeIdService, _statistics );
 
         /* then assign new services
          */
@@ -915,6 +917,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * Specifies the number of threads that are used if {@link #setSessionBackupAsync(boolean)}
+     * is set to <code>true</code>.
+     *
+     * @param backupThreadCount the number of threads to use for session backup.
+     */
+    public void setBackupThreadCount( final int backupThreadCount ) {
+        _backupThreadCount = backupThreadCount;
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void addLifecycleListener( final LifecycleListener arg0 ) {
@@ -1055,13 +1067,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     // ----------------------- protected getters/setters for testing ------------------
 
     /**
-     * Set the {@link TranscoderService} that is used by this manager and the {@link BackupSessionTask}.
+     * Set the {@link TranscoderService} that is used by this manager and the {@link BackupSessionService}.
      *
      * @param transcoderService the transcoder service to use.
      */
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
-        _backupSessionService = new BackupSessionTask( transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _memcached, _nodeIdService, _statistics );
+        _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
     }
 
     /**
