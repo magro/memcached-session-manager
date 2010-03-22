@@ -927,6 +927,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * The number of threads to use for session backup if session backup shall be
+     * done asynchronously.
+     * @return the number of threads for session backup.
+     */
+    public int getBackupThreadCount() {
+        return _backupThreadCount;
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void addLifecycleListener( final LifecycleListener arg0 ) {
