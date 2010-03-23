@@ -18,35 +18,24 @@ package de.javakaffee.web.msm;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Manager;
-import org.apache.catalina.Session;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
- * This {@link Manager} stores session in configured memcached nodes after the
- * response is finished (committed).
- * <p>
- * Use this session manager in a Context element, like this <code><pre>
- * &lt;Context path="/foo"&gt;
- *     &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
- *         memcachedNodes="n1.localhost:11211 n2.localhost:11212" failoverNodes="n2"
- *         requestUriIgnorePattern=".*\.(png|gif|jpg|css|js)$" /&gt;
- * &lt;/Context&gt;
- * </pre></code>
- * </p>
+ * Stores the provided session in memcached if the session was modified
+ * or if the session needs to be relocated (set <code>force</code> to <code>true</code>).
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
- * @version $Id$
  */
-public class BackupSessionTask {
+public class BackupSessionTask implements Callable<BackupResultStatus> {
 
     private static final Log _log = LogFactory.getLog( BackupSessionTask.class );
 
@@ -57,6 +46,8 @@ public class BackupSessionTask {
 
     private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
 
+    private final MemcachedBackupSession _session;
+    private final boolean _force;
     private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
@@ -65,6 +56,12 @@ public class BackupSessionTask {
     private final Statistics _statistics;
 
     /**
+     * @param session
+     *            the session to save
+     * @param force
+     *            specifies, if the session needs to be saved by all means, e.g.
+     *            as it has to be relocated to another memcached
+     *            node (the session id had been changed before in this case).
      * @param sessionBackupAsync
      * @param sessionBackupTimeout
      * @param memcached
@@ -72,8 +69,16 @@ public class BackupSessionTask {
      * @param nodeIds
      * @param failoverNodeIds
      */
-    public BackupSessionTask( final TranscoderService transcoderService, final boolean sessionBackupAsync, final int sessionBackupTimeout, final MemcachedClient memcached,
-            final NodeIdService nodeIdService, final Statistics statistics ) {
+    public BackupSessionTask( final MemcachedBackupSession session,
+            final boolean force,
+            final TranscoderService transcoderService,
+            final boolean sessionBackupAsync,
+            final int sessionBackupTimeout,
+            final MemcachedClient memcached,
+            final NodeIdService nodeIdService,
+            final Statistics statistics ) {
+        _session = session;
+        _force = force;
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
@@ -83,101 +88,30 @@ public class BackupSessionTask {
     }
 
     /**
-     * Update the expiration for the session associated with this {@link BackupSessionTask}
-     * in memcached, so that the session will expire in
-     * <em>session.maxInactiveInterval - timeIdle</em>
-     * seconds in memcached (whereas timeIdle is calculated as
-     * <em>System.currentTimeMillis - session.thisAccessedTime</em>).
-     * <p>
-     * <strong>IMPLEMENTATION NOTE</strong>: right now this performs a new backup of the session
-     * in memcached. Once the touch command is available in memcached
-     * (see <a href="http://code.google.com/p/memcached/issues/detail?id=110">issue #110</a> in memcached),
-     * we can consider to use this.
-     * </p>
-     *
-     * @param session the session for that the expiration shall be updated in memcached.
-     *
-     * @see Session#getMaxInactiveInterval()
-     * @see MemcachedBackupSession#getThisAccessedTimeInternal()
+     * {@inheritDoc}
      */
-    public void updateExpiration( final MemcachedBackupSession session ) {
+    @Override
+    public BackupResultStatus call() throws Exception {
         if ( _log.isDebugEnabled() ) {
-            _log.debug( "Updating expiration time for session " + session.getId() );
+            _log.debug( "Starting for session id " + _session.getId() );
         }
 
-        if ( !hasMemcachedIdSet( session ) ) {
-            return;
-        }
-
-        session.setExpirationUpdateRunning( true );
+        _session.setBackupRunning( true );
         try {
-            final Map<String, Object> attributes = session.getAttributesInternal();
-            final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
-            final byte[] data = _transcoderService.serialize( session, attributesData );
-            doBackupSession( session, data, attributesData );
-        } finally {
-            session.setExpirationUpdateRunning( false );
-        }
-    }
-
-    /**
-     * Store the provided session in memcached if the session was modified
-     * or if the session needs to be relocated.
-     * @param session TODO
-     * @param sessionRelocationRequired
-     *            specifies, if the session needs to be relocated to another memcached
-     *            node. The session id had been changed before.
-     * @param session
-     *            the session to save
-     *
-     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
-     */
-    public BackupResultStatus backupSession( final MemcachedBackupSession session, final boolean sessionRelocationRequired ) {
-        if ( _log.isDebugEnabled() ) {
-            _log.debug( "Starting for session id " + session.getId() );
-        }
-
-        if ( !hasMemcachedIdSet( session ) ) {
-            _statistics.requestWithBackupFailure();
-            return BackupResultStatus.FAILURE;
-        }
-
-        session.setBackupRunning( true );
-        try {
-
-            /* Check if the session was accessed at all since the last backup/check.
-             * If this is not the case, we even don't have to check if attributes
-             * have changed (and can skip serialization and hash calucation)
-             */
-            if ( !session.wasAccessedSinceLastBackupCheck()
-                    && !sessionRelocationRequired ) {
-                _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
-                _statistics.requestWithoutSessionAccess();
-                return BackupResultStatus.SKIPPED;
-            }
-
-            if ( !session.attributesAccessedSinceLastBackup()
-                    && !sessionRelocationRequired
-                    && !session.authenticationChanged()
-                    && !session.isNewInternal() ) {
-                _log.debug( "Session attributes were not accessed since last backup/check, therefore we can skip this" );
-                _statistics.requestWithoutAttributesAccess();
-                return BackupResultStatus.SKIPPED;
-            }
 
             final long startBackup = System.currentTimeMillis();
 
-            final Map<String, Object> attributes = session.getAttributesInternal();
+            final Map<String, Object> attributes = _session.getAttributesInternal();
 
-            final byte[] attributesData = serializeAttributes( session, attributes );
+            final byte[] attributesData = serializeAttributes( _session, attributes );
             final int hashCode = Arrays.hashCode( attributesData );
             final BackupResultStatus result;
-            if ( session.getDataHashCode() != hashCode
-                    || sessionRelocationRequired
-                    || session.authenticationChanged() ) {
-                final byte[] data = _transcoderService.serialize( session, attributesData );
+            if ( _session.getDataHashCode() != hashCode
+                    || _force
+                    || _session.authenticationChanged() ) {
+                final byte[] data = _transcoderService.serialize( _session, attributesData );
 
-                final BackupResult backupResult = doBackupSession( session, data, attributesData );
+                final BackupResult backupResult = doBackupSession( _session, data, attributesData );
                 if ( backupResult.isSuccess() || backupResult.isRelocated() ) {
                     /* we can use the already calculated hashcode if we have still the same
                      * attributes data, which is the case for the most common case SUCCESS
@@ -185,7 +119,7 @@ public class BackupSessionTask {
                     final int newHashCode = backupResult.getAttributesData() == attributesData
                         ? hashCode
                         : Arrays.hashCode( backupResult.getAttributesData() );
-                    session.setDataHashCode( newHashCode );
+                    _session.setDataHashCode( newHashCode );
                 }
 
                 result = backupResult.getStatus();
@@ -199,31 +133,31 @@ public class BackupSessionTask {
                     break;
                 case SKIPPED:
                     _statistics.requestWithoutSessionModification();
-                    session.storeThisAccessedTimeFromLastBackupCheck();
+                    _session.storeThisAccessedTimeFromLastBackupCheck();
                     break;
                 case SUCCESS:
                     _statistics.requestWithBackup();
                     _statistics.getBackupProbe().registerSince( startBackup );
-                    session.storeThisAccessedTimeFromLastBackupCheck();
-                    session.backupFinished();
+                    _session.storeThisAccessedTimeFromLastBackupCheck();
+                    _session.backupFinished();
                     break;
                 case RELOCATED:
                     _statistics.requestWithBackupRelocation();
                     _statistics.getBackupRelocationProbe().registerSince( startBackup );
-                    session.storeThisAccessedTimeFromLastBackupCheck();
-                    session.backupFinished();
+                    _session.storeThisAccessedTimeFromLastBackupCheck();
+                    _session.backupFinished();
                     break;
             }
 
             if ( _log.isDebugEnabled() ) {
-                _log.debug( "Finished for session id " + session.getId() +
+                _log.debug( "Finished for session id " + _session.getId() +
                         ", returning status " + result );
             }
 
             return result;
 
         } finally {
-            session.setBackupRunning( false );
+            _session.setBackupRunning( false );
         }
 
     }
@@ -235,10 +169,6 @@ public class BackupSessionTask {
         return attributesData;
     }
 
-    private boolean hasMemcachedIdSet( final MemcachedBackupSession session ) {
-        return _sessionIdFormat.isValid( session.getId() );
-    }
-
     /**
      * Store the provided session in memcached.
      * @param session the session to backup
@@ -247,7 +177,7 @@ public class BackupSessionTask {
      *
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    private BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) {
+    BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Trying to store session in memcached: " + session.getId() );
         }

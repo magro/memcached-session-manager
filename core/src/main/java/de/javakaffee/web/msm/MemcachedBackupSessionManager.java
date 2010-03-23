@@ -977,6 +977,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void stop() throws LifecycleException {
         if ( initialized ) {
+            try {
+                _backupSessionService.shutdown();
+            } catch ( final InterruptedException e ) {
+                _log.info( "Got interrupted during backupSessionService shutdown," +
+                		" continuing to shutdown memcached client and to destroy myself...", e );
+            }
             _memcached.shutdown();
             destroy();
         }
@@ -1199,8 +1205,22 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Returns a string array with labels and values of count, min, avg and max
+     * of the time that session backups took in the request thread (including omitted
+     * session backups e.g. because the session attributes were not accessed).
+     * This time was spent in the request thread.
+     *
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatEffectiveBackupInfo() {
+        return _statistics.getEffectiveBackupProbe().getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
      * of the time that session backups took (excluding backups where a session
-     * was relocated).
+     * was relocated). This time was spent in the request thread if session backup
+     * is done synchronously, otherwise another thread used this time.
+     *
      * @return a String array for statistics inspection via jmx.
      */
     public String[] getMsmStatBackupInfo() {

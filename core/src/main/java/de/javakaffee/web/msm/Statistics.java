@@ -34,6 +34,7 @@ public class Statistics {
     private final AtomicLong _numRequestsWithoutSessionModification = new AtomicLong();
     private final AtomicLong _numSessionsLoadedFromMemcached = new AtomicLong();
 
+    private final MinMaxAvgProbe _effectiveBackupProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _backupProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _backupRelocationProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _attributesSerializationProbe = new MinMaxAvgProbe();
@@ -116,6 +117,20 @@ public class Statistics {
     }
     public long getSessionsLoadedFromMemcached() {
         return _numSessionsLoadedFromMemcached.get();
+    }
+
+    /**
+     * Provides info regarding the effective time that was required for session
+     * backup in the request thread and it's measured for every request with a session,
+     * even if the session id has not set memcached id (this is the time that was effectively
+     * required as part of the client request). It should differ from {@link #getBackupProbe()}
+     * if async session backup shall be done.
+     *
+     * @return the effectiveBackupProbe
+     * @see BackupSessionService#backupSession(MemcachedBackupSession, boolean)
+     */
+    public MinMaxAvgProbe getEffectiveBackupProbe() {
+        return _effectiveBackupProbe;
     }
 
     /**
