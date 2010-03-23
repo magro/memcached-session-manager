@@ -111,18 +111,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Specifies if the session shall be stored asynchronously in memcached as
      * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
-     * evaluated.
+     * evaluated. If this is <code>true</code>, the {@link #setBackupThreadCount(int)}
+     * is evaluated.
      * <p>
-     * Notice: if the session backup is done asynchronously, it is possible that
-     * a session cannot be stored in memcached and we don't notice that -
-     * therefore the session would not get relocated to another memcached node.
-     * </p>
-     * <p>
-     * By default this property is set to <code>false</code> - the session
-     * backup is performed synchronously.
+     * By default this property is set to <code>true</code> - the session
+     * backup is performed asynchronously.
      * </p>
      */
-    private boolean _sessionBackupAsync = false;
+    private boolean _sessionBackupAsync = true;
 
     /**
      * The timeout in milliseconds after that a session backup is considered as
@@ -1051,15 +1047,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Specifies if the session shall be stored asynchronously in memcached as
      * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
-     * evaluated.
+     * evaluated. If this is <code>true</code>, the {@link #setBackupThreadCount(int)}
+     * is evaluated.
      * <p>
-     * Notice: if the session backup is done asynchronously, it is possible that
-     * a session cannot be stored in memcached and we don't notice that -
-     * therefore the session would not get relocated to another memcached node.
-     * </p>
-     * <p>
-     * By default this property is set to <code>false</code> - the session
-     * backup is performed synchronously.
+     * By default this property is set to <code>true</code> - the session
+     * backup is performed asynchronously.
      * </p>
      *
      * @param sessionBackupAsync
