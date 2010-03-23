@@ -442,7 +442,7 @@ public final class MemcachedBackupSession extends StandardSession {
 
     /**
      * Is invoked after this session has been successfully stored with
-     * {@link BackupResultStatus#SUCCESS} or {@link BackupResultStatus#RELOCATED}.
+     * {@link BackupResultStatus#SUCCESS}.
      */
     public void backupFinished() {
         _authenticationChanged = false;

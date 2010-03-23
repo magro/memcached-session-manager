@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
@@ -29,8 +30,6 @@ import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * This valve is used for tracking requests for that the session must be sent to
@@ -145,17 +144,8 @@ class SessionTrackerValve extends ValveBase {
 
             _statistics.requestWithSession();
 
-            final BackupResultStatus result = _sessionBackupService.backupSession( session, sessionRelocationRequired );
+            _sessionBackupService.backupSession( session, sessionRelocationRequired );
 
-            // TODO: at the end of the request, the cookie probably can never be set, as
-            // the response mostly will already be committed. Therefor, we might drop support
-            // for session relocation that was not requested.
-            if ( result == BackupResultStatus.RELOCATED ) {
-                if ( _log.isDebugEnabled() ) {
-                    _log.debug( "Session got relocated, setting a cookie: " + session.getId() );
-                }
-                setSessionIdCookie( response, request, session );
-            }
         }
         else {
             _statistics.requestWithoutSession();
@@ -177,10 +167,6 @@ class SessionTrackerValve extends ValveBase {
                 cookie.getValue() ).append( ", domain=" ).append( cookie.getDomain() ).append( ", path=" ).append( cookie.getPath() ).append(
                 ", maxAge=" ).append( cookie.getMaxAge() ).append( ", secure=" ).append( cookie.getSecure() ).append( ", version=" ).append(
                 cookie.getVersion() ).toString();
-    }
-
-    private void setSessionIdCookie( final Response response, final Request request, final Session session ) {
-        setSessionIdCookie( response, request, session.getId() );
     }
 
     private void setSessionIdCookie( final Response response, final Request request, final String sessionId ) {
@@ -245,9 +231,9 @@ class SessionTrackerValve extends ValveBase {
          *            specifies, if the session needs to be relocated to another memcached
          *            node. The session id has been changed before via {@link #changeSessionIdIfRelocationRequired(String)}.
          *
-         * @return a {@link BackupResultStatus}
+         * @return a {@link Future} providing the {@link BackupResultStatus}.
          */
-        BackupResultStatus backupSession( Session session, boolean sessionRelocationRequired );
+        Future<BackupResultStatus> backupSession( Session session, boolean sessionRelocationRequired );
 
         /**
          * The enumeration of possible backup results.
@@ -255,19 +241,13 @@ class SessionTrackerValve extends ValveBase {
         static enum BackupResultStatus {
                 /**
                  * The session was successfully stored in the sessions default memcached node.
+                 * This status is also used, if a session was relocated to another memcached node.
                  */
                 SUCCESS,
                 /**
                  * The session could not be stored in any memcached node.
                  */
                 FAILURE,
-                /**
-                 * The session was moved to another memcached node and stored successfully therein,
-                 * a new session cookie must be sent to the client.
-                 * If the necessary relocation was detected with {@link SessionBackupService#sessionNeedsRelocate(Session)}
-                 * before, {@link #SUCCESS} must be returned.
-                 */
-                RELOCATED,
                 /**
                  * The session was not modified and therefore the backup was skipped.
                  */

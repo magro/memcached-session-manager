@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -584,7 +585,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            node. The session id has been changed before via {@link #changeSessionIdIfRelocationRequired(String)}.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public BackupResultStatus backupSession( final Session session, final boolean sessionRelocationRequired ) {
+    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionRelocationRequired ) {
         return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionRelocationRequired );
 
     }

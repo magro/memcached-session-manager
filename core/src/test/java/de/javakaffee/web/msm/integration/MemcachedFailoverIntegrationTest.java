@@ -325,6 +325,8 @@ public class MemcachedFailoverIntegrationTest {
 
         _daemon1.stop();
 
+        Thread.sleep( 1000 );
+
         /* Expect relocation to node3
          */
         final Response response2 = get( _httpClient, _portTomcat1, sessionId1 );

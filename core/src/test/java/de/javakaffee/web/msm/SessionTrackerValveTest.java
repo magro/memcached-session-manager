@@ -32,6 +32,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
@@ -110,7 +111,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( false ) )
-            .will( returnValue( BackupResultStatus.SUCCESS ) );
+            .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
 
@@ -140,7 +141,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( true ) )
-            .will( returnValue( BackupResultStatus.SUCCESS ) );
+            .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
 

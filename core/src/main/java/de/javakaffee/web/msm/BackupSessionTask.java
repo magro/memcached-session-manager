@@ -39,11 +39,6 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
     private static final Log _log = LogFactory.getLog( BackupSessionTask.class );
 
-    /* the original session id is stored so that we can set this if no
-     * memcached node is left for taking over
-     */
-    private static final String ORIG_SESSION_ID_KEY = "orig.sessionid";
-
     private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
 
     private final MemcachedBackupSession _session;
@@ -112,14 +107,8 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 final byte[] data = _transcoderService.serialize( _session, attributesData );
 
                 final BackupResult backupResult = doBackupSession( _session, data, attributesData );
-                if ( backupResult.isSuccess() || backupResult.isRelocated() ) {
-                    /* we can use the already calculated hashcode if we have still the same
-                     * attributes data, which is the case for the most common case SUCCESS
-                     */
-                    final int newHashCode = backupResult.getAttributesData() == attributesData
-                        ? hashCode
-                        : Arrays.hashCode( backupResult.getAttributesData() );
-                    _session.setDataHashCode( newHashCode );
+                if ( backupResult.isSuccess() ) {
+                    _session.setDataHashCode( hashCode );
                 }
 
                 result = backupResult.getStatus();
@@ -136,14 +125,14 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                     _session.storeThisAccessedTimeFromLastBackupCheck();
                     break;
                 case SUCCESS:
-                    _statistics.requestWithBackup();
-                    _statistics.getBackupProbe().registerSince( startBackup );
-                    _session.storeThisAccessedTimeFromLastBackupCheck();
-                    _session.backupFinished();
-                    break;
-                case RELOCATED:
-                    _statistics.requestWithBackupRelocation();
-                    _statistics.getBackupRelocationProbe().registerSince( startBackup );
+                    if ( _force ) {
+                        _statistics.requestWithBackupRelocation();
+                        _statistics.getBackupRelocationProbe().registerSince( startBackup );
+                    }
+                    else {
+                        _statistics.requestWithBackup();
+                        _statistics.getBackupProbe().registerSince( startBackup );
+                    }
                     _session.storeThisAccessedTimeFromLastBackupCheck();
                     _session.backupFinished();
                     break;
@@ -189,103 +178,16 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
             return new BackupResult( BackupResultStatus.SUCCESS, attributesData );
         } catch ( final NodeFailureException e ) {
             if ( _log.isInfoEnabled() ) {
-                _log.info( "Could not store session " + session.getId() +
-                        " in memcached due to unavailable node " + e.getNodeId() );
-            }
-
-            /*
-             * get the next memcached node to try
-             */
-            final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-            final String targetNodeId = _nodeIdService.getAvailableNodeId( nodeId );
-
-            if ( targetNodeId == null ) {
-
-                if ( _log.isInfoEnabled() ) {
-                    _log.info( "The node " + nodeId
-                            + " is not available and there's no node for relocation left, omitting session backup." );
+                String msg = "Could not store session " + session.getId() +
+                        " in memcached due to unavailable node " + e.getNodeId() + ".";
+                if ( _force ) {
+                    msg += "\nNote that this session was relocated to this node because the original node was not available.";
                 }
-
-                noFailoverNodeLeft( session );
-
-                return new BackupResult( BackupResultStatus.FAILURE, null );
-
-            } else {
-
-                final BackupResult backupResult = failover( session, targetNodeId );
-                final BackupResultStatus translatedStatus = handleAndTranslateFailoverBackupResult( session, backupResult.getStatus() );
-
-                return new BackupResult( translatedStatus, backupResult.getAttributesData() );
+                _log.info( msg );
             }
+
+            return new BackupResult( BackupResultStatus.FAILURE, null );
         }
-    }
-
-    private BackupResultStatus handleAndTranslateFailoverBackupResult( final MemcachedBackupSession session,
-            final BackupResultStatus backupResult ) {
-        switch ( backupResult ) {
-            case SUCCESS:
-
-                //_relocatedSessions.put( session.getNote( ORIG_SESSION_ID ).toString(), session.getId() );
-
-                /*
-                 * cleanup
-                 */
-                session.removeNote( ORIG_SESSION_ID_KEY );
-
-                /*
-                 * and tell our client to do his part as well
-                 */
-                return BackupResultStatus.RELOCATED;
-            default:
-                /*
-                 * just pass it up
-                 */
-                return backupResult;
-
-        }
-    }
-
-    private BackupResult failover( final MemcachedBackupSession session, final String targetNodeId ) {
-        /*
-         * we must store the original session id so that we can set this if no
-         * memcached node is left for taking over
-         */
-        if ( session.getNote( ORIG_SESSION_ID_KEY ) == null ) {
-            session.setNote( ORIG_SESSION_ID_KEY, session.getId() );
-        }
-
-        /*
-         * relocate session to our memcached node...
-         */
-        session.setIdForRelocate( _sessionIdFormat.createNewSessionId( session.getId(), targetNodeId ) );
-
-        /* the serialized session data needs to be recreated as it changed.
-         */
-        final byte[] attributesData = serializeAttributes( session, session.getAttributesInternal() );
-        final byte[] data = _transcoderService.serialize( session, attributesData );
-
-        /*
-         * invoke backup again, until we have a success or a failure
-         */
-        final BackupResult backupResult = doBackupSession( session, data, attributesData );
-
-        return backupResult;
-    }
-
-    private void noFailoverNodeLeft( final MemcachedBackupSession session ) {
-
-        /*
-         * we must set the original session id in case we changed it already
-         */
-        final String origSessionId = (String) session.getNote( ORIG_SESSION_ID_KEY );
-        if ( origSessionId != null && !origSessionId.equals( session.getId() ) ) {
-            session.setIdForRelocate( origSessionId );
-        }
-
-        /*
-         * cleanup
-         */
-        session.removeNote( ORIG_SESSION_ID_KEY );
     }
 
     private void storeSessionInMemcached( final MemcachedBackupSession session, final byte[] data) throws NodeFailureException {
@@ -354,13 +256,6 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
          */
         public boolean isSuccess() {
             return _status == BackupResultStatus.SUCCESS;
-        }
-        /**
-         * @return <code>true</code> if the status is {@link BackupResultStatus#RELOCATED},
-         * otherwise <code>false</code>.
-         */
-        public boolean isRelocated() {
-            return _status == BackupResultStatus.RELOCATED;
         }
     }
 
