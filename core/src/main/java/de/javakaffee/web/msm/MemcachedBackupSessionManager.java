@@ -923,7 +923,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param backupThreadCount the number of threads to use for session backup.
      */
     public void setBackupThreadCount( final int backupThreadCount ) {
+        final int oldBackupThreadCount = _backupThreadCount;
         _backupThreadCount = backupThreadCount;
+        if ( initialized ) {
+            _log.info( "Changed backupThreadCount from " + oldBackupThreadCount + " to " + _backupThreadCount + "." +
+            		" Reloading configuration..." );
+            reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
+            _log.info( "Finished reloading configuration." );
+        }
     }
 
     /**
