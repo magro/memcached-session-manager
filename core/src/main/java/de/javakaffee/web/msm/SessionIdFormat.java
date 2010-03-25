@@ -18,6 +18,9 @@ package de.javakaffee.web.msm;
 
 import java.util.regex.Pattern;
 
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 /**
  * This class defines the session id format: It creates session ids based on the
  * original session id and the memcached id, and it extracts the session id and
@@ -31,6 +34,8 @@ import java.util.regex.Pattern;
  * @version $Id$
  */
 public class SessionIdFormat {
+
+    private static final Log LOG = LogFactory.getLog( SessionIdFormat.class );
 
     /**
      * The pattern for the session id.
@@ -48,6 +53,9 @@ public class SessionIdFormat {
      *  the sessionId unmodified.
      */
     public String createSessionId( final String sessionId, final String memcachedId ) {
+        if ( LOG.isDebugEnabled() ) {
+            LOG.debug( "Creating new session id with orig id '" + sessionId + "' and memcached id '" + memcachedId + "'." );
+        }
         if ( memcachedId == null ) {
             return sessionId;
         }
