@@ -20,6 +20,7 @@ import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.get;
 import static de.javakaffee.web.msm.integration.TestUtils.post;
+import static de.javakaffee.web.msm.integration.TestUtils.setChangeSessionIdOnAuth;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -130,7 +131,7 @@ public class TomcatFailoverIntegrationTest {
      * @throws InterruptedException
      * @throws HttpException
      */
-    @Test
+    @Test( enabled = true )
     public void testTomcatFailover() throws IOException, InterruptedException, HttpException {
 
         final String key = "foo";
@@ -162,7 +163,7 @@ public class TomcatFailoverIntegrationTest {
      * @throws InterruptedException
      * @throws HttpException
      */
-    @Test
+    @Test( enabled = true )
     public void testLoadedSessionOnlySentIfModified() throws IOException, InterruptedException, HttpException {
 
         /* create a session on tomcat1
@@ -192,7 +193,7 @@ public class TomcatFailoverIntegrationTest {
 
     }
 
-    @Test
+    @Test( enabled = true )
     public void testSerializationOfAuthStuffWithFormAuth() throws Exception {
 
         _tomcat1.stop();
@@ -200,6 +201,9 @@ public class TomcatFailoverIntegrationTest {
 
         _tomcat1 = startTomcat( TC_PORT_1, LoginType.FORM );
         _tomcat2 = startTomcat( TC_PORT_2, LoginType.FORM );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
@@ -224,7 +228,7 @@ public class TomcatFailoverIntegrationTest {
 
     }
 
-    @Test
+    @Test( enabled = true )
     public void testSerializationOfAuthStuffWithBasicAuth() throws Exception {
 
         _tomcat1.stop();
@@ -232,6 +236,9 @@ public class TomcatFailoverIntegrationTest {
 
         _tomcat1 = startTomcat( TC_PORT_1, LoginType.BASIC );
         _tomcat2 = startTomcat( TC_PORT_2, LoginType.BASIC );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
@@ -242,7 +249,7 @@ public class TomcatFailoverIntegrationTest {
         assertEquals( sessionId, tc1Response1.get( TestServlet.ID ) );
 
         /* tomcat1 failover "simulation":
-         * on tomcat2, we now be able to access the secured resource directly
+         * on tomcat2, we now should be able to access the secured resource directly
          * with the first request
          */
         final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );

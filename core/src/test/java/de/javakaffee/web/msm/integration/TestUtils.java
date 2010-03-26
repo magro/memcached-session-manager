@@ -39,13 +39,17 @@ import java.util.Map;
 
 import javax.naming.NamingException;
 
+import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Role;
 import org.apache.catalina.User;
+import org.apache.catalina.Valve;
+import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
+import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardServer;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
@@ -326,6 +330,7 @@ public class TestUtils {
             final LoginType loginType,
             final String transcoderFactoryClassName ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
+
         final Embedded catalina = new Embedded();
 
         final StandardServer server = new StandardServer();
@@ -418,6 +423,16 @@ public class TestUtils {
 
     public static MemcachedBackupSessionManager getManager( final Embedded tomcat ) {
         return (MemcachedBackupSessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
+    }
+
+    public static void setChangeSessionIdOnAuth( final Embedded tomcat, final boolean changeSessionIdOnAuth ) {
+        final Engine engine = (StandardEngine)tomcat.getContainer();
+        final Host host = (Host)engine.findChild( DEFAULT_HOST );
+        final Container context = host.findChild( CONTEXT_PATH );
+        final Valve first = context.getPipeline().getFirst();
+        if ( first instanceof AuthenticatorBase ) {
+            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( false );
+        }
     }
 
     /**

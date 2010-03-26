@@ -254,7 +254,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         /* add the valve for tracking requests for that the session must be sent
          * to memcached
          */
-        getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern, this, _statistics ) );
+        getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern,
+                (Context) getContainer(), this, _statistics ) );
 
         /* init memcached
          */
@@ -599,7 +600,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _log.debug( "Asked for session " + sessionId + ", but the related"
                     + " memcached node is still marked as unavailable (won't load from memcached)." );
         } else {
-            _log.debug( "Loading session from memcached: " + sessionId );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Loading session from memcached: " + sessionId );
+            }
             try {
 
                 final long start = System.currentTimeMillis();
@@ -1059,7 +1062,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the sessionBackupAsync to set
      */
     public void setSessionBackupAsync( final boolean sessionBackupAsync ) {
+        final boolean oldSessionBackupAsync = _sessionBackupAsync;
         _sessionBackupAsync = sessionBackupAsync;
+        if ( oldSessionBackupAsync != sessionBackupAsync ) {
+            _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
+            _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
+        }
     }
 
     /**

@@ -57,7 +57,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     public void setUp() throws Exception {
         _sessionBackupServiceControl = mock( SessionBackupService.class );
         _service = (SessionBackupService) _sessionBackupServiceControl.proxy();
-        _sessionTrackerValve = new SessionTrackerValve( null, _service, Statistics.create() );
+        _sessionTrackerValve = new SessionTrackerValve( null, new StandardContext(), _service, Statistics.create() );
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( (Valve) _nextValve.proxy() );
 
@@ -135,7 +135,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "isSecure" ).will( returnValue( false ) );
         _responseControl.expects( once() ).method( "addCookieInternal" ).with(
                 and( hasProperty( "name", eq( SessionTrackerValve.JSESSIONID ) ),
-                     hasProperty( "value", eq( newSessionId ) ) ) );
+                     hasProperty( "value", eq( newSessionId ) ) ),
+                     eq( false ) ); // default value in StandardContext.useHttpOnly
 
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )

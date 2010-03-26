@@ -49,6 +49,7 @@ class SessionTrackerValve extends ValveBase {
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
     private final Statistics _statistics;
+    private final AddCookieInteralStrategy _addCookieInteralStrategy;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -59,7 +60,7 @@ class SessionTrackerValve extends ValveBase {
      * @param sessionBackupService
      *            the service that actually backups sessions
      */
-    public SessionTrackerValve( final String ignorePattern, final SessionBackupService sessionBackupService,
+    public SessionTrackerValve( final String ignorePattern, final Context context, final SessionBackupService sessionBackupService,
             final Statistics statistics ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
@@ -69,6 +70,7 @@ class SessionTrackerValve extends ValveBase {
         }
         _sessionBackupService = sessionBackupService;
         _statistics = statistics;
+        _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
     }
 
     /**
@@ -114,6 +116,7 @@ class SessionTrackerValve extends ValveBase {
          */
         if ( request.getRequestedSessionId() != null ) {
             final String newSessionId = _sessionBackupService.changeSessionIdIfRelocationRequired( request.getRequestedSessionId() );
+
             if ( newSessionId != null ) {
                 request.setRequestedSessionId( newSessionId );
                 if ( request.isRequestedSessionIdFromCookie() ) {
@@ -179,7 +182,7 @@ class SessionTrackerValve extends ValveBase {
             if ( request.isSecure() ) {
                 newCookie.setSecure( true );
             }
-            response.addCookieInternal( newCookie );
+            _addCookieInteralStrategy.addCookieInternal( newCookie, response );
         }
     }
 
