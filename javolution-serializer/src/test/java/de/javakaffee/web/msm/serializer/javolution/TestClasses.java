@@ -45,7 +45,7 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
 
 /**
  * Test for {@link JavolutionTranscoder}
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class TestClasses {
@@ -92,15 +92,15 @@ public class TestClasses {
     static Container createContainer( final String bodyContent ) {
         return new Container( bodyContent );
     }
-    
+
     static SomeInterface createProxy() {
         return (SomeInterface) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
                 new Class<?>[] { SomeInterface.class, Serializable.class },
                 new MyInvocationHandler( SomeInterfaceImpl.class ) );
     }
-    
+
     static class MyInvocationHandler implements InvocationHandler {
-        
+
         private final Class<?> _targetClazz;
         private transient Object _target;
 
@@ -119,7 +119,7 @@ public class TestClasses {
     static interface SomeInterface {
         String hello();
     }
-    
+
     static class SomeInterfaceImpl implements SomeInterface {
 
         /**
@@ -128,18 +128,18 @@ public class TestClasses {
         public String hello() {
             return "hi";
         }
-        
+
     }
-    
+
     /**
      * A class with a transient field that must be initialized after deserialization,
      * this is a way to test if the XMLFormat defined in this XMLSerializable implementation
      * is used and if XMLSerializable is honored at all.
      */
     public static class MyXMLSerializable implements XMLSerializable {
-        
+
         private static final long serialVersionUID = -3392119483974151376L;
-        
+
         protected static final XMLFormat<MyXMLSerializable> XML = new XMLFormat<MyXMLSerializable>(MyXMLSerializable.class) {
             public MyXMLSerializable newInstance( final Class<MyXMLSerializable> cls, final InputElement xml ) throws XMLStreamException {
                 return new MyXMLSerializable( Runtime.getRuntime() );
@@ -148,14 +148,14 @@ public class TestClasses {
                 // nothing to do
             }
             public void read( final InputElement xml, final MyXMLSerializable obj ) {
-                // Immutable, deserialization occurs at creation, ref. newIntance(...) 
+                // Immutable, deserialization occurs at creation, ref. newIntance(...)
              }
         };
-        
+
         // Just some field that should not be serialized,
         // but which must be available after deserialization
         private transient final Runtime _runtime;
-        
+
         public MyXMLSerializable( final Runtime runtime ) {
             _runtime = runtime;
         }
@@ -163,7 +163,7 @@ public class TestClasses {
         public Runtime getRuntime() {
             return _runtime;
         }
-        
+
     }
 
     public static class Container {
@@ -269,38 +269,51 @@ public class TestClasses {
 
         @Override
         public boolean equals( final Object obj ) {
-            if ( this == obj )
+            if ( this == obj ) {
                 return true;
-            if ( obj == null )
+            }
+            if ( obj == null ) {
                 return false;
-            if ( getClass() != obj.getClass() )
+            }
+            if ( getClass() != obj.getClass() ) {
                 return false;
+            }
             final Person other = (Person) obj;
             if ( _age == null ) {
-                if ( other._age != null )
+                if ( other._age != null ) {
                     return false;
-            } else if ( !_age.equals( other._age ) )
+                }
+            } else if ( !_age.equals( other._age ) ) {
                 return false;
+            }
             if ( _friends == null ) {
-                if ( other._friends != null )
+                if ( other._friends != null ) {
                     return false;
-            } else if ( !flatEquals( _friends, other._friends ) )
+                }
+            } else if ( !flatEquals( _friends, other._friends ) ) {
                 return false;
+            }
             if ( _gender == null ) {
-                if ( other._gender != null )
+                if ( other._gender != null ) {
                     return false;
-            } else if ( !_gender.equals( other._gender ) )
+                }
+            } else if ( !_gender.equals( other._gender ) ) {
                 return false;
+            }
             if ( _name == null ) {
-                if ( other._name != null )
+                if ( other._name != null ) {
                     return false;
-            } else if ( !_name.equals( other._name ) )
+                }
+            } else if ( !_name.equals( other._name ) ) {
                 return false;
+            }
             if ( _props == null ) {
-                if ( other._props != null )
+                if ( other._props != null ) {
                     return false;
-            } else if ( !_props.equals( other._props ) )
+                }
+            } else if ( !_props.equals( other._props ) ) {
                 return false;
+            }
             return true;
         }
 
@@ -359,23 +372,30 @@ public class TestClasses {
 
         @Override
         public boolean equals( final Object obj ) {
-            if ( this == obj )
+            if ( this == obj ) {
                 return true;
-            if ( obj == null )
+            }
+            if ( obj == null ) {
                 return false;
-            if ( getClass() != obj.getClass() )
+            }
+            if ( getClass() != obj.getClass() ) {
                 return false;
+            }
             final Email other = (Email) obj;
             if ( _email == null ) {
-                if ( other._email != null )
+                if ( other._email != null ) {
                     return false;
-            } else if ( !_email.equals( other._email ) )
+                }
+            } else if ( !_email.equals( other._email ) ) {
                 return false;
+            }
             if ( _name == null ) {
-                if ( other._name != null )
+                if ( other._name != null ) {
                     return false;
-            } else if ( !_name.equals( other._name ) )
+                }
+            } else if ( !_name.equals( other._name ) ) {
                 return false;
+            }
             return true;
         }
 
@@ -408,18 +428,23 @@ public class TestClasses {
 
         @Override
         public boolean equals( final Object obj ) {
-            if ( this == obj )
+            if ( this == obj ) {
                 return true;
-            if ( obj == null )
+            }
+            if ( obj == null ) {
                 return false;
-            if ( getClass() != obj.getClass() )
+            }
+            if ( getClass() != obj.getClass() ) {
                 return false;
+            }
             final PublicClass other = (PublicClass) obj;
             if ( privateClass == null ) {
-                if ( other.privateClass != null )
+                if ( other.privateClass != null ) {
                     return false;
-            } else if ( !privateClass.equals( other.privateClass ) )
+                }
+            } else if ( !privateClass.equals( other.privateClass ) ) {
                 return false;
+            }
             return true;
         }
     }
@@ -439,18 +464,23 @@ public class TestClasses {
 
         @Override
         public boolean equals( final Object obj ) {
-            if ( this == obj )
+            if ( this == obj ) {
                 return true;
-            if ( obj == null )
+            }
+            if ( obj == null ) {
                 return false;
-            if ( getClass() != obj.getClass() )
+            }
+            if ( getClass() != obj.getClass() ) {
                 return false;
+            }
             final PrivateClass other = (PrivateClass) obj;
             if ( foo == null ) {
-                if ( other.foo != null )
+                if ( other.foo != null ) {
                     return false;
-            } else if ( !foo.equals( other.foo ) )
+                }
+            } else if ( !foo.equals( other.foo ) ) {
                 return false;
+            }
             return true;
         }
     }
@@ -474,18 +504,23 @@ public class TestClasses {
 
         @Override
         public boolean equals( final Object obj ) {
-            if ( this == obj )
+            if ( this == obj ) {
                 return true;
-            if ( obj == null )
+            }
+            if ( obj == null ) {
                 return false;
-            if ( getClass() != obj.getClass() )
+            }
+            if ( getClass() != obj.getClass() ) {
                 return false;
+            }
             final ClassWithoutDefaultConstructor other = (ClassWithoutDefaultConstructor) obj;
             if ( value == null ) {
-                if ( other.value != null )
+                if ( other.value != null ) {
                     return false;
-            } else if ( !value.equals( other.value ) )
+                }
+            } else if ( !value.equals( other.value ) ) {
                 return false;
+            }
             return true;
         }
 
@@ -504,6 +539,8 @@ public class TestClasses {
         private final Boolean _Boolean;
         private final Class<?> _Class;
         private String _String;
+        private final StringBuilder _StringBuilder;
+        private final StringBuffer _StringBuffer;
         private Long _Long;
         private Integer _Integer;
         private Character _Character;
@@ -518,7 +555,7 @@ public class TestClasses {
         private Integer[] _IntegerArray;
         private Date _Date;
         private Calendar _Calendar;
-        private Currency _Currency;
+        private final Currency _Currency;
         private List<String> _ArrayList;
         private final Set<String> _HashSet;
         private final Map<String, Integer> _HashMap;
@@ -540,6 +577,8 @@ public class TestClasses {
             _Boolean = Boolean.TRUE;
             _Class = String.class;
             _String = "42";
+            _StringBuffer = new StringBuffer( "foo" );
+            _StringBuilder = new StringBuilder( "foo" );
             _Long = new Long( 42 );
             _Integer = new Integer( 42 );
             _Character = new Character( 'c' );
@@ -840,19 +879,19 @@ public class TestClasses {
             this.holders = holders;
         }
     }
-    
+
     public static class HashMapWithIntConstructorOnly extends HashMap<Object, Object> {
-        
+
         private static final long serialVersionUID = 1L;
 
         @SuppressWarnings( "unused" )
         private HashMapWithIntConstructorOnly() {
         }
 
-        public HashMapWithIntConstructorOnly( int size ) {
+        public HashMapWithIntConstructorOnly( final int size ) {
             super( size );
         }
-        
+
     }
 
 }

@@ -52,18 +52,19 @@ import sun.reflect.ReflectionFactory;
 
 /**
  * An {@link XMLBinding} that provides class bindings based on reflection.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class ReflectionBinding extends XMLBinding {
-    
+
     private static final long serialVersionUID = -7047053153745571559L;
 
     private static final Log LOG = LogFactory.getLog( ReflectionBinding.class );
-    
+
     private static final ReflectionFactory REFLECTION_FACTORY = ReflectionFactory.getReflectionFactory();
     private static final Object[] INITARGS = new Object[0];
-    
+    private static final String SIZE = "size";
+
     private static final XMLCalendarFormat CALENDAR_FORMAT = new XMLCalendarFormat();
 
     private static final XMLCurrencyFormat CURRENCY_FORMAT = new XMLCurrencyFormat();
@@ -91,7 +92,7 @@ public class ReflectionBinding extends XMLBinding {
         _mapFormat = new XMLMapFormat( copyCollectionsForSerialization );
         _jdkProxyFormat = new XMLJdkProxyFormat( classLoader );
         _customFormats = customFormats;
-        
+
         Reflection.getInstance().add( classLoader );
     }
 
@@ -171,6 +172,10 @@ public class ReflectionBinding extends XMLBinding {
              * Proxy.class is required for deserialization
              */
             return _jdkProxyFormat;
+        } else if ( cls == StringBuilder.class ) {
+            return STRING_BUILDER_FORMAT;
+        } else if ( cls == StringBuffer.class ) {
+            return STRING_BUFFER_FORMAT;
         } else if ( ( xmlFormat = getCustomFormat( cls ) ) != null ) {
             return xmlFormat;
         } else {
@@ -185,12 +190,12 @@ public class ReflectionBinding extends XMLBinding {
             return xmlFormat;
         }
     }
-    
+
     private XMLFormat<?> getCustomFormat( final Class<?> cls ) {
         if ( _customFormats == null ) {
             return null;
         }
-        for( XMLFormat<?> xmlFormat : _customFormats ) {
+        for( final XMLFormat<?> xmlFormat : _customFormats ) {
             if ( xmlFormat.getBoundClass() == cls ) {
                 return xmlFormat;
             }
@@ -312,16 +317,16 @@ public class ReflectionBinding extends XMLBinding {
         }
 
     }
-    
+
     public static class XMLCollectionFormat extends XMLFormat<Collection<Object>> {
-        
+
         private final boolean _copyForWrite;
 
         protected XMLCollectionFormat( final boolean copyForWrite ) {
             super( null );
             _copyForWrite = copyForWrite;
         }
-        
+
         /**
          * {@inheritDoc}
          */
@@ -331,7 +336,7 @@ public class ReflectionBinding extends XMLBinding {
             throws XMLStreamException {
 
             Collection<Object> result = newInstanceFromPublicConstructor( cls, xml );
-            
+
             if ( result == null && Modifier.isPrivate( cls.getModifiers() ) ) {
                 try {
                     final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
@@ -341,11 +346,11 @@ public class ReflectionBinding extends XMLBinding {
                     throw new XMLStreamException( e );
                 }
             }
-            
+
             if ( result == null ) {
                 result = super.newInstance( cls, xml );
             }
-            
+
             return result;
         }
 
@@ -359,22 +364,23 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public void write( final Collection<Object> obj, final javolution.xml.XMLFormat.OutputElement xml )
             throws XMLStreamException {
+            xml.setAttribute( SIZE, obj.size() );
             for ( final Object item : _copyForWrite ? new ArrayList<Object>( obj ) : obj ) {
                 xml.add( item );
             }
         }
 
     }
-    
+
     public static class XMLMapFormat extends XMLFormat<Map<Object,Object>> {
-        
+
         private final boolean _copyForWrite;
 
         protected XMLMapFormat( final boolean copyForWrite ) {
             super( null );
             _copyForWrite = copyForWrite;
         }
-        
+
         /**
          * {@inheritDoc}
          */
@@ -382,9 +388,9 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public Map<Object, Object> newInstance( final Class<Map<Object, Object>> cls, final javolution.xml.XMLFormat.InputElement xml )
             throws XMLStreamException {
-            
+
             Map<Object, Object> result = newInstanceFromPublicConstructor( cls, xml );
-            
+
             if ( result == null && Modifier.isPrivate( cls.getModifiers() ) ) {
                 try {
                     final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
@@ -394,11 +400,11 @@ public class ReflectionBinding extends XMLBinding {
                     throw new XMLStreamException( e );
                 }
             }
-            
+
             if ( result == null ) {
                 result = super.newInstance( cls, xml );
             }
-            
+
             return result;
         }
 
@@ -412,7 +418,7 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public void write( final Map<Object,Object> obj, final javolution.xml.XMLFormat.OutputElement xml )
             throws XMLStreamException {
-            xml.setAttribute( "size", obj.size() );
+            xml.setAttribute( SIZE, obj.size() );
             final Set<Entry<Object, Object>> entrySet = _copyForWrite ? new LinkedHashMap<Object, Object>( obj ).entrySet() : obj.entrySet();
             for ( final Map.Entry<Object, Object> entry : entrySet ) {
                 xml.add( entry.getKey(), "k" );
@@ -426,29 +432,29 @@ public class ReflectionBinding extends XMLBinding {
     private static <T> T newInstanceFromPublicConstructor( final Class<T> cls,
             final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
         try {
-            Constructor<?>[] constructors = cls.getConstructors();
-            for ( Constructor<?> constructor : constructors ) {
-                Class<?>[] parameterTypes = constructor.getParameterTypes();
+            final Constructor<?>[] constructors = cls.getConstructors();
+            for ( final Constructor<?> constructor : constructors ) {
+                final Class<?>[] parameterTypes = constructor.getParameterTypes();
                 if ( parameterTypes.length == 0 ) {
                     return (T) constructor.newInstance();
                 }
                 else if ( parameterTypes.length == 1 && parameterTypes[0] == int.class ) {
-                    return (T) constructor.newInstance( xml.getAttribute( "size" ).toInt() );
+                    return (T) constructor.newInstance( xml.getAttribute( SIZE ).toInt() );
                 }
             }
             if ( LOG.isDebugEnabled() && constructors.length > 0 ) {
                 LOG.debug( "No suitable constructor found for map " + cls + ", available constructors:\n" +
                         Arrays.asList( constructors ) );
             }
-        } catch ( SecurityException e ) {
+        } catch ( final SecurityException e ) {
             // ignore
-        } catch ( IllegalArgumentException e ) {
+        } catch ( final IllegalArgumentException e ) {
             throw new XMLStreamException( e ); // not expected
-        } catch ( InstantiationException e ) {
+        } catch ( final InstantiationException e ) {
             throw new XMLStreamException( e ); // not expected
-        } catch ( IllegalAccessException e ) {
+        } catch ( final IllegalAccessException e ) {
             throw new XMLStreamException( e ); // not expected
-        } catch ( InvocationTargetException e ) {
+        } catch ( final InvocationTargetException e ) {
             // ignore - constructor threw exception
             LOG.info( "Tried to invoke int constructor on " + cls.getName() + ", this threw an exception.", e.getTargetException() );
         }
@@ -456,15 +462,15 @@ public class ReflectionBinding extends XMLBinding {
     }
 
     public static class XMLCurrencyFormat extends XMLFormat<Currency> {
-        
+
         public XMLCurrencyFormat() {
             super( Currency.class );
         }
-        
+
         /**
          * Currency instance do not have to be handled by the reference resolver, as we're using
          * Currency.getInstance for retrieving an instance.
-         * 
+         *
          * @return <code>false</code>
          */
         @Override
@@ -476,17 +482,17 @@ public class ReflectionBinding extends XMLBinding {
         public Currency newInstance( final Class<Currency> cls, final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
             return Currency.getInstance( xml.getAttribute( "code", "" ) );
         }
-        
+
         public void write( final Currency currency, final OutputElement xml ) throws XMLStreamException {
             xml.setAttribute( "code", currency.getCurrencyCode() );
         }
-        
+
         public void read( final InputElement xml, final Currency pos ) {
-            // Immutable, deserialization occurs at creation, ref. newIntance(...) 
+            // Immutable, deserialization occurs at creation, ref. newIntance(...)
         }
-        
+
     }
-    
+
     /**
      * An {@link XMLFormat} for {@link Calendar} that serialized those calendar
      * fields that contain actual data (these fields also are used by
@@ -626,5 +632,41 @@ public class ReflectionBinding extends XMLBinding {
         }
 
     }
+
+    public static final XMLFormat<StringBuilder> STRING_BUILDER_FORMAT = new XMLFormat<StringBuilder>( StringBuilder.class ) {
+
+        public StringBuilder newInstance( final Class<StringBuilder> cls, final InputElement xml ) throws XMLStreamException {
+            return new StringBuilder( xml.getAttribute( "val" ) );
+        }
+
+        @Override
+        public void read( final InputElement xml, final StringBuilder obj ) throws XMLStreamException {
+            // nothing todo
+        }
+
+        @Override
+        public void write( final StringBuilder obj, final OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "val", obj.toString() );
+        }
+
+    };
+
+    public static final XMLFormat<StringBuffer> STRING_BUFFER_FORMAT = new XMLFormat<StringBuffer>( StringBuffer.class ) {
+
+        public StringBuffer newInstance( final Class<StringBuffer> cls, final InputElement xml ) throws XMLStreamException {
+            return new StringBuffer( xml.getAttribute( "val" ) );
+        }
+
+        @Override
+        public void read( final InputElement xml, final StringBuffer obj ) throws XMLStreamException {
+            // nothing todo
+        }
+
+        @Override
+        public void write( final StringBuffer obj, final OutputElement xml ) throws XMLStreamException {
+            xml.setAttribute( "val", obj.toString() );
+        }
+
+    };
 
 }
