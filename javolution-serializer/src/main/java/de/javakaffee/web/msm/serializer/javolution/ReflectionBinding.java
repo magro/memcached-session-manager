@@ -20,9 +20,11 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Currency;
@@ -374,18 +376,55 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public Map<Object, Object> newInstance( final Class<Map<Object, Object>> cls, final javolution.xml.XMLFormat.InputElement xml )
             throws XMLStreamException {
-            if ( Modifier.isPrivate( cls.getModifiers() ) ) {
-                try {
-                    final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
-                    constructor.setAccessible( true );
-                    return (Map<Object, Object>) constructor.newInstance( INITARGS );
-                } catch ( final Exception e ) {
-                    throw new XMLStreamException( e );
+            Map<Object, Object> result = newInstanceFromPublicConstructor( cls, xml );
+            if ( result == null ) {
+                if ( Modifier.isPrivate( cls.getModifiers() ) ) {
+                    try {
+                        final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
+                        constructor.setAccessible( true );
+                        result = (Map<Object, Object>) constructor.newInstance( INITARGS );
+                    } catch ( final Exception e ) {
+                        throw new XMLStreamException( e );
+                    }
                 }
             }
-            else {
-                return super.newInstance( cls, xml );
+            if ( result == null ) {
+                result = super.newInstance( cls, xml );
             }
+            return result;
+        }
+
+        @SuppressWarnings( "unchecked" )
+        private Map<Object, Object> newInstanceFromPublicConstructor( final Class<Map<Object, Object>> cls,
+                final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+            try {
+                Constructor<?>[] constructors = cls.getConstructors();
+                for ( Constructor<?> constructor : constructors ) {
+                    Class<?>[] parameterTypes = constructor.getParameterTypes();
+                    if ( parameterTypes.length == 0 ) {
+                        return (Map<Object, Object>) constructor.newInstance();
+                    }
+                    else if ( parameterTypes.length == 1 && parameterTypes[0] == int.class ) {
+                        return (Map<Object, Object>) constructor.newInstance( xml.getAttribute( "size" ).toInt() );
+                    }
+                }
+                if ( LOG.isDebugEnabled() && constructors.length > 0 ) {
+                    LOG.debug( "No suitable constructor found for map " + cls + ", available constructors:\n" +
+                            Arrays.asList( constructors ) );
+                }
+            } catch ( SecurityException e ) {
+                // ignore
+            } catch ( IllegalArgumentException e ) {
+                throw new XMLStreamException( e ); // not expected
+            } catch ( InstantiationException e ) {
+                throw new XMLStreamException( e ); // not expected
+            } catch ( IllegalAccessException e ) {
+                throw new XMLStreamException( e ); // not expected
+            } catch ( InvocationTargetException e ) {
+                // ignore - constructor threw exception
+                LOG.info( "Tried to invoke int constructor on " + cls.getName() + ", this threw an exception.", e.getTargetException() );
+            }
+            return null;
         }
 
         @Override
@@ -398,6 +437,7 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public void write( final Map<Object,Object> obj, final javolution.xml.XMLFormat.OutputElement xml )
             throws XMLStreamException {
+            xml.setAttribute( "size", obj.size() );
             final Set<Entry<Object, Object>> entrySet = _copyForWrite ? new LinkedHashMap<Object, Object>( obj ).entrySet() : obj.entrySet();
             for ( final Map.Entry<Object, Object> entry : entrySet ) {
                 xml.add( entry.getKey(), "k" );

@@ -20,9 +20,6 @@ import static de.javakaffee.web.msm.serializer.javolution.TestClasses.createPers
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -61,6 +58,7 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.Container;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Email;
+import de.javakaffee.web.msm.serializer.javolution.TestClasses.HashMapWithIntConstructorOnly;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Holder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderList;
@@ -98,6 +96,32 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager, true );
+    }
+
+    /**
+     * This is test for issue #55:
+     * Wicket's MiniMap cannot be deserialized with javolution serializer
+     * 
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=55
+     * 
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testMapWithIntConstructorOnly() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+        
+        final HashMapWithIntConstructorOnly map = new HashMapWithIntConstructorOnly( 5 );
+        session.setAttribute( "map", map );
+        
+        System.out.println( new String( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) ));
+        
+        final Map<String, Object> deserialized =
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
+        
+        assertDeepEquals( deserialized, session.getAttributesInternal() );
+        assertDeepEquals( deserialized.get( "map" ), map );
+        
     }
 
     /**
@@ -554,27 +578,6 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 assertDeepEquals( field.get( one ), field.get( another ), alreadyChecked );
             }
         }
-    }
-
-    private StandardSession javaRoundtrip( final StandardSession session, final MemcachedBackupSessionManager manager )
-        throws IOException, ClassNotFoundException {
-
-        final long start1 = System.nanoTime();
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        final ObjectOutputStream oos = new ObjectOutputStream( bos );
-        session.writeObjectData( oos );
-        oos.close();
-        bos.close();
-        System.out.println( "java-ser took " + ( System.nanoTime() - start1 ) / 1000 );
-
-        final ByteArrayInputStream bis = new ByteArrayInputStream( bos.toByteArray() );
-        final ObjectInputStream ois = new ObjectInputStream( bis );
-        final StandardSession readSession = manager.createEmptySession();
-        readSession.readObjectData( ois );
-        ois.close();
-        bis.close();
-
-        return readSession;
     }
 
     protected byte[] serialize( final Object o ) {

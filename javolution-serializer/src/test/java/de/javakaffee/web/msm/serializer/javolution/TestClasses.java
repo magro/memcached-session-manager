@@ -840,5 +840,19 @@ public class TestClasses {
             this.holders = holders;
         }
     }
+    
+    public static class HashMapWithIntConstructorOnly extends HashMap<Object, Object> {
+        
+        private static final long serialVersionUID = 1L;
+
+        @SuppressWarnings( "unused" )
+        private HashMapWithIntConstructorOnly() {
+        }
+
+        public HashMapWithIntConstructorOnly( int size ) {
+            super( size );
+        }
+        
+    }
 
 }
