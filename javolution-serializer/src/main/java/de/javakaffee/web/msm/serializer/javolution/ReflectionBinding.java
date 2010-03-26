@@ -329,7 +329,10 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public Collection<Object> newInstance( final Class<Collection<Object>> cls, final javolution.xml.XMLFormat.InputElement xml )
             throws XMLStreamException {
-            if ( Modifier.isPrivate( cls.getModifiers() ) ) {
+
+            Collection<Object> result = newInstanceFromPublicConstructor( cls, xml );
+            
+            if ( result == null && Modifier.isPrivate( cls.getModifiers() ) ) {
                 try {
                     final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
                     constructor.setAccessible( true );
@@ -338,9 +341,12 @@ public class ReflectionBinding extends XMLBinding {
                     throw new XMLStreamException( e );
                 }
             }
-            else {
-                return super.newInstance( cls, xml );
+            
+            if ( result == null ) {
+                result = super.newInstance( cls, xml );
             }
+            
+            return result;
         }
 
         @Override
@@ -376,55 +382,24 @@ public class ReflectionBinding extends XMLBinding {
         @Override
         public Map<Object, Object> newInstance( final Class<Map<Object, Object>> cls, final javolution.xml.XMLFormat.InputElement xml )
             throws XMLStreamException {
+            
             Map<Object, Object> result = newInstanceFromPublicConstructor( cls, xml );
-            if ( result == null ) {
-                if ( Modifier.isPrivate( cls.getModifiers() ) ) {
-                    try {
-                        final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
-                        constructor.setAccessible( true );
-                        result = (Map<Object, Object>) constructor.newInstance( INITARGS );
-                    } catch ( final Exception e ) {
-                        throw new XMLStreamException( e );
-                    }
+            
+            if ( result == null && Modifier.isPrivate( cls.getModifiers() ) ) {
+                try {
+                    final Constructor<?> constructor = REFLECTION_FACTORY.newConstructorForSerialization( cls, Object.class.getDeclaredConstructor( new Class[0] ) );
+                    constructor.setAccessible( true );
+                    result = (Map<Object, Object>) constructor.newInstance( INITARGS );
+                } catch ( final Exception e ) {
+                    throw new XMLStreamException( e );
                 }
             }
+            
             if ( result == null ) {
                 result = super.newInstance( cls, xml );
             }
+            
             return result;
-        }
-
-        @SuppressWarnings( "unchecked" )
-        private Map<Object, Object> newInstanceFromPublicConstructor( final Class<Map<Object, Object>> cls,
-                final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
-            try {
-                Constructor<?>[] constructors = cls.getConstructors();
-                for ( Constructor<?> constructor : constructors ) {
-                    Class<?>[] parameterTypes = constructor.getParameterTypes();
-                    if ( parameterTypes.length == 0 ) {
-                        return (Map<Object, Object>) constructor.newInstance();
-                    }
-                    else if ( parameterTypes.length == 1 && parameterTypes[0] == int.class ) {
-                        return (Map<Object, Object>) constructor.newInstance( xml.getAttribute( "size" ).toInt() );
-                    }
-                }
-                if ( LOG.isDebugEnabled() && constructors.length > 0 ) {
-                    LOG.debug( "No suitable constructor found for map " + cls + ", available constructors:\n" +
-                            Arrays.asList( constructors ) );
-                }
-            } catch ( SecurityException e ) {
-                // ignore
-            } catch ( IllegalArgumentException e ) {
-                throw new XMLStreamException( e ); // not expected
-            } catch ( InstantiationException e ) {
-                throw new XMLStreamException( e ); // not expected
-            } catch ( IllegalAccessException e ) {
-                throw new XMLStreamException( e ); // not expected
-            } catch ( InvocationTargetException e ) {
-                // ignore - constructor threw exception
-                LOG.info( "Tried to invoke int constructor on " + cls.getName() + ", this threw an exception.", e.getTargetException() );
-            }
-            return null;
         }
 
         @Override
@@ -445,6 +420,39 @@ public class ReflectionBinding extends XMLBinding {
             }
         }
 
+    }
+
+    @SuppressWarnings( "unchecked" )
+    private static <T> T newInstanceFromPublicConstructor( final Class<T> cls,
+            final javolution.xml.XMLFormat.InputElement xml ) throws XMLStreamException {
+        try {
+            Constructor<?>[] constructors = cls.getConstructors();
+            for ( Constructor<?> constructor : constructors ) {
+                Class<?>[] parameterTypes = constructor.getParameterTypes();
+                if ( parameterTypes.length == 0 ) {
+                    return (T) constructor.newInstance();
+                }
+                else if ( parameterTypes.length == 1 && parameterTypes[0] == int.class ) {
+                    return (T) constructor.newInstance( xml.getAttribute( "size" ).toInt() );
+                }
+            }
+            if ( LOG.isDebugEnabled() && constructors.length > 0 ) {
+                LOG.debug( "No suitable constructor found for map " + cls + ", available constructors:\n" +
+                        Arrays.asList( constructors ) );
+            }
+        } catch ( SecurityException e ) {
+            // ignore
+        } catch ( IllegalArgumentException e ) {
+            throw new XMLStreamException( e ); // not expected
+        } catch ( InstantiationException e ) {
+            throw new XMLStreamException( e ); // not expected
+        } catch ( IllegalAccessException e ) {
+            throw new XMLStreamException( e ); // not expected
+        } catch ( InvocationTargetException e ) {
+            // ignore - constructor threw exception
+            LOG.info( "Tried to invoke int constructor on " + cls.getName() + ", this threw an exception.", e.getTargetException() );
+        }
+        return null;
     }
 
     public static class XMLCurrencyFormat extends XMLFormat<Currency> {
