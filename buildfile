@@ -16,6 +16,7 @@ MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4.2').from(file('lib/memc
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
+CGLIB = 'cglib:cglib:jar:2.2'
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
@@ -45,6 +46,7 @@ define 'msm' do
   compile.using :source=>'1.5', :target=>'1.5'
   test.using :testng
   package :sources, :javadoc
+  package_with_javadoc
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'
@@ -68,6 +70,13 @@ define 'msm' do
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
     test.with( compile.dependencies, MOCKITO )
     package :jar, :id => 'msm-javolution-serializer-jodatime'
+  end
+
+  desc 'Converter for cglib proxies for javolution serialization strategy'
+  define 'javolution-serializer-cglib' do |project|
+    compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, CGLIB )
+    test.with( compile.dependencies, MOCKITO )
+    package :jar, :id => 'msm-javolution-serializer-cglib'
   end
 
   desc 'XStream/xml based serialization strategy'

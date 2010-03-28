@@ -17,7 +17,6 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import javolution.text.CharArray;
-import javolution.xml.XMLFormat;
 import javolution.xml.stream.XMLStreamException;
 
 import org.joda.time.Chronology;
@@ -55,7 +54,7 @@ import org.joda.time.chrono.JulianChronology;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class JodaDateTimeFormat extends XMLFormat<DateTime> {
+public class JodaDateTimeFormat extends CustomXMLFormat<DateTime> {
 
     static final String MILLIS = "millis";
     static final String DATE_TIME = "dt";
@@ -63,10 +62,11 @@ public class JodaDateTimeFormat extends XMLFormat<DateTime> {
     static final String TIME_ZONE = "tz";
 
     /**
-     * @param cls
+     * {@inheritDoc}
      */
-    public JodaDateTimeFormat() {
-        super( DateTime.class );
+    @Override
+    public boolean canConvert( final Class<?> cls ) {
+        return cls == DateTime.class;
     }
 
     /**

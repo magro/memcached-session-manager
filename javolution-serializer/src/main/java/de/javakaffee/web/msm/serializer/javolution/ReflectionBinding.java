@@ -57,6 +57,8 @@ import sun.reflect.ReflectionFactory;
  */
 public class ReflectionBinding extends XMLBinding {
 
+    public static final String CLASS = "class";
+
     private static final long serialVersionUID = -7047053153745571559L;
 
     private static final Log LOG = LogFactory.getLog( ReflectionBinding.class );
@@ -77,14 +79,14 @@ public class ReflectionBinding extends XMLBinding {
     private final XMLCollectionFormat _collectionFormat;
     private final XMLMapFormat _mapFormat;
     private final XMLJdkProxyFormat _jdkProxyFormat;
-    private final XMLFormat<?>[] _customFormats;
+    private final CustomXMLFormat<?>[] _customFormats;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
         this( classLoader, false );
     }
 
     public ReflectionBinding( final ClassLoader classLoader, final boolean copyCollectionsForSerialization,
-            final XMLFormat<?> ... customFormats ) {
+            final CustomXMLFormat<?> ... customFormats ) {
         _classLoader = classLoader;
         _enumFormat = new XMLEnumFormat( classLoader );
         _arrayFormat = new XMLArrayFormat( classLoader );
@@ -102,14 +104,22 @@ public class ReflectionBinding extends XMLBinding {
     @SuppressWarnings( "unchecked" )
     @Override
     protected void writeClass( Class cls, final XMLStreamWriter writer, final boolean useAttributes ) throws XMLStreamException {
+
         if ( Proxy.isProxyClass( cls ) ) {
             cls = Proxy.class;
         }
+
+        CustomXMLFormat<?> xmlFormat = null;
+        if ( ( xmlFormat = getCustomFormat( cls ) ) != null ) {
+            cls = xmlFormat.getTargetClass( cls );
+        }
+
         if ( useAttributes ) {
-            writer.writeAttribute( "class", cls.getName() );
+            writer.writeAttribute( CLASS, cls.getName() );
         } else {
             writer.writeStartElement( cls.getName() );
         }
+
     }
 
     /**
@@ -119,7 +129,7 @@ public class ReflectionBinding extends XMLBinding {
     @Override
     protected Class readClass( final XMLStreamReader reader, final boolean useAttributes ) throws XMLStreamException {
         final CharArray className = useAttributes
-            ? reader.getAttributeValue( null, "class" )
+            ? reader.getAttributeValue( null, CLASS )
             : reader.getLocalName();
         try {
             return Class.forName( className.toString(), true, _classLoader );
@@ -137,7 +147,13 @@ public class ReflectionBinding extends XMLBinding {
             return xmlFormat;
         }
 
-        if ( cls.isPrimitive()
+        /* after reflection based formats check custom formats. this is
+         * required for the cglib extension, and is useful to allow the user
+         * to overwrite existing formats
+         */
+        if ( ( xmlFormat = getCustomFormat( cls ) ) != null ) {
+            return xmlFormat;
+        } else if ( cls.isPrimitive()
                 || cls == String.class
                 || cls == Boolean.class
                 || cls == Integer.class
@@ -176,8 +192,6 @@ public class ReflectionBinding extends XMLBinding {
             return STRING_BUILDER_FORMAT;
         } else if ( cls == StringBuffer.class ) {
             return STRING_BUFFER_FORMAT;
-        } else if ( ( xmlFormat = getCustomFormat( cls ) ) != null ) {
-            return xmlFormat;
         } else {
             if ( xmlFormat == null ) {
                 if ( ReflectionFormat.isNumberFormat( cls ) ) {
@@ -191,12 +205,12 @@ public class ReflectionBinding extends XMLBinding {
         }
     }
 
-    private XMLFormat<?> getCustomFormat( final Class<?> cls ) {
+    private CustomXMLFormat<?> getCustomFormat( final Class<?> cls ) {
         if ( _customFormats == null ) {
             return null;
         }
-        for( final XMLFormat<?> xmlFormat : _customFormats ) {
-            if ( xmlFormat.getBoundClass() == cls ) {
+        for( final CustomXMLFormat<?> xmlFormat : _customFormats ) {
+            if ( xmlFormat.canConvert( cls ) ) {
                 return xmlFormat;
             }
         }
@@ -439,7 +453,10 @@ public class ReflectionBinding extends XMLBinding {
                     return (T) constructor.newInstance();
                 }
                 else if ( parameterTypes.length == 1 && parameterTypes[0] == int.class ) {
-                    return (T) constructor.newInstance( xml.getAttribute( SIZE ).toInt() );
+                    final CharArray size = xml.getAttribute( SIZE );
+                    if ( size != null ) {
+                        return (T) constructor.newInstance( size.toInt() );
+                    }
                 }
             }
             if ( LOG.isDebugEnabled() && constructors.length > 0 ) {
@@ -586,17 +603,19 @@ public class ReflectionBinding extends XMLBinding {
         public Object newInstance( final Class<Object> clazz, final javolution.xml.XMLFormat.InputElement input )
             throws XMLStreamException {
             final InvocationHandler invocationHandler = input.get( "handler" );
-            final Class<?>[] interfaces = getInterfaces( input );
+            final Class<?>[] interfaces = getInterfaces( input, "interfaces", _classLoader );
             return Proxy.newProxyInstance( _classLoader, interfaces, invocationHandler );
         }
 
-        private Class<?>[] getInterfaces( final javolution.xml.XMLFormat.InputElement input ) throws XMLStreamException {
-            final String[] interfaceNames = input.get( "interfaces" );
+        public static Class<?>[] getInterfaces( final javolution.xml.XMLFormat.InputElement input,
+                final String elementName,
+                final ClassLoader classLoader ) throws XMLStreamException {
+            final String[] interfaceNames = input.get( elementName );
             if ( interfaceNames != null ) {
                 try {
                     final Class<?>[] interfaces = new Class<?>[interfaceNames.length];
                     for ( int i = 0; i < interfaceNames.length; i++ ) {
-                        interfaces[i] = Class.forName( interfaceNames[i], true, _classLoader );
+                        interfaces[i] = Class.forName( interfaceNames[i], true, classLoader );
                     }
                     return interfaces;
                 } catch ( final ClassNotFoundException e ) {
@@ -619,7 +638,7 @@ public class ReflectionBinding extends XMLBinding {
             output.add( interfaceNames, "interfaces" );
         }
 
-        private String[] getInterfaceNames( final Object obj ) {
+        public static String[] getInterfaceNames( final Object obj ) {
             final Class<?>[] interfaces = obj.getClass().getInterfaces();
             if ( interfaces != null ) {
                 final String[] interfaceNames = new String[interfaces.length];

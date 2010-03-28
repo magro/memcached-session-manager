@@ -27,7 +27,7 @@ import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
  * Creates {@link XStreamTranscoder} instances.
- * 
+ *
  * @author Martin Grotzke (martin.grotzke@freiheit.com) (initial creation)
  */
 public class JavolutionTranscoderFactory implements TranscoderFactory {
@@ -46,13 +46,13 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
     /**
      * Gets/creates a single instance of {@link JavolutionTranscoder}. We need to have a single
      * instance so that {@link XMLFormat}s are not created twice which would lead to errors.
-     * 
+     *
      * @param manager the manager that will be passed to the transcoder.
      * @return for all invocations the same instance of {@link JavolutionTranscoder}.
      */
     private JavolutionTranscoder getTranscoder( final Manager manager ) {
         if ( _transcoder == null ) {
-            final XMLFormat<?>[] customFormats = loadCustomFormats( manager );
+            final CustomXMLFormat<?>[] customFormats = loadCustomFormats( manager );
             _transcoder = new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
         }
         return _transcoder;
@@ -66,16 +66,18 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
         return getTranscoder( manager );
     }
 
-    private XMLFormat<?>[] loadCustomFormats( final Manager manager ) {
+    private CustomXMLFormat<?>[] loadCustomFormats( final Manager manager ) {
         if ( _customConverterClassNames == null || _customConverterClassNames.length == 0 ) {
             return null;
         }
-        final XMLFormat<?>[] customFormats = new XMLFormat<?>[ _customConverterClassNames.length ];
+        final CustomXMLFormat<?>[] customFormats = new CustomXMLFormat<?>[ _customConverterClassNames.length ];
         final Loader loader = manager.getContainer().getLoader();
         for ( int i = 0; i < _customConverterClassNames.length; i++ ) {
             final String className = _customConverterClassNames[i];
             try {
-                final XMLFormat<?> xmlFormat = Class.forName( className, true, loader.getClassLoader() ).asSubclass( XMLFormat.class ).newInstance();
+                final CustomXMLFormat<?> xmlFormat = Class.forName( className, true, loader.getClassLoader() )
+                    .asSubclass( CustomXMLFormat.class )
+                    .newInstance();
                 customFormats[i] = xmlFormat;
             } catch ( final Exception e ) {
                 throw new RuntimeException( "Could not load custom xml format " + className, e );
