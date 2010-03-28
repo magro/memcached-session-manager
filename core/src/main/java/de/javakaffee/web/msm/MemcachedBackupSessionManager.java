@@ -334,7 +334,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
         if ( _customConverterClassNames != null ) {
             _log.info( "Loading custom converter classes " + _customConverterClassNames );
-            transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ", " ) );
+            transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ",\\s*" ) );
         }
         return transcoderFactory;
     }
