@@ -340,7 +340,7 @@ public class MemcachedSessionManagerIntegrationTest {
         // Wait so that the daemon will be available and the client can reconnect (async get didn't do the trick)
         Thread.sleep( 2500 );
 
-        final String newSessionId = manager.changeSessionIdIfRelocationRequired( session.getId() );
+        final String newSessionId = manager.changeSessionIdOnMemcachedFailover( session.getId() );
         assertNotNull( newSessionId );
         assertEquals( newSessionId, session.getId() );
         assertEquals( sessionIdFormat.extractMemcachedId( newSessionId ), _memcachedNodeId );

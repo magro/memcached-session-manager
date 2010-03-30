@@ -241,7 +241,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     void init( final MemcachedClient memcachedClient ) {
         _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
-        		" nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
+                " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
 
         if ( initialized ) {
             return;
@@ -444,12 +444,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public Session findSession( final String id ) throws IOException {
         Session result = super.findSession( id );
-        if ( result == null && _missingSessionsCache.get( id ) == null ) {
+        if ( result == null ) {
             result = loadFromMemcached( id );
             if ( result != null ) {
                 add( result );
-            } else {
-                _missingSessionsCache.put( id, Boolean.TRUE );
             }
         }
         //        if ( result == null ) {
@@ -470,16 +468,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _log.debug( "createSession invoked: " + sessionId );
         }
 
-        if ( _maxActiveSessions >= 0 && sessions.size() >= _maxActiveSessions ) {
-            _rejectedSessions++;
-            throw new IllegalStateException
-                (sm.getString("standardManager.createSession.ise"));
-        }
+        checkMaxActiveSessions();
 
         Session session = null;
 
         if ( sessionId != null ) {
             session = loadFromMemcached( sessionId );
+            if ( session != null ) {
+                add( session );
+            }
         }
 
         if ( session == null ) {
@@ -508,6 +505,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     }
 
+    private void checkMaxActiveSessions() {
+        if ( _maxActiveSessions >= 0 && sessions.size() >= _maxActiveSessions ) {
+            _rejectedSessions++;
+            throw new IllegalStateException
+                (sm.getString("standardManager.createSession.ise"));
+        }
+    }
+
     private boolean isNodeAvailableForSessionId( final String sessionId ) {
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
         return nodeId != null && _nodeIdService.isNodeAvailable( nodeId );
@@ -525,7 +530,53 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public String changeSessionIdIfRelocationRequired( final String requestedSessionId ) {
+    public String changeSessionIdOnTomcatFailover( final String requestedSessionId ) {
+        final String localJvmRoute = getJvmRoute();
+        if ( localJvmRoute != null && !localJvmRoute.equals( _sessionIdFormat.extractJvmRoute( requestedSessionId ) ) ) {
+            final MemcachedBackupSession session = loadFromMemcached( requestedSessionId );
+            if ( session != null ) {
+                // checking valid() can expire() the session!
+                if ( session.isValid() ) {
+                    return handleSessionTakeOver( session );
+                }
+            }
+        }
+        return null;
+    }
+
+    private String handleSessionTakeOver( final MemcachedBackupSession session ) {
+
+        checkMaxActiveSessions();
+
+        final String origSessionId = session.getIdInternal();
+
+        final String newSessionId = _sessionIdFormat.changeJvmRoute( session.getIdInternal(), getJvmRoute() );
+        session.setIdInternal( newSessionId );
+
+        add( session );
+
+        deleteFromMemcached( origSessionId );
+
+        _statistics.requestWithTomcatFailover();
+
+        return newSessionId;
+
+    }
+
+    private void deleteFromMemcached(final String sessionId) {
+        _log.debug( "Deleting session from memcached: " + sessionId );
+        try {
+            _memcached.delete( sessionId );
+        } catch ( final Throwable e ) {
+            _log.info( "Could not delete session from memcached.", e );
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String changeSessionIdOnMemcachedFailover( final String requestedSessionId ) {
 
         /* We can just lookup the session in the local session map, as we wouldn't get
          * the session from memcached if the node was not available - or, the other way round,
@@ -541,6 +592,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId );
                     _log.debug( "Session needs to be relocated, setting new id on session..." );
                     session.setIdForRelocate( newSessionId );
+                    _statistics.requestWithMemcachedFailover();
                     return newSessionId;
                 }
             }
@@ -582,17 +634,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param session
      *            the session to save
      * @param sessionRelocationRequired
-     *            specifies, if the session needs to be relocated to another memcached
-     *            node. The session id has been changed before via {@link #changeSessionIdIfRelocationRequired(String)}.
+     *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionRelocationRequired ) {
-        return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionRelocationRequired );
+    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged ) {
+        return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
 
     }
 
-    protected Session loadFromMemcached( final String sessionId ) {
-        if ( !_sessionIdFormat.isValid( sessionId ) ) {
+    protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {
+        if ( !_sessionIdFormat.isValid( sessionId ) || _missingSessionsCache.get( sessionId ) != null ) {
             return null;
         }
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
@@ -624,17 +675,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 }
                 _nodeIdService.setNodeAvailable( nodeId, true );
 
-                if ( object instanceof MemcachedBackupSession ) {
+                if ( object != null ) {
+                    final MemcachedBackupSession result;
+                    if ( object instanceof MemcachedBackupSession ) {
+                        result = (MemcachedBackupSession) object;
+                    }
+                    else {
+                        result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
+                    }
                     _statistics.getLoadFromMemcachedProbe().registerSince( start );
-                    return (Session) object;
-                }
-                else {
-                    final MemcachedBackupSession result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
-                    if ( object != null ) {
-                        _statistics.getLoadFromMemcachedProbe().registerSince( start );
+                    if ( _log.isDebugEnabled() ) {
+                        _log.debug( "Found session with id " + sessionId );
                     }
                     return result;
                 }
+                else {
+                    _missingSessionsCache.put( sessionId, Boolean.TRUE );
+                    if ( _log.isDebugEnabled() ) {
+                        _log.debug( "Session " + sessionId + " not found in memcached." );
+                    }
+                    return null;
+                }
+
             } catch ( final NodeFailureException e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached." );
                 _nodeIdService.setNodeAvailable( nodeId, false );
@@ -657,12 +719,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
         if ( _sessionIdFormat.isValid( session.getId() )
                 && session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
-            try {
-                _log.debug( "Deleting session from memcached: " + session.getId() );
-                _memcached.delete( session.getId() );
-            } catch ( final NodeFailureException e ) {
-                /* We can ignore this */
-            }
+            deleteFromMemcached( session.getId() );
         }
         super.remove( session );
     }
@@ -927,7 +984,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _backupThreadCount = backupThreadCount;
         if ( initialized ) {
             _log.info( "Changed backupThreadCount from " + oldBackupThreadCount + " to " + _backupThreadCount + "." +
-            		" Reloading configuration..." );
+                    " Reloading configuration..." );
             reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
             _log.info( "Finished reloading configuration." );
         }
@@ -981,7 +1038,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 _backupSessionService.shutdown();
             } catch ( final InterruptedException e ) {
                 _log.info( "Got interrupted during backupSessionService shutdown," +
-                		" continuing to shutdown memcached client and to destroy myself...", e );
+                        " continuing to shutdown memcached client and to destroy myself...", e );
             }
             _memcached.shutdown();
             destroy();
@@ -1141,10 +1198,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * @return
-     * @see de.javakaffee.web.msm.Statistics#getRequestsWithBackupRelocation()
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithMemcachedFailover()
      */
-    public long getMsmStatBackupRelocations() {
-        return _statistics.getRequestsWithBackupRelocation();
+    public long getMsmStatNumTomcatFailover() {
+        return _statistics.getRequestsWithTomcatFailover();
+    }
+
+    /**
+     * @return
+     * @see de.javakaffee.web.msm.Statistics#getRequestsWithMemcachedFailover()
+     */
+    public long getMsmStatNumMemcachedFailover() {
+        return _statistics.getRequestsWithMemcachedFailover();
     }
 
     /**
@@ -1226,15 +1291,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public String[] getMsmStatBackupInfo() {
         return _statistics.getBackupProbe().getInfo();
-    }
-
-    /**
-     * Returns a string array with labels and values of count, min, avg and max
-     * of the time that session relocations took.
-     * @return a String array for statistics inspection via jmx.
-     */
-    public String[] getMsmStatBackupRelocationInfo() {
-        return _statistics.getBackupRelocationProbe().getInfo();
     }
 
     /**

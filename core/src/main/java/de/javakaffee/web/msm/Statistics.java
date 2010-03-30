@@ -25,9 +25,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Statistics {
 
     private final AtomicLong _numRequestsWithoutSession = new AtomicLong();
+    private final AtomicLong _numRequestsWithTomcatFailover = new AtomicLong();
     private final AtomicLong _numRequestsWithSession = new AtomicLong();
     private final AtomicLong _numRequestsWithBackup = new AtomicLong();
-    private final AtomicLong _numRequestsWithBackupRelocation = new AtomicLong();
+    private final AtomicLong _numRequestsWithMemcachedFailover = new AtomicLong();
     private final AtomicLong _numRequestsWithBackupFailure = new AtomicLong();
     private final AtomicLong _numRequestsWithoutSessionAccess = new AtomicLong();
     private final AtomicLong _numRequestsWithoutAttributesAccess = new AtomicLong();
@@ -36,7 +37,6 @@ public class Statistics {
 
     private final MinMaxAvgProbe _effectiveBackupProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _backupProbe = new MinMaxAvgProbe();
-    private final MinMaxAvgProbe _backupRelocationProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _attributesSerializationProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _memcachedUpdateProbe = new MinMaxAvgProbe();
     private final MinMaxAvgProbe _loadFromMemcachedProbe = new MinMaxAvgProbe();
@@ -82,11 +82,17 @@ public class Statistics {
     public long getRequestsWithBackup() {
         return _numRequestsWithBackup.get();
     }
-    public void requestWithBackupRelocation() {
-        _numRequestsWithBackupRelocation.incrementAndGet();
+    public void requestWithTomcatFailover() {
+        _numRequestsWithTomcatFailover.incrementAndGet();
     }
-    public long getRequestsWithBackupRelocation() {
-        return _numRequestsWithBackupRelocation.get();
+    public long getRequestsWithTomcatFailover() {
+        return _numRequestsWithTomcatFailover.get();
+    }
+    public void requestWithMemcachedFailover() {
+        _numRequestsWithMemcachedFailover.incrementAndGet();
+    }
+    public long getRequestsWithMemcachedFailover() {
+        return _numRequestsWithMemcachedFailover.get();
     }
     public void requestWithBackupFailure() {
         _numRequestsWithBackupFailure.incrementAndGet();
@@ -140,14 +146,6 @@ public class Statistics {
      */
     public MinMaxAvgProbe getBackupProbe() {
         return _backupProbe;
-    }
-
-    /**
-     * Provides info regarding the time that was required for relocation of sessions.
-     * @return the backupRelocationProbe
-     */
-    public MinMaxAvgProbe getBackupRelocationProbe() {
-        return _backupRelocationProbe;
     }
 
     /**
@@ -314,7 +312,14 @@ public class Statistics {
          * {@inheritDoc}
          */
         @Override
-        public void requestWithBackupRelocation() {
+        public void requestWithMemcachedFailover() {
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void requestWithTomcatFailover() {
         }
 
         /**
@@ -330,14 +335,6 @@ public class Statistics {
          */
         @Override
         public MinMaxAvgProbe getBackupProbe() {
-            return DISABLED_PROBE;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public MinMaxAvgProbe getBackupRelocationProbe() {
             return DISABLED_PROBE;
         }
 

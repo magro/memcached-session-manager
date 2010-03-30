@@ -16,7 +16,7 @@ MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4.2').from(file('lib/memc
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
-CGLIB = 'cglib:cglib:jar:2.2'
+CGLIB = transitive( 'cglib:cglib:jar:2.2' )
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }

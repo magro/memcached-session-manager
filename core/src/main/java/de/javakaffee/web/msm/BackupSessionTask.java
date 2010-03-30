@@ -65,7 +65,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
      * @param failoverNodeIds
      */
     public BackupSessionTask( final MemcachedBackupSession session,
-            final boolean force,
+            final boolean sessionIdChanged,
             final TranscoderService transcoderService,
             final boolean sessionBackupAsync,
             final int sessionBackupTimeout,
@@ -73,7 +73,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
             final NodeIdService nodeIdService,
             final Statistics statistics ) {
         _session = session;
-        _force = force;
+        _force = sessionIdChanged;
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
@@ -125,14 +125,8 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                     _session.storeThisAccessedTimeFromLastBackupCheck();
                     break;
                 case SUCCESS:
-                    if ( _force ) {
-                        _statistics.requestWithBackupRelocation();
-                        _statistics.getBackupRelocationProbe().registerSince( startBackup );
-                    }
-                    else {
-                        _statistics.requestWithBackup();
-                        _statistics.getBackupProbe().registerSince( startBackup );
-                    }
+                    _statistics.requestWithBackup();
+                    _statistics.getBackupProbe().registerSince( startBackup );
                     _session.storeThisAccessedTimeFromLastBackupCheck();
                     _session.backupFinished();
                     break;

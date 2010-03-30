@@ -94,6 +94,21 @@ public class SessionIdFormat {
     }
 
     /**
+     * Change the provided session id (optionally already including a jvmRoute) so that it
+     * contains the provided newJvmRoute.
+     *
+     * @param sessionId
+     *            the session id that may contain a former jvmRoute.
+     * @param newJvmRoute
+     *            the new jvm route.
+     * @return the sessionId which now contains the new jvmRoute instead the
+     *         former one.
+     */
+    public String changeJvmRoute( final String sessionId, final String newJvmRoute ) {
+        return stripJvmRoute( sessionId ) + "." + newJvmRoute;
+    }
+
+    /**
      * Checks if the given session id matches the pattern
      * <code>[^-.]+-[^.]+(\.[\w]+)?</code>.
      *
@@ -125,6 +140,32 @@ public class SessionIdFormat {
         } else {
             return sessionId.substring( idxDash + 1, idxDot );
         }
+    }
+
+    /**
+     * Extract the jvm route from the given session id if existing.
+     *
+     * @param sessionId
+     *            the session id possibly including the memcached id and eventually the
+     *            jvmRoute.
+     * @return the jvm route or null if the session id didn't contain any.
+     */
+    public String extractJvmRoute( final String sessionId ) {
+        final int idxDot = sessionId.indexOf( '.' );
+        return idxDot < 0 ? null : sessionId.substring( idxDot + 1 );
+    }
+
+    /**
+     * Remove the jvm route from the given session id if existing.
+     *
+     * @param sessionId
+     *            the session id possibly including the memcached id and eventually the
+     *            jvmRoute.
+     * @return the session id without the jvm route.
+     */
+    public String stripJvmRoute( final String sessionId ) {
+        final int idxDot = sessionId.indexOf( '.' );
+        return idxDot < 0 ? sessionId : sessionId.substring( 0, idxDot );
     }
 
 }

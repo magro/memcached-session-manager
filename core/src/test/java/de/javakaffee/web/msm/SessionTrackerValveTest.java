@@ -105,7 +105,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final Session session = (Session) mock( Session.class ).proxy();
 
         final String sessionId = "foo";
-        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdIfRelocationRequired" ).with( eq( sessionId)  );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnTomcatFailover" ).with( eq( sessionId)  );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnMemcachedFailover" ).with( eq( sessionId)  );
         _requestControl.expects( atLeastOnce() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
@@ -126,7 +127,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final String newSessionId = "newId";
 
         _requestControl.expects( atLeastOnce() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
-        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdIfRelocationRequired" ).with( eq( sessionId)  ).will( returnValue( newSessionId ) );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnTomcatFailover" ).with( eq( sessionId )  );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnMemcachedFailover" ).with( eq( sessionId )  ).will( returnValue( newSessionId ) );
 
         _requestControl.expects( once() ).method( "setRequestedSessionId" ).with( eq( newSessionId ) );
 

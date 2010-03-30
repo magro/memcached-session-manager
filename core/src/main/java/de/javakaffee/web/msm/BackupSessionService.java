@@ -149,16 +149,15 @@ public class BackupSessionService {
      *
      * @param session
      *            the session to save
-     * @param sessionRelocationRequired
-     *            specifies, if the session needs to be relocated to another memcached
-     *            node. The session id had been changed before.
+     * @param sessionIdChanged
+     *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
      *
      * @return a {@link Future} providing the result of the backup task.
      *
      * @see MemcachedBackupSessionManager#setSessionBackupAsync(boolean)
      * @see BackupSessionTask#call()
      */
-    public Future<BackupResultStatus> backupSession( final MemcachedBackupSession session, final boolean sessionRelocationRequired ) {
+    public Future<BackupResultStatus> backupSession( final MemcachedBackupSession session, final boolean sessionIdChanged ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Starting for session id " + session.getId() );
         }
@@ -176,14 +175,14 @@ public class BackupSessionService {
              * have changed (and can skip serialization and hash calucation)
              */
             if ( !session.wasAccessedSinceLastBackupCheck()
-                    && !sessionRelocationRequired ) {
+                    && !sessionIdChanged ) {
                 _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
                 _statistics.requestWithoutSessionAccess();
                 return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
             }
 
             if ( !session.attributesAccessedSinceLastBackup()
-                    && !sessionRelocationRequired
+                    && !sessionIdChanged
                     && !session.authenticationChanged()
                     && !session.isNewInternal() ) {
                 _log.debug( "Session attributes were not accessed since last backup/check, therefore we can skip this" );
@@ -191,7 +190,7 @@ public class BackupSessionService {
                 return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
             }
 
-            final BackupSessionTask task = createBackupSessionTask( session, sessionRelocationRequired );
+            final BackupSessionTask task = createBackupSessionTask( session, sessionIdChanged );
 
             final Future<BackupResultStatus> result = _executorService.submit( task );
 
@@ -213,9 +212,9 @@ public class BackupSessionService {
 
     }
 
-    private BackupSessionTask createBackupSessionTask( final MemcachedBackupSession session, final boolean sessionRelocationRequired ) {
+    private BackupSessionTask createBackupSessionTask( final MemcachedBackupSession session, final boolean sessionIdChanged ) {
         return new BackupSessionTask( session,
-                sessionRelocationRequired,
+                sessionIdChanged,
                 _transcoderService,
                 _sessionBackupAsync,
                 _sessionBackupTimeout,

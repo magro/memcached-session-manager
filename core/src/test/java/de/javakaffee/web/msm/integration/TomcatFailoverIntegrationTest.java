@@ -23,6 +23,8 @@ import static de.javakaffee.web.msm.integration.TestUtils.post;
 import static de.javakaffee.web.msm.integration.TestUtils.setChangeSessionIdOnAuth;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 import java.io.IOException;
@@ -33,7 +35,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import junit.framework.Assert;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.LifecycleException;
@@ -75,6 +76,9 @@ public class TomcatFailoverIntegrationTest {
     private static final int TC_PORT_1 = 18888;
     private static final int TC_PORT_2 = 18889;
 
+    private static final String JVM_ROUTE_2 = "tc2";
+    private static final String JVM_ROUTE_1 = "tc1";
+
     private static final String NODE_ID = "n1";
     private static final int MEMCACHED_PORT = 21211;
     private static final String MEMCACHED_NODES = NODE_ID + ":localhost:" + MEMCACHED_PORT;
@@ -89,8 +93,8 @@ public class TomcatFailoverIntegrationTest {
         _daemon.start();
 
         try {
-            _tomcat1 = startTomcat( TC_PORT_1 );
-            _tomcat2 = startTomcat( TC_PORT_2 );
+            _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1 );
+            _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2 );
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
@@ -104,12 +108,12 @@ public class TomcatFailoverIntegrationTest {
         _httpClient = new DefaultHttpClient();
     }
 
-    private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        return startTomcat( port, null );
+    private Embedded startTomcat( final int port, final String jvmRoute ) throws MalformedURLException, UnknownHostException, LifecycleException {
+        return startTomcat( port, jvmRoute, null );
     }
 
-    private Embedded startTomcat( final int port, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = createCatalina( port, MEMCACHED_NODES, loginType );
+    private Embedded startTomcat( final int port, final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
+        final Embedded tomcat = createCatalina( port, MEMCACHED_NODES, jvmRoute, loginType );
         tomcat.start();
         return tomcat;
     }
@@ -134,17 +138,23 @@ public class TomcatFailoverIntegrationTest {
     @Test( enabled = true )
     public void testTomcatFailover() throws IOException, InterruptedException, HttpException {
 
+        final SessionIdFormat format = new SessionIdFormat();
+
         final String key = "foo";
         final String value = "bar";
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, key, value ).getSessionId();
+        assertEquals( format.extractJvmRoute( sessionId1 ), JVM_ROUTE_1 );
 
         final Object session = _client.get( sessionId1 );
-        Assert.assertNotNull( "Session not found in memcached: " + sessionId1, session );
+        assertNotNull( session, "Session not found in memcached: " + sessionId1 );
 
         final Response response = get( _httpClient, TC_PORT_2, sessionId1 );
         final String sessionId2 = response.getSessionId();
+        assertNull( _client.get( sessionId1 ) );
+        assertNotNull( _client.get( sessionId2 ) );
 
-        Assert.assertEquals( sessionId1, sessionId2 );
+        assertEquals( format.stripJvmRoute( sessionId1 ), format.stripJvmRoute( sessionId2 ) );
+        assertEquals( format.extractJvmRoute( sessionId2 ), JVM_ROUTE_2 );
 
         /* check session attributes could be read
          */
@@ -171,23 +181,25 @@ public class TomcatFailoverIntegrationTest {
         final String key = "foo";
         final String value = "bar";
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, key, value ).getSessionId();
-        Assert.assertEquals( 1, _daemon.getCache().getSetCmds() );
+        assertEquals( 1, _daemon.getCache().getSetCmds() );
+
+        final SessionIdFormat format = new SessionIdFormat();
 
         /* request the session on tomcat2
          */
         final Response response = get( _httpClient, TC_PORT_2, sessionId1 );
-        Assert.assertEquals( sessionId1, response.getSessionId() );
-        Assert.assertEquals( 1, _daemon.getCache().getSetCmds() );
+        assertEquals( format.stripJvmRoute( sessionId1 ), format.stripJvmRoute( response.getSessionId() ) );
+        assertEquals( 2, _daemon.getCache().getSetCmds() );
 
         /* post key/value already stored in the session again (on tomcat2)
          */
         post( _httpClient, TC_PORT_2, sessionId1, key, value );
-        Assert.assertEquals( 1, _daemon.getCache().getSetCmds() );
+        assertEquals( 2, _daemon.getCache().getSetCmds() );
 
         /* post another key/value pair (on tomcat2)
          */
         post( _httpClient, TC_PORT_2, sessionId1, "bar", "baz" );
-        Assert.assertEquals( 2, _daemon.getCache().getSetCmds() );
+        assertEquals( 3, _daemon.getCache().getSetCmds() );
 
         Thread.sleep( 10 );
 
@@ -199,8 +211,8 @@ public class TomcatFailoverIntegrationTest {
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcat( TC_PORT_1, LoginType.FORM );
-        _tomcat2 = startTomcat( TC_PORT_2, LoginType.FORM );
+        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.FORM );
+        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.FORM );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -234,8 +246,8 @@ public class TomcatFailoverIntegrationTest {
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcat( TC_PORT_1, LoginType.BASIC );
-        _tomcat2 = startTomcat( TC_PORT_2, LoginType.BASIC );
+        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.BASIC );
+        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.BASIC );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
