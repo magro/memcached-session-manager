@@ -28,6 +28,7 @@ import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.transcoders.SerializingTranscoder;
 
@@ -76,6 +77,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
 
     private static final int NODE_AVAILABILITY_CACHE_TTL = 1000;
+
+    private static final String PROTOCOL_TEXT = "text";
+    private static final String PROTOCOL_BINARY = "binary";
 
     protected static final String NODE_FAILURE = "node.failure";
 
@@ -163,6 +167,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private boolean _enableStatistics = true;
 
     private int _backupThreadCount = Runtime.getRuntime().availableProcessors();
+
+    private String _memcachedProtocol = PROTOCOL_TEXT;
 
     // -------------------- END configuration properties --------------------
 
@@ -321,11 +327,21 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             final Map<InetSocketAddress, String> address2Ids,
             final Statistics statistics ) {
         try {
-            return new MemcachedClient( new SuffixLocatorConnectionFactory(
-                    new MapBasedResolver( address2Ids ), _sessionIdFormat, statistics ), addresses );
+            final ConnectionFactory connectionFactory = createConnectionFactory( address2Ids, statistics );
+            return new MemcachedClient( connectionFactory, addresses );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
+    }
+
+    private ConnectionFactory createConnectionFactory(
+            final Map<InetSocketAddress, String> address2Ids,
+            final Statistics statistics ) {
+        final MapBasedResolver resolver = new MapBasedResolver( address2Ids );
+        if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) ) {
+            return new SuffixLocatorBinaryConnectionFactory( resolver, _sessionIdFormat, statistics );
+        }
+        return new SuffixLocatorConnectionFactory( resolver, _sessionIdFormat, statistics );
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException {
@@ -997,6 +1013,20 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public int getBackupThreadCount() {
         return _backupThreadCount;
+    }
+
+    /**
+     * Specifies the memcached protocol to use, either "text" (default) or "binary".
+     *
+     * @param memcachedProtocol one of "text" or "binary".
+     */
+    public void setMemcachedProtocol( final String memcachedProtocol ) {
+        if ( !PROTOCOL_TEXT.equals( memcachedProtocol )
+                || !PROTOCOL_BINARY.equals( memcachedProtocol ) ) {
+            _log.warn( "Illegal memcachedProtocol " + memcachedProtocol + ", using default (" + _memcachedProtocol + ")." );
+            return;
+        }
+        _memcachedProtocol = memcachedProtocol;
     }
 
     /**
