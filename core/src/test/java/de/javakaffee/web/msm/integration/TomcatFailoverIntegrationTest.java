@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.integration;
 import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
 import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
 import static de.javakaffee.web.msm.integration.TestUtils.get;
+import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.post;
 import static de.javakaffee.web.msm.integration.TestUtils.setChangeSessionIdOnAuth;
 import static org.testng.Assert.assertEquals;
@@ -50,11 +51,14 @@ import org.testng.annotations.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.MemcachedBackupSession;
+import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
+import de.javakaffee.web.msm.integration.TestUtils.RecordingSessionActivationListener;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 
 /**
@@ -125,6 +129,78 @@ public class TomcatFailoverIntegrationTest {
         _tomcat1.stop();
         _tomcat2.stop();
         _httpClient.getConnectionManager().shutdown();
+    }
+
+    /**
+     * Test for issue #38:
+     * Notify HttpSessionActivationListeners when loading a session from memcached
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute() throws Exception {
+        final MemcachedBackupSessionManager manager1 = getManager( _tomcat1 );
+        final MemcachedBackupSessionManager manager2 = getManager( _tomcat2 );
+
+        final SessionIdFormat format = new SessionIdFormat();
+
+        final String sessionId1 = get( _httpClient, TC_PORT_1, null ).getSessionId();
+        assertEquals( format.extractJvmRoute( sessionId1 ), JVM_ROUTE_1 );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) manager1.findSession( sessionId1 );
+        session.setAttribute( "listener", new RecordingSessionActivationListener() );
+
+        get( _httpClient, TC_PORT_1, sessionId1 );
+
+        final String sessionId2 = get( _httpClient, TC_PORT_2, sessionId1 ).getSessionId();
+        assertEquals( format.stripJvmRoute( sessionId2 ), format.stripJvmRoute( sessionId1 ) );
+        assertEquals( format.extractJvmRoute( sessionId2 ), JVM_ROUTE_2 );
+
+        final MemcachedBackupSession loaded = (MemcachedBackupSession) manager2.findSession( sessionId2 );
+        assertNotNull( loaded );
+        final RecordingSessionActivationListener listener = (RecordingSessionActivationListener) loaded.getAttribute( "listener" );
+        assertNotNull( listener );
+
+        final String notifiedSessionId = listener.getSessionDidActivate();
+        assertEquals( notifiedSessionId, sessionId2 );
+    }
+
+    /**
+     * Test for issue #38:
+     * Notify HttpSessionActivationListeners when loading a session from memcached
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testHttpSessionActivationListenersNotifiedOnLoadWithoutJvmRoute() throws Exception {
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcat( TC_PORT_1, null );
+        _tomcat2 = startTomcat( TC_PORT_2, null );
+
+        final MemcachedBackupSessionManager manager1 = getManager( _tomcat1 );
+        final MemcachedBackupSessionManager manager2 = getManager( _tomcat2 );
+
+        final SessionIdFormat format = new SessionIdFormat();
+
+        final String sessionId1 = get( _httpClient, TC_PORT_1, null ).getSessionId();
+        assertNull( format.extractJvmRoute( sessionId1 ) );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) manager1.findSession( sessionId1 );
+        session.setAttribute( "listener", new RecordingSessionActivationListener() );
+
+        get( _httpClient, TC_PORT_1, sessionId1 );
+
+        final String sessionId2 = get( _httpClient, TC_PORT_2, sessionId1 ).getSessionId();
+        assertEquals( sessionId2, sessionId1 );
+
+        final MemcachedBackupSession loaded = (MemcachedBackupSession) manager2.findSession( sessionId2 );
+        assertNotNull( loaded );
+        final RecordingSessionActivationListener listener = (RecordingSessionActivationListener) loaded.getAttribute( "listener" );
+        assertNotNull( listener );
+
+        final String notifiedSessionId = listener.getSessionDidActivate();
+        assertEquals( notifiedSessionId, sessionId2 );
     }
 
     /**

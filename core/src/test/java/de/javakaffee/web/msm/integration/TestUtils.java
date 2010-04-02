@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -38,6 +39,8 @@ import java.util.List;
 import java.util.Map;
 
 import javax.naming.NamingException;
+import javax.servlet.http.HttpSessionActivationListener;
+import javax.servlet.http.HttpSessionEvent;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -541,6 +544,36 @@ public class TestUtils {
                 }
             }
         }
+    }
+
+    /**
+     * A simple serializable {@link HttpSessionActivationListener} that provides the
+     * session id that was passed during {@link #sessionDidActivate(HttpSessionEvent)}
+     * via {@link #getSessionDidActivate()}.
+     */
+    public static final class RecordingSessionActivationListener implements HttpSessionActivationListener, Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private transient String _sessionDidActivate;
+
+        @Override
+        public void sessionWillPassivate( final HttpSessionEvent se ) {
+        }
+
+        @Override
+        public void sessionDidActivate( final HttpSessionEvent se ) {
+            _sessionDidActivate = se.getSession().getId();
+        }
+
+        /**
+         * Returns the id of the session that was passed in {@link #sessionDidActivate(HttpSessionEvent)}.
+         * @return a session id or <code>null</code>.
+         */
+        public String getSessionDidActivate() {
+            return _sessionDidActivate;
+        }
+
     }
 
 }

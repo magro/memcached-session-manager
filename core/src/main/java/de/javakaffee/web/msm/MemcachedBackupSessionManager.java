@@ -40,6 +40,7 @@ import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
+import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.LifecycleSupport;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -459,11 +460,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public Session findSession( final String id ) throws IOException {
-        Session result = super.findSession( id );
+        StandardSession result = (StandardSession) super.findSession( id );
         if ( result == null ) {
             result = loadFromMemcached( id );
-            if ( result != null ) {
-                add( result );
+            // checking valid() would expire() the session if it's not valid!
+            if ( result != null && result.isValid() ) {
+                addValidLoadedSession( result );
             }
         }
         //        if ( result == null ) {
@@ -473,6 +475,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         //            }
         //        }
         return result;
+    }
+
+    private void addValidLoadedSession( final StandardSession session ) {
+        // make sure the listeners know about it. (as done by PersistentManagerBase)
+        session.tellNew();
+        add( session );
+        session.activate();
+        // endAccess() to ensure timeouts happen correctly.
+        // access() to keep access count correct or it will end up
+        // negative
+        session.access();
+        session.endAccess();
     }
 
     /**
@@ -486,12 +500,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         checkMaxActiveSessions();
 
-        Session session = null;
+        StandardSession session = null;
 
         if ( sessionId != null ) {
             session = loadFromMemcached( sessionId );
-            if ( session != null ) {
-                add( session );
+            // checking valid() would expire() the session if it's not valid!
+            if ( session != null && session.isValid() ) {
+                addValidLoadedSession( session );
             }
         }
 
@@ -550,11 +565,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final String localJvmRoute = getJvmRoute();
         if ( localJvmRoute != null && !localJvmRoute.equals( _sessionIdFormat.extractJvmRoute( requestedSessionId ) ) ) {
             final MemcachedBackupSession session = loadFromMemcached( requestedSessionId );
-            if ( session != null ) {
-                // checking valid() can expire() the session!
-                if ( session.isValid() ) {
-                    return handleSessionTakeOver( session );
-                }
+            // checking valid() can expire() the session!
+            if ( session != null && session.isValid() ) {
+                return handleSessionTakeOver( session );
             }
         }
         return null;
@@ -569,7 +582,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final String newSessionId = _sessionIdFormat.changeJvmRoute( session.getIdInternal(), getJvmRoute() );
         session.setIdInternal( newSessionId );
 
-        add( session );
+        addValidLoadedSession( session );
 
         deleteFromMemcached( origSessionId );
 
