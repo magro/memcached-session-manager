@@ -18,9 +18,10 @@ package de.javakaffee.web.msm.serializer.javolution;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Map;
 
-import javolution.xml.XMLFormat;
 import javolution.xml.XMLObjectReader;
 import javolution.xml.XMLObjectWriter;
 import javolution.xml.XMLReferenceResolver;
@@ -48,7 +49,7 @@ import de.javakaffee.web.msm.SessionTranscoder;
  * <p>
  * Additionally it's worth to note that cyclic dependencies are supported.
  * </p>
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class JavolutionTranscoder extends SessionTranscoder implements SessionAttributesTranscoder {
@@ -63,7 +64,7 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
 
     /**
      * Constructor.
-     * 
+     *
      * @param manager
      *            the manager
      */
@@ -73,16 +74,16 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
 
     /**
      * Constructor.
-     * 
+     *
      * @param manager
      *            the manager
      * @param copyCollectionsForSerialization
      *            specifies, if iterating over collection elements shall be done
      *            on a copy of the collection or on the collection itself
-     * @param customFormats a list of custom {@link XMLFormat}s or <code>null</code>.
+     * @param customFormats a list of {@link CustomXMLFormat}s or <code>null</code>.
      */
     public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization,
-            final XMLFormat<?> ... customFormats ) {
+            final CustomXMLFormat<?> ... customFormats ) {
         _manager = manager;
         final Loader loader = _manager.getContainer().getLoader();
         _xmlBinding = new ReflectionBinding( loader.getClassLoader(), copyCollectionsForSerialization, customFormats );
@@ -95,7 +96,7 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
     public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
         return doSerialize( attributes, "attributes" );
     }
-    
+
     /**
      * This is there just for testing, so that we can serialize sessions using
      * the former serialization strategy (the whole session, not just attribtes).
@@ -123,12 +124,17 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
             writer.setBinding( _xmlBinding );
             writer.write( object, name );
             writer.flush();
-            
+
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Returning serialized data:\n" + new String( bos.toByteArray() ) );
+                final File tmpFile = File.createTempFile( "session-" + System.identityHashCode( object ) + "-", ".tmp", new File( "/tmp" ) );
+                final FileOutputStream out = new FileOutputStream( tmpFile );
+                out.write( bos.toByteArray() );
+                out.close();
+                LOG.debug( "Wrote content to file " + tmpFile.getAbsolutePath() );
             }
             // getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
-            
+
             return bos.toByteArray();
         } catch ( final Exception e ) {
             LOG.error( "caught exception", e );
@@ -140,7 +146,7 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
 
     /**
      * Get the object represented by the given serialized bytes.
-     * 
+     *
      * @param in
      *            the bytes to deserialize
      * @return the resulting object
@@ -149,12 +155,12 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
     public Map<String, Object> deserializeAttributes( final byte[] in ) {
         return doDeserialize( in, "attributes" );
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
-    protected MemcachedBackupSession deserialize( byte[] in ) {
+    protected MemcachedBackupSession deserialize( final byte[] in ) {
         /* "session" is exactly the name that was used by the former transcoder.
          * We need to use the same name so that we can deserialize old session data.
          */
@@ -164,7 +170,7 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
         return result;
     }
 
-    private <T> T doDeserialize( final byte[] in, String name ) {
+    private <T> T doDeserialize( final byte[] in, final String name ) {
         // getLogger().info( "Loading serialized:\n" + new String( in ) );
         XMLObjectReader reader = null;
         try {

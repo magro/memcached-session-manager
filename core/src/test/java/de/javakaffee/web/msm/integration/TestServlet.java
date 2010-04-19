@@ -52,13 +52,12 @@ public class TestServlet extends HttpServlet {
     @Override
     protected void doGet( final HttpServletRequest request, final HttpServletResponse response )
             throws ServletException, IOException {
+        LOG.info( " + starting..." );
 
-        final HttpSession session = request.getSession( false );
-        LOG.info( "invoked" );
+        final HttpSession session = request.getSession();
 
         final PrintWriter out = response.getWriter();
-        out.println( ID + "=" + request.getSession().getId() );
-        System.out.println( "request.getSession().getId(): " + request.getSession().getId());
+        out.println( ID + "=" + session.getId() );
 
         // final HttpSession session = request.getSession( false );
         if ( session != null ) {
@@ -69,6 +68,8 @@ public class TestServlet extends HttpServlet {
                 out.println( name + "=" + value );
             }
         }
+
+        LOG.info( " - finished." );
 
     }
 

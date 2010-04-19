@@ -23,16 +23,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 /**
  * An LRUCache that supports a maximum number of cache entries and a time to
  * live for them. The TTL is measured from insertion time to access time.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  * @param <K>
  *            the type of the key
  */
 public class NodeAvailabilityCache<K> {
+
+    private static final Log LOG = LogFactory.getLog( NodeAvailabilityCache.class );
 
     private final long _ttl;
     private final ConcurrentHashMap<K, ManagedItem<Boolean>> _map;
@@ -42,7 +47,7 @@ public class NodeAvailabilityCache<K> {
      * Create a new LRUCache with a maximum number of cache entries and a
      * specified time to live for cache entries. The TTL is measured from
      * insertion time to access time.
-     * 
+     *
      * @param size
      *            the maximum number of cached items
      * @param ttlInMillis
@@ -60,7 +65,7 @@ public class NodeAvailabilityCache<K> {
      * If the specified key is not already associated with a value or if it's
      * associated with a different value, associate it with the given value.
      * This is equivalent to
-     * 
+     *
      * <pre>
      * <code> if (map.get(key) == null || !map.get(key).equals(value))
      *    return map.put(key, value);
@@ -68,9 +73,9 @@ public class NodeAvailabilityCache<K> {
      *    return map.get(key);
      * </code>
      * </pre>
-     * 
+     *
      * except that the action is performed atomically.
-     * 
+     *
      * @param key
      *            the key to associate the value with.
      * @param available
@@ -95,7 +100,7 @@ public class NodeAvailabilityCache<K> {
     /**
      * Determines, if the node is available. If it's not cached, it's loaded
      * from the cache loader.
-     * 
+     *
      * @param key
      *            the key to check
      * @return <code>true</code> if the node is marked as available.
@@ -118,13 +123,18 @@ public class NodeAvailabilityCache<K> {
 
     private boolean updateIsNodeAvailable( final K key ) {
         final Boolean result = Boolean.valueOf( _cacheLoader.isNodeAvailable( key ) );
+
+        if ( LOG.isDebugEnabled() ) {
+            LOG.debug( "CacheLoader returned node availability '" + result + "' for node '" + key + "'." );
+        }
+
         _map.put( key, new ManagedItem<Boolean>( result, System.currentTimeMillis() ) );
         return result;
     }
 
     /**
      * All known keys.
-     * 
+     *
      * @return a list of all keys, never <code>null</code>.
      */
     public List<K> getKeys() {
@@ -133,7 +143,7 @@ public class NodeAvailabilityCache<K> {
 
     /**
      * A set of nodes that are stored as unavailable.
-     * 
+     *
      * @return a set of unavailable nodes, never <code>null</code>.
      */
     public Set<K> getUnavailableNodes() {
@@ -148,7 +158,7 @@ public class NodeAvailabilityCache<K> {
 
     /**
      * Stores a value with the timestamp this value was added to the cache.
-     * 
+     *
      * @param <T>
      *            the type of the value
      */
@@ -164,7 +174,7 @@ public class NodeAvailabilityCache<K> {
 
     /**
      * The cache loader interface.
-     * 
+     *
      * @param <K>
      *            the type of the key.
      */

@@ -20,9 +20,6 @@ import static de.javakaffee.web.msm.serializer.javolution.TestClasses.createPers
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -61,6 +58,7 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.Container;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.CounterHolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Email;
+import de.javakaffee.web.msm.serializer.javolution.TestClasses.HashMapWithIntConstructorOnly;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Holder;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderArray;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderList;
@@ -72,7 +70,7 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
 
 /**
  * Test for {@link JavolutionTranscoder}
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class JavolutionTranscoderTest extends MockObjectTestCase {
@@ -100,54 +98,97 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         _transcoder = new JavolutionTranscoder( _manager, true );
     }
 
+    @Test( enabled = true )
+    public void testStringBufferAndStringBuilderFormat() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+
+        session.setAttribute( "stringbuffer", new StringBuffer( "<string\n&buffer/>" ) );
+        session.setAttribute( "stringbuilder", new StringBuilder( "<string\n&buffer/>" ) );
+
+        System.out.println( new String( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) ));
+
+        final Map<String, Object> deserialized =
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
+
+        assertDeepEquals( deserialized, session.getAttributesInternal() );
+
+    }
+
+    /**
+     * This is test for issue #55:
+     * Wicket's MiniMap cannot be deserialized with javolution serializer
+     *
+     * See http://code.google.com/p/memcached-session-manager/issues/detail?id=55
+     *
+     * @throws Exception
+     */
+    @Test( enabled = true )
+    public void testMapWithIntConstructorOnly() throws Exception {
+        final MemcachedBackupSession session = _manager.createEmptySession();
+        session.setValid( true );
+
+        final HashMapWithIntConstructorOnly map = new HashMapWithIntConstructorOnly( 5 );
+        session.setAttribute( "map", map );
+
+        System.out.println( new String( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) ));
+
+        final Map<String, Object> deserialized =
+                _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
+
+        assertDeepEquals( deserialized, session.getAttributesInternal() );
+        assertDeepEquals( deserialized.get( "map" ), map );
+
+    }
+
     /**
      * This is test for issue #34:
      * msm-javolution-serializer: java.util.Currency gets deserialized with ReflectionFormat
-     * 
+     *
      * See http://code.google.com/p/memcached-session-manager/issues/detail?id=34
-     * 
+     *
      * @throws Exception
      */
     @Test( enabled = true )
     public void testCurrency() throws Exception {
         final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
-        
+
         final Currency orig = Currency.getInstance( "EUR" );
         session.setAttribute( "currency1", orig );
         session.setAttribute( "currency2", orig );
-        
+
         final Map<String, Object> deserialized =
                 _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
-        
+
         assertDeepEquals( deserialized, session.getAttributesInternal() );
-        
+
         // Check that the transient field defaultFractionDigits is initialized correctly (that was the bug)
         final Currency currency1 = (Currency) deserialized.get( "currency1" );
         Assert.assertEquals( currency1.getCurrencyCode(), orig.getCurrencyCode() );
         Assert.assertEquals( currency1.getDefaultFractionDigits(), orig.getDefaultFractionDigits() );
-        
+
     }
 
     /**
      * This is test for issue #33:
      * msm-javolution-serializer: ReflectionBinding does not honor XMLSerializable interface
-     * 
+     *
      * See http://code.google.com/p/memcached-session-manager/issues/detail?id=33
-     * 
+     *
      * @throws Exception
      */
     @Test( enabled = true )
     public void testXMLSerializableSupport() throws Exception {
         final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
-        
+
         final String attributeName = "myxmlserializable";
         session.setAttribute( attributeName, new MyXMLSerializable( Runtime.getRuntime() ) );
-        
+
         final Map<String, Object> deserialized =
                 _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
-        
+
         assertDeepEquals( deserialized, session.getAttributesInternal() );
         final MyXMLSerializable myXMLSerializable = (MyXMLSerializable) deserialized.get( attributeName );
         Assert.assertNotNull( myXMLSerializable.getRuntime(), "Transient field runtime should be initialized by XMLFormat" +
@@ -156,17 +197,17 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
     /**
      * This is test for issue #30:
-     * msm-javolution-serializer should support serialization of java.util.Collections$UnmodifiableMap  
-     * 
+     * msm-javolution-serializer should support serialization of java.util.Collections$UnmodifiableMap
+     *
      * See http://code.google.com/p/memcached-session-manager/issues/detail?id=30
-     * 
+     *
      * @throws Exception
      */
     @Test( enabled = true )
     public void testJavaUtilCollectionsUnmodifiable() throws Exception {
         final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
-        
+
         session.setAttribute( "unmodifiableList", Collections.unmodifiableList( new ArrayList<String>( Arrays.asList( "foo", "bar" ) ) ) );
         final HashMap<String, String> m = new HashMap<String, String>();
         m.put( "foo", "bar" );
@@ -174,39 +215,39 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
         final Map<String, Object> deserialized =
                 _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
-        
+
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
     /**
      * This is the test for issue #28:
      * msm-javolution-serializer should support serialization of java.util.Collections$EmptyList
-     * 
+     *
      * See http://code.google.com/p/memcached-session-manager/issues/detail?id=28
-     * 
+     *
      * @throws Exception
      */
     @Test( enabled = true )
     public void testJavaUtilLists() throws Exception {
         final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
-        
+
         session.setAttribute( "emptyList", Collections.<String>emptyList() );
         session.setAttribute( "arrayList", new ArrayList<String>() );
         session.setAttribute( "arraysAsList", Arrays.asList( "foo", "bar" ) );
 
         final Map<String, Object> deserialized =
                 _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
-        
+
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
     /**
      * This is another test for issue #28, just for maps:
      * msm-javolution-serializer should support serialization of java.util.Collections$EmptyList
-     * 
+     *
      * See http://code.google.com/p/memcached-session-manager/issues/detail?id=28
-     * 
+     *
      * @throws Exception
      */
     @Test( enabled = true )
@@ -218,7 +259,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
         final Map<String, Object> deserialized =
                 _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
-        
+
         assertDeepEquals( deserialized, session.getAttributesInternal() );
     }
 
@@ -252,7 +293,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
         final MemcachedBackupSession session = _manager.createEmptySession();
         session.setValid( true );
         session.setAttribute( "hh", holderHolder );
-        
+
         final Map<String, Object> deserialized =
                 _transcoder.deserializeAttributes( _transcoder.serializeAttributes( session, session.getAttributesInternal() ) );
         assertDeepEquals( deserialized, session.getAttributesInternal() );
@@ -315,6 +356,8 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 { long.class, 42 },
                 { Boolean.class, Boolean.TRUE },
                 { String.class, "42" },
+                { StringBuilder.class, new StringBuilder( "42" ) },
+                { StringBuffer.class, new StringBuffer( "42" ) },
                 { Class.class, String.class },
                 { Long.class, new Long( 42 ) },
                 { Integer.class, new Integer( 42 ) },
@@ -448,25 +491,33 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
 
         @Override
         public boolean equals( final Object obj ) {
-            if ( this == obj )
+            if ( this == obj ) {
                 return true;
-            if ( obj == null )
+            }
+            if ( obj == null ) {
                 return false;
-            if ( getClass() != obj.getClass() )
+            }
+            if ( getClass() != obj.getClass() ) {
                 return false;
+            }
             final EntityWithCollections other = (EntityWithCollections) obj;
-            if ( !Arrays.equals( _bars, other._bars ) )
+            if ( !Arrays.equals( _bars, other._bars ) ) {
                 return false;
+            }
             if ( _bazens == null ) {
-                if ( other._bazens != null )
+                if ( other._bazens != null ) {
                     return false;
-            } else if ( !_bazens.equals( other._bazens ) )
+                }
+            } else if ( !_bazens.equals( other._bazens ) ) {
                 return false;
+            }
             if ( _foos == null ) {
-                if ( other._foos != null )
+                if ( other._foos != null ) {
                     return false;
-            } else if ( !_foos.equals( other._foos ) )
+                }
+            } else if ( !_foos.equals( other._foos ) ) {
                 return false;
+            }
             return true;
         }
     }
@@ -484,7 +535,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
      * [_gender=MALE, _name=foo bar, _props={email0=Email
      * [_email=foo.bar@example.org, _name=foo bar], email1=Email
      * [_email=foo.bar@example.com, _name=foo bar]}]}
-     * 
+     *
      * but was: person2={name=bar baz, props={email0={name=bar baz,
      * email=bar.baz@example.org}, email1={name=bar baz,
      * email=bar.baz@example.com}}, gender=FEMALE} person1={name=foo bar,
@@ -529,7 +580,7 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
             Assert.assertEquals( ( (Number) one ).longValue(), ( (Number) another ).longValue() );
             return;
         }
-        
+
         if ( one instanceof Currency ) {
             // Check that the transient field defaultFractionDigits is initialized correctly (that was issue #34)
             final Currency currency1 = ( Currency) one;
@@ -554,27 +605,6 @@ public class JavolutionTranscoderTest extends MockObjectTestCase {
                 assertDeepEquals( field.get( one ), field.get( another ), alreadyChecked );
             }
         }
-    }
-
-    private StandardSession javaRoundtrip( final StandardSession session, final MemcachedBackupSessionManager manager )
-        throws IOException, ClassNotFoundException {
-
-        final long start1 = System.nanoTime();
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        final ObjectOutputStream oos = new ObjectOutputStream( bos );
-        session.writeObjectData( oos );
-        oos.close();
-        bos.close();
-        System.out.println( "java-ser took " + ( System.nanoTime() - start1 ) / 1000 );
-
-        final ByteArrayInputStream bis = new ByteArrayInputStream( bos.toByteArray() );
-        final ObjectInputStream ois = new ObjectInputStream( bis );
-        final StandardSession readSession = manager.createEmptySession();
-        readSession.readObjectData( ois );
-        ois.close();
-        bis.close();
-
-        return readSession;
     }
 
     protected byte[] serialize( final Object o ) {

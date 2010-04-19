@@ -32,6 +32,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
@@ -56,7 +57,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     public void setUp() throws Exception {
         _sessionBackupServiceControl = mock( SessionBackupService.class );
         _service = (SessionBackupService) _sessionBackupServiceControl.proxy();
-        _sessionTrackerValve = new SessionTrackerValve( null, _service, Statistics.create() );
+        _sessionTrackerValve = new SessionTrackerValve( null, new StandardContext(), _service, Statistics.create() );
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( (Valve) _nextValve.proxy() );
 
@@ -104,13 +105,14 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final Session session = (Session) mock( Session.class ).proxy();
 
         final String sessionId = "foo";
-        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdIfRelocationRequired" ).with( eq( sessionId)  );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnTomcatFailover" ).with( eq( sessionId)  );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnMemcachedFailover" ).with( eq( sessionId)  );
         _requestControl.expects( atLeastOnce() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( false ) )
-            .will( returnValue( BackupResultStatus.SUCCESS ) );
+            .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
 
@@ -125,7 +127,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         final String newSessionId = "newId";
 
         _requestControl.expects( atLeastOnce() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
-        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdIfRelocationRequired" ).with( eq( sessionId)  ).will( returnValue( newSessionId ) );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnTomcatFailover" ).with( eq( sessionId )  );
+        _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnMemcachedFailover" ).with( eq( sessionId )  ).will( returnValue( newSessionId ) );
 
         _requestControl.expects( once() ).method( "setRequestedSessionId" ).with( eq( newSessionId ) );
 
@@ -134,13 +137,14 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "isSecure" ).will( returnValue( false ) );
         _responseControl.expects( once() ).method( "addCookieInternal" ).with(
                 and( hasProperty( "name", eq( SessionTrackerValve.JSESSIONID ) ),
-                     hasProperty( "value", eq( newSessionId ) ) ) );
+                     hasProperty( "value", eq( newSessionId ) ) ),
+                     eq( false ) ); // default value in StandardContext.useHttpOnly
 
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
         _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( true ) )
-            .will( returnValue( BackupResultStatus.SUCCESS ) );
+            .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
 
