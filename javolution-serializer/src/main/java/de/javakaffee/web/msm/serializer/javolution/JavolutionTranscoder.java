@@ -90,6 +90,22 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
     }
 
     /**
+     * Constructor.
+     *
+     * @param classLoader
+     *            the classLoader
+     * @param copyCollectionsForSerialization
+     *            specifies, if iterating over collection elements shall be done
+     *            on a copy of the collection or on the collection itself
+     * @param customFormats a list of {@link CustomXMLFormat}s or <code>null</code>.
+     */
+    public JavolutionTranscoder( final ClassLoader classLoader, final boolean copyCollectionsForSerialization,
+            final CustomXMLFormat<?> ... customFormats ) {
+        _manager = null;
+        _xmlBinding = new ReflectionBinding( classLoader, copyCollectionsForSerialization, customFormats );
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -153,6 +169,11 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
      */
     @Override
     public Map<String, Object> deserializeAttributes( final byte[] in ) {
+
+        if ( LOG.isDebugEnabled() ) {
+            LOG.debug( "Reading serialized data:\n" + new String( in ) );
+        }
+
         return doDeserialize( in, "attributes" );
     }
 

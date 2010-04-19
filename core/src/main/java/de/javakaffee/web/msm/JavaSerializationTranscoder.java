@@ -74,6 +74,16 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      * @param manager
      *            the manager
      */
+    public JavaSerializationTranscoder() {
+        this( null );
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param manager
+     *            the manager
+     */
     public JavaSerializationTranscoder( final Manager manager ) {
         _manager = manager;
     }
@@ -191,7 +201,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
         final ObjectInputStream ois;
         Loader loader = null;
         ClassLoader classLoader = null;
-        if ( _manager.getContainer() != null ) {
+        if ( _manager != null && _manager.getContainer() != null ) {
             loader = _manager.getContainer().getLoader();
         }
         if ( loader != null ) {
