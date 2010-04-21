@@ -15,8 +15,18 @@ TC_COYOTE = transitive( 'org.apache.tomcat:coyote:jar:6.0.26' )
 MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4.2').from(file('lib/memcached-2.4.2.jar'))
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
+
+# Kryo
+KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.1' ).from(file('lib/kryo-serializers-0.1.jar'))
+KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.1-SNAPSHOT' ).from( file( 'lib/kryo-1.1-SNAPSHOT.jar' ) )
+REFLECTASM = artifact('com.esotericsoftware:reflectasm:jar:0.8').from(file('lib/reflectasm-0.8.jar'))
+MINLOG = artifact('com.esotericsoftware:minlog:jar:1.2').from(file('lib/minlog-1.2.jar'))
+ASM = 'asm:asm:jar:3.2'
+
+# Custom converter libs
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
 CGLIB = transitive( 'cglib:cglib:jar:2.2' )
+WICKET = transitive( 'org.apache.wicket:wicket:jar:1.4.7' )
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
@@ -84,6 +94,21 @@ define 'msm' do
     compile.with( projects('core'), project('core').compile.dependencies, XSTREAM )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-xstream-serializer'
+  end
+
+  desc 'Kryo/binary serialization strategy'
+  define 'kryo-serializer' do |project|
+    compile.with( projects('core'), project('core').compile.dependencies, KRYO_SERIALIZERS, KRYO, REFLECTASM, ASM, MINLOG, JODA_TIME, WICKET )
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
+    package :jar, :id => 'msm-kryo-serializer'
+  end
+
+  desc 'Benchmark for serialization strategies'
+  define 'serializer-benchmark' do |project|
+    compile.with( projects('core'), project('core').compile.dependencies, projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, projects('kryo-serializer'), project('kryo-serializer').compile.dependencies )
+    #test.with( compile.dependencies, CLANG )
+    test.with( CLANG )
+    package :jar, :id => 'msm-serializer-benchmark'
   end
 
 end
