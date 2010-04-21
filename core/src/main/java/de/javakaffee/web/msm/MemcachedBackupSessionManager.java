@@ -140,11 +140,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private int _sessionBackupTimeout = 100;
 
     /**
-     * The class of the factory for
-     * {@link net.spy.memcached.transcoders.Transcoder}s. Default class is
+     * The class name of the factory for
+     * {@link net.spy.memcached.transcoders.Transcoder}s. Default class name is
      * {@link JavaSerializationTranscoderFactory}.
      */
-    private Class<? extends TranscoderFactory> _transcoderFactoryClass = JavaSerializationTranscoderFactory.class;
+    private String _transcoderFactoryClassName = JavaSerializationTranscoderFactory.class.getName();
 
     /**
      * Specifies, if iterating over collection elements shall be done on a copy
@@ -345,16 +345,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return new SuffixLocatorConnectionFactory( resolver, _sessionIdFormat, statistics );
     }
 
-    private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException {
-        log.info( "Starting with transcoder factory " + _transcoderFactoryClass.getName() );
-        final TranscoderFactory transcoderFactory = _transcoderFactoryClass.newInstance();
+    private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+        log.info( "Starting with transcoder factory " + _transcoderFactoryClassName );
+        final ClassLoader classLoader = getContainer().getLoader().getClassLoader();
+        final Class<? extends TranscoderFactory> transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, classLoader ).asSubclass( TranscoderFactory.class );
+        final TranscoderFactory transcoderFactory = transcoderFactoryClass.newInstance();
         transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
         if ( _customConverterClassNames != null ) {
-            _log.info( "Loading custom converter classes " + _customConverterClassNames );
+            _log.info( "Found configured custom converter classes, setting on transcoder factory: " + _customConverterClassNames );
             transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ",\\s*" ) );
         }
         return transcoderFactory;
     }
+
 
     private NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
             final MemcachedClient memcachedClient ) {
@@ -925,12 +928,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param transcoderFactoryClassName the {@link TranscoderFactory} class name.
      */
     public void setTranscoderFactoryClass( final String transcoderFactoryClassName ) {
-        try {
-            _transcoderFactoryClass = Class.forName( transcoderFactoryClassName ).asSubclass( TranscoderFactory.class );
-        } catch ( final ClassNotFoundException e ) {
-            _log.error( "The transcoderFactoryClass (" + transcoderFactoryClassName + ") could not be found" );
-            throw new RuntimeException( e );
-        }
+        _transcoderFactoryClassName = transcoderFactoryClassName;
     }
 
     /**
@@ -1164,7 +1162,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void setSessionBackupAsync( final boolean sessionBackupAsync ) {
         final boolean oldSessionBackupAsync = _sessionBackupAsync;
         _sessionBackupAsync = sessionBackupAsync;
-        if ( oldSessionBackupAsync != sessionBackupAsync ) {
+        if ( initialized && oldSessionBackupAsync != sessionBackupAsync ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
         }
