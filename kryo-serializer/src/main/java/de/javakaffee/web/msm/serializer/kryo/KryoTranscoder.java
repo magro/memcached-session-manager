@@ -72,8 +72,14 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
 
     private static final Log LOG = LogFactory.getLog( KryoTranscoder.class );
     
+    public static final int DEFAULT_INITIAL_BUFFER_SIZE = 50 * 1024;
+    public static final int DEFAULT_MAX_BUFFER_SIZE = 1000 * 1024;
+    
     private final Kryo _kryo;
     private final SerializerFactory[] _serializerFactories;
+
+    private final int _initialBufferSize;
+    private final int _maxBufferSize;
 
     /**
      * 
@@ -88,9 +94,21 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
      * @param customConverterClassNames 
      */
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
+        this( classLoader, customConverterClassNames, copyCollectionsForSerialization, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE );
+    }
+    
+    /**
+     * @param classLoader
+     * @param copyCollectionsForSerialization 
+     * @param customConverterClassNames 
+     */
+    public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames,
+            final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize ) {
         final Pair<Kryo, SerializerFactory[]> pair = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
         _kryo = pair.a;
         _serializerFactories = pair.b;
+        _initialBufferSize = initialBufferSize;
+        _maxBufferSize = maxBufferSize;
     }
 
     private Pair<Kryo, SerializerFactory[]> createKryo( final ClassLoader classLoader,
@@ -210,7 +228,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         /**
          * Creates an ObjectStream with an initial buffer size of 50KB and a maximum size of 1000KB.
          */
-        return new ObjectBuffer( _kryo, 50 * 1024, 1000 * 1024 ).writeObject( attributes );
+        return new ObjectBuffer( _kryo, _initialBufferSize, _maxBufferSize  ).writeObject( attributes );
     }
 
     /**

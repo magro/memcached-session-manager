@@ -17,6 +17,8 @@
 package de.javakaffee.web.msm.serializer.kryo;
 
 import org.apache.catalina.Manager;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.SessionTranscoder;
@@ -28,6 +30,11 @@ import de.javakaffee.web.msm.TranscoderFactory;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class KryoTranscoderFactory implements TranscoderFactory {
+    
+    private static final Log LOG = LogFactory.getLog( KryoTranscoderFactory.class );
+    
+    public static final String PROP_INIT_BUFFER_SIZE = "msm.kryo.buffersize.initial";
+    public static final String PROP_ENV_MAX_BUFFER_SIZE = "msm.kryo.buffersize.max";
 
     private boolean _copyCollectionsForSerialization;
     private String[] _customConverterClassNames;
@@ -49,10 +56,25 @@ public class KryoTranscoderFactory implements TranscoderFactory {
      */
     private KryoTranscoder getTranscoder( final Manager manager ) {
         if ( _transcoder == null ) {
+            final int initialBufferSize = getSysPropValue( PROP_INIT_BUFFER_SIZE, KryoTranscoder.DEFAULT_INITIAL_BUFFER_SIZE );
+            final int maxBufferSize = getSysPropValue( PROP_ENV_MAX_BUFFER_SIZE, KryoTranscoder.DEFAULT_MAX_BUFFER_SIZE );
             _transcoder = new KryoTranscoder( manager.getContainer().getLoader().getClassLoader(),
-                    _customConverterClassNames, _copyCollectionsForSerialization );
+                    _customConverterClassNames, _copyCollectionsForSerialization, initialBufferSize, maxBufferSize );
         }
         return _transcoder;
+    }
+
+    private int getSysPropValue( final String propName, final int defaultValue ) {
+        int value = defaultValue;
+        final String propValue = System.getProperty( propName );
+        if ( propValue != null ) {
+            try {
+                value = Integer.parseInt( propValue );
+            } catch( final NumberFormatException e ) {
+                LOG.warn( "Could not parse system property " + propName + ": " + e );
+            }
+        }
+        return value;
     }
 
     /**
