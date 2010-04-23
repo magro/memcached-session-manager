@@ -26,6 +26,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Currency;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,8 @@ import de.javakaffee.kryoserializers.CollectionsEmptySetSerializer;
 import de.javakaffee.kryoserializers.CopyForIterateCollectionSerializer;
 import de.javakaffee.kryoserializers.CopyForIterateMapSerializer;
 import de.javakaffee.kryoserializers.CurrencySerializer;
+import de.javakaffee.kryoserializers.EnumMapSerializer;
+import de.javakaffee.kryoserializers.EnumSetSerializer;
 import de.javakaffee.kryoserializers.GregorianCalendarSerializer;
 import de.javakaffee.kryoserializers.JdkProxySerializer;
 import de.javakaffee.kryoserializers.KryoReflectionFactorySupport;
@@ -100,6 +104,12 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                 final Serializer customSerializer = loadCustomSerializer( clazz );
                 if ( customSerializer != null ) {
                     return customSerializer;
+                }
+                if ( EnumSet.class.isAssignableFrom( clazz ) ) {
+                    return new EnumSetSerializer( this );
+                }
+                if ( EnumMap.class.isAssignableFrom( clazz ) ) {
+                    return new EnumMapSerializer( this );
                 }
                 if ( copyCollectionsForSerialization ) {
                     final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz );

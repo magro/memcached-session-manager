@@ -17,7 +17,7 @@ JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolu
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 
 # Kryo
-KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.1' ).from(file('lib/kryo-serializers-0.1.jar'))
+KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.2' ).from(file('lib/kryo-serializers-0.2.jar'))
 KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.1-SNAPSHOT' ).from( file( 'lib/kryo-1.1-SNAPSHOT.jar' ) )
 REFLECTASM = artifact('com.esotericsoftware:reflectasm:jar:0.8').from(file('lib/reflectasm-0.8.jar'))
 MINLOG = artifact('com.esotericsoftware:minlog:jar:1.2').from(file('lib/minlog-1.2.jar'))
@@ -53,10 +53,11 @@ define 'msm' do
   project.group = 'de.javakaffee.web.msm'
   project.version = '1.3.1'
 
-  compile.using :source=>'1.5', :target=>'1.5'
+  compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng
   package :sources, :javadoc
   package_with_javadoc
+  package_with_sources
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'
@@ -105,7 +106,7 @@ define 'msm' do
 
   desc 'Benchmark for serialization strategies'
   define 'serializer-benchmark' do |project|
-    compile.with( projects('core'), project('core').compile.dependencies, projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, projects('kryo-serializer'), project('kryo-serializer').compile.dependencies )
+    compile.with( projects('core'), project('core').compile.dependencies, projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, projects('kryo-serializer'), project('kryo-serializer').compile.dependencies, CLANG )
     #test.with( compile.dependencies, CLANG )
     test.with( CLANG )
     package :jar, :id => 'msm-serializer-benchmark'
