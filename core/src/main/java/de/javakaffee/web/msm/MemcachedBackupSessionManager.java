@@ -1033,7 +1033,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setMemcachedProtocol( final String memcachedProtocol ) {
         if ( !PROTOCOL_TEXT.equals( memcachedProtocol )
-                || !PROTOCOL_BINARY.equals( memcachedProtocol ) ) {
+                && !PROTOCOL_BINARY.equals( memcachedProtocol ) ) {
             _log.warn( "Illegal memcachedProtocol " + memcachedProtocol + ", using default (" + _memcachedProtocol + ")." );
             return;
         }
