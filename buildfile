@@ -12,13 +12,13 @@ SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
 CATALINA = 'org.apache.tomcat:catalina:jar:6.0.26'
 CATALINA_HA = 'org.apache.tomcat:catalina-ha:jar:6.0.26'
 TC_COYOTE = transitive( 'org.apache.tomcat:coyote:jar:6.0.26' )
-MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.4.2').from(file('lib/memcached-2.4.2.jar'))
+MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.5').from(file('lib/memcached-2.5.jar'))
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 
 # Kryo
 KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.2' ).from(file('lib/kryo-serializers-0.2.jar'))
-KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.1-SNAPSHOT' ).from( file( 'lib/kryo-1.1-SNAPSHOT.jar' ) )
+KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.01' ).from( file( 'lib/kryo-1.01.jar' ) )
 REFLECTASM = artifact('com.esotericsoftware:reflectasm:jar:0.8').from(file('lib/reflectasm-0.8.jar'))
 MINLOG = artifact('com.esotericsoftware:minlog:jar:1.2').from(file('lib/minlog-1.2.jar'))
 ASM = 'asm:asm:jar:3.2'
@@ -55,9 +55,7 @@ define 'msm' do
 
   compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng
-  package :sources, :javadoc
   package_with_javadoc
-  package_with_sources
 
   checkstyle.config 'etc/checkstyle-checks.xml'
   checkstyle.style 'etc/checkstyle.xsl'
@@ -67,6 +65,7 @@ define 'msm' do
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
     test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO )
     package :jar, :id => 'memcached-session-manager'
+    package(:jar, :classifier => 'sources', :id => 'memcached-session-manager').include :from => compile.sources 
   end
 
   desc 'Javolution/xml based serialization strategy'
@@ -74,6 +73,7 @@ define 'msm' do
     compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-javolution-serializer'
+    package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer').include :from => compile.sources 
   end
 
   desc 'Converter for Joda DateTime instances for javolution serialization strategy'
@@ -81,6 +81,7 @@ define 'msm' do
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
     test.with( compile.dependencies, MOCKITO )
     package :jar, :id => 'msm-javolution-serializer-jodatime'
+    package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer-jodatime').include :from => compile.sources 
   end
 
   desc 'Converter for cglib proxies for javolution serialization strategy'
@@ -88,6 +89,7 @@ define 'msm' do
     compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, CGLIB )
     test.with( compile.dependencies, MOCKITO )
     package :jar, :id => 'msm-javolution-serializer-cglib'
+    package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer-cglib').include :from => compile.sources 
   end
 
   desc 'XStream/xml based serialization strategy'
@@ -95,6 +97,7 @@ define 'msm' do
     compile.with( projects('core'), project('core').compile.dependencies, XSTREAM )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-xstream-serializer'
+    package(:jar, :classifier => 'sources', :id => 'msm-xstream-serializer').include :from => compile.sources 
   end
 
   desc 'Kryo/binary serialization strategy'
@@ -102,6 +105,7 @@ define 'msm' do
     compile.with( projects('core'), project('core').compile.dependencies, KRYO_SERIALIZERS, KRYO, REFLECTASM, ASM, MINLOG, JODA_TIME, WICKET )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-kryo-serializer'
+    package(:jar, :classifier => 'sources', :id => 'msm-kryo-serializer').include :from => compile.sources 
   end
 
   desc 'Benchmark for serialization strategies'
@@ -110,6 +114,7 @@ define 'msm' do
     #test.with( compile.dependencies, CLANG )
     test.with( CLANG )
     package :jar, :id => 'msm-serializer-benchmark'
+    package(:jar, :classifier => 'sources', :id => 'msm-serializer-benchmark').include :from => compile.sources 
   end
 
 end

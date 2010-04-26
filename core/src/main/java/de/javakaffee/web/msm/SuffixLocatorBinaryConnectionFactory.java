@@ -79,10 +79,13 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     @Override
     public MemcachedNode createMemcachedNode(final SocketAddress sa,
             final SocketChannel c, final int bufSize) {
+        final boolean doAuth = false;
         return new BinaryMemcachedNodeImpl(sa, c, bufSize,
             createReadOperationQueue(),
             createWriteOperationQueue(),
-            createOperationQueue());
+            createOperationQueue(),
+            getOpQueueMaxBlockTime(),
+            doAuth);
     }
 
     @Override
