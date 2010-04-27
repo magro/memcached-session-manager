@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -38,14 +39,20 @@ import java.util.List;
 import java.util.Map;
 
 import javax.naming.NamingException;
+import javax.servlet.http.HttpSessionActivationListener;
+import javax.servlet.http.HttpSessionEvent;
 
+import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Role;
 import org.apache.catalina.User;
+import org.apache.catalina.Valve;
+import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
+import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardServer;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
@@ -326,6 +333,7 @@ public class TestUtils {
             final LoginType loginType,
             final String transcoderFactoryClassName ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
+
         final Embedded catalina = new Embedded();
 
         final StandardServer server = new StandardServer();
@@ -418,6 +426,16 @@ public class TestUtils {
 
     public static MemcachedBackupSessionManager getManager( final Embedded tomcat ) {
         return (MemcachedBackupSessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
+    }
+
+    public static void setChangeSessionIdOnAuth( final Embedded tomcat, final boolean changeSessionIdOnAuth ) {
+        final Engine engine = (StandardEngine)tomcat.getContainer();
+        final Host host = (Host)engine.findChild( DEFAULT_HOST );
+        final Container context = host.findChild( CONTEXT_PATH );
+        final Valve first = context.getPipeline().getFirst();
+        if ( first instanceof AuthenticatorBase ) {
+            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( false );
+        }
     }
 
     /**
@@ -526,6 +544,36 @@ public class TestUtils {
                 }
             }
         }
+    }
+
+    /**
+     * A simple serializable {@link HttpSessionActivationListener} that provides the
+     * session id that was passed during {@link #sessionDidActivate(HttpSessionEvent)}
+     * via {@link #getSessionDidActivate()}.
+     */
+    public static final class RecordingSessionActivationListener implements HttpSessionActivationListener, Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private transient String _sessionDidActivate;
+
+        @Override
+        public void sessionWillPassivate( final HttpSessionEvent se ) {
+        }
+
+        @Override
+        public void sessionDidActivate( final HttpSessionEvent se ) {
+            _sessionDidActivate = se.getSession().getId();
+        }
+
+        /**
+         * Returns the id of the session that was passed in {@link #sessionDidActivate(HttpSessionEvent)}.
+         * @return a session id or <code>null</code>.
+         */
+        public String getSessionDidActivate() {
+            return _sessionDidActivate;
+        }
+
     }
 
 }

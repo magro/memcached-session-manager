@@ -35,7 +35,7 @@ import net.spy.memcached.ops.Operation;
 
 /**
  * Locates nodes based on their id which is a part of the sessionId (key).
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
@@ -50,7 +50,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     /**
      * Create a new {@link SuffixBasedNodeLocator}.
-     * 
+     *
      * @param nodes
      *            the nodes to select from.
      * @param resolver
@@ -118,7 +118,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     /**
      * The class that is used for readonly copies.
-     * 
+     *
      */
     static class MyMemcachedNodeROImpl implements MemcachedNode {
 
@@ -328,6 +328,21 @@ class SuffixBasedNodeLocator implements NodeLocator {
          * {@inheritDoc}
          */
         public Collection<Operation> destroyInputQueue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void authComplete() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void insertOp( final Operation arg0 ) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void setupForAuth() {
             throw new UnsupportedOperationException();
         }
     }

@@ -1,0 +1,10 @@
+The transcoder that uses kryo for serialization (http://code.google.com/p/kryo/). It requires kryo-serializers (http://github.com/magro/kryo-serializers).
+
+== Custom Converter ==
+* de.javakaffee.web.msm.serializer.kryo.KryoCustomization: implement this if you want to register a Serializer for a known class (at start time)
+* de.javakaffee.web.msm.serializer.kryo.SerializerFactory: implement this if you want to create a new Serializer for unknown classes (e.g. subtypes of a certain class) - at runtime (used by Kryo.newSerializer(Class)).
+
+The following custom converts are provided:
+* de.javakaffee.web.msm.serializer.kryo.JodaDateTimeRegistration: KryoCustomization that registers JodaDateTimeSerializer for joda DateTime
+* de.javakaffee.web.msm.serializer.kryo.CGLibProxySerializerFactory: KryoCustomization and SerializerFactory for CGLib proxies (registers/creates CGLibProxySerializer)
+* de.javakaffee.web.msm.serializer.kryo.WicketMiniMapRegistration: KryoCustomization that registers MiniMapSerializer for wickets MiniMap

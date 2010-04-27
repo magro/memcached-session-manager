@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -122,29 +123,33 @@ public class MemcachedBackupSessionManagerTest {
 
     /**
      * Test that sessions are only backuped if they are modified.
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     @Test
-    public void testOnlySendModifiedSessions() {
+    public void testOnlySendModifiedSessions() throws InterruptedException, ExecutionException {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         /* simulate the first request, with session access
          */
         session.access();
+        session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the second request, with session access
          */
         session.access();
+        session.endAccess();
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the third request, without session access
          */
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
     }
@@ -153,9 +158,11 @@ public class MemcachedBackupSessionManagerTest {
      * Test that session attribute serialization and hash calculation is only
      * performed if session attributes were accessed since the last backup.
      * Otherwise this computing time shall be saved for a better world :-)
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     @Test
-    public void testOnlyHashAttributesOfAccessedAttributes() {
+    public void testOnlyHashAttributesOfAccessedAttributes() throws InterruptedException, ExecutionException {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
         @SuppressWarnings( "unchecked" )
@@ -165,13 +172,15 @@ public class MemcachedBackupSessionManagerTest {
 
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
+        session.access();
+        session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.endAccess();
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
@@ -180,9 +189,11 @@ public class MemcachedBackupSessionManagerTest {
      * Test that session attribute serialization and hash calculation is only
      * performed if the session and its attributes were accessed since the last backup/backup check.
      * Otherwise this computing time shall be saved for a better world :-)
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     @Test
-    public void testOnlyHashAttributesOfAccessedSessionsAndAttributes() {
+    public void testOnlyHashAttributesOfAccessedSessionsAndAttributes() throws InterruptedException, ExecutionException {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
         @SuppressWarnings( "unchecked" )
@@ -193,15 +204,15 @@ public class MemcachedBackupSessionManagerTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.getAttribute( "foo" );
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }

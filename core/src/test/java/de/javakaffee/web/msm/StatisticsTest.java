@@ -37,7 +37,8 @@ public class StatisticsTest {
         return new Object[][] {
                 { "getRequestsWithBackup", "requestWithBackup" },
                 { "getRequestsWithBackupFailure", "requestWithBackupFailure" },
-                { "getRequestsWithBackupRelocation", "requestWithBackupRelocation" },
+                { "getRequestsWithTomcatFailover", "requestWithTomcatFailover" },
+                { "getRequestsWithMemcachedFailover", "requestWithMemcachedFailover" },
                 { "getRequestsWithoutSession", "requestWithoutSession" },
                 { "getRequestsWithoutSessionAccess", "requestWithoutSessionAccess" },
                 { "getRequestsWithoutAttributesAccess", "requestWithoutAttributesAccess" },
