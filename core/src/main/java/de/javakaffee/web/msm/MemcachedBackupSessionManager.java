@@ -84,7 +84,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected static final String NODE_FAILURE = "node.failure";
 
-    private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
+    protected final Log _log = LogFactory.getLog( getClass() );
 
     private final LifecycleSupport _lifecycle = new LifecycleSupport( this );
 
@@ -173,7 +173,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     // -------------------- END configuration properties --------------------
 
-    private Statistics _statistics;
+    protected Statistics _statistics;
 
     /*
      * the memcached client
@@ -201,7 +201,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private int _rejectedSessions;
 
-    private TranscoderService _transcoderService;
+    protected TranscoderService _transcoderService;
 
     private TranscoderFactory _transcoderFactory;
 
@@ -324,7 +324,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _transcoderFactory;
     }
 
-    private MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses,
+    protected MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses,
             final Map<InetSocketAddress, String> address2Ids,
             final Statistics statistics ) {
         try {
@@ -358,8 +358,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return transcoderFactory;
     }
 
-
-    private NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
+    protected NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
             final MemcachedClient memcachedClient ) {
         return new NodeAvailabilityCache<String>( size, ttlInMillis, new CacheLoader<String>() {
 
@@ -439,11 +438,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void expireSession( final String sessionId ) {
-        _log.debug( "expireSession invoked: " + sessionId );
-        super.expireSession( sessionId );
-        if ( _sessionIdFormat.isValid( sessionId ) ) {
-            _memcached.delete( sessionId );
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "expireSession invoked: " + sessionId );
         }
+        super.expireSession( sessionId );
+        deleteFromMemcached( sessionId );
     }
 
     /**
@@ -595,12 +594,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     }
 
-    private void deleteFromMemcached(final String sessionId) {
-        _log.debug( "Deleting session from memcached: " + sessionId );
-        try {
-            _memcached.delete( sessionId );
-        } catch ( final Throwable e ) {
-            _log.info( "Could not delete session from memcached.", e );
+    protected void deleteFromMemcached(final String sessionId) {
+        if ( _sessionIdFormat.isValid( sessionId ) ) {
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Deleting session from memcached: " + sessionId );
+            }
+            try {
+                _memcached.delete( sessionId );
+            } catch ( final Throwable e ) {
+                _log.info( "Could not delete session from memcached.", e );
+            }
         }
     }
 
@@ -671,7 +674,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged ) {
         return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
-
     }
 
     protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {
@@ -749,8 +751,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     ", node failure: " + session.getNote( NODE_FAILURE ) +
                     ", id: " + session.getId() );
         }
-        if ( _sessionIdFormat.isValid( session.getId() )
-                && session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
+        if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
             deleteFromMemcached( session.getId() );
         }
         super.remove( session );
@@ -849,7 +850,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         /* then assign new services
          */
-        _memcached.shutdown();
+        if ( _memcached != null ) {
+            _memcached.shutdown();
+        }
         _memcached = memcachedClient;
         _nodeIdService = nodeIdService;
         _backupSessionService = backupSessionService;
@@ -1081,7 +1084,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 _log.info( "Got interrupted during backupSessionService shutdown," +
                         " continuing to shutdown memcached client and to destroy myself...", e );
             }
-            _memcached.shutdown();
+            if ( _memcached != null ) {
+                _memcached.shutdown();
+            }
             destroy();
         }
     }
@@ -1095,7 +1100,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         super.backgroundProcess();
     }
 
-    private void updateExpirationInMemcached() {
+    protected void updateExpirationInMemcached() {
         final Session[] sessions = findSessions();
         final int delay = getContainer().getBackgroundProcessorDelay();
         for ( final Session s : sessions ) {
@@ -1118,7 +1123,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 try {
                     _backupSessionService.updateExpiration( session );
                 } catch ( final Throwable e ) {
-                    _log.info( "Could not update expiration in memcached for session " + session.getId() );
+                    _log.info( "Could not update expiration in memcached for session " + session.getId(), e );
                 }
             }
         }
