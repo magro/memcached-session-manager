@@ -20,7 +20,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import net.spy.memcached.MemcachedClient;
@@ -52,6 +55,7 @@ import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionManager {
 
     private final Map<String,byte[]> _sessionData = new ConcurrentHashMap<String, byte[]>();
+    private final ExecutorService _executorService = Executors.newSingleThreadExecutor();
 
     @Override
     protected MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids,
@@ -105,14 +109,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
         if ( result != null ) {
             final byte[] data = _sessionData.remove( id );
             if ( data != null ) {
-                _log.info( "Deserializing session data for session " + id );
-                final long startDeserialization = System.currentTimeMillis();
-                try {
-                    _transcoderService.deserializeAttributes( data );
-                } catch( final Exception e ) {
-                    _log.warn( "Could not deserialize session data.", e );
-                }
-                _statistics.getLoadFromMemcachedProbe().registerSince( startDeserialization );
+                _executorService.submit( new SessionDeserialization( id, data ) );
             }
         }
         return result;
@@ -124,6 +121,32 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
 
     @Override
     protected void updateExpirationInMemcached() {
+    }
+
+    private final class SessionDeserialization implements Callable<Void> {
+
+        private final String _id;
+        private final byte[] _data;
+
+        private SessionDeserialization( final String id, final byte[] data ) {
+            _id = id;
+            _data = data;
+        }
+
+        @Override
+        public Void call() throws Exception {
+            _log.info( String.format( "Deserializing %1$,.3f kb session data for session %2$s (asynchronously).", (double)_data.length / 1000, _id ) );
+            final long startDeserialization = System.currentTimeMillis();
+            try {
+                _transcoderService.deserializeAttributes( _data );
+            } catch( final Exception e ) {
+                _log.warn( "Could not deserialize session data.", e );
+            }
+            _log.info( String.format( "Deserializing %1$,.3f kb session data for session %2$s took %3$d ms.",
+                    (double)_data.length / 1000, _id, System.currentTimeMillis() - startDeserialization ) );
+            _statistics.getLoadFromMemcachedProbe().registerSince( startDeserialization );
+            return null;
+        }
     }
 
 }
