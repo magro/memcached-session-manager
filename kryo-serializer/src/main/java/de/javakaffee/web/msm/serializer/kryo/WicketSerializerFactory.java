@@ -29,6 +29,7 @@ import com.esotericsoftware.kryo.Serializer;
 public class WicketSerializerFactory implements SerializerFactory, KryoCustomization {
     
     private final WicketChildListSerializerFactory _childListSerializerFactory;
+    private final ComponentSerializerFactory _componentSerializerFactory;
 
     /**
      * Creates a new instances.
@@ -39,12 +40,16 @@ public class WicketSerializerFactory implements SerializerFactory, KryoCustomiza
             throw new NullPointerException( "Kryo is not provided but null!" );
         }
         _childListSerializerFactory = new WicketChildListSerializerFactory( kryo );
+        _componentSerializerFactory = new ComponentSerializerFactory( kryo );
     }
 
     @Override
     public Serializer newSerializer( final Class<?> type ) {
-        final Serializer serializer = _childListSerializerFactory.newSerializer( type );
-        if ( serializer != null ) {
+        Serializer serializer;
+        if ( ( serializer = _childListSerializerFactory.newSerializer( type ) ) != null ) {
+            return serializer;
+        }
+        if ( ( serializer = _componentSerializerFactory.newSerializer( type ) ) != null ) {
             return serializer;
         }
         return null;
