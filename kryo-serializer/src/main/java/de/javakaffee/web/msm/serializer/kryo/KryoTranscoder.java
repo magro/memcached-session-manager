@@ -75,8 +75,8 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
 
     private static final Log LOG = LogFactory.getLog( KryoTranscoder.class );
     
-    public static final int DEFAULT_INITIAL_BUFFER_SIZE = 50 * 1024;
-    public static final int DEFAULT_MAX_BUFFER_SIZE = 1000 * 1024;
+    public static final int DEFAULT_INITIAL_BUFFER_SIZE = 100 * 1024;
+    public static final int DEFAULT_MAX_BUFFER_SIZE = 2000 * 1024;
     
     private final Kryo _kryo;
     private final SerializerFactory[] _serializerFactories;

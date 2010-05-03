@@ -17,7 +17,7 @@ JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolu
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 
 # Kryo
-KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.3' ).from(file('lib/kryo-serializers-0.3.jar'))
+KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.4' ).from(file('lib/kryo-serializers-0.4.jar'))
 KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.01' ).from( file( 'lib/kryo-1.01.jar' ) )
 REFLECTASM = artifact('com.esotericsoftware:reflectasm:jar:0.8').from(file('lib/reflectasm-0.8.jar'))
 MINLOG = artifact('com.esotericsoftware:minlog:jar:1.2').from(file('lib/minlog-1.2.jar'))
@@ -51,7 +51,7 @@ end
 desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
 define 'msm' do
   project.group = 'de.javakaffee.web.msm'
-  project.version = '1.3.1'
+  project.version = '1.3.2'
 
   compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng
