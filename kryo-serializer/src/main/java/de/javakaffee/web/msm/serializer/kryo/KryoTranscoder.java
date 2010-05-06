@@ -29,6 +29,9 @@ import java.util.Currency;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -150,6 +153,10 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         // com.esotericsoftware.minlog.Log.TRACE = true;
         
         kryo.setRegistrationOptional( true );
+        kryo.register( ArrayList.class );
+        kryo.register( LinkedList.class );
+        kryo.register( HashSet.class );
+        kryo.register( HashMap.class );
         kryo.register( Arrays.asList( "" ).getClass(), new ArraysAsListSerializer( kryo ) );
         kryo.register( Currency.class, new CurrencySerializer( kryo ) );
         kryo.register( StringBuffer.class, new StringBufferSerializer( kryo ) );
