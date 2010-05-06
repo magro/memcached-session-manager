@@ -17,8 +17,8 @@ JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolu
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 
 # Kryo
-KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.4' ).from(file('lib/kryo-serializers-0.4.jar'))
-KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.01' ).from( file( 'lib/kryo-1.01.jar' ) )
+KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.5' ).from(file('lib/kryo-serializers-0.5.jar'))
+KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.02' ).from( file( 'lib/kryo-1.02.jar' ) )
 REFLECTASM = artifact('com.esotericsoftware:reflectasm:jar:0.8').from(file('lib/reflectasm-0.8.jar'))
 MINLOG = artifact('com.esotericsoftware:minlog:jar:1.2').from(file('lib/minlog-1.2.jar'))
 ASM = 'asm:asm:jar:3.2'
