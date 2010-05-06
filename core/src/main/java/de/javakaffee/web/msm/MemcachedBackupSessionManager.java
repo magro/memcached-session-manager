@@ -346,9 +346,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-        log.info( "Starting with transcoder factory " + _transcoderFactoryClassName );
-        final ClassLoader classLoader = getContainer().getLoader().getClassLoader();
-        final Class<? extends TranscoderFactory> transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, classLoader ).asSubclass( TranscoderFactory.class );
+        _log.info( "Creating transcoder factory " + _transcoderFactoryClassName );
+        final Class<? extends TranscoderFactory> transcoderFactoryClass = loadTranscoderFactoryClass();
         final TranscoderFactory transcoderFactory = transcoderFactoryClass.newInstance();
         transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
         if ( _customConverterClassNames != null ) {
@@ -356,6 +355,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             transcoderFactory.setCustomConverterClassNames( _customConverterClassNames.split( ",\\s*" ) );
         }
         return transcoderFactory;
+    }
+
+    private Class<? extends TranscoderFactory> loadTranscoderFactoryClass() throws ClassNotFoundException {
+        Class<? extends TranscoderFactory> transcoderFactoryClass;
+        final ClassLoader classLoader = getContainer().getLoader().getClassLoader();
+        try {
+            _log.debug( "Loading transcoder factory class " + _transcoderFactoryClassName + " using classloader " + classLoader );
+            transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, classLoader ).asSubclass( TranscoderFactory.class );
+        } catch ( final ClassNotFoundException e ) {
+            _log.info( "Could not load transcoderfactory class with classloader "+ classLoader +", trying " + getClass().getClassLoader() );
+            transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, getClass().getClassLoader() ).asSubclass( TranscoderFactory.class );
+        }
+        return transcoderFactoryClass;
     }
 
     protected NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
