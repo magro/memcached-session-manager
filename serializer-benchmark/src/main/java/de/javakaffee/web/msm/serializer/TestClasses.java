@@ -70,7 +70,7 @@ public class TestClasses {
     }
 
     static Person createPerson( final String name, final Gender gender, final Calendar dateOfBirth, final String... emailAddresses ) {
-        final int age = Calendar.getInstance().get( Calendar.YEAR ) - dateOfBirth.get( Calendar.YEAR );
+        final int age = dateOfBirth == null ? -1 : Calendar.getInstance().get( Calendar.YEAR ) - dateOfBirth.get( Calendar.YEAR );
         final Person result = createPerson( name, gender, age, emailAddresses );
         result.setDateOfBirth( dateOfBirth );
         return result;

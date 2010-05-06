@@ -61,7 +61,7 @@ serialized size is 70122 bytes.
         
         final MemcachedBackupSessionManager manager = createManager();
         
-        benchmark( manager, 10, 20, 2 /* 2^2 = 4 */ );
+        benchmark( manager, 10, 10, 2 /* 2^2 = 4 */ );
         benchmark( manager, 10, 100, 3 /* 3^3 = 27 */ );
         benchmark( manager, 10, 500, 4 /* 4^4 = 256 */ );
         
@@ -124,7 +124,7 @@ serialized size is 70122 bytes.
         for( int r = 0; r < rounds; r++ ) {
     
             final long start = System.currentTimeMillis();
-            for( int i = 0; i < 1000; i++ ) {
+            for( int i = 0; i < 500; i++ ) {
                 transcoderService.serialize( session );
             }
             serializationStats.registerSince( start );
@@ -138,7 +138,7 @@ serialized size is 70122 bytes.
         // deserialization
         for( int r = 0; r < rounds; r++ ) {
             final long start = System.currentTimeMillis();
-            for( int i = 0; i < 1000; i++ ) {
+            for( int i = 0; i < 500; i++ ) {
                 transcoderService.deserialize( data, null, null );
             }
             deserializationStats.registerSince( start );
