@@ -136,7 +136,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                     return new EnumMapSerializer( this );
                 }
                 if ( copyCollectionsForSerialization ) {
-                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz );
+                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
@@ -208,18 +208,18 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         return null;
     }
     
-    private Serializer loadCopyCollectionSerializer( final Class<?> clazz ) {
+    private Serializer loadCopyCollectionSerializer( final Class<?> clazz, final Kryo kryo ) {
         if ( Collection.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateCollectionSerializer for class " + clazz );
             }
-            return new CopyForIterateCollectionSerializer( _kryo );
+            return new CopyForIterateCollectionSerializer( kryo );
         }
         if ( Map.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateMapSerializer for class " + clazz );
             }
-            return new CopyForIterateMapSerializer( _kryo );
+            return new CopyForIterateMapSerializer( kryo );
         }
         return null;
     }
