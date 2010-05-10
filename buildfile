@@ -74,7 +74,7 @@ define 'msm' do
 
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
-    compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
+    compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION, HIBERNATE )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-javolution-serializer'
     package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer').include :from => compile.sources 
