@@ -22,7 +22,8 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.serializer.hibernate.AbstractHibernateCollectionsTest;
 
 /**
- * Test for {@link JodaDateTimeFormat}.
+ * Test for serialization/deserialization of hibernate collection mappings with
+ * {@link KryoTranscoderFactory}, using {@link HibernateCollectionsSerializerFactory}.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
