@@ -34,9 +34,11 @@ import java.util.Currency;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
@@ -505,6 +507,18 @@ public class TestUtils {
             Assert.assertEquals( m1.size(), m2.size() );
             for ( final Map.Entry<?, ?> entry : m1.entrySet() ) {
                 assertDeepEquals( entry.getValue(), m2.get( entry.getKey() ) );
+            }
+            return;
+        }
+
+        if ( Set.class.isAssignableFrom( one.getClass() ) ) {
+            final Set<?> m1 = (Set<?>) one;
+            final Set<?> m2 = (Set<?>) another;
+            Assert.assertEquals( m1.size(), m2.size() );
+            final Iterator<?> iter1 = m1.iterator();
+            final Iterator<?> iter2 = m2.iterator();
+            while( iter1.hasNext() ) {
+                assertDeepEquals( iter1.next(), iter2.next() );
             }
             return;
         }

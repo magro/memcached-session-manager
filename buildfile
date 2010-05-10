@@ -27,6 +27,10 @@ ASM = 'asm:asm:jar:3.2'
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
 CGLIB = transitive( 'cglib:cglib:jar:2.2' )
 WICKET = transitive( 'org.apache.wicket:wicket:jar:1.4.7' )
+HIBERNATE = transitive( 'org.hibernate:hibernate-core:jar:3.3.2.GA' )
+HIBERNATE_ANNOTATIONS = transitive( 'org.hibernate:hibernate-annotations:jar:3.4.0.GA' )
+HSQLDB = transitive( 'hsqldb:hsqldb:jar:1.8.0.10' )
+JAVASSIST = transitive( 'javassist:javassist:jar:3.11.0.GA' )
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
@@ -63,7 +67,7 @@ define 'msm' do
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
-    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO )
+    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO, HIBERNATE, HIBERNATE_ANNOTATIONS, JAVASSIST, HSQLDB )
     package :jar, :id => 'memcached-session-manager'
     package(:jar, :classifier => 'sources', :id => 'memcached-session-manager').include :from => compile.sources 
   end
