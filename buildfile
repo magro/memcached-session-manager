@@ -17,8 +17,8 @@ JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolu
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
 
 # Kryo
-KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.4' ).from(file('lib/kryo-serializers-0.4.jar'))
-KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.01' ).from( file( 'lib/kryo-1.01.jar' ) )
+KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.6' ).from(file('lib/kryo-serializers-0.6.jar'))
+KRYO = artifact( 'com.esotericsoftware:kryo:jar:1.02' ).from( file( 'lib/kryo-1.02.jar' ) )
 REFLECTASM = artifact('com.esotericsoftware:reflectasm:jar:0.8').from(file('lib/reflectasm-0.8.jar'))
 MINLOG = artifact('com.esotericsoftware:minlog:jar:1.2').from(file('lib/minlog-1.2.jar'))
 ASM = 'asm:asm:jar:3.2'
@@ -27,6 +27,10 @@ ASM = 'asm:asm:jar:3.2'
 JODA_TIME = 'joda-time:joda-time:jar:1.6'
 CGLIB = transitive( 'cglib:cglib:jar:2.2' )
 WICKET = transitive( 'org.apache.wicket:wicket:jar:1.4.7' )
+HIBERNATE = transitive( 'org.hibernate:hibernate-core:jar:3.3.2.GA' )
+HIBERNATE_ANNOTATIONS = transitive( 'org.hibernate:hibernate-annotations:jar:3.4.0.GA' )
+HSQLDB = transitive( 'hsqldb:hsqldb:jar:1.8.0.10' )
+JAVASSIST = transitive( 'javassist:javassist:jar:3.11.0.GA' )
 
 # Testing
 JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
@@ -51,7 +55,7 @@ end
 desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
 define 'msm' do
   project.group = 'de.javakaffee.web.msm'
-  project.version = '1.3.2'
+  project.version = '1.3.3'
 
   compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng
@@ -63,14 +67,14 @@ define 'msm' do
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
-    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO )
+    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO, HIBERNATE, HIBERNATE_ANNOTATIONS, JAVASSIST, HSQLDB )
     package :jar, :id => 'memcached-session-manager'
     package(:jar, :classifier => 'sources', :id => 'memcached-session-manager').include :from => compile.sources 
   end
 
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
-    compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION )
+    compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION, HIBERNATE )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-javolution-serializer'
     package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer').include :from => compile.sources 
@@ -102,7 +106,7 @@ define 'msm' do
 
   desc 'Kryo/binary serialization strategy'
   define 'kryo-serializer' do |project|
-    compile.with( projects('core'), project('core').compile.dependencies, KRYO_SERIALIZERS, KRYO, REFLECTASM, ASM, MINLOG, JODA_TIME, WICKET )
+    compile.with( projects('core'), project('core').compile.dependencies, KRYO_SERIALIZERS, KRYO, REFLECTASM, ASM, MINLOG, JODA_TIME, WICKET, HIBERNATE )
     test.with( compile.dependencies, project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-kryo-serializer'
     package(:jar, :classifier => 'sources', :id => 'msm-kryo-serializer').include :from => compile.sources 

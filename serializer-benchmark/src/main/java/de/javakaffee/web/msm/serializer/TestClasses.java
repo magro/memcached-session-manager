@@ -70,8 +70,8 @@ public class TestClasses {
     }
 
     static Person createPerson( final String name, final Gender gender, final Calendar dateOfBirth, final String... emailAddresses ) {
-        int age = Calendar.getInstance().get( Calendar.YEAR ) - dateOfBirth.get( Calendar.YEAR );
-        Person result = createPerson( name, gender, age, emailAddresses );
+        final int age = dateOfBirth == null ? -1 : Calendar.getInstance().get( Calendar.YEAR ) - dateOfBirth.get( Calendar.YEAR );
+        final Person result = createPerson( name, gender, age, emailAddresses );
         result.setDateOfBirth( dateOfBirth );
         return result;
     }
@@ -138,12 +138,15 @@ public class TestClasses {
         private static final long serialVersionUID = -3392119483974151376L;
 
         protected static final XMLFormat<MyXMLSerializable> XML = new XMLFormat<MyXMLSerializable>(MyXMLSerializable.class) {
+            @Override
             public MyXMLSerializable newInstance( final Class<MyXMLSerializable> cls, final InputElement xml ) throws XMLStreamException {
                 return new MyXMLSerializable( Runtime.getRuntime() );
             }
+            @Override
             public void write( final MyXMLSerializable obj, final OutputElement xml ) throws XMLStreamException {
                 // nothing to do
             }
+            @Override
             public void read( final InputElement xml, final MyXMLSerializable obj ) {
                 // Immutable, deserialization occurs at creation, ref. newIntance(...)
              }
@@ -239,7 +242,7 @@ public class TestClasses {
             return _dateOfBirth;
         }
 
-        public void setDateOfBirth( Calendar dataOfBirth ) {
+        public void setDateOfBirth( final Calendar dataOfBirth ) {
             _dateOfBirth = dataOfBirth;
         }
 
@@ -344,11 +347,11 @@ public class TestClasses {
         
         private static final long serialVersionUID = 1L;
         
-        private String _street;
-        private String _zip;
-        private String _city;
-        private String _country;
-        public Address( String street, String zip, String city, String country ) {
+        private final String _street;
+        private final String _zip;
+        private final String _city;
+        private final String _country;
+        public Address( final String street, final String zip, final String city, final String country ) {
             _street = street;
             _zip = zip;
             _city = city;
@@ -944,16 +947,26 @@ public class TestClasses {
         private final String _name;
         private final List<Component> _children = new ArrayList<Component>();
         private Component _parent;
-        public Component( String name ) {
+        public Component( final String name ) {
             _name = name;
         }
-        public Component addChild( Component child ) {
+        public Component addChild( final Component child ) {
             child.setParent( this );
             _children.add( child );
             return this;
         }
-        private void setParent( Component parent ) {
+        public Component addChildren( final Collection<Component> children ) {
+            for ( final Component child : children ) {
+                child.setParent( this );
+                _children.add( child );
+            }
+            return this;
+        }
+        private void setParent( final Component parent ) {
             _parent = parent;
+        }
+        public String getName() {
+            return _name;
         }
         @Override
         public String toString() {

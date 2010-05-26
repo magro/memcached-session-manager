@@ -29,6 +29,9 @@ import java.util.Currency;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,6 +63,7 @@ import de.javakaffee.kryoserializers.JdkProxySerializer;
 import de.javakaffee.kryoserializers.KryoReflectionFactorySupport;
 import de.javakaffee.kryoserializers.StringBufferSerializer;
 import de.javakaffee.kryoserializers.StringBuilderSerializer;
+import de.javakaffee.kryoserializers.SubListSerializer;
 import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
 import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 import de.javakaffee.web.msm.MemcachedBackupSession;
@@ -133,10 +137,13 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                     return new EnumMapSerializer( this );
                 }
                 if ( copyCollectionsForSerialization ) {
-                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz );
+                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
+                }
+                if ( SubListSerializer.canSerialize( clazz ) ) {
+                    return new SubListSerializer( this );
                 }
                 return super.newSerializer( clazz );
             }
@@ -150,6 +157,10 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         // com.esotericsoftware.minlog.Log.TRACE = true;
         
         kryo.setRegistrationOptional( true );
+        kryo.register( ArrayList.class );
+        kryo.register( LinkedList.class );
+        kryo.register( HashSet.class );
+        kryo.register( HashMap.class );
         kryo.register( Arrays.asList( "" ).getClass(), new ArraysAsListSerializer( kryo ) );
         kryo.register( Currency.class, new CurrencySerializer( kryo ) );
         kryo.register( StringBuffer.class, new StringBufferSerializer( kryo ) );
@@ -201,18 +212,18 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         return null;
     }
     
-    private Serializer loadCopyCollectionSerializer( final Class<?> clazz ) {
+    private Serializer loadCopyCollectionSerializer( final Class<?> clazz, final Kryo kryo ) {
         if ( Collection.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateCollectionSerializer for class " + clazz );
             }
-            return new CopyForIterateCollectionSerializer( _kryo );
+            return new CopyForIterateCollectionSerializer( kryo );
         }
         if ( Map.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateMapSerializer for class " + clazz );
             }
-            return new CopyForIterateMapSerializer( _kryo );
+            return new CopyForIterateMapSerializer( kryo );
         }
         return null;
     }
