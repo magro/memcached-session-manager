@@ -63,6 +63,7 @@ import de.javakaffee.kryoserializers.JdkProxySerializer;
 import de.javakaffee.kryoserializers.KryoReflectionFactorySupport;
 import de.javakaffee.kryoserializers.StringBufferSerializer;
 import de.javakaffee.kryoserializers.StringBuilderSerializer;
+import de.javakaffee.kryoserializers.SubListSerializer;
 import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
 import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 import de.javakaffee.web.msm.MemcachedBackupSession;
@@ -140,6 +141,9 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
+                }
+                if ( SubListSerializer.canSerialize( clazz ) ) {
+                    return new SubListSerializer( this );
                 }
                 return super.newSerializer( clazz );
             }
