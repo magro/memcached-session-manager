@@ -136,14 +136,14 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                 if ( EnumMap.class.isAssignableFrom( clazz ) ) {
                     return new EnumMapSerializer( this );
                 }
+                if ( SubListSerializer.canSerialize( clazz ) ) {
+                    return new SubListSerializer( this );
+                }
                 if ( copyCollectionsForSerialization ) {
                     final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
-                }
-                if ( SubListSerializer.canSerialize( clazz ) ) {
-                    return new SubListSerializer( this );
                 }
                 return super.newSerializer( clazz );
             }
