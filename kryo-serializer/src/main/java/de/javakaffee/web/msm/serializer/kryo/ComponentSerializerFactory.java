@@ -45,7 +45,9 @@ public class ComponentSerializerFactory implements SerializerFactory {
     @Override
     public Serializer newSerializer( final Class<?> type ) {
         if ( Component.class.isAssignableFrom( type ) ) {
-            return new ReferenceFieldSerializerReflectionFactorySupport( _kryo, type );
+            final ReferenceFieldSerializerReflectionFactorySupport result = new ReferenceFieldSerializerReflectionFactorySupport( _kryo, type );
+            result.setIgnoreSyntheticFields( false );
+            return result;
         }
         return null;
     }
