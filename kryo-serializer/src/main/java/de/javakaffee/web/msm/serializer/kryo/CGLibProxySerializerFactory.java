@@ -17,7 +17,6 @@
 package de.javakaffee.web.msm.serializer.kryo;
 
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.Serializer;
 
 import de.javakaffee.kryoserializers.cglib.CGLibProxySerializer;
 import de.javakaffee.kryoserializers.cglib.CGLibProxySerializer.CGLibProxyMarker;
@@ -29,7 +28,7 @@ import de.javakaffee.kryoserializers.cglib.CGLibProxySerializer.CGLibProxyMarker
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class CGLibProxySerializerFactory implements SerializerFactory, KryoCustomization {
+public class CGLibProxySerializerFactory implements UnregisteredClassHandler, KryoCustomization {
     
     private final Kryo _kryo;
 
@@ -43,18 +42,19 @@ public class CGLibProxySerializerFactory implements SerializerFactory, KryoCusto
         }
         _kryo = kryo;
     }
-
-    @Override
-    public Serializer newSerializer( final Class<?> type ) {
-        if ( CGLibProxySerializer.canSerialize( type ) ) {
-            return new CGLibProxySerializer( _kryo );
-        }
-        return null;
-    }
     
     @Override
     public void customize( final Kryo kryo ) {
         kryo.register( CGLibProxySerializer.CGLibProxyMarker.class, new CGLibProxySerializer( kryo ) );
+    }
+    
+    @Override
+    public boolean handleUnregisteredClass( final Class<?> type ) {
+        if ( CGLibProxySerializer.canSerialize( type ) ) {
+            _kryo.putRegisteredClass( type, _kryo.getRegisteredClass( CGLibProxySerializer.CGLibProxyMarker.class ) );
+            return true;
+        }
+        return false;
     }
     
 }

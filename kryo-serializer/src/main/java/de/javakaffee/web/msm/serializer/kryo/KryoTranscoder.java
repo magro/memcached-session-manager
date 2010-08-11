@@ -84,6 +84,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
     
     private final Kryo _kryo;
     private final SerializerFactory[] _serializerFactories;
+    private final UnregisteredClassHandler[] _unregisteredClassHandlers;
 
     private final int _initialBufferSize;
     private final int _maxBufferSize;
@@ -111,14 +112,16 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
      */
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames,
             final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize ) {
-        final Pair<Kryo, SerializerFactory[]> pair = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
-        _kryo = pair.a;
-        _serializerFactories = pair.b;
+        LOG.info( "Starting with initialBufferSize " + initialBufferSize + " and maxBufferSize " + maxBufferSize );
+        final Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> triple = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
+        _kryo = triple.a;
+        _serializerFactories = triple.b;
+        _unregisteredClassHandlers = triple.c;
         _initialBufferSize = initialBufferSize;
         _maxBufferSize = maxBufferSize;
     }
 
-    private Pair<Kryo, SerializerFactory[]> createKryo( final ClassLoader classLoader,
+    private Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> createKryo( final ClassLoader classLoader,
             final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
         
         final Kryo kryo = new KryoReflectionFactorySupport() {
@@ -146,6 +149,23 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                     }
                 }
                 return super.newSerializer( clazz );
+            }
+            
+            @SuppressWarnings( "unchecked" )
+            @Override
+            protected void handleUnregisteredClass( final Class clazz ) {
+                if ( _unregisteredClassHandlers != null ) {
+                    for( int i = 0; i < _unregisteredClassHandlers.length; i++ ) {
+                        final boolean handled = _unregisteredClassHandlers[i].handleUnregisteredClass( clazz );
+                        if ( handled ) {
+                            if ( LOG.isDebugEnabled() ) {
+                                LOG.debug( "UnregisteredClassHandler " + _unregisteredClassHandlers[i].getClass().getName() + " handled class " + clazz );
+                            }
+                            return;
+                        }
+                    }
+                }
+                super.handleUnregisteredClass( clazz );
             }
             
         };
@@ -179,7 +199,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         UnmodifiableCollectionsSerializer.registerSerializers( kryo );
         SynchronizedCollectionsSerializer.registerSerializers( kryo );
         
-        final Pair<KryoCustomization[], SerializerFactory[]> pair = loadCustomConverter( customConverterClassNames,
+        final Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> pair = loadCustomConverter( customConverterClassNames,
                 classLoader, kryo );
         
         final KryoCustomization[] customizations = pair.a;
@@ -194,7 +214,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
             }
         }
         
-        return Pair.create( kryo, pair.b );
+        return Triple.create( kryo, pair.b, pair.c );
     }
     
     private Serializer loadCustomSerializer( final Class<?> clazz ) {
@@ -256,18 +276,19 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         throw new UnsupportedOperationException( "Session deserialization not implemented." );
     }
 
-    private Pair<KryoCustomization[], SerializerFactory[]> loadCustomConverter( final String[] customConverterClassNames, final ClassLoader classLoader,
+    private Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> loadCustomConverter( final String[] customConverterClassNames, final ClassLoader classLoader,
             final Kryo kryo ) {
         if ( customConverterClassNames == null || customConverterClassNames.length == 0 ) {
-            return Pair.empty();
+            return Triple.empty();
         }
         final List<KryoCustomization> customizations = new ArrayList<KryoCustomization>();
         final List<SerializerFactory> serializerFactories = new ArrayList<SerializerFactory>();
+        final List<UnregisteredClassHandler> unregisteredClassHandlers = new ArrayList<UnregisteredClassHandler>();
         final ClassLoader loader = classLoader != null ? classLoader : Thread.currentThread().getContextClassLoader();
         for ( int i = 0; i < customConverterClassNames.length; i++ ) {
             final String element = customConverterClassNames[i];
             try {
-                processElement( element, customizations, serializerFactories, kryo, loader );
+                processElement( element, customizations, serializerFactories, unregisteredClassHandlers, kryo, loader );
             } catch ( final Exception e ) {
                 LOG.error( "Could not instantiate " + element + ", omitting this KryoCustomization/SerializerFactory.", e );
                 throw new RuntimeException( "Could not load serializer " + element, e );
@@ -275,11 +296,12 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         }
         final KryoCustomization[] customizationsArray = customizations.toArray( new KryoCustomization[customizations.size()] );
         final SerializerFactory[] serializerFactoriesArray = serializerFactories.toArray( new SerializerFactory[serializerFactories.size()] );
-        return Pair.create( customizationsArray, serializerFactoriesArray );
+        final UnregisteredClassHandler[] unregisteredClassHandlersArray = unregisteredClassHandlers.toArray( new UnregisteredClassHandler[unregisteredClassHandlers.size()] );
+        return Triple.create( customizationsArray, serializerFactoriesArray, unregisteredClassHandlersArray );
     }
 
     private void processElement( final String element, final List<KryoCustomization> customizations,
-            final List<SerializerFactory> serializerFactories, final Kryo kryo, final ClassLoader loader )
+            final List<SerializerFactory> serializerFactories, final List<UnregisteredClassHandler> unregisteredClassHandlers, final Kryo kryo, final ClassLoader loader )
         throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException,
         InvocationTargetException {
         final Class<?> clazz = Class.forName( element, true, loader );
@@ -291,15 +313,15 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                 serializerFactories.add( (SerializerFactory) customization );
             }
         }
-        else if ( SerializerFactory.class.isAssignableFrom( clazz ) ) {
+        if ( SerializerFactory.class.isAssignableFrom( clazz ) ) {
             LOG.info( "Loading SerializerFactory " + element );
             final SerializerFactory factory = createInstance( clazz.asSubclass( SerializerFactory.class ), kryo );
             serializerFactories.add( factory );
         }
-        else  {
-            throw new IllegalArgumentException( "The provided class '" + element + "'" +
-            		" does not implement SerializerFactory or KryoCustomization." +
-            		" Implemented interfaces: " +Arrays.asList( clazz.getInterfaces() ) );
+        if ( UnregisteredClassHandler.class.isAssignableFrom( clazz ) ) {
+            LOG.info( "Loading UnregisteredClassHandler " + element );
+            final UnregisteredClassHandler handler = createInstance( clazz.asSubclass( UnregisteredClassHandler.class ), kryo );
+            unregisteredClassHandlers.add( handler );
         }
     }
 
@@ -313,20 +335,22 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         }
     }
     
-    private static class Pair<A,B> {
-        private static final Pair<?, ?> EMPTY = Pair.create( null, null );
+    private static class Triple<A,B,C> {
+        private static final Triple<?, ?, ?> EMPTY = Triple.create( null, null, null );
         private final A a;
         private final B b;
-        public Pair( final A a, final B b ) {
+        private final C c;
+        public Triple( final A a, final B b, final C c ) {
             this.a = a;
             this.b = b;
+            this.c = c;
         }
-        public static <A, B> Pair<A, B> create( final A a, final B b ) {
-            return new Pair<A, B>( a, b );
+        public static <A, B, C> Triple<A, B, C> create( final A a, final B b, final C c ) {
+            return new Triple<A, B, C>( a, b, c );
         }
         @SuppressWarnings( "unchecked" )
-        public static <A, B> Pair<A, B> empty() {
-            return (Pair<A, B>) EMPTY;
+        public static <A, B, C> Triple<A, B, C> empty() {
+            return (Triple<A, B, C>) EMPTY;
         }
     }
 
