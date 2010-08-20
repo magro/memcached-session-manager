@@ -51,7 +51,7 @@ public class CGLibProxySerializerFactory implements UnregisteredClassHandler, Kr
     @Override
     public boolean handleUnregisteredClass( final Class<?> type ) {
         if ( CGLibProxySerializer.canSerialize( type ) ) {
-            _kryo.putRegisteredClass( type, _kryo.getRegisteredClass( CGLibProxySerializer.CGLibProxyMarker.class ) );
+            _kryo.register( type, _kryo.getRegisteredClass( CGLibProxySerializer.CGLibProxyMarker.class ) );
             return true;
         }
         return false;
