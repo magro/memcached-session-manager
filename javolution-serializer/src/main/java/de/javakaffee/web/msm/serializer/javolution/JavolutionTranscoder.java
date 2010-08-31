@@ -205,7 +205,7 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
             if ( !reader.hasNext() ) {
                 throw new IllegalStateException( "reader has no input" );
             }
-            return reader.read( name );
+            return reader.<T> read( name );
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
             throw e;
