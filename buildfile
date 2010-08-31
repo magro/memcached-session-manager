@@ -108,7 +108,7 @@ define 'msm' do
   desc 'Kryo/binary serialization strategy'
   define 'kryo-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, KRYO_SERIALIZERS, KRYO, REFLECTASM, ASM, MINLOG, JODA_TIME, WICKET, HIBERNATE, SPRING )
-    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
+    test.with( project('core').test.dependencies, CLANG )
     package :jar, :id => 'msm-kryo-serializer'
     package(:jar, :classifier => 'sources', :id => 'msm-kryo-serializer').include :from => compile.sources 
   end
