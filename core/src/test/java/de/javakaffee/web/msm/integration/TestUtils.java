@@ -24,7 +24,6 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -397,7 +396,7 @@ public class TestUtils {
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         sessionManager.setTranscoderFactoryClass( transcoderFactoryClassName );
 
-        final Connector connector = catalina.createConnector( InetAddress.getLocalHost(), port, false );
+        final Connector connector = catalina.createConnector( "localhost", port, false );
         catalina.addConnector( connector );
 
         return catalina;
