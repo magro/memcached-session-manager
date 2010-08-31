@@ -1,2 +1,0 @@
-A custom javolution XMLFormat implementation for Joda's DateTime. Place the jar in WEB-INF/lib and configure the memcached-session-manager Manager element with
-  customConverter="de.javakaffee.web.msm.serializer.javolution.JodaDateTimeFormat"

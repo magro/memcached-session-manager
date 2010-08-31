@@ -41,13 +41,13 @@ import org.testng.annotations.Test;
 
 /**
  * Test for {@link CGLibProxyFormat}.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class CGLibProxyFormatTest {
 
     private static final Log LOG = LogFactory.getLog( CGLibProxyFormatTest.class );
-    
+
     private ReflectionBinding _binding;
 
     @BeforeTest
@@ -59,7 +59,7 @@ public class CGLibProxyFormatTest {
     public void testCGLibProxy() throws XMLStreamException {
         final ClassToProxy proxy = createProxy( new ClassToProxy() );
         proxy.setValue( "foo" );
-        
+
         final byte[] serialized = serialize( proxy, _binding );
         System.out.println( new String( serialized ) );
         final ClassToProxy deserialized = deserialize( serialized, _binding );
@@ -68,7 +68,7 @@ public class CGLibProxyFormatTest {
 
     /**
      * Test that a proxy for another existing xmlformat is handled correctly.
-     * 
+     *
      * @throws XMLStreamException
      */
     @Test( enabled = true )
@@ -76,7 +76,7 @@ public class CGLibProxyFormatTest {
         final Map<String, String> proxy = createProxy( new HashMap<String, String>() );
         proxy.put( "foo", "bar" );
         Assert.assertEquals( proxy.get( "foo" ), "bar" );
-        
+
         final byte[] serialized = serialize( proxy, _binding );
         System.out.println( new String( serialized ) );
         final Map<String, String> deserialized = deserialize( serialized, _binding );
@@ -85,7 +85,7 @@ public class CGLibProxyFormatTest {
 
     @SuppressWarnings( "unchecked" )
     private <T> T createProxy( final T obj ) {
-        
+
         final Enhancer e = new Enhancer();
         e.setInterfaces( new Class[] { Serializable.class } );
         final Class<? extends Object> class1 = obj.getClass();
@@ -144,7 +144,7 @@ public class CGLibProxyFormatTest {
             if ( !reader.hasNext() ) {
                 throw new IllegalStateException( "reader has no input" );
             }
-            return reader.read( "root" );
+            return reader.<T> read( "root" );
         } catch ( final RuntimeException e ) {
             LOG.error( "Could not deserialize.", e );
             throw e;
@@ -161,9 +161,9 @@ public class CGLibProxyFormatTest {
     }
 
     public static class DelegatingHandler implements InvocationHandler, Serializable {
-        
+
         private static final long serialVersionUID = 1L;
-        
+
         private final Object _delegate;
 
         public DelegatingHandler( final Object delegate ) {
@@ -174,17 +174,17 @@ public class CGLibProxyFormatTest {
             return method.invoke( _delegate, args );
         }
     }
-    
+
     public static class ClassToProxy {
         private String _value;
-        
+
         /**
          * @param value the value to set
          */
         public void setValue( final String value ) {
             _value = value;
         }
-        
+
         /**
          * @return the value
          */

@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 
 /**
  * Test for {@link JodaDateTimeFormat}.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class JodaDateTimeFormatTest {
@@ -145,7 +145,7 @@ public class JodaDateTimeFormatTest {
             if ( !reader.hasNext() ) {
                 throw new IllegalStateException( "reader has no input" );
             }
-            return reader.read( "root" );
+            return reader.<T> read( "root" );
         } catch ( final RuntimeException e ) {
             throw e;
         } catch ( final javolution.xml.stream.XMLStreamException e ) {
@@ -162,7 +162,7 @@ public class JodaDateTimeFormatTest {
 //    @BeforeTest
 //    protected void beforeTest() {
 //        //_binding = new ReflectionBinding( getClass().getClassLoader(), false, new JodaDateTimeFormat() );
-//        
+//
 //        _manager = new MemcachedBackupSessionManager();
 //
 //        final StandardContext container = new StandardContext();

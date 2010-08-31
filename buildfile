@@ -75,26 +75,10 @@ define 'msm' do
 
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
-    compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION, HIBERNATE )
-    test.with( compile.dependencies, project('core').test.dependencies, CLANG )
+    compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION, HIBERNATE, JODA_TIME, CGLIB )
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG, MOCKITO )
     package :jar, :id => 'msm-javolution-serializer'
     package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer').include :from => compile.sources 
-  end
-
-  desc 'Converter for Joda DateTime instances for javolution serialization strategy'
-  define 'javolution-serializer-jodatime' do |project|
-    compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, JODA_TIME )
-    test.with( compile.dependencies, MOCKITO )
-    package :jar, :id => 'msm-javolution-serializer-jodatime'
-    package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer-jodatime').include :from => compile.sources 
-  end
-
-  desc 'Converter for cglib proxies for javolution serialization strategy'
-  define 'javolution-serializer-cglib' do |project|
-    compile.with( projects('javolution-serializer'), project('javolution-serializer').compile.dependencies, CGLIB )
-    test.with( compile.dependencies, MOCKITO )
-    package :jar, :id => 'msm-javolution-serializer-cglib'
-    package(:jar, :classifier => 'sources', :id => 'msm-javolution-serializer-cglib').include :from => compile.sources 
   end
 
   desc 'XStream/xml based serialization strategy'
