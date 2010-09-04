@@ -18,6 +18,7 @@ package de.javakaffee.web.msm;
 
 import java.io.IOException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
@@ -50,6 +51,7 @@ class SessionTrackerValve extends ValveBase {
     private final SessionBackupService _sessionBackupService;
     private final Statistics _statistics;
     private final AddCookieInteralStrategy _addCookieInteralStrategy;
+    private final AtomicBoolean _enabled;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -57,11 +59,18 @@ class SessionTrackerValve extends ValveBase {
      *
      * @param ignorePattern
      *            the regular expression for request uris to ignore
+     * @param context
+     *            the catalina context of this valve
      * @param sessionBackupService
      *            the service that actually backups sessions
+     * @param statistics
+     *            used to store statistics
+     * @param enabled
+     *            specifies if memcached-session-manager is enabled or not.
+     *            If <code>false</code>, each request is just processed without doing anything further.
      */
     public SessionTrackerValve( final String ignorePattern, final Context context, final SessionBackupService sessionBackupService,
-            final Statistics statistics ) {
+            final Statistics statistics, final AtomicBoolean enabled ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -71,6 +80,7 @@ class SessionTrackerValve extends ValveBase {
         _sessionBackupService = sessionBackupService;
         _statistics = statistics;
         _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
+        _enabled = enabled;
     }
 
     /**
@@ -79,11 +89,9 @@ class SessionTrackerValve extends ValveBase {
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
-        if ( _ignorePattern != null && _ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+        if ( !_enabled.get() || _ignorePattern != null && _ignorePattern.matcher( request.getRequestURI() ).matches() ) {
             getNext().invoke( request, response );
         } else {
-
-
 
             final boolean sessionIdChanged = changeRequestedSessionId( request, response );
 

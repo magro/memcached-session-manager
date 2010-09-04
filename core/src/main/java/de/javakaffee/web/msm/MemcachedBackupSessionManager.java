@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,6 +46,7 @@ import org.apache.catalina.util.LifecycleSupport;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
+import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
@@ -171,6 +173,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private String _memcachedProtocol = PROTOCOL_TEXT;
 
+    private final AtomicBoolean _enabled = new AtomicBoolean( true );
+
     // -------------------- END configuration properties --------------------
 
     protected Statistics _statistics;
@@ -262,7 +266,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          * to memcached
          */
         getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern,
-                (Context) getContainer(), this, _statistics ) );
+                (Context) getContainer(), this, _statistics, _enabled ) );
 
         /* init memcached
          */
@@ -685,11 +689,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
     public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged ) {
+        if ( !_enabled.get() ) {
+            return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
+        }
         return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
     }
 
     protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {
-        if ( !_sessionIdFormat.isValid( sessionId ) || _missingSessionsCache.get( sessionId ) != null ) {
+        if ( !_enabled.get() || !_sessionIdFormat.isValid( sessionId ) || _missingSessionsCache.get( sessionId ) != null ) {
             return null;
         }
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
@@ -1056,6 +1063,27 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * Enable/disable memcached-session-manager (default <code>true</code> / enabled).
+     * If disabled, sessions are neither looked up in memcached nor stored in memcached.
+     *
+     * @param enabled specifies if msm shall be disabled or not.
+     */
+    public void setEnabled( final boolean enabled ) {
+        if ( _enabled.compareAndSet( !enabled, enabled ) ) {
+            _log.info( "Changed enabled status to " + enabled + "." );
+        }
+    }
+
+    /**
+     * Specifies, if msm is enabled or not.
+     *
+     * @return <code>true</code> if enabled, otherwise <code>false</code>.
+     */
+    public boolean isEnabled() {
+        return _enabled.get();
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void addLifecycleListener( final LifecycleListener arg0 ) {
@@ -1113,29 +1141,31 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     protected void updateExpirationInMemcached() {
-        final Session[] sessions = findSessions();
-        final int delay = getContainer().getBackgroundProcessorDelay();
-        for ( final Session s : sessions ) {
-            final MemcachedBackupSession session = (MemcachedBackupSession) s;
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Checking session " + session.getId() + ": " +
-                        "\n- isValid: " + session.isValidInternal() +
-                        "\n- isExpiring: " + session.isExpiring() +
-                        "\n- isBackupRunning: " + session.isBackupRunning() +
-                        "\n- isExpirationUpdateRunning: " + session.isExpirationUpdateRunning() +
-                        "\n- wasAccessedSinceLastBackup: " + session.wasAccessedSinceLastBackup() +
-                        "\n- memcachedExpirationTime: " + session.getMemcachedExpirationTime() );
-            }
-            if ( session.isValidInternal()
-                    && !session.isExpiring()
-                    && !session.isBackupRunning()
-                    && !session.isExpirationUpdateRunning()
-                    && session.wasAccessedSinceLastBackup()
-                    && session.getMemcachedExpirationTime() <= 2 * delay ) {
-                try {
-                    _backupSessionService.updateExpiration( session );
-                } catch ( final Throwable e ) {
-                    _log.info( "Could not update expiration in memcached for session " + session.getId(), e );
+        if ( _enabled.get() ) {
+            final Session[] sessions = findSessions();
+            final int delay = getContainer().getBackgroundProcessorDelay();
+            for ( final Session s : sessions ) {
+                final MemcachedBackupSession session = (MemcachedBackupSession) s;
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Checking session " + session.getId() + ": " +
+                            "\n- isValid: " + session.isValidInternal() +
+                            "\n- isExpiring: " + session.isExpiring() +
+                            "\n- isBackupRunning: " + session.isBackupRunning() +
+                            "\n- isExpirationUpdateRunning: " + session.isExpirationUpdateRunning() +
+                            "\n- wasAccessedSinceLastBackup: " + session.wasAccessedSinceLastBackup() +
+                            "\n- memcachedExpirationTime: " + session.getMemcachedExpirationTime() );
+                }
+                if ( session.isValidInternal()
+                        && !session.isExpiring()
+                        && !session.isBackupRunning()
+                        && !session.isExpirationUpdateRunning()
+                        && session.wasAccessedSinceLastBackup()
+                        && session.getMemcachedExpirationTime() <= 2 * delay ) {
+                    try {
+                        _backupSessionService.updateExpiration( session );
+                    } catch ( final Throwable e ) {
+                        _log.info( "Could not update expiration in memcached for session " + session.getId(), e );
+                    }
                 }
             }
         }
