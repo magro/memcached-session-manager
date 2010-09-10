@@ -35,6 +35,7 @@ public class SessionIdFormatTest {
         final SessionIdFormat cut = new SessionIdFormat();
         assertEquals( "foo-n", cut.createSessionId( "foo", "n" ) );
         assertEquals( "foo-n.jvm1", cut.createSessionId( "foo.jvm1", "n" ) );
+        assertEquals( "foo-n.j-v-m1", cut.createSessionId( "foo.j-v-m1", "n" ) );
     }
 
     @Test
@@ -45,6 +46,7 @@ public class SessionIdFormatTest {
         assertEquals( "foo-m", cut.createNewSessionId( "foo-n", "m" ) );
         assertEquals( "foo-m.jvm1", cut.createNewSessionId( "foo-n.jvm1", "m" ) );
         assertEquals( "foo-m.jvm1", cut.createNewSessionId( "foo.jvm1", "m" ) );
+        assertEquals( "foo-m.j-v-m1", cut.createNewSessionId( "foo.j-v-m1", "m" ) );
 
     }
 
@@ -54,6 +56,7 @@ public class SessionIdFormatTest {
 
         assertEquals( "n", cut.extractMemcachedId( "foo-n" ) );
         assertEquals( "n", cut.extractMemcachedId( "foo-n.jvm1" ) );
+        assertEquals( "n", cut.extractMemcachedId( "foo-n.j-v-m1" ) );
     }
 
     @Test
@@ -63,9 +66,11 @@ public class SessionIdFormatTest {
         assertFalse( cut.isValid( "foo" ) );
         assertFalse( cut.isValid( "foo.jvm1-n" ) );
         assertFalse( cut.isValid( "foo.n.jvm1" ) );
+        assertFalse( cut.isValid( "foo.n.j-v-m1" ) );
 
         assertTrue( cut.isValid( "foo-n" ) );
         assertTrue( cut.isValid( "foo-n.jvm1" ) );
+        assertTrue( cut.isValid( "foo-n.j-v-m1" ) );
     }
 
 }
