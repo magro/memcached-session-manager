@@ -35,7 +35,7 @@ import org.apache.catalina.Manager;
 import org.apache.catalina.session.Constants;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
-import org.apache.catalina.util.StringManager;
+import org.apache.catalina.tribes.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 

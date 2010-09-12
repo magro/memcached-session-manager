@@ -99,7 +99,7 @@ class SessionTrackerValve extends ValveBase {
 
             backupSession( request, response, sessionIdChanged );
 
-            logDebugResponseCookie( response );
+            logDebugResponseCookie( request );
 
         }
 
@@ -152,7 +152,7 @@ class SessionTrackerValve extends ValveBase {
          * invoking getSessionInternal, as getSessionInternal triggers a
          * memcached lookup if the session is not available locally.
          */
-        final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
+        final Session session = request.getRequestedSessionId() != null || getCookie( request, JSESSIONID ) != null
             ? request.getSessionInternal( false )
             : null;
         if ( _log.isDebugEnabled() ) {
@@ -171,9 +171,9 @@ class SessionTrackerValve extends ValveBase {
 
     }
 
-    private void logDebugResponseCookie( final Response response ) {
+    private void logDebugResponseCookie( final Request request ) {
         if ( _log.isDebugEnabled() ) {
-            final Cookie respCookie = getCookie( response, JSESSIONID );
+            final Cookie respCookie = getCookie( request, JSESSIONID );
             _log.debug( "Finished, " + ( respCookie != null
                 ? toString( respCookie )
                 : null ) );
@@ -206,8 +206,8 @@ class SessionTrackerValve extends ValveBase {
         return contextPath != null && contextPath.length() > 0 ? contextPath : "/";
     }
 
-    private Cookie getCookie( final Response response, final String name ) {
-        final Cookie[] cookies = response.getCookies();
+    private Cookie getCookie( final Request request, final String name ) {
+        final Cookie[] cookies = request.getCookies();
         if ( cookies != null ) {
             for ( final Cookie cookie : cookies ) {
                 if ( name.equals( cookie.getName() ) ) {

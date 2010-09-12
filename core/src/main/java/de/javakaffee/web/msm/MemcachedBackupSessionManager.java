@@ -38,6 +38,7 @@ import org.apache.catalina.Context;
 import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
+import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
@@ -239,7 +240,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public void init() {
+    public void initInternal() {
         init( null );
     }
 
@@ -253,12 +254,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     void init( final MemcachedClient memcachedClient ) {
         _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
                 " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
-
-        if ( initialized ) {
-            return;
-        }
-
-        super.init();
 
         _statistics = Statistics.create( _enableStatistics );
 
@@ -831,14 +826,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setMemcachedNodes( final String memcachedNodes ) {
 
-        if ( initialized ) {
             final MemcachedConfig config = reloadMemcachedConfig( memcachedNodes, _failoverNodes );
             _log.info( "Loaded new memcached node configuration." +
                     "\n- Former config: "+ _memcachedNodes +
                     "\n- New config: " + config.getMemcachedNodes() +
                     "\n- New node ids: " + config.getNodeIds() +
                     "\n- New failover node ids: " + config.getFailoverNodeIds() );
-        }
 
         _memcachedNodes = memcachedNodes;
     }
@@ -895,14 +888,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the failoverNodes to set, whitespace or comma separated
      */
     public void setFailoverNodes( final String failoverNodes ) {
-        if ( initialized ) {
-            final MemcachedConfig config = reloadMemcachedConfig( _memcachedNodes, failoverNodes );
-            _log.info( "Loaded new memcached failover node configuration." +
-                    "\n- Former failover config: "+ _failoverNodes +
-                    "\n- New failover config: " + config.getFailoverNodes() +
-                    "\n- New node ids: " + config.getNodeIds() +
-                    "\n- New failover node ids: " + config.getFailoverNodeIds() );
-        }
+        final MemcachedConfig config = reloadMemcachedConfig( _memcachedNodes, failoverNodes );
+        _log.info( "Loaded new memcached failover node configuration." +
+                "\n- Former failover config: "+ _failoverNodes +
+                "\n- New failover config: " + config.getFailoverNodes() +
+                "\n- New node ids: " + config.getNodeIds() +
+                "\n- New failover node ids: " + config.getFailoverNodeIds() );
+
         _failoverNodes = failoverNodes;
     }
 
@@ -1031,12 +1023,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void setBackupThreadCount( final int backupThreadCount ) {
         final int oldBackupThreadCount = _backupThreadCount;
         _backupThreadCount = backupThreadCount;
-        if ( initialized ) {
-            _log.info( "Changed backupThreadCount from " + oldBackupThreadCount + " to " + _backupThreadCount + "." +
-                    " Reloading configuration..." );
-            reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
-            _log.info( "Finished reloading configuration." );
-        }
+
+        _log.info( "Changed backupThreadCount from " + oldBackupThreadCount + " to " + _backupThreadCount + "." +
+                " Reloading configuration..." );
+        reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
+        _log.info( "Finished reloading configuration." );
     }
 
     /**
@@ -1107,27 +1098,25 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * {@inheritDoc}
      */
-    public void start() throws LifecycleException {
-        if ( !initialized ) {
-            init();
-        }
+    public void startInternal() throws LifecycleException {
+       
+    	setState(LifecycleState.STARTING);
     }
 
     /**
      * {@inheritDoc}
      */
-    public void stop() throws LifecycleException {
-        if ( initialized ) {
-            try {
-                _backupSessionService.shutdown();
-            } catch ( final InterruptedException e ) {
-                _log.info( "Got interrupted during backupSessionService shutdown," +
-                        " continuing to shutdown memcached client and to destroy myself...", e );
-            }
-            if ( _memcached != null ) {
-                _memcached.shutdown();
-            }
-            destroy();
+    public void stopInternal() throws LifecycleException {
+    	setState(LifecycleState.STOPPING);
+      
+        try {
+            _backupSessionService.shutdown();
+        } catch ( final InterruptedException e ) {
+            _log.info( "Got interrupted during backupSessionService shutdown," +
+                    " continuing to shutdown memcached client and to destroy myself...", e );
+        }
+        if ( _memcached != null ) {
+            _memcached.shutdown();
         }
     }
 
@@ -1209,7 +1198,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void setSessionBackupAsync( final boolean sessionBackupAsync ) {
         final boolean oldSessionBackupAsync = _sessionBackupAsync;
         _sessionBackupAsync = sessionBackupAsync;
-        if ( initialized && oldSessionBackupAsync != sessionBackupAsync ) {
+        if ( oldSessionBackupAsync != sessionBackupAsync ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
         }
@@ -1248,7 +1237,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Just for testing, DON'T USE THIS OTHERWISE!
      */
     void resetInitialized() {
-        initialized = false;
+       
     }
 
     /**

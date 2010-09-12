@@ -303,7 +303,7 @@ public class TranscoderService {
         try {
             bis = new ByteArrayInputStream( data );
             ois = new ObjectInputStream( bis );
-            return SerializablePrincipal.readPrincipal( ois, realm );
+            return SerializablePrincipal.readPrincipal( ois );
         } catch ( final IOException e ) {
             throw new IllegalArgumentException( "Could not deserialize principal", e );
         } catch ( final ClassNotFoundException e ) {

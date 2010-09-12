@@ -98,7 +98,7 @@ abstract class AddCookieInteralStrategy {
          */
         @Override
         void addCookieInternal( final Cookie newCookie, final Response response ) {
-            response.addCookieInternal( newCookie, _useHttpOnly );
+            response.addCookieInternal( newCookie );
         }
 
     }

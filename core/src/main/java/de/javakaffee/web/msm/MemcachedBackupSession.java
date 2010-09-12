@@ -22,6 +22,7 @@ import java.util.Hashtable;
 import java.util.Map;
 
 import org.apache.catalina.Manager;
+import org.apache.catalina.SessionListener;
 import org.apache.catalina.session.StandardSession;
 
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
@@ -305,10 +306,10 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     public void doAfterDeserialization() {
         if ( listeners == null ) {
-            listeners = new ArrayList<Object>();
+            listeners = new ArrayList<SessionListener>();
         }
         if ( notes == null ) {
-            notes = new Hashtable<Object, Object>();
+            notes = new Hashtable<String, Object>();
         }
     }
 
@@ -360,7 +361,7 @@ public final class MemcachedBackupSession extends StandardSession {
      *
      * @return the timestamp of the last {@link #access()} invocation.
      */
-    long getThisAccessedTimeInternal() {
+    public long getThisAccessedTimeInternal() {
         return super.thisAccessedTime;
     }
 
@@ -380,7 +381,6 @@ public final class MemcachedBackupSession extends StandardSession {
         return super.expiring;
     }
 
-    @SuppressWarnings( "unchecked" )
     public Map<String, Object> getAttributesInternal() {
         return super.attributes;
     }
