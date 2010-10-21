@@ -143,6 +143,8 @@ public class SessionIdFormat {
         final int idxDot = sessionId.indexOf( '.' );
         if ( idxDot < 0 ) {
             return sessionId.substring( idxDash + 1 );
+        } else if ( idxDot < idxDash ) /* The dash was part of the jvmRoute */ {
+            return null;
         } else {
             return sessionId.substring( idxDash + 1, idxDot );
         }

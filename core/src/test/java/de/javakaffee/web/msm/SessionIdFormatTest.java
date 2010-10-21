@@ -57,6 +57,7 @@ public class SessionIdFormatTest {
         assertEquals( "n", cut.extractMemcachedId( "foo-n" ) );
         assertEquals( "n", cut.extractMemcachedId( "foo-n.jvm1" ) );
         assertEquals( "n", cut.extractMemcachedId( "foo-n.j-v-m1" ) );
+        assertEquals( null, cut.extractMemcachedId( "foo.j-v-m1" ) );
     }
 
     @Test
