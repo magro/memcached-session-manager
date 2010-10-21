@@ -46,7 +46,7 @@ public class SessionIdFormat {
     /**
      * The pattern for the session id.
      */
-    private final Pattern _pattern = Pattern.compile( "[^-.]+-[^.]+(\\.[\\w]+)?" );
+    private final Pattern _pattern = Pattern.compile( "[^-.]+-[^.]+(\\.[^.]+)?" );
 
     /**
      * Create a session id including the provided memcachedId.
@@ -87,18 +87,24 @@ public class SessionIdFormat {
      */
     @Nonnull
     public String createNewSessionId( @Nonnull final String sessionId, @Nonnull final String newMemcachedId ) {
-        final int idxDash = sessionId.indexOf( '-' );
         final int idxDot = sessionId.indexOf( '.' );
-
-        final String sessionIdWithNewMemcachedId;
-        if ( idxDash < 0 ) {
-            final String plainSessionId = idxDot < 0 ? sessionId : sessionId.substring( 0, idxDot );
-            sessionIdWithNewMemcachedId = plainSessionId + "-" + newMemcachedId;
-        } else {
-            sessionIdWithNewMemcachedId = sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
+        if ( idxDot != -1 ) {
+            final String plainSessionId = sessionId.substring( 0, idxDot );
+            final String jvmRouteWithDot = sessionId.substring( idxDot );
+            return appendOrReplaceMemcachedId( plainSessionId, newMemcachedId ) + jvmRouteWithDot;
         }
+        else {
+            return appendOrReplaceMemcachedId( sessionId, newMemcachedId );
+        }
+    }
 
-        return idxDot < 0 ? sessionIdWithNewMemcachedId : sessionIdWithNewMemcachedId + sessionId.substring( idxDot );
+    private String appendOrReplaceMemcachedId( final String sessionId, final String newMemcachedId ) {
+        final int idxDash = sessionId.indexOf( '-' );
+        if ( idxDash < 0 ) {
+            return sessionId + "-" + newMemcachedId;
+        } else {
+            return sessionId.substring( 0, idxDash + 1 ) + newMemcachedId;
+        }
     }
 
     /**
@@ -147,6 +153,8 @@ public class SessionIdFormat {
         final int idxDot = sessionId.indexOf( '.' );
         if ( idxDot < 0 ) {
             return sessionId.substring( idxDash + 1 );
+        } else if ( idxDot < idxDash ) /* The dash was part of the jvmRoute */ {
+            return null;
         } else {
             return sessionId.substring( idxDash + 1, idxDot );
         }

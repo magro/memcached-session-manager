@@ -175,6 +175,9 @@ public class BackupSessionService {
         try {
 
             if ( !hasMemcachedIdSet( session ) ) {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Skipping backup for session id " + session.getId() + " as no memcached id could be detected in the session id." );
+                }
                 _statistics.requestWithBackupFailure();
                 return new SimpleFuture<BackupResult>( BackupResult.FAILURE );
             }
@@ -209,7 +212,7 @@ public class BackupSessionService {
                     result.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
                 } catch ( final Exception e ) {
                     if ( _log.isInfoEnabled() ) {
-                        _log.info( "Could not store session " + session.getId() + " in memcached." );
+                        _log.info( "Could not store session " + session.getId() + " in memcached.", e );
                     }
                 }
             }
