@@ -331,6 +331,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses,
             final Map<InetSocketAddress, String> address2Ids,
             final Statistics statistics ) {
+        if ( ! _enabled.get() ) {
+            return null;
+        }
         try {
             final ConnectionFactory connectionFactory = createConnectionFactory( address2Ids, statistics );
             return new MemcachedClient( connectionFactory, addresses );
@@ -611,7 +614,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     protected void deleteFromMemcached(final String sessionId) {
-        if ( _sessionIdFormat.isValid( sessionId ) ) {
+        if ( _enabled.get() && _sessionIdFormat.isValid( sessionId ) ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Deleting session from memcached: " + sessionId );
             }
@@ -1070,6 +1073,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setEnabled( final boolean enabled ) {
         if ( _enabled.compareAndSet( !enabled, enabled ) ) {
+            reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
             _log.info( "Changed enabled status to " + enabled + "." );
         }
     }

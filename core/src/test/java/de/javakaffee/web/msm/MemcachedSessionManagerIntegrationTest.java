@@ -38,6 +38,7 @@ import java.util.concurrent.TimeoutException;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
+import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Session;
 import org.apache.catalina.startup.Embedded;
 import org.apache.http.HttpException;
@@ -94,15 +95,20 @@ public class MemcachedSessionManagerIntegrationTest {
             throw e;
         }
 
-        _memcached =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
-                        _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
-                        Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
+        _memcached = createMemcachedClient( address );
+
+        _httpClient = new DefaultHttpClient();
+    }
+
+    private MemcachedClient createMemcachedClient( final InetSocketAddress address ) throws IOException, InterruptedException {
+        final MemcachedClient result = new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+                _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
+                Arrays.asList( address ) );
 
         // Wait a little bit, so that the memcached client can connect and is ready when test starts
         Thread.sleep( 100 );
 
-        _httpClient = new DefaultHttpClient();
+        return result;
     }
 
     @AfterMethod
@@ -162,16 +168,9 @@ public class MemcachedSessionManagerIntegrationTest {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
 
-        /*
-         * wait some time, as processExpires runs every second and the
-         * maxInactiveTime is set to 1 sec...
-         */
-        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
-        final Container container = manager.getContainer();
-        final long timeout = TimeUnit.SECONDS.toMillis( container.getBackgroundProcessorDelay() + manager.getMaxInactiveInterval() ) + 100;
-        Thread.sleep( timeout );
+        waitForSessionExpiration();
 
-        assertNull( _memcached.get( sessionId1 ), "Expired sesion still existing in memcached" );
+        assertNull( _memcached.get( sessionId1 ), "Expired session still existing in memcached" );
     }
 
     @Test( enabled = true )
@@ -345,6 +344,78 @@ public class MemcachedSessionManagerIntegrationTest {
         assertEquals( newSessionId, session.getId() );
         assertEquals( sessionIdFormat.extractMemcachedId( newSessionId ), _memcachedNodeId );
 
+    }
+
+    /**
+     * Test for issue #60 (Add possibility to disable msm at runtime): disable msm
+     */
+    @Test( enabled = true )
+    public void testDisableMsmAtRuntime() throws InterruptedException, IOException, ExecutionException, TimeoutException, LifecycleException, HttpException {
+        // disable msm, shutdown our server and our client
+        getManager( _tomcat1 ).setEnabled( false );
+        _memcached.shutdown();
+        _daemon.stop();
+
+        checkSessionFunctionalityWithMsmDisabled();
+    }
+
+    /**
+     * Test for issue #60 (Add possibility to disable msm at runtime): start msm disabled and afterwards enable
+     */
+    @Test( enabled = true )
+    public void testStartMsmDisabled() throws InterruptedException, IOException, ExecutionException, TimeoutException, LifecycleException, HttpException {
+        // shutdown our server and our client
+        _memcached.shutdown();
+        _daemon.stop();
+
+        // start a new tomcat with msm initially disabled
+        _tomcat1.stop();
+        Thread.sleep( 500 );
+        final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
+        _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
+        getManager( _tomcat1 ).setEnabled( false );
+        _tomcat1.start();
+
+        LOG.info( "Waiting, check logs to see if the client causes any 'Connection refused' logging..." );
+        Thread.sleep( 1000 );
+
+        // some basic tests for session functionality
+        checkSessionFunctionalityWithMsmDisabled();
+
+        // start memcached, client and reenable msm
+        _daemon.start();
+        _memcached = createMemcachedClient( new InetSocketAddress( "localhost", _memcachedPort ) );
+        getManager( _tomcat1 ).setEnabled( true );
+        // Wait a little bit, so that msm's memcached client can connect and is ready when test starts
+        Thread.sleep( 100 );
+
+        // memcached based stuff should work again
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( sessionId1, "No session created." );
+        assertNotNull( new SessionIdFormat().extractMemcachedId( sessionId1 ), "memcached node id missing with msm switched to enabled" );
+        Thread.sleep( 50 );
+        assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
+
+        waitForSessionExpiration();
+
+        assertNull( _memcached.get( sessionId1 ), "Expired session still existing in memcached" );
+
+    }
+
+    private void checkSessionFunctionalityWithMsmDisabled() throws IOException, HttpException, InterruptedException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( sessionId1, "No session created." );
+        assertNull( new SessionIdFormat().extractMemcachedId( sessionId1 ), "Got a memcached node id, even with msm disabled." );
+        waitForSessionExpiration();
+        final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertNotSame( sessionId2, sessionId1, "SessionId not changed." );
+    }
+
+    private void waitForSessionExpiration() throws InterruptedException {
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        final Container container = manager.getContainer();
+        final long timeout = TimeUnit.SECONDS.toMillis( container.getBackgroundProcessorDelay() + manager.getMaxInactiveInterval() ) + 100;
+        Thread.sleep( timeout );
     }
 
 }
