@@ -61,9 +61,16 @@ serialized size is 70122 bytes.
         
         final MemcachedBackupSessionManager manager = createManager();
         
-        benchmark( manager, 10, 10, 2 /* 2^2 = 4 */ );
-        benchmark( manager, 10, 100, 3 /* 3^3 = 27 */ );
+        // some warmup
+        final int warmupCycles = 100000;
+        warmup( manager, new JavaSerializationTranscoder(), warmupCycles, 100, 3 );
+        warmup( manager, new JavolutionTranscoder( Thread.currentThread().getContextClassLoader(), false ), warmupCycles, 100, 3 );
+        warmup( manager, new KryoTranscoder(), warmupCycles, 100, 3 );
+        recover();
+
         benchmark( manager, 10, 500, 4 /* 4^4 = 256 */ );
+        benchmark( manager, 10, 100, 3 /* 3^3 = 27 */ );
+        benchmark( manager, 10, 10, 2 /* 2^2 = 4 */ );
         
         // Thread.sleep( Integer.MAX_VALUE );
     }
@@ -122,14 +129,12 @@ serialized size is 70122 bytes.
         final int size = data.length;
         
         for( int r = 0; r < rounds; r++ ) {
-    
             final long start = System.currentTimeMillis();
             for( int i = 0; i < 500; i++ ) {
                 transcoderService.serialize( session );
             }
             serializationStats.registerSince( start );
             serializationStats.setSize( size );
-            
         }
         
         System.gc();
@@ -145,6 +150,26 @@ serialized size is 70122 bytes.
             deserializationStats.setSize( size );
         }
         
+    }
+
+    private static void warmup( final MemcachedBackupSessionManager manager, final SessionAttributesTranscoder transcoder,
+            final int loops, final int countPersons, final int nodesPerEdge )
+        throws InterruptedException {
+        
+        final TranscoderService transcoderService = new TranscoderService( transcoder );
+        final MemcachedBackupSession session = createSession( manager, "123456789abcdefghijk987654321", countPersons, nodesPerEdge );
+        
+        System.out.print("Performing warmup for serialization using "+ transcoder.getClass().getSimpleName() +"...");
+        final long serWarmupStart = System.currentTimeMillis();
+        for( int i = 0; i < loops; i++ ) transcoderService.serialize( session );
+        System.out.println(" (" + (System.currentTimeMillis() - serWarmupStart) + " ms)");
+        
+        System.out.print("Performing warmup for deserialization...");
+        final byte[] data = transcoderService.serialize( session );
+        final long deserWarmupStart = System.currentTimeMillis();
+        for( int i = 0; i < loops; i++ ) transcoderService.deserialize( data, null, null );
+        System.out.println(" (" + (System.currentTimeMillis() - deserWarmupStart) + " ms)");
+
     }
 
     private static MemcachedBackupSession createSession( final MemcachedBackupSessionManager manager, final String id,
