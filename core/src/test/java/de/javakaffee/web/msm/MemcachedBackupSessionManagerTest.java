@@ -86,17 +86,17 @@ public class MemcachedBackupSessionManagerTest {
     public void testConfigurationFormatMemcachedNodesFeature44() {
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
-        _manager.init();
+        _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
-        _manager.init();
+        _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211,n2:127.0.0.1:11212" );
-        _manager.init();
+        _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
@@ -105,19 +105,19 @@ public class MemcachedBackupSessionManagerTest {
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _manager.setFailoverNodes( "n1" );
-        _manager.init();
+        _manager.initInternal();
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1 n2" );
-        _manager.init();
+        _manager.initInternal();
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1,n2" );
-        _manager.init();
+        _manager.initInternal();
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 

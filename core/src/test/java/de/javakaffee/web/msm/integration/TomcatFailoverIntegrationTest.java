@@ -67,6 +67,7 @@ import de.javakaffee.web.msm.integration.TestUtils.Response;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
+@SuppressWarnings("deprecation")
 public class TomcatFailoverIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( TomcatFailoverIntegrationTest.class );

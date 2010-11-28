@@ -35,8 +35,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
@@ -60,6 +60,7 @@ import de.javakaffee.web.msm.integration.TestUtils.Response;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
+@SuppressWarnings("deprecation")
 public class MemcachedFailoverIntegrationTest {
 
     private static final Log LOG = LogFactory
@@ -143,7 +144,6 @@ public class MemcachedFailoverIntegrationTest {
      * Tests, that on a memcached failover sessions are relocated to another node and that
      * the session id reflects this.
      */
-    @SuppressWarnings("unchecked")
     @Test( enabled = true )
     public void testRelocateSession() throws Throwable {
 
@@ -178,7 +178,6 @@ public class MemcachedFailoverIntegrationTest {
     /**
      * Tests that multiple memcached nodes can fail and backup/relocation handles this.
      */
-    @SuppressWarnings("unchecked")
     @Test( enabled = true )
     public void testMultipleMemcachedNodesFailure() throws Throwable {
 
@@ -228,7 +227,6 @@ public class MemcachedFailoverIntegrationTest {
      *
      * @throws Throwable
      */
-    @SuppressWarnings("unchecked")
     @Test( enabled = true )
     public void testAllMemcachedNodesFailure() throws Throwable {
 

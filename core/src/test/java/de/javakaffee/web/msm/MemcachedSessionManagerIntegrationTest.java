@@ -56,6 +56,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
+@SuppressWarnings("deprecation")
 public class MemcachedSessionManagerIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( MemcachedSessionManagerIntegrationTest.class );

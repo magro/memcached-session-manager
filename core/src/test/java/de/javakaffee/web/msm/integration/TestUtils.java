@@ -96,6 +96,7 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
+@SuppressWarnings("deprecation")
 public class TestUtils {
 
     private static final String CONTEXT_PATH = "/";
@@ -341,7 +342,7 @@ public class TestUtils {
         catalina.setServer( server );
 
         try {
-            final NamingContext globalNamingContext = new NamingContext( new Hashtable<Object, Object>(), "ctxt" );
+            final NamingContext globalNamingContext = new NamingContext( new Hashtable<String, Object>(), "ctxt" );
             server.setGlobalNamingContext( globalNamingContext );
             globalNamingContext.bind( USER_DATABASE, createUserDatabase() );
         } catch ( final NamingException e ) {

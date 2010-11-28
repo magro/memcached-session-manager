@@ -86,7 +86,6 @@ public class TestServlet extends HttpServlet {
 
         out.println( "OK: " + session.getId() );
 
-        @SuppressWarnings( "unchecked" )
         final Enumeration<String> names = request.getParameterNames();
         while ( names.hasMoreElements() ) {
             final String name = names.nextElement();
