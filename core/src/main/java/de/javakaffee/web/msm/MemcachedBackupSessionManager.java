@@ -729,7 +729,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                         result = (MemcachedBackupSession) object;
                     }
                     else {
-                        result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
+                        result = _transcoderService.deserialize( (byte[]) object, this );
                     }
                     _statistics.getLoadFromMemcachedProbe().registerSince( start );
                     if ( _log.isDebugEnabled() ) {

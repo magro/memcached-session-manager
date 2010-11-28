@@ -139,7 +139,7 @@ serialized size is 70122 bytes.
         for( int r = 0; r < rounds; r++ ) {
             final long start = System.currentTimeMillis();
             for( int i = 0; i < 500; i++ ) {
-                transcoderService.deserialize( data, null, null );
+                transcoderService.deserialize( data, null );
             }
             deserializationStats.registerSince( start );
             deserializationStats.setSize( size );

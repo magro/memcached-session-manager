@@ -29,7 +29,6 @@ import java.util.Arrays;
 import java.util.Map;
 
 import org.apache.catalina.Manager;
-import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.ha.session.SerializablePrincipal;
@@ -73,11 +72,11 @@ public class TranscoderService {
      * final byte[] attributesData = serializeAttributes( session, session.getAttributes() );
      * serialize( session, attributesData );
      * </pre></code>
-     * The returned byte array can be deserialized using {@link #deserialize(byte[], Realm, Manager)}.
+     * The returned byte array can be deserialized using {@link #deserialize(byte[], Manager)}.
      *
      * @see #serializeAttributes(MemcachedBackupSession, Map)
      * @see #serialize(MemcachedBackupSession, byte[])
-     * @see #deserialize(byte[], Realm, Manager)
+     * @see #deserialize(byte[], Manager)
      * @param session the session to serialize.
      * @return the serialized session data.
      */
@@ -97,18 +96,16 @@ public class TranscoderService {
      * </p>
      *
      * @param data the byte array of the serialized session and its session attributes. Can be <code>null</code>.
-     * @param realm the realm that is used to reconstruct the principal if there was any stored in the session.
      * @param manager the manager to set on the deserialized session.
-     *
      * @return the deserialized {@link MemcachedBackupSession}
      *  or <code>null</code> if the provided <code>byte[] data</code> was <code>null</code>.
      */
-    public MemcachedBackupSession deserialize( final byte[] data, final Realm realm, final Manager manager ) {
+    public MemcachedBackupSession deserialize( final byte[] data, final Manager manager ) {
         if ( data == null ) {
             return null;
         }
         try {
-            final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, realm );
+            final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data );
             final byte[] attributesData = deserializationResult.getAttributesData();
             final Map<String, Object> attributes = deserializeAttributes( attributesData );
             final MemcachedBackupSession session = deserializationResult.getSession();
@@ -212,7 +209,7 @@ public class TranscoderService {
         return data;
     }
 
-    static DeserializationResult deserializeSessionFields( final byte[] data, final Realm realm ) throws InvalidVersionException {
+    static DeserializationResult deserializeSessionFields( final byte[] data ) throws InvalidVersionException {
         final MemcachedBackupSession result = new MemcachedBackupSession();
 
         final short version = (short) decodeNum( data, 0, 2 );
@@ -241,7 +238,7 @@ public class TranscoderService {
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];
             System.arraycopy( data, currentIdx + 2, principalData, 0, principalDataLength );
-            result.setPrincipal( deserializePrincipal( principalData, realm ) );
+            result.setPrincipal( deserializePrincipal( principalData ) );
         }
 
         final byte[] attributesData = new byte[ data.length - sessionFieldsDataLength ];
@@ -297,7 +294,7 @@ public class TranscoderService {
         }
     }
 
-    private static Principal deserializePrincipal( final byte[] data, final Realm realm ) {
+    private static Principal deserializePrincipal( final byte[] data ) {
         ByteArrayInputStream bis = null;
         ObjectInputStream ois = null;
         try {

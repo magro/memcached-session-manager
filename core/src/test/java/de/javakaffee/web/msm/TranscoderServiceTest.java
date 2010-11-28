@@ -20,7 +20,6 @@ import static de.javakaffee.web.msm.integration.TestUtils.assertDeepEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.apache.catalina.Realm;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
@@ -60,7 +59,7 @@ public class TranscoderServiceTest {
         Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
 
         _manager.getContainer().setLoader( webappLoader );
-        _manager.init();
+        _manager.initInternal();
 
     }
 
@@ -68,7 +67,7 @@ public class TranscoderServiceTest {
     public void testSerializeSessionFields() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
         final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager.getContainer().getRealm() ).getSession();
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data ).getSession();
 
         assertSessionFields( session, deserialized );
     }
@@ -77,13 +76,11 @@ public class TranscoderServiceTest {
     public void testSerializeSessionFieldsWithAuthenticatedPrincipal() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
-        final Realm realm = _manager.getContainer().getRealm();
-
         session.setAuthType( Constants.FORM_METHOD );
-        session.setPrincipal( new GenericPrincipal( realm, "foo", "bar" ) );
+        session.setPrincipal( new GenericPrincipal( "foo", "bar" ) );
 
         final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data, realm ).getSession();
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data ).getSession();
 
         assertSessionFields( session, deserialized );
     }
@@ -93,7 +90,7 @@ public class TranscoderServiceTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
         final TranscoderService transcoderService = new TranscoderService( new JavaSerializationTranscoder( _manager ) );
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm(), _manager );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager );
 
         assertSessionFields( session, deserialized );
     }
@@ -107,7 +104,7 @@ public class TranscoderServiceTest {
         session.setAttribute( "foo", value );
 
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm(), _manager );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager );
 
         assertSessionFields( session, deserialized );
         Assert.assertEquals( value, deserialized.getAttribute( "foo" ) );

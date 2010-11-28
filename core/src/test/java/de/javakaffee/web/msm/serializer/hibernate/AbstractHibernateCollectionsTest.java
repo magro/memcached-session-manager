@@ -91,7 +91,7 @@ public abstract class AbstractHibernateCollectionsTest {
         session.setAttribute( "person", foundPerson );
 
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, null, manager );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, manager );
 
         final Person deserializedPerson = (Person) deserialized.getAttribute( "person" );
         TestUtils.assertDeepEquals( foundPerson, deserializedPerson );
