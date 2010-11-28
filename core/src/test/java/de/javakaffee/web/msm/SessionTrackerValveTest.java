@@ -26,7 +26,12 @@ import org.apache.catalina.Session;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
+import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.core.StandardContext;
+import org.apache.catalina.core.StandardEngine;
+import org.apache.catalina.core.StandardHost;
+import org.apache.catalina.core.StandardService;
+import org.apache.tomcat.util.http.ServerCookie;
 import org.jmock.Mock;
 import org.jmock.cglib.MockObjectTestCase;
 import org.testng.annotations.AfterMethod;
@@ -53,19 +58,34 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     private Request _request;
     private Response _response;
     private Mock _responseControl;
+    private StandardContext _context;
 
     @BeforeMethod
     public void setUp() throws Exception {
         _sessionBackupServiceControl = mock( SessionBackupService.class );
         _service = (SessionBackupService) _sessionBackupServiceControl.proxy();
-        _sessionTrackerValve = new SessionTrackerValve( null, new StandardContext(), _service, Statistics.create(), new AtomicBoolean( true ) );
+        _context = createContext();
+        _sessionTrackerValve = new SessionTrackerValve( null, _context, _service, Statistics.create(), new AtomicBoolean( true ) );
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( (Valve) _nextValve.proxy() );
-
         _requestControl = mock( Request.class );
         _request = (Request) _requestControl.proxy();
         _responseControl = mock( Response.class );
         _response = (Response) _responseControl.proxy();
+    }
+
+    private StandardContext createContext() {
+        final StandardEngine engine = new StandardEngine();
+        engine.setService( new StandardService() );
+
+        final StandardHost host = new StandardHost();
+        engine.addChild( host );
+
+        final StandardContext context = new StandardContext();
+        context.setSessionCookiePath( "/" );
+        host.addChild( context );
+
+        return context;
     }
 
     @AfterMethod
@@ -81,9 +101,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
-        _responseControl.expects( once() ).method( "getCookies" ).will( returnValue( null ) );
+        _responseControl.expects( once() ).method( "getHeader" ).with( eq( "Set-Cookie" ) ).will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
-
     }
 
     @Test
@@ -92,12 +111,24 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
-        _responseControl.expects( once() ).method( "getCookies" )
-            .will( returnValue( new Cookie[] { new Cookie( SessionTrackerValve.JSESSIONID, "foo" ) } ) );
+        final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), "foo" );
+        _responseControl.expects( once() ).method( "getHeader" ).with( eq( "Set-Cookie" ) )
+            .will( returnValue( generateCookieString( cookie ) ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
 
+    }
+
+    private String generateCookieString(final Cookie cookie) {
+        final StringBuffer sb = new StringBuffer();
+        ServerCookie.appendCookieValue
+        (sb, cookie.getVersion(), cookie.getName(), cookie.getValue(),
+             cookie.getPath(), cookie.getDomain(), cookie.getComment(),
+             cookie.getMaxAge(), cookie.getSecure(),
+             cookie.isHttpOnly());
+        final String setSessionCookieHeader = sb.toString();
+        return setSessionCookieHeader;
     }
 
     @Test
@@ -134,12 +165,12 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "setRequestedSessionId" ).with( eq( newSessionId ) );
 
         _requestControl.expects( atLeastOnce() ).method( "isRequestedSessionIdFromCookie" ).will( returnValue( true ) );
-        _requestControl.expects( atLeastOnce() ).method( "getContext" ).will( returnValue( new StandardContext() ) );
+
+        _requestControl.expects( atLeastOnce() ).method( "getContext" ).will( returnValue( _context ) );
         _requestControl.expects( once() ).method( "isSecure" ).will( returnValue( false ) );
-        _responseControl.expects( once() ).method( "addCookieInternal" ).with(
-                and( hasProperty( "name", eq( SessionTrackerValve.JSESSIONID ) ),
-                     hasProperty( "value", eq( newSessionId ) ) ),
-                     eq( false ) ); // default value in StandardContext.useHttpOnly
+        _responseControl.expects( once() ).method( "addSessionCookieInternal" ).with(
+                and( hasProperty( "name", eq( ApplicationSessionCookieConfig.getSessionCookieName( _context ) ) ),
+                     hasProperty( "value", eq( newSessionId ) ) ) );
 
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )

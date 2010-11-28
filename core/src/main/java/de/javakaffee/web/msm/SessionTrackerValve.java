@@ -28,6 +28,7 @@ import org.apache.catalina.Context;
 import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
+import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -41,8 +42,6 @@ import org.apache.juli.logging.LogFactory;
  */
 class SessionTrackerValve extends ValveBase {
 
-    static final String JSESSIONID = "JSESSIONID";
-
     static final String RELOCATE = "session.relocate";
 
     private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
@@ -50,8 +49,8 @@ class SessionTrackerValve extends ValveBase {
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
     private final Statistics _statistics;
-    private final AddCookieInteralStrategy _addCookieInteralStrategy;
     private final AtomicBoolean _enabled;
+    private final String _sessionCookieName;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -79,8 +78,8 @@ class SessionTrackerValve extends ValveBase {
         }
         _sessionBackupService = sessionBackupService;
         _statistics = statistics;
-        _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
         _enabled = enabled;
+        _sessionCookieName = ApplicationSessionCookieConfig.getSessionCookieName( context );
     }
 
     /**
@@ -99,7 +98,7 @@ class SessionTrackerValve extends ValveBase {
 
             backupSession( request, response, sessionIdChanged );
 
-            logDebugResponseCookie( request );
+            logDebugResponseCookie( response );
 
         }
 
@@ -126,8 +125,8 @@ class SessionTrackerValve extends ValveBase {
          */
         if ( request.getRequestedSessionId() != null ) {
 
-        	String newSessionId = _sessionBackupService.changeSessionIdOnTomcatFailover( request.getRequestedSessionId() );
-        	if ( newSessionId == null ) {
+            String newSessionId = _sessionBackupService.changeSessionIdOnTomcatFailover( request.getRequestedSessionId() );
+            if ( newSessionId == null ) {
                 newSessionId = _sessionBackupService.changeSessionIdOnMemcachedFailover( request.getRequestedSessionId() );
             }
 
@@ -152,7 +151,7 @@ class SessionTrackerValve extends ValveBase {
          * invoking getSessionInternal, as getSessionInternal triggers a
          * memcached lookup if the session is not available locally.
          */
-        final Session session = request.getRequestedSessionId() != null || getCookie( request, JSESSIONID ) != null
+        final Session session = request.getRequestedSessionId() != null || responseContainsSessionCookie( response )
             ? request.getSessionInternal( false )
             : null;
         if ( _log.isDebugEnabled() ) {
@@ -171,51 +170,38 @@ class SessionTrackerValve extends ValveBase {
 
     }
 
-    private void logDebugResponseCookie( final Request request ) {
+    private void logDebugResponseCookie( final Response response ) {
         if ( _log.isDebugEnabled() ) {
-            final Cookie respCookie = getCookie( request, JSESSIONID );
-            _log.debug( "Finished, " + ( respCookie != null
-                ? toString( respCookie )
-                : null ) );
+            final String header = response.getHeader("Set-Cookie");
+            if ( header != null && header.contains( _sessionCookieName ) ) {
+                _log.debug( "Finished, " + header );
+            }
         }
-    }
-
-    private String toString( final Cookie cookie ) {
-        return new StringBuilder( cookie.getClass().getName() ).append( "[name=" ).append( cookie.getName() ).append( ", value=" ).append(
-                cookie.getValue() ).append( ", domain=" ).append( cookie.getDomain() ).append( ", path=" ).append( cookie.getPath() ).append(
-                ", maxAge=" ).append( cookie.getMaxAge() ).append( ", secure=" ).append( cookie.getSecure() ).append( ", version=" ).append(
-                cookie.getVersion() ).toString();
     }
 
     private void setSessionIdCookie( final Response response, final Request request, final String sessionId ) {
         //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
         final Context context = request.getContext();
         if ( context.getCookies() ) {
-            final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
-            newCookie.setMaxAge( -1 );
-            newCookie.setPath( getContextPath( request ) );
-            if ( request.isSecure() ) {
-                newCookie.setSecure( true );
-            }
-            _addCookieInteralStrategy.addCookieInternal( newCookie, response );
+            final Cookie newCookie = ApplicationSessionCookieConfig.createSessionCookie( context,
+                    sessionId, request.isSecure() );
+            response.addSessionCookieInternal( newCookie );
         }
     }
 
-    private String getContextPath( final Request request ) {
-        final String contextPath = request.getContext().getEncodedPath();
-        return contextPath != null && contextPath.length() > 0 ? contextPath : "/";
+    private boolean responseContainsSessionCookie( final Response response ) {
+        final String header = response.getHeader( "Set-Cookie" );
+        return header != null && header.contains( _sessionCookieName );
     }
 
-    private Cookie getCookie( final Request request, final String name ) {
-        final Cookie[] cookies = request.getCookies();
-        if ( cookies != null ) {
-            for ( final Cookie cookie : cookies ) {
-                if ( name.equals( cookie.getName() ) ) {
-                    return cookie;
-                }
-            }
-        }
-        return null;
+    /**
+     * The session cookie name used by this webapplication.
+     * @return the session cookie name, should not be <code>null</code>.
+     *
+     * @see ApplicationSessionCookieConfig#getSessionCookieName(Context)
+     */
+    String getSessionCookieName() {
+        return _sessionCookieName;
     }
 
     /**
