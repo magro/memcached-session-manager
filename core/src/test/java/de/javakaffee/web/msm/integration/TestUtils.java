@@ -53,8 +53,11 @@ import org.apache.catalina.User;
 import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
+import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
+import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.core.StandardServer;
+import org.apache.catalina.core.StandardService;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
 import org.apache.catalina.deploy.SecurityConstraint;
@@ -290,6 +293,21 @@ public class TestUtils {
         return null;
     }
 
+    public static StandardContext createContext() {
+        final StandardEngine engine = new StandardEngine();
+        engine.setService( new StandardService() );
+
+        final StandardHost host = new StandardHost();
+        engine.addChild( host );
+
+        final StandardContext context = new StandardContext();
+        context.setPath( "/" );
+        context.setSessionCookiePath( "/" );
+        host.addChild( context );
+
+        return context;
+    }
+
     public static MemCacheDaemon<? extends CacheElement> createDaemon( final InetSocketAddress address ) throws IOException {
         final MemCacheDaemon<LocalCacheElement> daemon = new MemCacheDaemon<LocalCacheElement>();
         final ConcurrentLinkedHashMap<String, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(
@@ -351,6 +369,7 @@ public class TestUtils {
 
         final Engine engine = catalina.createEngine();
         catalina.addEngine( engine );
+        engine.setService( catalina );
 
         /* we must have a unique name for mbeans
          */
@@ -398,6 +417,7 @@ public class TestUtils {
         sessionManager.setTranscoderFactoryClass( transcoderFactoryClassName );
 
         final Connector connector = catalina.createConnector( "localhost", port, false );
+        connector.setProperty("bindOnInit", "false");
         catalina.addConnector( connector );
 
         return catalina;

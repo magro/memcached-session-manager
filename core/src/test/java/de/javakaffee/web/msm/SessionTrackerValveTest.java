@@ -16,6 +16,8 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.integration.TestUtils.createContext;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -28,9 +30,6 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.core.StandardContext;
-import org.apache.catalina.core.StandardEngine;
-import org.apache.catalina.core.StandardHost;
-import org.apache.catalina.core.StandardService;
 import org.apache.tomcat.util.http.ServerCookie;
 import org.jmock.Mock;
 import org.jmock.cglib.MockObjectTestCase;
@@ -72,20 +71,6 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _request = (Request) _requestControl.proxy();
         _responseControl = mock( Response.class );
         _response = (Response) _responseControl.proxy();
-    }
-
-    private StandardContext createContext() {
-        final StandardEngine engine = new StandardEngine();
-        engine.setService( new StandardService() );
-
-        final StandardHost host = new StandardHost();
-        engine.addChild( host );
-
-        final StandardContext context = new StandardContext();
-        context.setSessionCookiePath( "/" );
-        host.addChild( context );
-
-        return context;
     }
 
     @AfterMethod

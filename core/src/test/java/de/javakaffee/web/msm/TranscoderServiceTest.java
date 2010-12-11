@@ -24,6 +24,7 @@ import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
+import org.apache.catalina.core.StandardService;
 import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.testng.Assert;
@@ -48,8 +49,10 @@ public class TranscoderServiceTest {
 
         final StandardContext container = new StandardContext();
         container.setPath( "/" );
+        final StandardEngine engine = new StandardEngine();
+        engine.setService( new StandardService() );
         final StandardHost host = new StandardHost();
-        host.setParent( new StandardEngine() );
+        host.setParent( engine );
         container.setParent( host );
         _manager.setContainer( container );
 

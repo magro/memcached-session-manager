@@ -74,7 +74,7 @@ public class MemcachedSessionManagerIntegrationTest {
 
     private int _memcachedPort;
 
-    @BeforeMethod
+    @BeforeMethod( alwaysRun = true )
     public void setUp() throws Throwable {
 
         _portTomcat1 = 18888;
@@ -88,6 +88,9 @@ public class MemcachedSessionManagerIntegrationTest {
         try {
             _memcachedNodeId = "n1";
             final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
+
+            System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
+
             _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
             _tomcat1.start();
         } catch ( final Throwable e ) {
@@ -106,7 +109,7 @@ public class MemcachedSessionManagerIntegrationTest {
         _httpClient = new DefaultHttpClient();
     }
 
-    @AfterMethod
+    @AfterMethod( alwaysRun = true )
     public void tearDown() throws Exception {
         _memcached.shutdown();
         _tomcat1.stop();
@@ -158,7 +161,7 @@ public class MemcachedSessionManagerIntegrationTest {
         assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
     }
 
-    @Test( enabled = true )
+    @Test( enabled = true, invocationCount=10 )
     public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException, HttpException {
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
@@ -169,10 +172,11 @@ public class MemcachedSessionManagerIntegrationTest {
          */
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
         final Container container = manager.getContainer();
-        final long timeout = TimeUnit.SECONDS.toMillis( container.getBackgroundProcessorDelay() + manager.getMaxInactiveInterval() ) + 100;
+        final long timeout = TimeUnit.SECONDS.toMillis( container.getBackgroundProcessorDelay() / manager.getProcessExpiresFrequency() +
+                manager.getMaxInactiveInterval() ) + 500;
         Thread.sleep( timeout );
 
-        assertNull( _memcached.get( sessionId1 ), "Expired sesion still existing in memcached" );
+        assertNull( _memcached.get( sessionId1 ), "Expired session still existing in memcached" );
     }
 
     @Test( enabled = true )

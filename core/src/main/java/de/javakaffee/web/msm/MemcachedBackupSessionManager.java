@@ -759,7 +759,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public void remove( final Session session ) {
+    public void remove( final Session session, final boolean update ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "remove invoked, session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE ) +
                     ", node failure: " + session.getNote( NODE_FAILURE ) +
@@ -768,7 +768,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
             deleteFromMemcached( session.getId() );
         }
-        super.remove( session );
+        super.remove( session, update );
     }
 
     /**
@@ -1099,7 +1099,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     public void startInternal() throws LifecycleException {
-       
+
     	setState(LifecycleState.STARTING);
     }
 
@@ -1108,7 +1108,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void stopInternal() throws LifecycleException {
     	setState(LifecycleState.STOPPING);
-      
+
         try {
             _backupSessionService.shutdown();
         } catch ( final InterruptedException e ) {
@@ -1231,13 +1231,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
         _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
-    }
-
-    /**
-     * Just for testing, DON'T USE THIS OTHERWISE!
-     */
-    void resetInitialized() {
-       
     }
 
     /**

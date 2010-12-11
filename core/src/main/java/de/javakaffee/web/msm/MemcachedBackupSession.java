@@ -331,10 +331,6 @@ public final class MemcachedBackupSession extends StandardSession {
         _dataHashCode = attributesDataHashCode;
     }
 
-    long getCreationTimeInternal() {
-        return super.creationTime;
-    }
-
     void setCreationTimeInternal( final long creationTime ) {
         super.creationTime = creationTime;
     }
@@ -347,22 +343,13 @@ public final class MemcachedBackupSession extends StandardSession {
         super.isNew = isNew;
     }
 
-    protected boolean isValidInternal() {
-        return super.isValid;
+    @Override
+    public boolean isValidInternal() {
+        return super.isValidInternal();
     }
 
     void setIsValidInternal( final boolean isValid ) {
         super.isValid = isValid;
-    }
-
-    /**
-     * The timestamp (System.currentTimeMillis) of the last {@link #access()} invocation,
-     * this is the timestamp when the application requested the session.
-     *
-     * @return the timestamp of the last {@link #access()} invocation.
-     */
-    public long getThisAccessedTimeInternal() {
-        return super.thisAccessedTime;
     }
 
     void setThisAccessedTimeInternal( final long thisAccessedTime ) {
@@ -377,7 +364,7 @@ public final class MemcachedBackupSession extends StandardSession {
         super.id = id;
     }
 
-    boolean isExpiring() {
+    public boolean isExpiring() {
         return super.expiring;
     }
 

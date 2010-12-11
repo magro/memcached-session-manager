@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.integration.TestUtils.createContext;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.eq;
@@ -32,9 +33,6 @@ import java.util.concurrent.TimeUnit;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.core.StandardContext;
-import org.apache.catalina.core.StandardEngine;
-import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.loader.WebappLoader;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -51,18 +49,13 @@ public class MemcachedBackupSessionManagerTest {
     private MemcachedBackupSessionManager _manager;
     private MemcachedClient _memcachedMock;
 
-    @BeforeMethod
+    @BeforeMethod( alwaysRun = true )
     public void setup() throws Exception {
 
         _manager = new MemcachedBackupSessionManager();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
 
-        final StandardContext container = new StandardContext();
-        container.setPath( "/" );
-        final StandardHost host = new StandardHost();
-        host.setParent( new StandardEngine() );
-        container.setParent( host );
-        _manager.setContainer( container );
+        _manager.setContainer( createContext() );
 
         final WebappLoader webappLoader = mock( WebappLoader.class );
         // webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
@@ -84,17 +77,14 @@ public class MemcachedBackupSessionManagerTest {
 
     @Test
     public void testConfigurationFormatMemcachedNodesFeature44() {
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
         _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211,n2:127.0.0.1:11212" );
         _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
@@ -102,19 +92,16 @@ public class MemcachedBackupSessionManagerTest {
 
     @Test
     public void testConfigurationFormatFailoverNodesFeature44() {
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _manager.setFailoverNodes( "n1" );
         _manager.initInternal();
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1 n2" );
         _manager.initInternal();
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1,n2" );
         _manager.initInternal();
