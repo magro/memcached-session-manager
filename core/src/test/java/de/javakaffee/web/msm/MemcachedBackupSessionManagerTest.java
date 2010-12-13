@@ -16,6 +16,8 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
+import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.eq;
@@ -41,6 +43,10 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.LockingStrategy.LockingMode;
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
+
 
 /**
  * Test the {@link MemcachedBackupSessionManager}.
@@ -57,6 +63,7 @@ public class MemcachedBackupSessionManagerTest {
 
         _manager = new MemcachedBackupSessionManager();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _manager.setSticky( true );
 
         final StandardContext container = new StandardContext();
         container.setPath( "/" );
@@ -87,17 +94,17 @@ public class MemcachedBackupSessionManagerTest {
     public void testConfigurationFormatMemcachedNodesFeature44() {
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
-        _manager.init();
+        _manager.init(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
-        _manager.init();
+        _manager.init(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211,n2:127.0.0.1:11212" );
-        _manager.init();
+        _manager.init(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
@@ -106,19 +113,19 @@ public class MemcachedBackupSessionManagerTest {
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _manager.setFailoverNodes( "n1" );
-        _manager.init();
+        _manager.init(_memcachedMock);
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1 n2" );
-        _manager.init();
+        _manager.init(_memcachedMock);
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
 
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1,n2" );
-        _manager.init();
+        _manager.init(_memcachedMock);
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
@@ -136,7 +143,7 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the second request, with session access
@@ -145,12 +152,12 @@ public class MemcachedBackupSessionManagerTest {
         session.endAccess();
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the third request, without session access
          */
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
     }
@@ -176,12 +183,12 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.endAccess();
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
@@ -205,15 +212,15 @@ public class MemcachedBackupSessionManagerTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.getAttribute( "foo" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
@@ -227,23 +234,34 @@ public class MemcachedBackupSessionManagerTest {
      * session is removed from memcached under the old id but not sent to memcached (if the case the session
      * was not accessed during this request at all, which is very unprobable but who knows).
      */
-    @Test
-    public void testChangeSessionId() throws InterruptedException, ExecutionException, TimeoutException {
+    @Test( dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testChangeSessionId( final SessionAffinityMode stickyness ) throws InterruptedException, ExecutionException, TimeoutException {
+
+        _manager.setStickyInternal( stickyness.isSticky() );
+        if ( !stickyness.isSticky() ) {
+            _manager.setLockingMode( LockingMode.NONE, null );
+        }
 
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, "foo" ).get();
 
         final String oldSessionId = session.getId();
         _manager.changeSessionId( session );
 
         // on session backup we specify sessionIdChanged as false as we're not aware of this fact
-        _manager.backupSession( session, false );
+        _manager.backupSession( session, false, "foo" );
 
         // remove session with old id and add it with the new id
         verify( _memcachedMock, times( 1 ) ).delete( eq( oldSessionId ) );
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
+
+        if ( !stickyness.isSticky() ) {
+            // check validity info
+            verify( _memcachedMock, times( 1 ) ).delete( eq( createValidityInfoKeyName( oldSessionId ) ) );
+            verify( _memcachedMock, times( 1 ) ).set( eq( createValidityInfoKeyName( session.getId() ) ), anyInt(), any() );
+        }
 
     }
 

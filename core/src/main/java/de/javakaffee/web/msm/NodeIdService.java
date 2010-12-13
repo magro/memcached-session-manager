@@ -22,13 +22,21 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
+
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 
 /**
  * Provides services related to node ids.
  *
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class NodeIdService {
+
+    @SuppressWarnings( "unused" )
+    private static final Log LOG = LogFactory.getLog( NodeIdService.class );
 
     private final Random _random = new Random();
 
@@ -47,7 +55,7 @@ public class NodeIdService {
      * configured TTL.
      */
     private final NodeAvailabilityCache<String> _nodeAvailabilityCache;
-    private final List<String> _nodeIds;
+    private final NodeIdList _nodeIds;
     private final List<String> _failoverNodeIds;
 
     /**
@@ -57,21 +65,21 @@ public class NodeIdService {
      * @param nodeIds
      * @param failoverNodeIds
      */
-    public NodeIdService( final NodeAvailabilityCache<String> nodeAvailabilityCache, final List<String> nodeIds, final List<String> failoverNodeIds ) {
+    public NodeIdService( final NodeAvailabilityCache<String> nodeAvailabilityCache, final NodeIdList nodeIds, final List<String> failoverNodeIds ) {
         _nodeAvailabilityCache = nodeAvailabilityCache;
         _nodeIds = nodeIds;
         _failoverNodeIds = failoverNodeIds;
     }
 
     /**
-     * A special constructor used for testing of {@link #getNextNodeId(String, Set)}.
+     * A special constructor used for testing of {@link #getRandomNextNodeId(String, Set)}.
      *
      * @param nodeIds
      * @param failoverNodeIds
      */
     NodeIdService( final List<String> nodeIds,
             final List<String> failoverNodeIds ) {
-        this( null, nodeIds, failoverNodeIds );
+        this( null, new NodeIdList( nodeIds ), failoverNodeIds );
     }
 
     /**
@@ -108,17 +116,29 @@ public class NodeIdService {
         /*
          * first check regular nodes
          */
-        result = getNextNodeId( nodeId, _nodeIds );
+        result = getRandomNextNodeId( nodeId, _nodeIds );
 
         /*
          * we got no node from the first nodes list, so we must check the
          * alternative node list
          */
         if ( result == null && _failoverNodeIds != null && !_failoverNodeIds.isEmpty() ) {
-            result = getNextNodeId( nodeId, _failoverNodeIds );
+            result = getRandomNextNodeId( nodeId, _failoverNodeIds );
         }
 
         return result;
+    }
+
+    /**
+     * Gets the next node id for the given one from the list of all node ids.
+     * @param nodeId the node id for that the next one is determined.
+     * @return the next node id, never <code>null</code>
+     *
+     * @see NodeIdList#getNextNodeId(String)
+     */
+    @Nonnull
+    public String getNextNodeId( @Nonnull final String nodeId ) {
+        return _nodeIds.getNextNodeId( nodeId );
     }
 
     /**
@@ -132,7 +152,7 @@ public class NodeIdService {
      *            the node ids to choose from
      * @return an available node or null
      */
-    protected String getNextNodeId( final String nodeId, final Collection<String> nodeIds ) {
+    protected String getRandomNextNodeId( final String nodeId, final Collection<String> nodeIds ) {
 
         /* create a list of nodeIds to check randomly
          */

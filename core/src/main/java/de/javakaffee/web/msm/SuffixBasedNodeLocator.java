@@ -41,9 +41,8 @@ import net.spy.memcached.ops.Operation;
  */
 class SuffixBasedNodeLocator implements NodeLocator {
 
-    // private final Logger _logger = Logger.getLogger( SuffixBasedNodeLocator.class.getName() );
-
     private final List<MemcachedNode> _nodes;
+    private final NodeIdList _nodeIds;
     private final NodeIdResolver _resolver;
     private final Map<String, MemcachedNode> _nodesMap;
     private final SessionIdFormat _sessionIdFormat;
@@ -53,15 +52,18 @@ class SuffixBasedNodeLocator implements NodeLocator {
      *
      * @param nodes
      *            the nodes to select from.
+     * @param nodeIds
+     *            the list of nodeIds.
      * @param resolver
      *            used to resolve the node id for the address of a memcached
      *            node.
      * @param sessionIdFormat
      *            used to extract the node id from the session id.
      */
-    public SuffixBasedNodeLocator( final List<MemcachedNode> nodes, final NodeIdResolver resolver,
+    public SuffixBasedNodeLocator( final List<MemcachedNode> nodes, final NodeIdList nodeIds, final NodeIdResolver resolver,
             final SessionIdFormat sessionIdFormat ) {
         _nodes = nodes;
+        _nodeIds = nodeIds;
         _resolver = resolver;
 
         final Map<String, MemcachedNode> map = new HashMap<String, MemcachedNode>( nodes.size(), 1 );
@@ -94,7 +96,11 @@ class SuffixBasedNodeLocator implements NodeLocator {
     }
 
     private String getNodeId( final String key ) {
-        return _sessionIdFormat.extractMemcachedId( key );
+        final String nodeId = _sessionIdFormat.extractMemcachedId( key );
+        if ( !_sessionIdFormat.isBackupKey( key ) ) {
+            return nodeId;
+        }
+        return _nodeIds.getNextNodeId( nodeId );
     }
 
     /**
@@ -113,7 +119,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         for ( final MemcachedNode node : _nodes ) {
             nodes.add( new MyMemcachedNodeROImpl( node ) );
         }
-        return new SuffixBasedNodeLocator( nodes, _resolver, _sessionIdFormat );
+        return new SuffixBasedNodeLocator( nodes, _nodeIds, _resolver, _sessionIdFormat );
     }
 
     /**

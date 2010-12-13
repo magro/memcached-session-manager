@@ -41,6 +41,12 @@ public class TestServlet extends HttpServlet {
      * The key of the id in the response body.
      */
     public static final String ID = "id";
+    public static final String PATH_WAIT = "/sleep";
+    public static final String PARAM_WAIT = "sleep";
+    public static final String PARAM_MILLIS = "millies";
+    public static final String PATH_GET_REQUESTED_SESSION_INFO = "/requestedSessionInfo";
+    public static final String KEY_REQUESTED_SESSION_ID = "requestedSessionId";
+    public static final String KEY_IS_REQUESTED_SESSION_ID_VALID = "isRequestedSessionIdValid";
 
     private static final long serialVersionUID = 7954803132860358448L;
 
@@ -54,18 +60,31 @@ public class TestServlet extends HttpServlet {
             throws ServletException, IOException {
         LOG.info( " + starting..." );
 
-        final HttpSession session = request.getSession();
+        final String pathInfo = request.getPathInfo();
+        if ( PATH_GET_REQUESTED_SESSION_INFO.equals( pathInfo ) ) {
+            LOG.info( "getRequestedSessionId: " + request.getRequestedSessionId() );
+            LOG.info( "isRequestedSessionIdValid: " + request.isRequestedSessionIdValid() );
+            final PrintWriter out = response.getWriter();
+            out.println( KEY_REQUESTED_SESSION_ID + "=" + request.getRequestedSessionId() );
+            out.println( KEY_IS_REQUESTED_SESSION_ID_VALID + "=" + request.isRequestedSessionIdValid() );
+        }
+        else {
 
-        final PrintWriter out = response.getWriter();
-        out.println( ID + "=" + session.getId() );
+            final HttpSession session = request.getSession();
 
-        // final HttpSession session = request.getSession( false );
-        if ( session != null ) {
-            final Enumeration<?> attributeNames = session.getAttributeNames();
-            while ( attributeNames.hasMoreElements() ) {
-                final String name = attributeNames.nextElement().toString();
-                final Object value = session.getAttribute( name );
-                out.println( name + "=" + value );
+            waitIfRequested( request );
+
+            final PrintWriter out = response.getWriter();
+            out.println( ID + "=" + session.getId() );
+
+            // final HttpSession session = request.getSession( false );
+            if ( session != null ) {
+                final Enumeration<?> attributeNames = session.getAttributeNames();
+                while ( attributeNames.hasMoreElements() ) {
+                    final String name = attributeNames.nextElement().toString();
+                    final Object value = session.getAttribute( name );
+                    out.println( name + "=" + value );
+                }
             }
         }
 
@@ -81,8 +100,11 @@ public class TestServlet extends HttpServlet {
 
         LOG.info( "invoked" );
 
-        final PrintWriter out = response.getWriter();
         final HttpSession session = request.getSession();
+
+        waitIfRequested( request );
+
+        final PrintWriter out = response.getWriter();
 
         out.println( "OK: " + session.getId() );
 
@@ -94,6 +116,17 @@ public class TestServlet extends HttpServlet {
             session.setAttribute( name, value );
         }
 
+    }
+
+    private void waitIfRequested( final HttpServletRequest request ) throws ServletException {
+        final String pathInfo = request.getPathInfo();
+        if ( PATH_WAIT.equals( pathInfo ) || request.getParameter( PARAM_WAIT ) != null ) {
+            try {
+                Thread.sleep( Long.parseLong( request.getParameter( PARAM_MILLIS ) ) );
+            } catch ( final Exception e ) {
+                throw new ServletException( "Could not sleep.", e );
+            }
+        }
     }
 
 }

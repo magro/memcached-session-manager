@@ -16,14 +16,19 @@
  */
 package de.javakaffee.web.msm;
 
-import java.util.ArrayList;
+import java.util.AbstractList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.RandomAccess;
 
 /**
  * An LRUCache that supports a maximum number of cache entries and a time to
  * live for them. The TTL is measured from insertion time to access time.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  * @param <K>
@@ -39,7 +44,7 @@ public class LRUCache<K, V> {
 
     /**
      * Creates a new instance with the given maximum size.
-     * 
+     *
      * @param size
      *            the number of items to keep at max
      */
@@ -51,7 +56,7 @@ public class LRUCache<K, V> {
      * Create a new LRUCache with a maximum number of cache entries and a
      * specified time to live for cache entries. The TTL is measured from
      * insertion time to access time.
-     * 
+     *
      * @param size
      *            the maximum number of cached items
      * @param ttlInMillis
@@ -65,7 +70,7 @@ public class LRUCache<K, V> {
 
     /**
      * Put the key and value.
-     * 
+     *
      * @param key
      *            the key
      * @param value
@@ -88,7 +93,7 @@ public class LRUCache<K, V> {
      * If the specified key is not already associated with a value or if it's
      * associated with a different value, associate it with the given value.
      * This is equivalent to
-     * 
+     *
      * <pre>
      * <code> if (map.get(key) == null || !map.get(key).equals(value))
      *    return map.put(key, value);
@@ -96,9 +101,9 @@ public class LRUCache<K, V> {
      *    return map.get(key);
      * </code>
      * </pre>
-     * 
+     *
      * except that the action is performed atomically.
-     * 
+     *
      * @param key
      *            the key to associate the value with.
      * @param value
@@ -118,8 +123,25 @@ public class LRUCache<K, V> {
     }
 
     /**
+     * Removes the mapping for the specified key from this map if present.
+     *
+     * @param  key key whose mapping is to be removed from the map
+     * @return
+     * @return the previous value associated with <tt>key</tt>, or
+     *         <tt>null</tt> if there was no mapping for <tt>key</tt>.
+     *         (A <tt>null</tt> return can also indicate that the map
+     *         previously associated <tt>null</tt> with <tt>key</tt>.)
+     */
+    public V remove( final K key ) {
+        synchronized ( _map ) {
+            final ManagedItem<V> removed = _map.remove( key );
+            return removed != null ? removed._value : null;
+        }
+    }
+
+    /**
      * Returns the value that was stored to the given key.
-     * 
+     *
      * @param key
      *            the key
      * @return the stored value or <code>null</code>
@@ -139,19 +161,56 @@ public class LRUCache<K, V> {
     }
 
     /**
-     * The list of all keys.
-     * 
+     * Determines if the given key is cached without "touching" this key.
+     *
+     * @param key
+     *            the key
+     * @return <code>true</code> if the given key is present in the underlying map, otherwise <code>false</code>.
+     */
+    public boolean containsKey( final K key ) {
+        synchronized ( _map ) {
+            return _map.containsKey( key );
+        }
+    }
+
+    /**
+     * The list of all keys, whose order is the order in which its entries were last accessed,
+     * from least-recently accessed to most-recently.
+     *
      * @return a new list.
      */
     public List<K> getKeys() {
         synchronized ( _map ) {
-            return new ArrayList<K>( _map.keySet() );
+            return new java.util.ArrayList<K>( _map.keySet() );
+        }
+    }
+
+    /**
+     * The keys sorted by the given value comparator.
+     *
+     * @return the underlying set, see {@link LinkedHashMap#keySet()}.
+     */
+    public List<K> getKeysSortedByValue( final Comparator<V> comparator ) {
+        synchronized ( _map ) {
+            @SuppressWarnings( "unchecked" )
+            final
+            Entry<K, ManagedItem<V>>[] a = _map.entrySet().toArray( new Map.Entry[_map.size()] );
+            final Comparator<Entry<K, ManagedItem<V>>> c = new Comparator<Entry<K, ManagedItem<V>>>() {
+
+                @Override
+                public int compare( final Entry<K, ManagedItem<V>> o1, final Entry<K, ManagedItem<V>> o2 ) {
+                    return comparator.compare( o1.getValue()._value, o2.getValue()._value );
+                }
+
+            };
+            Arrays.sort(a, c);
+            return new LRUCache.ArrayList<K, V>( a );
         }
     }
 
     /**
      * Stores a value with the timestamp this value was added to the cache.
-     * 
+     *
      * @param <T>
      *            the type of the value
      */
@@ -162,6 +221,63 @@ public class LRUCache<K, V> {
         private ManagedItem( final T value, final long accessTime ) {
             _value = value;
             _insertionTime = accessTime;
+        }
+    }
+
+    /**
+     * An array list over the backed array of keys and managed items.
+     * @author Martin Grotzke
+     *
+     * @param <E>
+     * @param <V>
+     */
+    private static class ArrayList<E, V> extends AbstractList<E> implements RandomAccess, java.io.Serializable {
+        private static final long serialVersionUID = -2764017481108945198L;
+        private final Entry<E, ManagedItem<V>>[] a;
+
+        ArrayList( final Entry<E, ManagedItem<V>>[] array ) {
+            if ( array == null ) {
+                throw new NullPointerException();
+            }
+            a = array;
+        }
+
+        public int size() {
+            return a.length;
+        }
+
+        public <T> T[] toArray( final T[] a ) {
+            throw new UnsupportedOperationException( "Not implemented." );
+        }
+
+        public E get( final int index ) {
+            return a[index].getKey();
+        }
+
+        public E set( final int index, final E element ) {
+            throw new UnsupportedOperationException( "Not implemented." );
+        }
+
+        public int indexOf( final Object o ) {
+            if ( o == null ) {
+                for ( int i = 0; i < a.length; i++ ) {
+                    if ( a[i] == null || a[i].getKey() == null ) {
+                        return i;
+                    }
+                }
+            }
+            else {
+                for ( int i = 0; i < a.length; i++ ) {
+                    if ( o.equals( a[i].getKey() ) ) {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        public boolean contains( final Object o ) {
+            return indexOf( o ) != -1;
         }
     }
 
