@@ -87,7 +87,7 @@ public class JavolutionMemcachedSessionManagerIntegrationTest {
         }
 
         _memcached =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( _memcachedNodeId ), NodeIdResolver.node(
                         _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
                         Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
 
@@ -109,17 +109,17 @@ public class JavolutionMemcachedSessionManagerIntegrationTest {
      * Test that a session that has been serialized with the old serialization
      * format (the complete session was serialized by one serialization strategy)
      * can be loaded from memcached.
-     * @throws ExecutionException 
-     * @throws InterruptedException 
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     @Test
     public void testLoadFromMemcachedOldSessionSerializationFormat() throws InterruptedException, ExecutionException {
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
         final Session session = manager.createSession( null );
         final SessionTranscoder oldSessionTranscoder = manager.getTranscoderFactory().createSessionTranscoder( manager );
-        Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
+        final Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
         Assert.assertTrue( future.get() );
-        final Session loadedFromMemcached = manager.loadFromMemcached( session.getId() );
+        final Session loadedFromMemcached = manager.loadFromMemcachedWithCheck( session.getId() );
         Assert.assertNotNull( loadedFromMemcached );
         Assert.assertNotNull( loadedFromMemcached.getManager() );
         Assert.assertNotNull( loadedFromMemcached.getNoteNames() );

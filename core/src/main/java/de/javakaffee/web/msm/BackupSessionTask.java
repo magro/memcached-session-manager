@@ -22,11 +22,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
+
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
@@ -35,7 +39,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResu
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class BackupSessionTask implements Callable<BackupResultStatus> {
+public class BackupSessionTask implements Callable<BackupResult> {
 
     private static final Log _log = LogFactory.getLog( BackupSessionTask.class );
 
@@ -53,13 +57,13 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
     /**
      * @param session
      *            the session to save
+     * @param sessionBackupAsync
+     * @param sessionBackupTimeout
+     * @param memcached
      * @param force
      *            specifies, if the session needs to be saved by all means, e.g.
      *            as it has to be relocated to another memcached
      *            node (the session id had been changed before in this case).
-     * @param sessionBackupAsync
-     * @param sessionBackupTimeout
-     * @param memcached
      * @param nodeAvailabilityCache
      * @param nodeIds
      * @param failoverNodeIds
@@ -86,7 +90,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
      * {@inheritDoc}
      */
     @Override
-    public BackupResultStatus call() throws Exception {
+    public BackupResult call() throws Exception {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Starting for session id " + _session.getId() );
         }
@@ -100,25 +104,26 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
             final byte[] attributesData = serializeAttributes( _session, attributes );
             final int hashCode = Arrays.hashCode( attributesData );
-            final BackupResultStatus result;
+            final BackupResult result;
             if ( _session.getDataHashCode() != hashCode
                     || _force
                     || _session.authenticationChanged() ) {
+
+                _session.setLastBackupTime( System.currentTimeMillis() );
                 final byte[] data = _transcoderService.serialize( _session, attributesData );
 
-                final BackupResult backupResult = doBackupSession( _session, data, attributesData );
-                if ( backupResult.isSuccess() ) {
+                result = doBackupSession( _session, data, attributesData );
+                if ( result.isSuccess() ) {
                     _session.setDataHashCode( hashCode );
                 }
-
-                result = backupResult.getStatus();
             } else {
-                result = BackupResultStatus.SKIPPED;
+                result = new BackupResult( BackupResultStatus.SKIPPED );
             }
 
-            switch ( result ) {
+            switch ( result.getStatus() ) {
                 case FAILURE:
                     _statistics.requestWithBackupFailure();
+                    _session.backupFailed();
                     break;
                 case SKIPPED:
                     _statistics.requestWithoutSessionModification();
@@ -141,8 +146,23 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
         } finally {
             _session.setBackupRunning( false );
+            releaseLock();
         }
 
+    }
+
+    private void releaseLock() {
+        if ( _session.isLocked()  ) {
+            try {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Releasing lock for session " + _session.getIdInternal() );
+                }
+                _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
+                _session.releaseLock();
+            } catch( final Exception e ) {
+                _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
+            }
+        }
     }
 
     private byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
@@ -169,7 +189,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
             storeSessionInMemcached( session, data );
 
-            return new BackupResult( BackupResultStatus.SUCCESS, attributesData );
+            return new BackupResult( BackupResultStatus.SUCCESS, data, attributesData );
         } catch ( final NodeFailureException e ) {
             if ( _log.isInfoEnabled() ) {
                 String msg = "Could not store session " + session.getId() +
@@ -180,7 +200,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 _log.info( msg );
             }
 
-            return new BackupResult( BackupResultStatus.FAILURE, null );
+            return new BackupResult( BackupResultStatus.FAILURE, data, null );
         }
     }
 
@@ -199,7 +219,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 try {
                     future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
                     session.setLastMemcachedExpirationTime( expirationTime );
-                    session.setLastBackupTimestamp( System.currentTimeMillis() );
+                    session.setLastBackupTime( System.currentTimeMillis() );
                 } catch ( final Exception e ) {
                     if ( _log.isInfoEnabled() ) {
                         _log.info( "Could not store session " + session.getId() + " in memcached." );
@@ -213,7 +233,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 /* in async mode, we asume the session was stored successfully
                  */
                 session.setLastMemcachedExpirationTime( expirationTime );
-                session.setLastBackupTimestamp( System.currentTimeMillis() );
+                session.setLastBackupTime( System.currentTimeMillis() );
             }
         } finally {
             _statistics.getMemcachedUpdateProbe().registerSince( start );
@@ -221,26 +241,49 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
     }
 
     static final class BackupResult {
+
+        public static final BackupResult SKIPPED = new BackupResult( BackupResultStatus.SKIPPED );
+        public static final BackupResult FAILURE = new BackupResult( BackupResultStatus.FAILURE );
+
         private final BackupResultStatus _status;
+        private final byte[] _data;
         private final byte[] _attributesData;
-        public BackupResult( final BackupResultStatus status, final byte[] attributesData ) {
+        public BackupResult( @Nonnull final BackupResultStatus status ) {
             _status = status;
+            _data = null;
+            _attributesData = null;
+        }
+        public BackupResult( @Nonnull final BackupResultStatus status, @Nonnull final byte[] data, @Nonnull final byte[] attributesData ) {
+            _status = status;
+            _data = data;
             _attributesData = attributesData;
         }
         /**
          * The status/result of the backup operation.
          * @return the status
          */
+        @Nonnull
         BackupResultStatus getStatus() {
             return _status;
         }
         /**
+         * The serialized session data (session fields and session attributes).
+         * This can be <code>null</code> (if {@link #getStatus()} is {@link BackupResultStatus#SKIPPED}).
+         *
+         * @return the session data
+         */
+        @CheckForNull
+        byte[] getData() {
+            return _data;
+        }
+        /**
          * The serialized attributes that were actually stored in memcached with the
          * full serialized session data. This can be <code>null</code>, e.g. if
-         * {@link #getStatus()} is {@link BackupResultStatus#FAILURE}.
+         * {@link #getStatus()} is {@link BackupResultStatus#FAILURE} or {@link BackupResultStatus#SKIPPED}.
          *
          * @return the attributesData
          */
+        @CheckForNull
         byte[] getAttributesData() {
             return _attributesData;
         }

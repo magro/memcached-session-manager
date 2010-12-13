@@ -21,6 +21,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 
 import org.apache.catalina.Context;
@@ -31,6 +34,8 @@ import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 
 /**
  * This valve is used for tracking requests for that the session must be sent to
@@ -50,6 +55,7 @@ class SessionTrackerValve extends ValveBase {
     private final Statistics _statistics;
     private final AtomicBoolean _enabled;
     private final String _sessionCookieName;
+    private @CheckForNull LockingStrategy _lockingStrategy;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -67,8 +73,10 @@ class SessionTrackerValve extends ValveBase {
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
      */
-    public SessionTrackerValve( final String ignorePattern, final Context context, final SessionBackupService sessionBackupService,
-            final Statistics statistics, final AtomicBoolean enabled ) {
+    public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final Context context,
+            @Nonnull final SessionBackupService sessionBackupService,
+            @Nonnull final Statistics statistics,
+            @Nonnull final AtomicBoolean enabled ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -91,16 +99,46 @@ class SessionTrackerValve extends ValveBase {
             getNext().invoke( request, response );
         } else {
 
-            final boolean sessionIdChanged = changeRequestedSessionId( request, response );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " ==================" );
+            }
 
-            getNext().invoke( request, response );
+            boolean sessionIdChanged = false;
+            try {
+                storeRequestThreadLocal( request );
+                sessionIdChanged = changeRequestedSessionId( request, response );
+                getNext().invoke( request, response );
+            } finally {
+                backupSession( request, response, sessionIdChanged );
+                resetRequestThreadLocal();
+            }
 
-            backupSession( request, response, sessionIdChanged );
-
-            logDebugResponseCookie( response );
+            if ( _log.isDebugEnabled() ) {
+                logDebugResponseCookie( response );
+                _log.debug( "<<<<<< Request finished: " + getURIWithQueryString( request ) + " ==================" );
+            }
 
         }
 
+    }
+
+    @Nonnull
+    protected static String getURIWithQueryString( @Nonnull final Request request ) {
+        final String uri = request.getRequestURI();
+        final String qs = request.getMethod().toLowerCase().equals( "post" ) ? null : request.getQueryString();
+        return qs != null ? uri + "?" + qs : uri;
+    }
+
+    private void resetRequestThreadLocal() {
+        if ( _lockingStrategy != null ) {
+            _lockingStrategy.onRequestFinished();
+        }
+    }
+
+    private void storeRequestThreadLocal( @Nonnull final Request request ) {
+        if ( _lockingStrategy != null ) {
+            _lockingStrategy.onRequestStart( request );
+        }
     }
 
     /**
@@ -146,15 +184,9 @@ class SessionTrackerValve extends ValveBase {
         final Session session = request.getRequestedSessionId() != null || responseContainsSessionCookie( response )
             ? request.getSessionInternal( false )
             : null;
-        if ( _log.isDebugEnabled() ) {
-            _log.debug( "Have a session: " + ( session != null ) );
-        }
         if ( session != null ) {
-
             _statistics.requestWithSession();
-
-            _sessionBackupService.backupSession( session, sessionIdChanged );
-
+            _sessionBackupService.backupSession( session, sessionIdChanged, getURIWithQueryString( request ) );
         }
         else {
             _statistics.requestWithoutSession();
@@ -197,6 +229,10 @@ class SessionTrackerValve extends ValveBase {
          * different jvmRoute load if from memcached. If the session was found in memcached and
          * if it's valid it must be associated with this tomcat and therefore the session id has to
          * be changed. The new session id must be returned if it was changed.
+         * <p>
+         * This is only useful for sticky sessions, in non-sticky operation mode <code>null</code> should
+         * always be returned.
+         * </p>
          *
          * @param requestedSessionId
          *            the sessionId that was requested.
@@ -232,10 +268,12 @@ class SessionTrackerValve extends ValveBase {
          *            the session to backup
          * @param sessionIdChanged
          *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
+         * @param requestId
+         *            the uri of the request for that the session backup shall be performed.
          *
          * @return a {@link Future} providing the {@link BackupResultStatus}.
          */
-        Future<BackupResultStatus> backupSession( Session session, boolean sessionIdChanged );
+        Future<BackupResult> backupSession( Session session, boolean sessionIdChanged, String requestId );
 
         /**
          * The enumeration of possible backup results.
@@ -256,6 +294,10 @@ class SessionTrackerValve extends ValveBase {
                 SKIPPED
         }
 
+    }
+
+    public void setLockingStrategy( @Nullable final LockingStrategy lockingStrategy ) {
+        _lockingStrategy = lockingStrategy;
     }
 
 }

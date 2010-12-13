@@ -16,17 +16,8 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
-import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
-import static de.javakaffee.web.msm.integration.TestUtils.get;
-import static de.javakaffee.web.msm.integration.TestUtils.getManager;
-import static de.javakaffee.web.msm.integration.TestUtils.post;
-import static de.javakaffee.web.msm.integration.TestUtils.setChangeSessionIdOnAuth;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static de.javakaffee.web.msm.integration.TestUtils.*;
+import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -53,6 +44,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.NodeIdList;
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
@@ -100,13 +92,14 @@ public class TomcatFailoverIntegrationTest {
         try {
             _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1 );
             _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2 );
+
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
 
         _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( NODE_ID ), NodeIdResolver.node(
                         NODE_ID, address ).build(), new SessionIdFormat(), Statistics.create() ),
                         Arrays.asList( address ) );
 
@@ -120,6 +113,7 @@ public class TomcatFailoverIntegrationTest {
     private Embedded startTomcat( final int port, final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
         final Embedded tomcat = createCatalina( port, MEMCACHED_NODES, jvmRoute, loginType );
         tomcat.start();
+        getManager( tomcat ).setSticky( true );
         return tomcat;
     }
 
@@ -304,7 +298,7 @@ public class TomcatFailoverIntegrationTest {
         final Map<String, String> params = new HashMap<String, String>();
         params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
-        final Response tc1Response2 = post( _httpClient, TC_PORT_1, "j_security_check", sessionId, params );
+        final Response tc1Response2 = post( _httpClient, TC_PORT_1, "/j_security_check", sessionId, params );
 
         assertTrue( sessionId.equals( tc1Response2.get( TestServlet.ID ) ) );
 

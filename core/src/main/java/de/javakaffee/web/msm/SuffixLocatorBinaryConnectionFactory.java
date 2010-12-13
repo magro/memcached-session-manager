@@ -40,19 +40,23 @@ import net.spy.memcached.transcoders.Transcoder;
  */
 public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectionFactory {
 
+    private final NodeIdList _nodeIds;
     private final SessionIdFormat _sessionIdFormat;
     private final NodeIdResolver _resolver;
     private final Statistics _statistics;
 
     /**
      * Creates a new instance.
+     * @param nodeIds
+     *            the list of nodeIds
      * @param resolver
      *            the {@link NodeIdResolver}
      * @param sessionIdFormat
      *            the {@link SessionIdFormat}
      */
-    public SuffixLocatorBinaryConnectionFactory( final NodeIdResolver resolver, final SessionIdFormat sessionIdFormat,
+    public SuffixLocatorBinaryConnectionFactory( final NodeIdList nodeIds, final NodeIdResolver resolver, final SessionIdFormat sessionIdFormat,
             final Statistics statistics ) {
+        _nodeIds = nodeIds;
         _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
         _statistics = statistics;
@@ -63,7 +67,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
      */
     @Override
     public NodeLocator createLocator( final List<MemcachedNode> nodes ) {
-        return new SuffixBasedNodeLocator( nodes, _resolver, _sessionIdFormat );
+        return new SuffixBasedNodeLocator( nodes, _nodeIds, _resolver, _sessionIdFormat );
     }
 
     /**

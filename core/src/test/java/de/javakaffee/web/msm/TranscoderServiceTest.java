@@ -71,6 +71,7 @@ public class TranscoderServiceTest {
     @Test
     public void testSerializeSessionFields() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        session.setLastBackupTime( System.currentTimeMillis() );
         final byte[] data = TranscoderService.serializeSessionFields( session );
         final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data ).getSession();
 
@@ -84,6 +85,8 @@ public class TranscoderServiceTest {
         session.setAuthType( Constants.FORM_METHOD );
         session.setPrincipal( new GenericPrincipal( "foo", "bar" ) );
 
+        session.setLastBackupTime( System.currentTimeMillis() );
+
         final byte[] data = TranscoderService.serializeSessionFields( session );
         final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data ).getSession();
 
@@ -93,6 +96,9 @@ public class TranscoderServiceTest {
     @Test
     public void testSerializeSessionWithoutAttributes() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        session.setLastBackupTime( System.currentTimeMillis() );
+
         final TranscoderService transcoderService = new TranscoderService( new JavaSerializationTranscoder( _manager ) );
         final byte[] data = transcoderService.serialize( session );
         final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager );
@@ -108,6 +114,8 @@ public class TranscoderServiceTest {
         final String value = "bar";
         session.setAttribute( "foo", value );
 
+        session.setLastBackupTime( System.currentTimeMillis() );
+
         final byte[] data = transcoderService.serialize( session );
         final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager );
 
@@ -122,6 +130,7 @@ public class TranscoderServiceTest {
         Assert.assertEquals( session.isNewInternal(), deserialized.isNewInternal() );
         Assert.assertEquals( session.isValidInternal(), deserialized.isValidInternal() );
         Assert.assertEquals( session.getThisAccessedTimeInternal(), deserialized.getThisAccessedTimeInternal() );
+        Assert.assertEquals( session.getLastBackupTime(), deserialized.getLastBackupTime() );
         Assert.assertEquals( session.getIdInternal(), deserialized.getIdInternal() );
         Assert.assertEquals( session.getAuthType(), deserialized.getAuthType() );
         assertDeepEquals( session.getPrincipal(), deserialized.getPrincipal() );

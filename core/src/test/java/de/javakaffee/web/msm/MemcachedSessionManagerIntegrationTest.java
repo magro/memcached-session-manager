@@ -16,16 +16,8 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.integration.TestUtils.assertDeepEquals;
-import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
-import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
-import static de.javakaffee.web.msm.integration.TestUtils.getManager;
-import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static de.javakaffee.web.msm.integration.TestUtils.*;
+import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -35,9 +27,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.annotation.Nonnull;
+
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
+import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Session;
 import org.apache.catalina.startup.Embedded;
 import org.apache.http.HttpException;
@@ -49,6 +44,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
+
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
 /**
  * Integration test testing basic session manager functionality.
@@ -92,21 +90,26 @@ public class MemcachedSessionManagerIntegrationTest {
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
 
             _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
+            getManager( _tomcat1 ).setSticky( true );
             _tomcat1.start();
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
 
-        _memcached =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
-                        _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
-                        Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
+        _memcached = createMemcachedClient( address );
 
         // Wait a little bit, so that the memcached client can connect and is ready when test starts
         Thread.sleep( 100 );
 
         _httpClient = new DefaultHttpClient();
+    }
+
+    private MemcachedClient createMemcachedClient( final InetSocketAddress address ) throws IOException, InterruptedException {
+        final MemcachedClient result = new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( _memcachedNodeId ),  NodeIdResolver.node(
+                _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
+                Arrays.asList( address ) );
+        return result;
     }
 
     @AfterMethod( alwaysRun = true )
@@ -146,41 +149,45 @@ public class MemcachedSessionManagerIntegrationTest {
      * @throws InterruptedException
      * @throws HttpException
      */
-    @Test( enabled = true )
-    public void testInvalidSessionId() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testInvalidSessionId( final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, "12345" );
         assertNotNull( sessionId1, "No session created." );
         assertTrue( sessionId1.indexOf( '-' ) > -1, "Invalid session id format" );
     }
 
-    @Test( enabled = true )
-    public void testSessionAvailableInMemcached() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionAvailableInMemcached( final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
         Thread.sleep( 50 );
         assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
     }
 
-    @Test( enabled = true, invocationCount=10 )
-    public void testExpiredSessionRemovedFromMemcached() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testExpiredSessionRemovedFromMemcached( @Nonnull final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
 
-        /*
-         * wait some time, as processExpires runs every second and the
-         * maxInactiveTime is set to 1 sec...
-         */
-        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
-        final Container container = manager.getContainer();
-        final long timeout = TimeUnit.SECONDS.toMillis( container.getBackgroundProcessorDelay() / manager.getProcessExpiresFrequency() +
-                manager.getMaxInactiveInterval() ) + 500;
-        Thread.sleep( timeout );
+        waitForSessionExpiration( sessionAffinity.isSticky() );
 
         assertNull( _memcached.get( sessionId1 ), "Expired session still existing in memcached" );
     }
 
-    @Test( enabled = true )
-    public void testInvalidSessionNotFound() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testInvalidSessionNotFound( @Nonnull final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
 
@@ -195,40 +202,18 @@ public class MemcachedSessionManagerIntegrationTest {
     }
 
     /**
-     * Tests, that relocated sessions are no longer available under the
-     * old/former session id.
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     * @throws HttpException
-     */
-    @Test( enabled = true )
-    public void testRelocateSession() throws IOException, InterruptedException, HttpException {
-        // FIXME implementation does not match docs
-        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
-        assertNotNull( sessionId1, "No session created." );
-
-        /*
-         * wait some time, as processExpires runs every second and the
-         * maxInactiveTime is set to 1 sec...
-         */
-        Thread.sleep( 2100 );
-
-        final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
-        assertNotSame( sessionId1, sessionId2, "Expired session returned" );
-    }
-
-    /**
      * Tests, that for a session that was not sent to memcached (because it's attributes
      * were not modified), the expiration is updated so that they don't expire in memcached
      * before they expire in tomcat.
      *
      * @throws Exception if something goes wrong with the http communication with tomcat
      */
-    @Test( enabled = true )
-    public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple( final SessionAffinityMode stickyness ) throws Exception {
 
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        manager.setSticky( stickyness.isSticky() );
+
         // set to 1 sec above (in setup), default is 10 seconds
         final int delay = manager.getContainer().getBackgroundProcessorDelay();
         manager.setMaxInactiveInterval( delay * 4 );
@@ -241,19 +226,20 @@ public class MemcachedSessionManagerIntegrationTest {
          * it's not sent to memcached
          */
         Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 2 ) );
-        makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertEquals( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1, "SessionId should be the same" );
 
         /* after another 3 seconds check that the session is still alive in memcached,
          * this would have been expired without an updated expiration
          */
         Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 3 ) );
-        assertNotNull( _memcached.get( sessionId1 ), "Session expired in memcached." );
+        assertNotNull( _memcached.get( sessionId1 ), "Session should still exist in memcached." );
 
         /* after another >1 second (4 seconds since the last request)
          * the session must be expired in memcached
          */
-        Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 1000 ); // +1000 just to be sure that we're >4 secs
-        assertNull( _memcached.get( sessionId1 ), "Session not expired in memcached." );
+        Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 500 ); // +1000 just to be sure that we're >4 secs
+        assertNotSame( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1,
+                "The sessionId should have changed due to expired sessin" );
 
     }
 
@@ -265,10 +251,12 @@ public class MemcachedSessionManagerIntegrationTest {
      *
      * @throws Exception if something goes wrong with the http communication with tomcat
      */
-    @Test( enabled = true )
-    public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedManyReadonlyRequests() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedManyReadonlyRequests( final SessionAffinityMode stickyness ) throws Exception {
 
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        manager.setSticky( stickyness.isSticky() );
+
         // set to 1 sec above (in setup), default is 10 seconds
         final int delay = manager.getContainer().getBackgroundProcessorDelay();
         manager.setMaxInactiveInterval( delay * 4 );
@@ -281,24 +269,28 @@ public class MemcachedSessionManagerIntegrationTest {
          * it's not sent to memcached
          */
         Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 3 ) );
-        makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertEquals( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1, "SessionId should be the same" );
+        assertNotNull( _memcached.get( sessionId1 ), "Session should still exist in memcached." );
 
         /* after another 3 seconds make another request without changing the session
          */
         Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 3 ) );
-        makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertEquals( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1, "SessionId should be the same" );
+        assertNotNull( _memcached.get( sessionId1 ), "Session should still exist in memcached." );
 
-        /* after another nearly 4 seconds check that the session is still alive in memcached,
+        /* after another nearly 4 seconds (maxInactiveInterval) check that the session is still alive in memcached,
          * this would have been expired without an updated expiration
          */
-        Thread.sleep( TimeUnit.SECONDS.toMillis( delay * 4 ) - 500 );
-        assertNotNull( _memcached.get( sessionId1 ), "Session expired in memcached." );
+        Thread.sleep( TimeUnit.SECONDS.toMillis( manager.getMaxInactiveInterval() ) - 500 );
+        assertNotNull( _memcached.get( sessionId1 ), "Session should still exist in memcached." );
 
-        /* after another second (more than 4 seconds since the last request)
+        /* after another second in sticky mode (more than 4 seconds since the last request), or an two times the
+         * maxInactiveInterval in non-sticky mode (we must keep sessions in memcached with double expirationtime)
          * the session must be expired in memcached
          */
         Thread.sleep( TimeUnit.SECONDS.toMillis( delay ) + 500 );
-        assertNull( _memcached.get( sessionId1 ), "Session not expired in memcached." );
+        assertNotSame( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1,
+                "The sessionId should have changed due to expired sessin" );
 
     }
 
@@ -316,7 +308,7 @@ public class MemcachedSessionManagerIntegrationTest {
         final SessionTranscoder oldSessionTranscoder = manager.getTranscoderFactory().createSessionTranscoder( manager );
         final Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
         assertTrue( future.get() );
-        final Session loadedFromMemcached = manager.loadFromMemcached( session.getId() );
+        final Session loadedFromMemcached = manager.loadFromMemcachedWithCheck( session.getId() );
         assertNotNull( loadedFromMemcached );
         assertDeepEquals( session, loadedFromMemcached );
     }
@@ -335,6 +327,7 @@ public class MemcachedSessionManagerIntegrationTest {
 
         final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
         manager.setMaxInactiveInterval( 5 );
+        manager.setSticky( true );
         final SessionIdFormat sessionIdFormat = new SessionIdFormat();
 
         final Session session = manager.createSession( null );
@@ -343,13 +336,94 @@ public class MemcachedSessionManagerIntegrationTest {
         _daemon.start();
 
         // Wait so that the daemon will be available and the client can reconnect (async get didn't do the trick)
-        Thread.sleep( 2500 );
+        Thread.sleep( 4000 );
 
         final String newSessionId = manager.changeSessionIdOnMemcachedFailover( session.getId() );
         assertNotNull( newSessionId );
         assertEquals( newSessionId, session.getId() );
         assertEquals( sessionIdFormat.extractMemcachedId( newSessionId ), _memcachedNodeId );
 
+    }
+
+    /**
+     * Test for issue #60 (Add possibility to disable msm at runtime): disable msm
+     */
+    @Test( enabled = true )
+    public void testDisableMsmAtRuntime() throws InterruptedException, IOException, ExecutionException, TimeoutException, LifecycleException, HttpException {
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        manager.setSticky( true );
+        // disable msm, shutdown our server and our client
+        manager.setEnabled( false );
+        _memcached.shutdown();
+        _daemon.stop();
+
+        checkSessionFunctionalityWithMsmDisabled();
+    }
+
+    /**
+     * Test for issue #60 (Add possibility to disable msm at runtime): start msm disabled and afterwards enable
+     */
+    @Test( enabled = true )
+    public void testStartMsmDisabled() throws InterruptedException, IOException, ExecutionException, TimeoutException, LifecycleException, HttpException {
+
+        // shutdown our server and our client
+        _memcached.shutdown();
+        _daemon.stop();
+
+        // start a new tomcat with msm initially disabled
+        _tomcat1.stop();
+        Thread.sleep( 500 );
+        final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
+        _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        manager.setSticky( true );
+        manager.setEnabled( false );
+        _tomcat1.start();
+
+        LOG.info( "Waiting, check logs to see if the client causes any 'Connection refused' logging..." );
+        Thread.sleep( 1000 );
+
+        // some basic tests for session functionality
+        checkSessionFunctionalityWithMsmDisabled();
+
+        // start memcached, client and reenable msm
+        _daemon.start();
+        _memcached = createMemcachedClient( new InetSocketAddress( "localhost", _memcachedPort ) );
+        manager.setEnabled( true );
+        // Wait a little bit, so that msm's memcached client can connect and is ready when test starts
+        Thread.sleep( 100 );
+
+        // memcached based stuff should work again
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( sessionId1, "No session created." );
+        assertNotNull( new SessionIdFormat().extractMemcachedId( sessionId1 ), "memcached node id missing with msm switched to enabled" );
+        Thread.sleep( 50 );
+        assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
+
+        waitForSessionExpiration( true );
+
+        assertNull( _memcached.get( sessionId1 ), "Expired session still existing in memcached" );
+
+    }
+
+    private void checkSessionFunctionalityWithMsmDisabled() throws IOException, HttpException, InterruptedException {
+        assertTrue( getManager( _tomcat1 ).isSticky() );
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( sessionId1, "No session created." );
+        assertNull( new SessionIdFormat().extractMemcachedId( sessionId1 ), "Got a memcached node id, even with msm disabled." );
+        waitForSessionExpiration( true );
+        final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
+        assertNotSame( sessionId2, sessionId1, "SessionId not changed." );
+    }
+
+    private void waitForSessionExpiration(final boolean sticky) throws InterruptedException {
+        final MemcachedBackupSessionManager manager = getManager( _tomcat1 );
+        assertEquals( manager.isSticky(), sticky );
+        final Container container = manager.getContainer();
+        final long timeout = TimeUnit.SECONDS.toMillis(
+                sticky ? container.getBackgroundProcessorDelay() + manager.getMaxInactiveInterval()
+                       : 2 * manager.getMaxInactiveInterval() ) + 1000;
+        Thread.sleep( timeout );
     }
 
 }

@@ -16,17 +16,8 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
-import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
-import static de.javakaffee.web.msm.integration.TestUtils.extractNodeId;
-import static de.javakaffee.web.msm.integration.TestUtils.get;
-import static de.javakaffee.web.msm.integration.TestUtils.getManager;
-import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
+import static de.javakaffee.web.msm.integration.TestUtils.*;
+import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -53,6 +44,7 @@ import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.integration.TestUtils.Response;
+import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
 /**
  * Integration test testing memcached failover.
@@ -112,6 +104,7 @@ public class MemcachedFailoverIntegrationTest {
                 " " + toString( _nodeId2, _address2 ) +
                 " " + toString( _nodeId3, _address3 );
             _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
+            getManager( _tomcat1 ).setSticky( true );
             _tomcat1.start();
         } catch( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
@@ -142,17 +135,18 @@ public class MemcachedFailoverIntegrationTest {
 
     /**
      * Tests, that on a memcached failover sessions are relocated to another node and that
-     * the session id reflects this.
+     * the session id reflects this. The session must no longer be available under the old
+     * session id.
      */
-    @Test( enabled = true )
-    public void testRelocateSession() throws Throwable {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testRelocateSession( final SessionAffinityMode sessionAffinity ) throws Throwable {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
         final String firstNode = extractNodeId( sid1 );
         assertNotNull( "No node id encoded in session id.", firstNode );
-
-        Thread.sleep( 50 );
 
         final FailoverInfo info = getFailoverInfo( firstNode );
         info.activeNode.stop();
@@ -169,22 +163,30 @@ public class MemcachedFailoverIntegrationTest {
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + secondNode,
                 "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
-        final Session session = getManager( _tomcat1 ).findSession( sid2 );
-        assertNotNull( session, "Session not found by new id " + sid2 );
-        assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
+        // we must get the same session back
+        assertEquals( makeRequest( _httpClient, _portTomcat1, sid2 ), sid2, "We should keep the sessionId." );
+        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+
+        // some more checks in sticky mode
+        if ( sessionAffinity.isSticky() ) {
+            final Session session = getManager( _tomcat1 ).findSession( sid2 );
+            assertNotNull( session, "Session not found by new id " + sid2 );
+            assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
+        }
 
     }
 
     /**
      * Tests that multiple memcached nodes can fail and backup/relocation handles this.
      */
-    @Test( enabled = true )
-    public void testMultipleMemcachedNodesFailure() throws Throwable {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testMultipleMemcachedNodesFailure( final SessionAffinityMode sessionAffinity ) throws Throwable {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
         final String firstNode = extractNodeId( sid1 );
-        LOG.debug( "Have firstNode " + firstNode );
         assertNotNull( "No node id encoded in session id.", firstNode );
 
         /* shutdown active and another memcached node
@@ -193,9 +195,8 @@ public class MemcachedFailoverIntegrationTest {
         info.activeNode.stop();
         final Map.Entry<String, MemCacheDaemon<?>> otherNodeWithId = info.otherNode();
         otherNodeWithId.getValue().stop();
-        LOG.debug( "Stopping otherNode " + otherNodeWithId.getKey() );
 
-        Thread.sleep( 1000 );
+        Thread.sleep( 300 );
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
         final String secondNode = extractNodeId( sid2 );
@@ -209,8 +210,15 @@ public class MemcachedFailoverIntegrationTest {
                 sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
                 "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
-        final Session session = getManager( _tomcat1 ).findSession( sid2 );
-        assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
+        // we must get the same session back
+        assertEquals( makeRequest( _httpClient, _portTomcat1, sid2 ), sid2, "We should keep the sessionId." );
+        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+
+        // some more checks in sticky mode
+        if ( sessionAffinity.isSticky() ) {
+            final Session session = getManager( _tomcat1 ).findSession( sid2 );
+            assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
+        }
 
     }
 
@@ -229,6 +237,8 @@ public class MemcachedFailoverIntegrationTest {
      */
     @Test( enabled = true )
     public void testAllMemcachedNodesFailure() throws Throwable {
+
+        getManager( _tomcat1 ).setSticky( true );
 
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
@@ -252,6 +262,9 @@ public class MemcachedFailoverIntegrationTest {
 
     @Test( enabled = true )
     public void testCookieNotSetWhenAllMemcachedsDownIssue40() throws IOException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( true );
+
         /* shutdown all memcached nodes
          */
         _daemon1.stop();
@@ -272,14 +285,15 @@ public class MemcachedFailoverIntegrationTest {
 
     }
 
-    @Test( enabled = true )
-    public void testCookieNotSetWhenRegularMemcachedDownIssue40() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testCookieNotSetWhenRegularMemcachedDownIssue40( final SessionAffinityMode sessionAffinity ) throws Exception {
 
         /* reconfigure tomcat with failover node
          */
         final String memcachedNodes = toString( _nodeId1, _address1 ) +
         " " + toString( _nodeId2, _address2 );
         restartTomcat( memcachedNodes, _nodeId1 );
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
         /* shutdown regular memcached node
          */
@@ -299,8 +313,10 @@ public class MemcachedFailoverIntegrationTest {
 
     }
 
-    @Test( enabled = true )
-    public void testReconfigureMemcachedNodesAtRuntimeFeature46() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testReconfigureMemcachedNodesAtRuntimeFeature46( final SessionAffinityMode sessionAffinity ) throws Exception {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
         /* reconfigure tomcat with only two memcached nodes
          */
@@ -337,6 +353,8 @@ public class MemcachedFailoverIntegrationTest {
 
     @Test( enabled = true )
     public void testReconfigureFailoverNodesAtRuntimeFeature46() throws Exception {
+
+        getManager( _tomcat1 ).setSticky( true );
 
         /* set failover nodes n2 and n3
          */

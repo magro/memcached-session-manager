@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.naming.NamingException;
@@ -46,6 +47,7 @@ import javax.servlet.http.HttpSessionEvent;
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
+import org.apache.catalina.Globals;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Role;
@@ -83,6 +85,7 @@ import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
 import org.apache.naming.NamingContext;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 
 import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.CacheImpl;
@@ -110,6 +113,8 @@ public class TestUtils {
     protected static final String PASSWORD = "secret";
     protected static final String USER_NAME = "testuser";
     protected static final String ROLE_NAME = "test";
+
+    public static final String STICKYNESS_PROVIDER = "stickynessProvider";
 
     public static String makeRequest( final HttpClient client, final int port, final String rsessionId ) throws IOException,
             HttpException {
@@ -146,23 +151,36 @@ public class TestUtils {
     public static Response get( final DefaultHttpClient client, final int port, final String rsessionId,
             final Credentials credentials )
         throws IOException, HttpException {
-        return get( client, port, null, rsessionId, credentials );
+        return get( client, port, null, rsessionId, null, null, credentials );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId ) throws IOException,
             HttpException {
-        return get( client, port, path, rsessionId, null );
+        return get( client, port, path, rsessionId, null, null, null );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
+            final Map<String, String> params ) throws IOException,
+            HttpException {
+        return get( client, port, path, rsessionId, null, params, null );
+    }
+
+    public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
+            final SessionTrackingMode sessionTrackingMode,
+            final Map<String, String> params,
             final Credentials credentials ) throws IOException,
             HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH;
-        final String url = baseUri + ( path != null ? path : "" );
+        String url = getUrl( port, path );
+        if ( params != null && !params.isEmpty() ) {
+            url += toQueryString( params );
+        }
+        if ( rsessionId != null && sessionTrackingMode == SessionTrackingMode.URL ) {
+            url += ";" + Globals.SESSION_PARAMETER_NAME + "=" + rsessionId;
+        }
         final HttpGet method = new HttpGet( url );
-        if ( rsessionId != null ) {
-            method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
+        if ( rsessionId != null && sessionTrackingMode == SessionTrackingMode.COOKIE ) {
+            method.setHeader( "Cookie", Globals.SESSION_COOKIE_NAME + "=" + rsessionId );
         }
 
         final HttpResponse response = credentials == null
@@ -174,6 +192,33 @@ public class TestUtils {
         }
 
         return readResponse( rsessionId, response );
+    }
+
+    private static String getUrl( final int port, String path ) throws IllegalArgumentException {
+        // we assume the context_path is "/"
+        if ( path != null && !path.startsWith( "/" ) ) {
+            // but we can also fix this
+            path = CONTEXT_PATH + path;
+        }
+        return "http://"+ DEFAULT_HOST +":"+ port + ( path != null ? path : CONTEXT_PATH );
+    }
+
+    /**
+     * @param params
+     * @return
+     */
+    private static String toQueryString( final Map<String, String> params ) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append( "?" );
+        for ( final Iterator<Entry<String, String>> iterator = params.entrySet().iterator(); iterator.hasNext(); ) {
+            final Entry<String, String> entry = iterator.next();
+            sb.append( entry.getKey() ).append( "=" ).append( entry.getValue() );
+            if ( iterator.hasNext() ) {
+                sb.append( "&" );
+            }
+        }
+        final String qs = sb.toString();
+        return qs;
     }
 
     private static HttpResponse executeRequestWithAuth( final DefaultHttpClient client, final HttpGet method,
@@ -230,8 +275,8 @@ public class TestUtils {
             final String rsessionId,
             final Map<String, String> params ) throws IOException, HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH;
-        final String url = baseUri + ( path != null ? path : "" );
+        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port;
+        final String url = getUrl( port, path );
         final HttpPost method = new HttpPost( url );
         if ( rsessionId != null ) {
             method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
@@ -314,7 +359,7 @@ public class TestUtils {
                 EvictionPolicy.LRU, 100000, 1024*1024 );
         daemon.setCache( new CacheImpl( cacheStorage ) );
         daemon.setAddr( address );
-        daemon.setVerbose( false );
+        daemon.setVerbose( true );
         return daemon;
     }
 
@@ -474,16 +519,16 @@ public class TestUtils {
             _responseSessionId = responseSessionId;
             _keyValues = keyValues;
         }
-        String getSessionId() {
+        public String getSessionId() {
             return _sessionId;
         }
-        String getResponseSessionId() {
+        public String getResponseSessionId() {
             return _responseSessionId;
         }
-        Map<String, String> getKeyValues() {
+        public Map<String, String> getKeyValues() {
             return _keyValues;
         }
-        String get( final String key ) {
+        public String get( final String key ) {
             return _keyValues.get( key );
         }
 
@@ -608,6 +653,54 @@ public class TestUtils {
             return _sessionDidActivate;
         }
 
+    }
+
+    /**
+     * Creates a map from the given keys and values (key1, value1, key2, value2, etc.).
+     * @param <T> the type of the keys and values.
+     * @param keysAndValues the keys and values, must be an even number of arguments.
+     * @return a {@link Map} or null if no argument was given.
+     */
+    public static <T> Map<T,T> asMap( final T ... keysAndValues ) {
+        if ( keysAndValues == null ) {
+            return null;
+        }
+        if ( keysAndValues.length % 2 != 0 ) {
+            throw new IllegalArgumentException( "You must provide an even number of arguments as key/value pairs." );
+        }
+
+        final Map<T,T> result = new HashMap<T,T>();
+        for ( int i = 0; i < keysAndValues.length; i++ ) {
+            if ( i % 2 == 1 ) {
+                result.put( keysAndValues[i - 1], keysAndValues[i] );
+            }
+        }
+
+        return result;
+    }
+
+    public static enum SessionTrackingMode {
+        COOKIE,
+        URL
+    }
+
+    public static enum SessionAffinityMode {
+        STICKY {
+            @Override public boolean isSticky() { return true; }
+        },
+        NON_STICKY {
+            @Override public boolean isSticky() { return false; }
+        };
+
+        public abstract boolean isSticky();
+    }
+
+    @DataProvider
+    public static Object[][] stickynessProvider() {
+        return new Object[][] {
+                { SessionAffinityMode.STICKY },
+                { SessionAffinityMode.NON_STICKY }
+        };
     }
 
 }

@@ -18,6 +18,10 @@ package de.javakaffee.web.msm;
 
 import java.util.regex.Pattern;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -27,13 +31,15 @@ import org.apache.juli.logging.LogFactory;
  * memcached id from a compound session id.
  * <p>
  * The session id is of the following format:
- * <code>[^-.]+-[^.]+(\.[\w]+)?</code>
+ * <code>[^-.]+-[^.]+(\.[^.]+)?</code>
  * </p>
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 public class SessionIdFormat {
+
+    private static final String BACKUP_PREFIX = "bak:";
 
     private static final Log LOG = LogFactory.getLog( SessionIdFormat.class );
 
@@ -52,7 +58,8 @@ public class SessionIdFormat {
      * @return the sessionId which now contains the memcachedId if one was provided, otherwise
      *  the sessionId unmodified.
      */
-    public String createSessionId( final String sessionId, final String memcachedId ) {
+    @Nonnull
+    public String createSessionId( @Nonnull final String sessionId, @Nullable final String memcachedId ) {
         if ( LOG.isDebugEnabled() ) {
             LOG.debug( "Creating new session id with orig id '" + sessionId + "' and memcached id '" + memcachedId + "'." );
         }
@@ -78,7 +85,8 @@ public class SessionIdFormat {
      * @return the sessionId which now contains the new memcachedId instead the
      *         former one.
      */
-    public String createNewSessionId( final String sessionId, final String newMemcachedId ) {
+    @Nonnull
+    public String createNewSessionId( @Nonnull final String sessionId, @Nonnull final String newMemcachedId ) {
         final int idxDash = sessionId.indexOf( '-' );
         final int idxDot = sessionId.indexOf( '.' );
 
@@ -104,7 +112,8 @@ public class SessionIdFormat {
      * @return the sessionId which now contains the new jvmRoute instead the
      *         former one.
      */
-    public String changeJvmRoute( final String sessionId, final String newJvmRoute ) {
+    @Nonnull
+    public String changeJvmRoute( @Nonnull final String sessionId, @Nonnull final String newJvmRoute ) {
         return stripJvmRoute( sessionId ) + "." + newJvmRoute;
     }
 
@@ -116,7 +125,7 @@ public class SessionIdFormat {
      *            the session id
      * @return true if matching, otherwise false.
      */
-    public boolean isValid( final String sessionId ) {
+    public boolean isValid( @Nullable final String sessionId ) {
         return sessionId != null && _pattern.matcher( sessionId ).matches();
     }
 
@@ -129,7 +138,8 @@ public class SessionIdFormat {
      * @return the memcached id or null if the session id didn't contain any
      *         memcached id.
      */
-    public String extractMemcachedId( final String sessionId ) {
+    @CheckForNull
+    public String extractMemcachedId( @Nonnull final String sessionId ) {
         final int idxDash = sessionId.indexOf( '-' );
         if ( idxDash < 0 ) {
             return null;
@@ -150,7 +160,8 @@ public class SessionIdFormat {
      *            jvmRoute.
      * @return the jvm route or null if the session id didn't contain any.
      */
-    public String extractJvmRoute( final String sessionId ) {
+    @CheckForNull
+    public String extractJvmRoute( @Nonnull final String sessionId ) {
         final int idxDot = sessionId.indexOf( '.' );
         return idxDot < 0 ? null : sessionId.substring( idxDot + 1 );
     }
@@ -163,9 +174,44 @@ public class SessionIdFormat {
      *            jvmRoute.
      * @return the session id without the jvm route.
      */
-    public String stripJvmRoute( final String sessionId ) {
+    @Nonnull
+    public String stripJvmRoute( @Nonnull final String sessionId ) {
         final int idxDot = sessionId.indexOf( '.' );
         return idxDot < 0 ? sessionId : sessionId.substring( 0, idxDot );
+    }
+
+    /**
+     * Creates the name/key that can be used for the lock stored in memcached.
+     * @param sessionId the session id for that a lock key shall be created.
+     * @return a String.
+     */
+    @Nonnull
+    public String createLockName( @Nonnull final String sessionId ) {
+        if ( sessionId == null ) {
+            throw new IllegalArgumentException( "The sessionId must not be null." );
+        }
+        return "lock:" + sessionId;
+    }
+
+    /**
+     * Creates the name/key that is used for the data (session or validity info)
+     * that is additionally stored in a secondary memcached node for non-sticky sessions.
+     * @param origKey the session id (or validity info key) for that a key shall be created.
+     * @return a String.
+     */
+    @Nonnull
+    public String createBackupKey( @Nonnull final String origKey ) {
+        if ( origKey == null ) {
+            throw new IllegalArgumentException( "The origKey must not be null." );
+        }
+        return BACKUP_PREFIX + origKey;
+    }
+
+    /**
+     * Determines, if the given key is a backup key, if it was created via {@link #createBackupKey(String)}.
+     */
+    public boolean isBackupKey( @Nonnull final String key ) {
+        return key.startsWith( BACKUP_PREFIX );
     }
 
 }

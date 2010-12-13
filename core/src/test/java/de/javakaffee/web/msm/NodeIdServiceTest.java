@@ -46,7 +46,7 @@ public class NodeIdServiceTest {
             }
         };
         final NodeIdService cut = new NodeIdService( new NodeAvailabilityCache<String>( 10, 100, cacheLoader ),
-                Arrays.asList( nodeId1 ), Collections.<String> emptyList() );
+                NodeIdList.create( nodeId1 ), Collections.<String> emptyList() );
         Assert.assertTrue( cut.isNodeAvailable( nodeId1 ) );
         cut.setNodeAvailable( nodeId1, false );
         Assert.assertFalse( cut.isNodeAvailable( nodeId1 ) );
@@ -59,7 +59,7 @@ public class NodeIdServiceTest {
     public final void testGetNextNodeId_SingleNode() {
         final CacheLoader<String> cacheLoader = new DummyCacheLoader( null );
         final NodeIdService cut = new NodeIdService( new NodeAvailabilityCache<String>( 10, 100, cacheLoader ),
-                Arrays.asList( "n1" ), null );
+                NodeIdList.create( "n1" ), null );
         final String actual = cut.getAvailableNodeId( "n1" );
         assertNull( actual, "For a sole existing node we cannot get a next node" );
     }
@@ -78,7 +78,7 @@ public class NodeIdServiceTest {
 
         final CacheLoader<String> cacheLoader = new DummyCacheLoader( null );
         final NodeIdService cut = new NodeIdService( new NodeAvailabilityCache<String>( 10, 100, cacheLoader ),
-                Arrays.asList( nodeId1, nodeId2 ), null );
+                NodeIdList.create( nodeId1, nodeId2 ), null );
 
         String actual = cut.getAvailableNodeId( nodeId1 );
         assertEquals( nodeId2, actual );
@@ -102,7 +102,7 @@ public class NodeIdServiceTest {
 
         final CacheLoader<String> cacheLoader = new DummyCacheLoader( Arrays.asList( nodeId1 ) );
         final NodeIdService cut = new NodeIdService( new NodeAvailabilityCache<String>( 10, 100, cacheLoader ),
-                Arrays.asList( nodeId1, nodeId2 ), null );
+                NodeIdList.create( nodeId1, nodeId2 ), null );
 
         final String actual = cut.getAvailableNodeId( nodeId2 );
         assertNull( actual );
@@ -119,7 +119,7 @@ public class NodeIdServiceTest {
         final String nodeId2 = "n2";
 
         final NodeIdService cut = new NodeIdService( createNodeAvailabilityCache(),
-                Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
+                NodeIdList.create( nodeId1 ), Arrays.asList( nodeId2 ) );
 
         final String actual = cut.getAvailableNodeId( nodeId1 );
         assertEquals( nodeId2, actual, "The failover node is not chosen" );
@@ -138,7 +138,7 @@ public class NodeIdServiceTest {
         final String nodeId1 = "n1";
         final String nodeId2 = "n2";
         final NodeIdService cut = new NodeIdService( createNodeAvailabilityCache(),
-                Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
+                NodeIdList.create( nodeId1 ), Arrays.asList( nodeId2 ) );
 
         final String actual = cut.getAvailableNodeId( nodeId2 );
         assertEquals( nodeId1, actual, "The regular node is not chosen" );
@@ -157,7 +157,7 @@ public class NodeIdServiceTest {
         final String nodeId1 = "n1";
         final String nodeId2 = "n2";
         final NodeIdService cut = new NodeIdService( createNodeAvailabilityCache( nodeId1 ),
-                Arrays.asList( nodeId1 ), Arrays.asList( nodeId2 ) );
+                NodeIdList.create( nodeId1 ), Arrays.asList( nodeId2 ) );
 
         final String actual = cut.getAvailableNodeId( nodeId2 );
         assertNull( actual );
@@ -178,7 +178,7 @@ public class NodeIdServiceTest {
         final String nodeId2 = "n2";
         final String nodeId3 = "n3";
         final NodeIdService cut = new NodeIdService( createNodeAvailabilityCache( nodeId1 ),
-                Arrays.asList( nodeId1 ), Arrays.asList( nodeId2, nodeId3 ) );
+                NodeIdList.create( nodeId1 ), Arrays.asList( nodeId2, nodeId3 ) );
 
         final String actual = cut.getAvailableNodeId( nodeId2 );
         assertEquals( nodeId3, actual, "The second failover node is not chosen" );

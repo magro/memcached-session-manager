@@ -17,6 +17,7 @@ TC_COYOTE = transitive( "org.apache.tomcat:tomcat-coyote:jar:#{TC_VERSION}" )
 MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.5').from(file('lib/memcached-2.5.jar'))
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
+JSR305 = 'com.google.code.findbugs:jsr305:jar:1.3.9'
 
 # Kryo
 KRYO_SERIALIZERS = artifact( 'de.javakaffee:kryoserializers:jar:0.8' ).from(file('lib/kryo-serializers-0.8.jar'))
@@ -69,7 +70,7 @@ define 'msm' do
 
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
-    compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED )
+    compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED, JSR305 )
     test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO, HIBERNATE, HIBERNATE_ANNOTATIONS, JAVASSIST, HSQLDB )
     package :jar, :id => 'memcached-session-manager'
     package(:jar, :classifier => 'sources', :id => 'memcached-session-manager').include :from => compile.sources 

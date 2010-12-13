@@ -22,15 +22,14 @@ import java.util.Map;
 
 /**
  * Resolves an {@link InetSocketAddress} to a memcached node id.
- * 
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
- * @version $Id$
+ *
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public abstract class NodeIdResolver {
 
     /**
      * Resolve an {@link InetSocketAddress} to a memcached node id.
-     * 
+     *
      * @param address
      *            the address of the memcached node
      * @return the memcached node id
@@ -40,11 +39,11 @@ public abstract class NodeIdResolver {
     /**
      * Start to build a {@link NodeIdResolver} with the help of the builder. You
      * can use it like this:
-     * 
+     *
      * <pre>
      * NodeIdResolver resolver = NodeIdResolver.node( nodeId1, address1 ).node( nodeId2, address2 ).build()
      * </pre>
-     * 
+     *
      * @param id
      *            the id of the memcached node
      * @param address
@@ -65,7 +64,7 @@ public abstract class NodeIdResolver {
 
         /**
          * Add a new node with the give id and address.
-         * 
+         *
          * @param id
          *            the node id
          * @param address
@@ -82,7 +81,7 @@ public abstract class NodeIdResolver {
 
         /**
          * Creates the {@link NodeIdResolver}.
-         * 
+         *
          * @return a new instance/implementation of {@link NodeIdResolver}
          */
         public NodeIdResolver build() {
@@ -101,7 +100,7 @@ public abstract class NodeIdResolver {
 
         /**
          * Creates a new {@link MapBasedResolver} with the given addresses.
-         * 
+         *
          * @param address2Ids
          *            the mapping of addresses to node ids.
          */

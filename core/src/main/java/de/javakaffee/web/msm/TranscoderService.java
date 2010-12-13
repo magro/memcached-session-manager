@@ -53,7 +53,8 @@ public class TranscoderService {
             + 4 // maxInactiveInterval: int
             + 1 // isNew: boolean
             + 1 // isValid: boolean
-            + 8; // thisAccessedTime
+            + 8 // thisAccessedTime
+            + 8; // lastBackupTime
 
     private final SessionAttributesTranscoder _attributesTranscoder;
 
@@ -200,6 +201,7 @@ public class TranscoderService {
         idx = encodeBoolean( session.isNewInternal(), data, idx );
         idx = encodeBoolean( session.isValidInternal(), data, idx );
         idx = encodeNum( session.getThisAccessedTimeInternal(), data, idx, 8 );
+        idx = encodeNum( session.getLastBackupTime(), data, idx, 8 );
         idx = encodeNum( idData.length, data, idx, 2 );
         idx = copy( idData, data, idx );
         idx = encodeNum( AuthType.valueOfValue( session.getAuthType() ).getId(), data, idx, 2 );
@@ -226,14 +228,15 @@ public class TranscoderService {
         result.setIsNewInternal( decodeBoolean( data, 24 ) );
         result.setIsValidInternal( decodeBoolean( data, 25 ) );
         result.setThisAccessedTimeInternal( decodeNum( data, 26, 8 ) );
+        result.setLastBackupTime( decodeNum( data, 34, 8 ) );
 
-        final short idLength = (short) decodeNum( data, 34, 2 );
-        result.setIdInternal( decodeString( data, 36, idLength ) );
+        final short idLength = (short) decodeNum( data, 42, 2 );
+        result.setIdInternal( decodeString( data, 44, idLength ) );
 
-        final short authTypeId = (short)decodeNum( data, 36 + idLength, 2 );
+        final short authTypeId = (short)decodeNum( data, 44 + idLength, 2 );
         result.setAuthType( AuthType.valueOfId( authTypeId ).getValue() );
 
-        final int currentIdx = 36 + idLength + 2;
+        final int currentIdx = 44 + idLength + 2;
         final short principalDataLength = (short) decodeNum( data, currentIdx, 2 );
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];
@@ -326,7 +329,7 @@ public class TranscoderService {
      *            the number of bytes to store for the number
      * @return the next beginIndex (<code>beginIndex + maxBytes</code>).
      */
-    private static int encodeNum( final long num, final byte[] data, final int beginIndex, final int maxBytes ) {
+    public static int encodeNum( final long num, final byte[] data, final int beginIndex, final int maxBytes ) {
         for ( int i = 0; i < maxBytes; i++ ) {
             final int pos = maxBytes - i - 1; // the position of the byte in the number
             final int idx = beginIndex + pos; // the index in the data array
@@ -335,7 +338,7 @@ public class TranscoderService {
         return beginIndex + maxBytes;
     }
 
-    private static long decodeNum( final byte[] data, final int beginIndex, final int numBytes ) {
+    public static long decodeNum( final byte[] data, final int beginIndex, final int numBytes ) {
         long result = 0;
         for ( int i = 0; i < numBytes; i++ ) {
             final byte b = data[beginIndex + i];
