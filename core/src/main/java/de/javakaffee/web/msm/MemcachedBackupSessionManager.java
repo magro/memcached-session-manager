@@ -175,6 +175,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private final AtomicBoolean _enabled = new AtomicBoolean( true );
 
+    private final boolean _sticky = false;
+
     // -------------------- END configuration properties --------------------
 
     protected Statistics _statistics;
@@ -695,7 +697,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
         }
-        return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
+        final Future<BackupResultStatus> result = _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
+        if ( !_sticky ) {
+            remove( session, false );
+        }
+        return result;
     }
 
     protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {
@@ -722,13 +728,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                  */
                 final Object object = _memcached.get( sessionId, _upgradeSupportTranscoder );
 
-                if ( _log.isDebugEnabled() ) {
-                    if ( object == null ) {
-                        _log.debug( "Session " + sessionId + " not found in memcached." );
-                    } else {
-                        _log.debug( "Found session with id " + sessionId );
-                    }
-                }
                 _nodeIdService.setNodeAvailable( nodeId, true );
 
                 if ( object != null ) {
@@ -768,12 +767,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void remove( final Session session ) {
+        remove( session, session.getNote( NODE_FAILURE ) != Boolean.TRUE );
+    }
+
+    private void remove( final Session session, final boolean removeFromMemcached ) {
         if ( _log.isDebugEnabled() ) {
-            _log.debug( "remove invoked, session.relocate:  " + session.getNote( SessionTrackerValve.RELOCATE ) +
-                    ", node failure: " + session.getNote( NODE_FAILURE ) +
+            _log.debug( "remove invoked, removeFromMemcached: " + removeFromMemcached +
                     ", id: " + session.getId() );
         }
-        if ( session.getNote( NODE_FAILURE ) != Boolean.TRUE ) {
+        if ( removeFromMemcached ) {
             deleteFromMemcached( session.getId() );
         }
         super.remove( session );

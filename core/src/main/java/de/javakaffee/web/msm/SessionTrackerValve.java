@@ -93,13 +93,25 @@ class SessionTrackerValve extends ValveBase {
             getNext().invoke( request, response );
         } else {
 
-            final boolean sessionIdChanged = changeRequestedSessionId( request, response );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( ">>>>>> Request starting: " + request.getRequestURI() + " ==================" );
+            }
 
-            getNext().invoke( request, response );
+            boolean sessionIdChanged = false;
+            try {
+                sessionIdChanged = changeRequestedSessionId( request, response );
+                getNext().invoke( request, response );
+            } finally {
+                backupSession( request, response, sessionIdChanged );
+            }
 
-            backupSession( request, response, sessionIdChanged );
-
-            logDebugResponseCookie( response );
+            if ( _log.isDebugEnabled() ) {
+                final Cookie respCookie = getCookie( response, JSESSIONID );
+                if ( respCookie != null ) {
+                    _log.debug( "Sent response cookie: " + toString( respCookie ) );
+                }
+                _log.debug( "<<<<<< Request finished: " + request.getRequestURI() + " ==================" );
+            }
 
         }
 
@@ -155,29 +167,14 @@ class SessionTrackerValve extends ValveBase {
         final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
             ? request.getSessionInternal( false )
             : null;
-        if ( _log.isDebugEnabled() ) {
-            _log.debug( "Have a session: " + ( session != null ) );
-        }
         if ( session != null ) {
-
             _statistics.requestWithSession();
-
             _sessionBackupService.backupSession( session, sessionIdChanged );
-
         }
         else {
             _statistics.requestWithoutSession();
         }
 
-    }
-
-    private void logDebugResponseCookie( final Response response ) {
-        if ( _log.isDebugEnabled() ) {
-            final Cookie respCookie = getCookie( response, JSESSIONID );
-            _log.debug( "Finished, " + ( respCookie != null
-                ? toString( respCookie )
-                : null ) );
-        }
     }
 
     private String toString( final Cookie cookie ) {
