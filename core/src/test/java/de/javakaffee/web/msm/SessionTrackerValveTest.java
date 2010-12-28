@@ -28,7 +28,6 @@ import org.apache.catalina.Session;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
-import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.core.StandardContext;
 import org.apache.tomcat.util.http.ServerCookie;
 import org.jmock.Mock;
@@ -81,6 +80,13 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _responseControl.reset();
     }
 
+    private void verifyMocks() {
+        _sessionBackupServiceControl.verify();
+        _nextValve.verify();
+        _requestControl.verify();
+        _responseControl.verify();
+    }
+
     @Test
     public final void testGetSessionInternalNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
@@ -88,6 +94,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getHeader" ).with( eq( "Set-Cookie" ) ).will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
+
+        verifyMocks();
     }
 
     @Test
@@ -102,6 +110,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
+
+        verifyMocks();
 
     }
 
@@ -133,6 +143,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
 
         _sessionTrackerValve.invoke( _request, _response );
 
+        verifyMocks();
+
     }
 
     @Test
@@ -147,15 +159,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnTomcatFailover" ).with( eq( sessionId )  );
         _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnMemcachedFailover" ).with( eq( sessionId )  ).will( returnValue( newSessionId ) );
 
-        _requestControl.expects( once() ).method( "setRequestedSessionId" ).with( eq( newSessionId ) );
-
-        _requestControl.expects( atLeastOnce() ).method( "isRequestedSessionIdFromCookie" ).will( returnValue( true ) );
-
-        _requestControl.expects( atLeastOnce() ).method( "getContext" ).will( returnValue( _context ) );
-        _requestControl.expects( once() ).method( "isSecure" ).will( returnValue( false ) );
-        _responseControl.expects( once() ).method( "addSessionCookieInternal" ).with(
-                and( hasProperty( "name", eq( ApplicationSessionCookieConfig.getSessionCookieName( _context ) ) ),
-                     hasProperty( "value", eq( newSessionId ) ) ) );
+        _requestControl.expects( once() ).method( "changeSessionId" ).with( eq( newSessionId ) );
 
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
@@ -164,6 +168,8 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
             .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
+
+        verifyMocks();
 
     }
 

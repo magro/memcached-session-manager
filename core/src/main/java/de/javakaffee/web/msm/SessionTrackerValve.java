@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
-import javax.servlet.http.Cookie;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.Session;
@@ -106,18 +105,14 @@ class SessionTrackerValve extends ValveBase {
 
     /**
      * If there's a session for a requested session id that is taken over (tomcat failover) or
-     * that will be relocated (memcached failover), the new session id will be set as requested
-     * session id on the request and a new session id cookie will be set (if the session id was
-     * requested via a cookie and if the context is configured to use cookies for session ids).
+     * that will be relocated (memcached failover), the new session id will be set (via {@link Request#changeSessionId(String)}).
      *
      * @param request the request
      * @param response the response
      *
      * @return <code>true</code> if the id of a valid session was changed.
      *
-     * @see Request#setRequestedSessionId(String)
-     * @see Request#isRequestedSessionIdFromCookie()
-     * @see Context#getCookies()
+     * @see Request#changeSessionId(String)
      */
     private boolean changeRequestedSessionId( final Request request, final Response response ) {
         /*
@@ -131,10 +126,7 @@ class SessionTrackerValve extends ValveBase {
             }
 
             if ( newSessionId != null ) {
-                request.setRequestedSessionId( newSessionId );
-                if ( request.isRequestedSessionIdFromCookie() ) {
-                    setSessionIdCookie( response, request, newSessionId );
-                }
+                request.changeSessionId( newSessionId );
                 return true;
             }
 
@@ -176,16 +168,6 @@ class SessionTrackerValve extends ValveBase {
             if ( header != null && header.contains( _sessionCookieName ) ) {
                 _log.debug( "Finished, " + header );
             }
-        }
-    }
-
-    private void setSessionIdCookie( final Response response, final Request request, final String sessionId ) {
-        //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
-        final Context context = request.getContext();
-        if ( context.getCookies() ) {
-            final Cookie newCookie = ApplicationSessionCookieConfig.createSessionCookie( context,
-                    sessionId, request.isSecure() );
-            response.addSessionCookieInternal( newCookie );
         }
     }
 
