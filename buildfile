@@ -8,11 +8,12 @@ repositories.remote << 'http://thimbleware.com/maven'
 repositories.remote << 'http://repository.jboss.com/maven2'
 #repositories.remote << 'http://powermock.googlecode.com/svn/repo'
 
+TC_VERSION = '7.0.6'
 #SERVLET_API = 'javax.servlet:servlet-api:jar:3.0'
-SERVLET_API = 'org.apache.tomcat:tomcat-servlet-api:jar:7.0.6'
-CATALINA = 'org.apache.tomcat:tomcat-catalina:jar:7.0.6'
-CATALINA_HA = 'org.apache.tomcat:tomcat-catalina-ha:jar:7.0.6'
-TC_COYOTE = transitive( 'org.apache.tomcat:tomcat-coyote:jar:7.0.6' )
+SERVLET_API = "org.apache.tomcat:tomcat-servlet-api:jar:#{TC_VERSION}"
+CATALINA = "org.apache.tomcat:tomcat-catalina:jar:#{TC_VERSION}"
+CATALINA_HA = "org.apache.tomcat:tomcat-catalina-ha:jar:#{TC_VERSION}"
+TC_COYOTE = transitive( "org.apache.tomcat:tomcat-coyote:jar:#{TC_VERSION}" )
 MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.5').from(file('lib/memcached-2.5.jar'))
 JAVOLUTION = artifact('javolution:javolution:jar:5.4.3.1').from(file('lib/javolution-5.4.3.1.jar'))
 XSTREAM = transitive( 'com.thoughtworks.xstream:xstream:jar:1.3.1' )
