@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -25,6 +26,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
 import org.apache.catalina.Context;
+import org.apache.catalina.Globals;
 import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -41,8 +43,6 @@ import org.apache.juli.logging.LogFactory;
  */
 class SessionTrackerValve extends ValveBase {
 
-    static final String JSESSIONID = "JSESSIONID";
-
     static final String RELOCATE = "session.relocate";
 
     private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
@@ -52,6 +52,7 @@ class SessionTrackerValve extends ValveBase {
     private final Statistics _statistics;
     private final AddCookieInteralStrategy _addCookieInteralStrategy;
     private final AtomicBoolean _enabled;
+    private final String _sessionCookieName;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -81,6 +82,42 @@ class SessionTrackerValve extends ValveBase {
         _statistics = statistics;
         _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
         _enabled = enabled;
+        _sessionCookieName = getSessionCookieName( context );
+    }
+
+    private String getSessionCookieName( final Context context ) {
+        String result = getSessionCookieNameFromContext( context );
+        if ( result == null ) {
+            result = Globals.SESSION_COOKIE_NAME;
+            _log.debug( "Using session cookie name from context: " + result );
+        }
+        return result;
+    }
+
+    protected String getSessionCookieNameFromContext( final Context context ) {
+        // since 6.0.27 the session cookie name, domain and path is configurable per context,
+        // see issue http://issues.apache.org/bugzilla/show_bug.cgi?id=48379
+        try {
+            final Method getSessionCookieName = Context.class.getDeclaredMethod( "getSessionCookieName" );
+            final String result = (String) getSessionCookieName.invoke( context );
+            if ( result != null ) {
+                _log.debug( "Using session cookie name from context: " + result );
+            }
+            return result;
+        } catch( final NoSuchMethodException e ) {
+            // the context does not provide the method getSessionCookieName
+        } catch ( final Exception e ) {
+            throw new RuntimeException( "Could not read session cookie name from context.", e );
+        }
+        return null;
+    }
+
+    /**
+     * Returns the actually used name for the session cookie.
+     * @return the cookie name, never null.
+     */
+    protected String getSessionCookieName() {
+        return _sessionCookieName;
     }
 
     /**
@@ -152,7 +189,7 @@ class SessionTrackerValve extends ValveBase {
          * invoking getSessionInternal, as getSessionInternal triggers a
          * memcached lookup if the session is not available locally.
          */
-        final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
+        final Session session = request.getRequestedSessionId() != null || getCookie( response, _sessionCookieName ) != null
             ? request.getSessionInternal( false )
             : null;
         if ( _log.isDebugEnabled() ) {
@@ -173,7 +210,7 @@ class SessionTrackerValve extends ValveBase {
 
     private void logDebugResponseCookie( final Response response ) {
         if ( _log.isDebugEnabled() ) {
-            final Cookie respCookie = getCookie( response, JSESSIONID );
+            final Cookie respCookie = getCookie( response, _sessionCookieName );
             _log.debug( "Finished, " + ( respCookie != null
                 ? toString( respCookie )
                 : null ) );
@@ -191,7 +228,7 @@ class SessionTrackerValve extends ValveBase {
         //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
         final Context context = request.getContext();
         if ( context.getCookies() ) {
-            final Cookie newCookie = new Cookie( JSESSIONID, sessionId );
+            final Cookie newCookie = new Cookie( _sessionCookieName, sessionId );
             newCookie.setMaxAge( -1 );
             newCookie.setPath( getContextPath( request ) );
             if ( request.isSecure() ) {

@@ -9,7 +9,7 @@ repositories.remote << 'http://repository.jboss.com/maven2'
 #repositories.remote << 'http://powermock.googlecode.com/svn/repo'
 
 SERVLET_API = 'javax.servlet:servlet-api:jar:2.5'
-TC_VERSION = '6.0.26'
+TC_VERSION = '6.0.28'
 CATALINA = "org.apache.tomcat:catalina:jar:#{TC_VERSION}"
 CATALINA_HA = "org.apache.tomcat:catalina-ha:jar:#{TC_VERSION}"
 TC_COYOTE = transitive( "org.apache.tomcat:coyote:jar:#{TC_VERSION}" )

@@ -17,11 +17,12 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
+import org.apache.catalina.Globals;
 import org.apache.catalina.Session;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
@@ -77,6 +78,18 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     }
 
     @Test
+    public final void testSessionCookieName() throws IOException, ServletException {
+        final StandardContext context = new StandardContext();
+        context.setSessionCookieName( "foo" );
+        SessionTrackerValve cut = new SessionTrackerValve( null, context, _service, Statistics.create(), new AtomicBoolean(true) );
+        assertEquals( "foo", cut.getSessionCookieName() );
+
+        context.setSessionCookieName( null );
+        cut = new SessionTrackerValve( null, context, _service, Statistics.create(), new AtomicBoolean(true) );
+        assertEquals( Globals.SESSION_COOKIE_NAME, cut.getSessionCookieName() );
+    }
+
+    @Test
     public final void testGetSessionInternalNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
@@ -93,7 +106,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _responseControl.expects( once() ).method( "getCookies" )
-            .will( returnValue( new Cookie[] { new Cookie( SessionTrackerValve.JSESSIONID, "foo" ) } ) );
+            .will( returnValue( new Cookie[] { new Cookie( _sessionTrackerValve.getSessionCookieName(), "foo" ) } ) );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
@@ -137,7 +150,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( atLeastOnce() ).method( "getContext" ).will( returnValue( new StandardContext() ) );
         _requestControl.expects( once() ).method( "isSecure" ).will( returnValue( false ) );
         _responseControl.expects( once() ).method( "addCookieInternal" ).with(
-                and( hasProperty( "name", eq( SessionTrackerValve.JSESSIONID ) ),
+                and( hasProperty( "name", eq( _sessionTrackerValve.getSessionCookieName() ) ),
                      hasProperty( "value", eq( newSessionId ) ) ),
                      eq( false ) ); // default value in StandardContext.useHttpOnly
 
