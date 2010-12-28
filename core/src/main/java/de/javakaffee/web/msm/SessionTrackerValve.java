@@ -50,7 +50,6 @@ class SessionTrackerValve extends ValveBase {
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
     private final Statistics _statistics;
-    private final AddCookieInteralStrategy _addCookieInteralStrategy;
     private final AtomicBoolean _enabled;
     private final String _sessionCookieName;
 
@@ -80,7 +79,6 @@ class SessionTrackerValve extends ValveBase {
         }
         _sessionBackupService = sessionBackupService;
         _statistics = statistics;
-        _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
         _enabled = enabled;
         _sessionCookieName = getSessionCookieName( context );
     }
@@ -144,18 +142,14 @@ class SessionTrackerValve extends ValveBase {
 
     /**
      * If there's a session for a requested session id that is taken over (tomcat failover) or
-     * that will be relocated (memcached failover), the new session id will be set as requested
-     * session id on the request and a new session id cookie will be set (if the session id was
-     * requested via a cookie and if the context is configured to use cookies for session ids).
+     * that will be relocated (memcached failover), the new session id will be set (via {@link Request#changeSessionId(String)}).
      *
      * @param request the request
      * @param response the response
      *
      * @return <code>true</code> if the id of a valid session was changed.
      *
-     * @see Request#setRequestedSessionId(String)
-     * @see Request#isRequestedSessionIdFromCookie()
-     * @see Context#getCookies()
+     * @see Request#changeSessionId(String)
      */
     private boolean changeRequestedSessionId( final Request request, final Response response ) {
         /*
@@ -169,10 +163,7 @@ class SessionTrackerValve extends ValveBase {
             }
 
             if ( newSessionId != null ) {
-                request.setRequestedSessionId( newSessionId );
-                if ( request.isRequestedSessionIdFromCookie() ) {
-                    setSessionIdCookie( response, request, newSessionId );
-                }
+                request.changeSessionId( newSessionId );
                 return true;
             }
 
@@ -222,25 +213,6 @@ class SessionTrackerValve extends ValveBase {
                 cookie.getValue() ).append( ", domain=" ).append( cookie.getDomain() ).append( ", path=" ).append( cookie.getPath() ).append(
                 ", maxAge=" ).append( cookie.getMaxAge() ).append( ", secure=" ).append( cookie.getSecure() ).append( ", version=" ).append(
                 cookie.getVersion() ).toString();
-    }
-
-    private void setSessionIdCookie( final Response response, final Request request, final String sessionId ) {
-        //_logger.fine( "Response is committed: " + response.isCommitted() + ", closed: " + response.isClosed() );
-        final Context context = request.getContext();
-        if ( context.getCookies() ) {
-            final Cookie newCookie = new Cookie( _sessionCookieName, sessionId );
-            newCookie.setMaxAge( -1 );
-            newCookie.setPath( getContextPath( request ) );
-            if ( request.isSecure() ) {
-                newCookie.setSecure( true );
-            }
-            _addCookieInteralStrategy.addCookieInternal( newCookie, response );
-        }
-    }
-
-    private String getContextPath( final Request request ) {
-        final String contextPath = request.getContext().getEncodedPath();
-        return contextPath != null && contextPath.length() > 0 ? contextPath : "/";
     }
 
     private Cookie getCookie( final Response response, final String name ) {
