@@ -578,6 +578,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return new MemcachedBackupSession( this );
     }
 
+    @Override
+    public void changeSessionId( final Session session ) {
+        // e.g. invoked by the AuthenticatorBase (for BASIC auth) on login to prevent session fixation
+        // so that session backup won't be omitted we must store this event
+        super.changeSessionId( session );
+        ((MemcachedBackupSession)session).setSessionIdChanged( true );
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -695,7 +703,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
         }
-        return _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
+        final MemcachedBackupSession msmSession = (MemcachedBackupSession) session;
+        return _backupSessionService.backupSession( msmSession, sessionIdChanged || msmSession.isSessionIdChanged() );
     }
 
     protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {

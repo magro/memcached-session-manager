@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -214,6 +215,34 @@ public class MemcachedBackupSessionManagerTest {
 
         _manager.backupSession( session, false ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
+    }
+
+    /**
+     * Test that session attribute serialization and hash calculation is only
+     * performed if the session and its attributes were accessed since the last backup/backup check.
+     * Otherwise this computing time shall be saved for a better world :-)
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * @throws TimeoutException
+     */
+    @Test
+    public void testChangeSessionId() throws InterruptedException, ExecutionException, TimeoutException {
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        session.setAttribute( "foo", "bar" );
+        _manager.backupSession( session, false ).get();
+
+        final String oldSessionId = session.getId();
+        _manager.changeSessionId( session );
+
+        // on session backup we specify sessionIdChanged as false as we're not aware of this fact
+        _manager.backupSession( session, false );
+
+        // remove session with old id and add it with the new id
+        verify( _memcachedMock, times( 1 ) ).delete( eq( oldSessionId ) );
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
     }
 
