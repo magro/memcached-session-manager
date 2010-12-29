@@ -219,12 +219,13 @@ public class MemcachedBackupSessionManagerTest {
     }
 
     /**
-     * Test that session attribute serialization and hash calculation is only
-     * performed if the session and its attributes were accessed since the last backup/backup check.
-     * Otherwise this computing time shall be saved for a better world :-)
-     * @throws ExecutionException
-     * @throws InterruptedException
-     * @throws TimeoutException
+     * Test for issue #68: External change of sessionId must be handled correctly.
+     *
+     * When the webapp is configured with BASIC auth the sessionId is changed on login since 6.0.21
+     * (AuthenticatorBase.register invokes manager.changeSessionId(session)).
+     * This change of the sessionId was not recognized by msm so that it might have happened that the
+     * session is removed from memcached under the old id but not sent to memcached (if the case the session
+     * was not accessed during this request at all, which is very unprobable but who knows).
      */
     @Test
     public void testChangeSessionId() throws InterruptedException, ExecutionException, TimeoutException {
