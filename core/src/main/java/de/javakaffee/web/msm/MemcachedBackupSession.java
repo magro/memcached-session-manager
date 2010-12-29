@@ -81,6 +81,8 @@ public final class MemcachedBackupSession extends StandardSession {
 
     private transient boolean _attributesAccessed;
 
+    private transient boolean _sessionIdChanged;
+
     /**
      * Creates a new instance without a given manager. This has to be
      * assigned via {@link #setManager(Manager)} before this session is
@@ -434,6 +436,22 @@ public final class MemcachedBackupSession extends StandardSession {
     public void backupFinished() {
         _authenticationChanged = false;
         _attributesAccessed = false;
+        _sessionIdChanged = false;
+    }
+
+    /**
+     * Returns the value previously set by {@link #setSessionIdChanged(boolean)}.
+     */
+    public boolean isSessionIdChanged() {
+        return _sessionIdChanged;
+    }
+
+    /**
+     * Store that the session id was changed externally.
+     * @param sessionIdChanged
+     */
+    public void setSessionIdChanged( final boolean sessionIdChanged ) {
+        _sessionIdChanged = sessionIdChanged;
     }
 
 }
