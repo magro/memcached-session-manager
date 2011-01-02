@@ -121,7 +121,7 @@ public class NonStickySessionsIntegrationTest {
      * tomcat when the request is finished.
      */
     @Test( enabled = true )
-    public void testTomcatFailover() throws IOException, InterruptedException, HttpException {
+    public void testNoStaleSessionsWithNonStickySessions() throws IOException, InterruptedException, HttpException {
 
         final String key = "foo";
         final String value1 = "bar";
