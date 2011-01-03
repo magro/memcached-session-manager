@@ -176,4 +176,16 @@ public class SessionIdFormat {
         return idxDot < 0 ? sessionId : sessionId.substring( 0, idxDot );
     }
 
+    /**
+     * Creates the name/key that can be used for the lock stored in memcached.
+     * @param sessionId the session id for that a lock key shall be created.
+     * @return a String.
+     */
+    public String createLockName( final String sessionId ) {
+        if ( sessionId == null ) {
+            throw new IllegalArgumentException( "The sessionId must not be null." );
+        }
+        return "lock:" + sessionId;
+    }
+
 }

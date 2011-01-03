@@ -49,6 +49,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
     private final MemcachedClient _memcached;
     private final NodeIdService _nodeIdService;
     private final Statistics _statistics;
+    private final boolean _unlockSession;
 
     /**
      * @param session
@@ -71,7 +72,8 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
             final int sessionBackupTimeout,
             final MemcachedClient memcached,
             final NodeIdService nodeIdService,
-            final Statistics statistics ) {
+            final Statistics statistics,
+            final boolean unlockSession ) {
         _session = session;
         _force = sessionIdChanged;
         _transcoderService = transcoderService;
@@ -80,6 +82,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
         _memcached = memcached;
         _nodeIdService = nodeIdService;
         _statistics = statistics;
+        _unlockSession = unlockSession;
     }
 
     /**
@@ -141,8 +144,22 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
         } finally {
             _session.setBackupRunning( false );
+            if ( _unlockSession ) {
+                releaseLock();
+            }
         }
 
+    }
+
+    private void releaseLock() {
+        try {
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Releasing lock for session " + _session.getIdInternal() );
+            }
+            _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
+        } catch( final Exception e ) {
+            _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
+        }
     }
 
     private byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {

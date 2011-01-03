@@ -589,4 +589,28 @@ public class TestUtils {
 
     }
 
+    /**
+     * Creates a map from the given keys and values (key1, value1, key2, value2, etc.).
+     * @param <T> the type of the keys and values.
+     * @param keysAndValues the keys and values, must be an even number of arguments.
+     * @return a {@link Map} or null if no argument was given.
+     */
+    public static <T> Map<T,T> asMap( final T ... keysAndValues ) {
+        if ( keysAndValues == null ) {
+            return null;
+        }
+        if ( keysAndValues.length % 2 != 0 ) {
+            throw new IllegalArgumentException( "You must provide an even number of arguments as key/value pairs." );
+        }
+
+        final Map<T,T> result = new HashMap<T,T>();
+        for ( int i = 0; i < keysAndValues.length; i++ ) {
+            if ( i % 2 == 1 ) {
+                result.put( keysAndValues[i - 1], keysAndValues[i] );
+            }
+        }
+
+        return result;
+    }
+
 }

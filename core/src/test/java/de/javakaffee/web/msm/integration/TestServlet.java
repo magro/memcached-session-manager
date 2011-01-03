@@ -41,6 +41,8 @@ public class TestServlet extends HttpServlet {
      * The key of the id in the response body.
      */
     public static final String ID = "id";
+    public static final String PATH_POST_WAIT = "/sleep";
+    public static final String PARAM_MILLIS = "millies";
 
     private static final long serialVersionUID = 7954803132860358448L;
 
@@ -80,6 +82,15 @@ public class TestServlet extends HttpServlet {
     protected void doPost( final HttpServletRequest request, final HttpServletResponse response ) throws ServletException, IOException {
 
         LOG.info( "invoked" );
+
+        final String pathInfo = request.getPathInfo();
+        if ( PATH_POST_WAIT.equals( pathInfo ) ) {
+            try {
+                Thread.sleep( Long.parseLong( request.getParameter( PARAM_MILLIS ) ) );
+            } catch ( final Exception e ) {
+                throw new ServletException( "Could not sleep.", e );
+            }
+        }
 
         final PrintWriter out = response.getWriter();
         final HttpSession session = request.getSession();

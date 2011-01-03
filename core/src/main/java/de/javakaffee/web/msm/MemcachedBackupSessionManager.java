@@ -16,6 +16,9 @@
  */
 package de.javakaffee.web.msm;
 
+import static java.lang.Math.min;
+import static java.lang.Thread.sleep;
+
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
@@ -24,7 +27,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -697,7 +702,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
         }
-        final Future<BackupResultStatus> result = _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
+        final boolean unlockSession = !_sticky;
+        final Future<BackupResultStatus> result = _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged, unlockSession );
         if ( !_sticky ) {
             remove( session, false );
         }
@@ -717,6 +723,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 _log.debug( "Loading session from memcached: " + sessionId );
             }
             try {
+
+                if ( !_sticky ) {
+                    aquireLock( sessionId, 10, 500, 2000 );
+                }
 
                 final long start = System.currentTimeMillis();
 
@@ -760,6 +770,37 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             }
         }
         return null;
+    }
+
+    private void aquireLock( final String sessionId, final long retryInterval, final long maxRetryInterval, final long timeout ) throws InterruptedException,
+        ExecutionException {
+        try {
+            aquireLock( sessionId, retryInterval, maxRetryInterval, timeout, System.currentTimeMillis() );
+        } catch ( final TimeoutException e ) {
+            _log.warn( "Reached timeout when trying to aquire lock for session " + sessionId + ". Will use this session without this lock." );
+        }
+    }
+
+    private void aquireLock( final String sessionId, final long retryInterval, final long maxRetryInterval,
+            final long timeout, final long start ) throws InterruptedException, ExecutionException, TimeoutException {
+        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, "void" );
+        if ( result.get().booleanValue() ) {
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Locked session " + sessionId );
+            }
+            return;
+        }
+        else {
+            if ( System.currentTimeMillis() >= start + timeout  ) {
+                throw new TimeoutException( "Reached timeout when trying to aquire lock for session " + sessionId );
+            }
+            final long timeToWait = min( retryInterval, maxRetryInterval );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Could not aquire lock for session " + sessionId + ", waiting " + timeToWait + " millis now..." );
+            }
+            sleep( timeToWait );
+            aquireLock( sessionId, retryInterval * 2, maxRetryInterval, timeout, start );
+        }
     }
 
     /**

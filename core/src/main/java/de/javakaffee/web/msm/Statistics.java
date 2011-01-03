@@ -133,7 +133,7 @@ public class Statistics {
      * if async session backup shall be done.
      *
      * @return the effectiveBackupProbe
-     * @see BackupSessionService#backupSession(MemcachedBackupSession, boolean)
+     * @see BackupSessionService#backupSession(MemcachedBackupSession, boolean, boolean)
      */
     public MinMaxAvgProbe getEffectiveBackupProbe() {
         return _effectiveBackupProbe;
