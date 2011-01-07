@@ -49,18 +49,17 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
     private final MemcachedClient _memcached;
     private final NodeIdService _nodeIdService;
     private final Statistics _statistics;
-    private final boolean _unlockSession;
 
     /**
      * @param session
      *            the session to save
+     * @param sessionBackupAsync
+     * @param sessionBackupTimeout
+     * @param memcached
      * @param force
      *            specifies, if the session needs to be saved by all means, e.g.
      *            as it has to be relocated to another memcached
      *            node (the session id had been changed before in this case).
-     * @param sessionBackupAsync
-     * @param sessionBackupTimeout
-     * @param memcached
      * @param nodeAvailabilityCache
      * @param nodeIds
      * @param failoverNodeIds
@@ -72,8 +71,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
             final int sessionBackupTimeout,
             final MemcachedClient memcached,
             final NodeIdService nodeIdService,
-            final Statistics statistics,
-            final boolean unlockSession ) {
+            final Statistics statistics ) {
         _session = session;
         _force = sessionIdChanged;
         _transcoderService = transcoderService;
@@ -82,7 +80,6 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
         _memcached = memcached;
         _nodeIdService = nodeIdService;
         _statistics = statistics;
-        _unlockSession = unlockSession;
     }
 
     /**
@@ -144,7 +141,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
         } finally {
             _session.setBackupRunning( false );
-            if ( _unlockSession ) {
+            if ( _session.isLocked()  ) {
                 releaseLock();
             }
         }
@@ -157,6 +154,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 _log.debug( "Releasing lock for session " + _session.getIdInternal() );
             }
             _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
+            _session.releaseLock();
         } catch( final Exception e ) {
             _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
         }

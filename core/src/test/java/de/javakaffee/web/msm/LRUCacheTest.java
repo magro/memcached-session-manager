@@ -16,8 +16,12 @@
  */
 package de.javakaffee.web.msm;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 import java.util.Arrays;
+import java.util.Comparator;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -62,6 +66,15 @@ public class LRUCacheTest {
     }
 
     @Test
+    public void testRemove() {
+        final LRUCache<String,String> cut = new LRUCache<String, String>( 3 );
+        cut.put("foo", "bar");
+        assertTrue( cut.containsKey( "foo" ) );
+        assertEquals( cut.remove( "foo" ), "bar" );
+        assertFalse( cut.containsKey( "foo" ) );
+    }
+
+    @Test
     public void testCacheSize() {
         final LRUCache<String,String> cut = new LRUCache<String, String>( 1 );
         cut.put("foo", "bar");
@@ -78,6 +91,32 @@ public class LRUCacheTest {
         Assert.assertEquals( "bar", cut.get("foo") );
         Thread.sleep( 101 );
         Assert.assertNull( cut.get("foo"), "expired key still existing, unexpected cache size" );
+    }
+
+    @Test
+    public void testGetKeysSortedByValue() {
+        final LRUCache<String,Integer> cut = new LRUCache<String, Integer>( 3 );
+        final String f = "foo";
+        final String br = "bar";
+
+        cut.put(f, 1);
+        cut.put(br, 2);
+
+        final Comparator<Integer> c = new Comparator<Integer>() {
+
+            @Override
+            public int compare( final Integer o1, final Integer o2 ) {
+                return o1.compareTo( o2 );
+            }
+
+        };
+
+        Assert.assertTrue( Arrays.equals( new String[]{ f, br }, cut.getKeysSortedByValue( c ).toArray() ),
+                "invalid order of items, the keys are not order by their values" );
+
+        cut.put(f, 3);
+        Assert.assertTrue( Arrays.equals( new String[]{ br, f }, cut.getKeysSortedByValue( c ).toArray() ),
+                "invalid order of items, the keys are not order by their values" );
     }
 
 }

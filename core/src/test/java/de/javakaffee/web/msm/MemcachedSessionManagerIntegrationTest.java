@@ -310,7 +310,7 @@ public class MemcachedSessionManagerIntegrationTest {
         final SessionTranscoder oldSessionTranscoder = manager.getTranscoderFactory().createSessionTranscoder( manager );
         final Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
         assertTrue( future.get() );
-        final Session loadedFromMemcached = manager.loadFromMemcached( session.getId() );
+        final Session loadedFromMemcached = manager.loadFromMemcachedWithCheck( session.getId() );
         assertNotNull( loadedFromMemcached );
         assertDeepEquals( session, loadedFromMemcached );
     }

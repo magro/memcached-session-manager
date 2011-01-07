@@ -16,17 +16,8 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.integration.TestUtils.createCatalina;
-import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
-import static de.javakaffee.web.msm.integration.TestUtils.extractNodeId;
-import static de.javakaffee.web.msm.integration.TestUtils.get;
-import static de.javakaffee.web.msm.integration.TestUtils.getManager;
-import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
+import static de.javakaffee.web.msm.integration.TestUtils.*;
+import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -35,8 +26,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
@@ -112,6 +103,7 @@ public class MemcachedFailoverIntegrationTest {
                 " " + toString( _nodeId3, _address3 );
             _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
             _tomcat1.start();
+            getManager( _tomcat1 ).setSticky( true );
         } catch( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;

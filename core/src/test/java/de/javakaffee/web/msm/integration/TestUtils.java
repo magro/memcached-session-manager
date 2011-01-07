@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.naming.NamingException;
@@ -142,20 +143,29 @@ public class TestUtils {
     public static Response get( final DefaultHttpClient client, final int port, final String rsessionId,
             final Credentials credentials )
         throws IOException, HttpException {
-        return get( client, port, null, rsessionId, credentials );
+        return get( client, port, null, rsessionId, null, credentials );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId ) throws IOException,
             HttpException {
-        return get( client, port, path, rsessionId, null );
+        return get( client, port, path, rsessionId, null, null );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
+            final Map<String, String> params ) throws IOException,
+            HttpException {
+        return get( client, port, path, rsessionId, params, null );
+    }
+
+    public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
+            final Map<String, String> params,
             final Credentials credentials ) throws IOException,
             HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH;
-        final String url = baseUri + ( path != null ? path : "" );
+        String url = getUrl( port, path );
+        if ( params != null && !params.isEmpty() ) {
+            url += toQueryString( params );
+        }
         final HttpGet method = new HttpGet( url );
         if ( rsessionId != null ) {
             method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
@@ -170,6 +180,33 @@ public class TestUtils {
         }
 
         return readResponse( rsessionId, response );
+    }
+
+    private static String getUrl( final int port, String path ) throws IllegalArgumentException {
+        // we assume the context_path is "/"
+        if ( path != null && !path.startsWith( "/" ) ) {
+            // but we can also fix this
+            path = CONTEXT_PATH + path;
+        }
+        return "http://"+ DEFAULT_HOST +":"+ port + ( path != null ? path : CONTEXT_PATH );
+    }
+
+    /**
+     * @param params
+     * @return
+     */
+    private static String toQueryString( final Map<String, String> params ) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append( "?" );
+        for ( final Iterator<Entry<String, String>> iterator = params.entrySet().iterator(); iterator.hasNext(); ) {
+            final Entry<String, String> entry = iterator.next();
+            sb.append( entry.getKey() ).append( "=" ).append( entry.getValue() );
+            if ( iterator.hasNext() ) {
+                sb.append( "&" );
+            }
+        }
+        final String qs = sb.toString();
+        return qs;
     }
 
     private static HttpResponse executeRequestWithAuth( final DefaultHttpClient client, final HttpGet method,
@@ -226,8 +263,8 @@ public class TestUtils {
             final String rsessionId,
             final Map<String, String> params ) throws IOException, HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port + CONTEXT_PATH;
-        final String url = baseUri + ( path != null ? path : "" );
+        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port;
+        final String url = getUrl( port, path );
         final HttpPost method = new HttpPost( url );
         if ( rsessionId != null ) {
             method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );

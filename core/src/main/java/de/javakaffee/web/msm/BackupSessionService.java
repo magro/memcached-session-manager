@@ -124,7 +124,7 @@ public class BackupSessionService {
             final Map<String, Object> attributes = session.getAttributesInternal();
             final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
             final byte[] data = _transcoderService.serialize( session, attributesData );
-            createBackupSessionTask( session, true, false ).doBackupSession( session, data, attributesData );
+            createBackupSessionTask( session, true ).doBackupSession( session, data, attributesData );
         } finally {
             session.setExpirationUpdateRunning( false );
         }
@@ -151,14 +151,12 @@ public class BackupSessionService {
      *            the session to save
      * @param sessionIdChanged
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
-     * @param unlockSession
-     *            specifies, if the session should be unlocked after it has been stored in memcached.
      * @return a {@link Future} providing the result of the backup task.
      *
      * @see MemcachedBackupSessionManager#setSessionBackupAsync(boolean)
      * @see BackupSessionTask#call()
      */
-    public Future<BackupResultStatus> backupSession( final MemcachedBackupSession session, final boolean sessionIdChanged, final boolean unlockSession ) {
+    public Future<BackupResultStatus> backupSession( final MemcachedBackupSession session, final boolean sessionIdChanged ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Starting for session id " + session.getId() );
         }
@@ -194,7 +192,7 @@ public class BackupSessionService {
                 return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
             }
 
-            final BackupSessionTask task = createBackupSessionTask( session, sessionIdChanged, unlockSession );
+            final BackupSessionTask task = createBackupSessionTask( session, sessionIdChanged );
 
             final Future<BackupResultStatus> result = _executorService.submit( task );
 
@@ -216,7 +214,7 @@ public class BackupSessionService {
 
     }
 
-    private BackupSessionTask createBackupSessionTask( final MemcachedBackupSession session, final boolean sessionIdChanged, final boolean unlockSession ) {
+    private BackupSessionTask createBackupSessionTask( final MemcachedBackupSession session, final boolean sessionIdChanged ) {
         return new BackupSessionTask( session,
                 sessionIdChanged,
                 _transcoderService,
@@ -224,8 +222,7 @@ public class BackupSessionService {
                 _sessionBackupTimeout,
                 _memcached,
                 _nodeIdService,
-                _statistics,
-                unlockSession );
+                _statistics );
     }
 
     private boolean hasMemcachedIdSet( final MemcachedBackupSession session ) {

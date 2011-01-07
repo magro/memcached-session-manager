@@ -41,7 +41,7 @@ public class TestServlet extends HttpServlet {
      * The key of the id in the response body.
      */
     public static final String ID = "id";
-    public static final String PATH_POST_WAIT = "/sleep";
+    public static final String PATH_WAIT = "/sleep";
     public static final String PARAM_MILLIS = "millies";
 
     private static final long serialVersionUID = 7954803132860358448L;
@@ -57,6 +57,8 @@ public class TestServlet extends HttpServlet {
         LOG.info( " + starting..." );
 
         final HttpSession session = request.getSession();
+
+        waitIfRequested( request );
 
         final PrintWriter out = response.getWriter();
         out.println( ID + "=" + session.getId() );
@@ -83,17 +85,11 @@ public class TestServlet extends HttpServlet {
 
         LOG.info( "invoked" );
 
-        final String pathInfo = request.getPathInfo();
-        if ( PATH_POST_WAIT.equals( pathInfo ) ) {
-            try {
-                Thread.sleep( Long.parseLong( request.getParameter( PARAM_MILLIS ) ) );
-            } catch ( final Exception e ) {
-                throw new ServletException( "Could not sleep.", e );
-            }
-        }
+        final HttpSession session = request.getSession();
+
+        waitIfRequested( request );
 
         final PrintWriter out = response.getWriter();
-        final HttpSession session = request.getSession();
 
         out.println( "OK: " + session.getId() );
 
@@ -105,6 +101,17 @@ public class TestServlet extends HttpServlet {
             session.setAttribute( name, value );
         }
 
+    }
+
+    private void waitIfRequested( final HttpServletRequest request ) throws ServletException {
+        final String pathInfo = request.getPathInfo();
+        if ( PATH_WAIT.equals( pathInfo ) ) {
+            try {
+                Thread.sleep( Long.parseLong( request.getParameter( PARAM_MILLIS ) ) );
+            } catch ( final Exception e ) {
+                throw new ServletException( "Could not sleep.", e );
+            }
+        }
     }
 
 }

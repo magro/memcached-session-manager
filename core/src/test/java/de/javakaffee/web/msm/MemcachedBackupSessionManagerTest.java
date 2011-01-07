@@ -135,7 +135,7 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the second request, with session access
@@ -144,12 +144,12 @@ public class MemcachedBackupSessionManagerTest {
         session.endAccess();
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the third request, without session access
          */
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
     }
@@ -175,12 +175,12 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.endAccess();
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
@@ -204,15 +204,15 @@ public class MemcachedBackupSessionManagerTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.getAttribute( "foo" );
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        _manager.backupSession( session, false ).get();
+        _manager.backupSession( session, false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }

@@ -17,8 +17,8 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
@@ -58,7 +58,7 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     public void setUp() throws Exception {
         _sessionBackupServiceControl = mock( SessionBackupService.class );
         _service = (SessionBackupService) _sessionBackupServiceControl.proxy();
-        _sessionTrackerValve = new SessionTrackerValve( null, new StandardContext(), _service, Statistics.create(), new AtomicBoolean(true) );
+        _sessionTrackerValve = new SessionTrackerValve( null, new StandardContext(), _service, Statistics.create(), new AtomicBoolean(true), null );
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( (Valve) _nextValve.proxy() );
 

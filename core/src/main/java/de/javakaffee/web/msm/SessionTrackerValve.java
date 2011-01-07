@@ -17,10 +17,15 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
@@ -52,6 +57,7 @@ class SessionTrackerValve extends ValveBase {
     private final Statistics _statistics;
     private final AddCookieInteralStrategy _addCookieInteralStrategy;
     private final AtomicBoolean _enabled;
+    private @CheckForNull final ThreadLocal<Request> _requestsThreadLocal;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -68,9 +74,14 @@ class SessionTrackerValve extends ValveBase {
      * @param enabled
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
+     * @param requestsThreadLocal
+     *            the threadlocal to store requests, can be <code>null</code>.
      */
-    public SessionTrackerValve( final String ignorePattern, final Context context, final SessionBackupService sessionBackupService,
-            final Statistics statistics, final AtomicBoolean enabled ) {
+    public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final Context context,
+            @Nonnull final SessionBackupService sessionBackupService,
+            @Nonnull final Statistics statistics,
+            @Nonnull final AtomicBoolean enabled,
+            @Nullable final ThreadLocal<Request> requestsThreadLocal ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -81,6 +92,7 @@ class SessionTrackerValve extends ValveBase {
         _statistics = statistics;
         _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
         _enabled = enabled;
+        _requestsThreadLocal = requestsThreadLocal;
     }
 
     /**
@@ -94,15 +106,17 @@ class SessionTrackerValve extends ValveBase {
         } else {
 
             if ( _log.isDebugEnabled() ) {
-                _log.debug( ">>>>>> Request starting: " + request.getRequestURI() + " ==================" );
+                _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " ==================" );
             }
 
             boolean sessionIdChanged = false;
             try {
+                storeRequestThreadLocal( request );
                 sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
                 backupSession( request, response, sessionIdChanged );
+                resetRequestThreadLocal();
             }
 
             if ( _log.isDebugEnabled() ) {
@@ -110,11 +124,45 @@ class SessionTrackerValve extends ValveBase {
                 if ( respCookie != null ) {
                     _log.debug( "Sent response cookie: " + toString( respCookie ) );
                 }
-                _log.debug( "<<<<<< Request finished: " + request.getRequestURI() + " ==================" );
+                _log.debug( "<<<<<< Request finished: " + getURIWithQueryString( request ) + " ==================" );
             }
 
         }
 
+    }
+
+    @Nonnull
+    protected static String getURIWithQueryString( @Nonnull final Request request ) {
+        final String uri = request.getRequestURI();
+        final String qs = request.getMethod().toLowerCase().equals( "post" ) ? buildQueryString( request ) : request.getQueryString();
+        return qs != null ? uri + "?" + qs : uri;
+    }
+
+    @CheckForNull
+    private static String buildQueryString( @Nonnull final Request request ) {
+        final StringBuilder sb = new StringBuilder();
+        final Enumeration<?> enumeration = request.getParameterNames();
+        while (enumeration.hasMoreElements()) {
+            final String name = enumeration.nextElement().toString();
+            final String[] values = request.getParameterValues(name);
+            sb.append( name ).append( "=" ).append( Arrays.toString( values ) );
+            if ( enumeration.hasMoreElements() ) {
+                sb.append( "&" );
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    private void resetRequestThreadLocal() {
+        if ( _requestsThreadLocal != null ) {
+            _requestsThreadLocal.set( null );
+        }
+    }
+
+    private void storeRequestThreadLocal( @Nonnull final Request request ) {
+        if ( _requestsThreadLocal != null ) {
+            _requestsThreadLocal.set( request );
+        }
     }
 
     /**
@@ -169,7 +217,7 @@ class SessionTrackerValve extends ValveBase {
             : null;
         if ( session != null ) {
             _statistics.requestWithSession();
-            _sessionBackupService.backupSession( session, sessionIdChanged );
+            _sessionBackupService.backupSession( session, sessionIdChanged, getURIWithQueryString( request ) );
         }
         else {
             _statistics.requestWithoutSession();
@@ -261,10 +309,12 @@ class SessionTrackerValve extends ValveBase {
          *            the session to backup
          * @param sessionIdChanged
          *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
+         * @param requestId
+         *            the uri of the request for that the session backup shall be performed.
          *
          * @return a {@link Future} providing the {@link BackupResultStatus}.
          */
-        Future<BackupResultStatus> backupSession( Session session, boolean sessionIdChanged );
+        Future<BackupResultStatus> backupSession( Session session, boolean sessionIdChanged, String requestId );
 
         /**
          * The enumeration of possible backup results.

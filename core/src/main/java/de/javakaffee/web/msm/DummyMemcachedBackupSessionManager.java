@@ -91,7 +91,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged ) {
+    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged, String requestURI ) {
         _log.info( "Serializing session data for session " + session.getIdInternal() );
         final long startSerialization = System.currentTimeMillis();
         final byte[] data = _transcoderService.serializeAttributes( (MemcachedBackupSession) session, ((MemcachedBackupSession) session).getAttributesInternal() );
@@ -115,7 +115,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
         return result;
     }
 
-    protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {
+    protected MemcachedBackupSession loadFromMemcachedWithCheck( final String sessionId ) {
         return null;
     }
 

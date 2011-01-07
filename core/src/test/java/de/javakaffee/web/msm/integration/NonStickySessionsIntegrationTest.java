@@ -17,16 +17,19 @@
 package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestServlet.PARAM_MILLIS;
-import static de.javakaffee.web.msm.integration.TestServlet.PATH_POST_WAIT;
+import static de.javakaffee.web.msm.integration.TestServlet.PATH_WAIT;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -174,7 +177,7 @@ public class NonStickySessionsIntegrationTest {
 
             @Override
             public Response call() throws Exception {
-                return post( _httpClient, TC_PORT_1, PATH_POST_WAIT, sessionId, asMap( PARAM_MILLIS, "500",
+                return post( _httpClient, TC_PORT_1, PATH_WAIT, sessionId, asMap( PARAM_MILLIS, "500",
                         key2, value2 ) );
             }
 
@@ -199,6 +202,67 @@ public class NonStickySessionsIntegrationTest {
         assertEquals( response3.get( key1 ), value1 );
         assertEquals( response3.get( key2 ), value2 );
         assertEquals( response3.get( key3 ), value3 ); // failed without session locking
+
+    }
+
+    /**
+     * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
+     * tomcat when the request is finished.
+     */
+    @Test( enabled = true )
+    public void testReadOnlyRequestsDontLockSession() throws IOException, InterruptedException, HttpException, ExecutionException {
+
+        final String key1 = "k1";
+        final String value1 = "v1";
+        final String sessionId = post( _httpClient, TC_PORT_1, null, key1, value1 ).getSessionId();
+        assertNotNull( sessionId );
+
+        // perform a readonly request without waiting, we perform this one later again
+        final String path = "/mypath";
+        final Map<String, String> params = asMap( "foo", "bar" );
+        final Response response0 = get( _httpClient, TC_PORT_1, path, sessionId, params );
+        assertEquals( response0.getSessionId(), sessionId );
+
+        // perform a readonly, waiting request that we can perform again later
+        final long timeToWaitInMillis = 500;
+        final Map<String, String> paramsWait = asMap( PARAM_MILLIS, String.valueOf( timeToWaitInMillis ) );
+        final Response response1 = get( _httpClient, TC_PORT_1, PATH_WAIT, sessionId, paramsWait );
+        assertEquals( response1.getSessionId(), sessionId );
+
+        // now do it again, now in the background, and in parallel start another readonly request,
+        // both should not block each other
+        final long start = System.currentTimeMillis();
+        final Future<Response> response2 = _executor.submit( new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return get( _httpClient, TC_PORT_1, PATH_WAIT, sessionId, paramsWait );
+            }
+        });
+        final Future<Response> response3 = _executor.submit( new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return get( _httpClient, TC_PORT_1, PATH_WAIT, sessionId, paramsWait );
+            }
+        });
+        response2.get();
+        response3.get();
+        assertTrue ( ( System.currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
+                "The time for both requests should be less than 2 * the wait time if they don't block each other." );
+        assertEquals( response2.get().getSessionId(), sessionId );
+        assertEquals( response3.get().getSessionId(), sessionId );
+
+        // now perform a modifying request and a readonly in parallel which should not be blocked
+        final Future<Response> response4 = _executor.submit( new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return post( _httpClient, TC_PORT_1, PATH_WAIT, sessionId, asMap( PARAM_MILLIS, "500", "foo", "bar" ) );
+            }
+        });
+        Thread.sleep( 50 );
+        final Response response5 = get( _httpClient, TC_PORT_1, path, sessionId, params );
+        assertEquals( response5.getSessionId(), sessionId );
+        assertFalse( response4.isDone(), "The readonly request should return before the long, session locking one" );
+        assertEquals( response4.get().getSessionId(), sessionId );
 
     }
 

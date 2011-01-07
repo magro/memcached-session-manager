@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
 
+import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
@@ -79,6 +80,8 @@ public final class MemcachedBackupSession extends StandardSession {
     private transient boolean _authenticationChanged;
 
     private transient boolean _attributesAccessed;
+
+    private volatile transient LockStatus _lockStatus;
 
     /**
      * Creates a new instance without a given manager. This has to be
@@ -447,6 +450,34 @@ public final class MemcachedBackupSession extends StandardSession {
     public void backupFinished() {
         _authenticationChanged = false;
         _attributesAccessed = false;
+    }
+
+    /**
+     * Returns if there was a lock created in memcached.
+     */
+    public LockStatus getLockStatus() {
+        return _lockStatus;
+    }
+
+    /**
+     * Stores if there's a lock created in memcached.
+     */
+    public void setLockStatus( final LockStatus locked ) {
+        _lockStatus = locked;
+    }
+
+    /**
+     * Returns if there was a lock created in memcached.
+     */
+    public boolean isLocked() {
+        return _lockStatus == LockStatus.LOCKED;
+    }
+
+    /**
+     * Resets the lock status.
+     */
+    public void releaseLock() {
+        _lockStatus = null;
     }
 
 }

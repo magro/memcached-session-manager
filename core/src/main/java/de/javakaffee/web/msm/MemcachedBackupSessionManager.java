@@ -27,12 +27,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
 
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.MemcachedClient;
@@ -45,6 +51,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.connector.Request;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.LifecycleSupport;
@@ -74,6 +81,9 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  */
 public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, SessionBackupService, PropertyChangeListener {
 
+
+    private static final String LOCK_VALUE = "locked";
+
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
     private static final String INFO = NAME + "/1.0";
@@ -90,6 +100,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private static final String PROTOCOL_BINARY = "binary";
 
     protected static final String NODE_FAILURE = "node.failure";
+
+    private static final int LOCK_RETRY_INTERVAL = 10;
+    private static final int LOCK_MAX_RETRY_INTERVAL = 500;
+    private static final int LOCK_TIMEOUT = 2000;
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
@@ -180,8 +194,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private final AtomicBoolean _enabled = new AtomicBoolean( true );
 
-    private final boolean _sticky = false;
-
     // -------------------- END configuration properties --------------------
 
     protected Statistics _statistics;
@@ -219,6 +231,25 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private SerializingTranscoder _upgradeSupportTranscoder;
 
     private BackupSessionService _backupSessionService;
+
+    private boolean _sticky = false;
+    private final LockingMode _lockingMode = LockingMode.AUTO;
+    private ExecutorService _requestPatternDetectionExecutor;
+    private ReadOnlyRequestsCache _readOnlyRequestCache;
+    private ThreadLocal<Request> _requestsThreadLocal;
+
+    static enum LockingMode {
+        ALL, AUTO
+    }
+
+    static enum LockStatus {
+        /**
+         * For sticky sessions or readonly requests with non-sticky sessions there's no lock required.
+         */
+        LOCK_NOT_REQUIRED,
+        LOCKED,
+        COULD_NOT_AQUIRE_LOCK
+    }
 
     /**
      * Return descriptive information about this Manager implementation and the
@@ -269,11 +300,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         _statistics = Statistics.create( _enableStatistics );
 
-        /* add the valve for tracking requests for that the session must be sent
-         * to memcached
-         */
+        if ( !_sticky && _lockingMode == LockingMode.AUTO ) {
+            _requestsThreadLocal = new InheritableThreadLocal<Request>();
+            _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor();
+            _readOnlyRequestCache = new ReadOnlyRequestsCache();
+        }
         getContainer().getPipeline().addValve( new SessionTrackerValve( _requestUriIgnorePattern,
-                (Context) getContainer(), this, _statistics, _enabled ) );
+                (Context) getContainer(), this, _statistics, _enabled, _requestsThreadLocal ) );
 
         /* init memcached
          */
@@ -488,21 +521,53 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public Session findSession( final String id ) throws IOException {
-        StandardSession result = (StandardSession) super.findSession( id );
-        if ( result == null ) {
+        MemcachedBackupSession result = (MemcachedBackupSession) super.findSession( id );
+        if ( result == null && canHitMemcached( id ) ) {
+            // when the request comes from the container, it's from CoyoteAdapter to see if the session is valid
+            if ( isNonStickyAutoLocking() && _requestsThreadLocal.get() == null ) {
+                // return loadFromMemcached( id, true );
+                return checkSessionInMemcached( id );
+            }
+
+            // else load the session from memcached
             result = loadFromMemcached( id );
             // checking valid() would expire() the session if it's not valid!
             if ( result != null && result.isValid() ) {
                 addValidLoadedSession( result );
             }
         }
-        //        if ( result == null ) {
-        //            final String relocatedSessionId = _relocatedSessions.get( id );
-        //            if ( relocatedSessionId != null ) {
-        //                result = findSession( relocatedSessionId );
-        //            }
-        //        }
         return result;
+    }
+
+    /**
+     * Checks if there's a session stored in memcached for the given key.
+     */
+    @CheckForNull
+    private Session checkSessionInMemcached( @Nonnull final String id ) throws IOException {
+        /* we use "add" to see if memcached has this session
+         * - "1" is the lowest exptime possible, "0" would mean no expiration;
+         * - "-1" is just some value.
+         */
+        try {
+            final boolean noSessionExisting = _memcached.add( id, 1, -1 ).get().booleanValue();
+            if ( noSessionExisting ) {
+                _missingSessionsCache.put( id, Boolean.TRUE );
+                // as we created this object we should delete it
+                _memcached.delete( id );
+                return null;
+            }
+            return new EmptyValidSession();
+        } catch ( final InterruptedException e ) {
+            Thread.currentThread().interrupt();
+            throw new IOException( "Got interrupted while retrieving the session.", e );
+        } catch ( final ExecutionException e ) {
+            _log.warn( "An error occurred when trying to check if session is stored in memcached.", e );
+            throw new IOException( "Could not retrieve session.", e.getCause() );
+        }
+    }
+
+    private boolean isNonStickyAutoLocking() {
+        return !_sticky && _lockingMode == LockingMode.AUTO;
     }
 
     private void addValidLoadedSession( final StandardSession session ) {
@@ -531,7 +596,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         StandardSession session = null;
 
         if ( sessionId != null ) {
-            session = loadFromMemcached( sessionId );
+            session = loadFromMemcachedWithCheck( sessionId );
             // checking valid() would expire() the session if it's not valid!
             if ( session != null && session.isValid() ) {
                 addValidLoadedSession( session );
@@ -592,7 +657,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public String changeSessionIdOnTomcatFailover( final String requestedSessionId ) {
         final String localJvmRoute = getJvmRoute();
         if ( localJvmRoute != null && !localJvmRoute.equals( _sessionIdFormat.extractJvmRoute( requestedSessionId ) ) ) {
-            final MemcachedBackupSession session = loadFromMemcached( requestedSessionId );
+            final MemcachedBackupSession session = loadFromMemcachedWithCheck( requestedSessionId );
             // checking valid() can expire() the session!
             if ( session != null && session.isValid() ) {
                 return handleSessionTakeOver( session );
@@ -696,24 +761,73 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the session to save
      * @param sessionRelocationRequired
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
+     * @param requestId
+     *            the uri/id of the request for that the session backup shall be performed, used for readonly tracking.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged ) {
+    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged, final String requestId ) {
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
         }
-        final boolean unlockSession = !_sticky;
-        final Future<BackupResultStatus> result = _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged, unlockSession );
+        final Future<BackupResultStatus> result = _backupSessionService.backupSession( (MemcachedBackupSession) session, sessionIdChanged );
         if ( !_sticky ) {
             remove( session, false );
+            if ( _lockingMode == LockingMode.AUTO ) {
+                detectSessionReadOnlyRequestPattern( result, requestId );
+            }
         }
         return result;
     }
 
-    protected MemcachedBackupSession loadFromMemcached( final String sessionId ) {
-        if ( !_enabled.get() || !_sessionIdFormat.isValid( sessionId ) || _missingSessionsCache.get( sessionId ) != null ) {
+    private void detectSessionReadOnlyRequestPattern( final Future<BackupResultStatus> result, final String requestId ) {
+        final Callable<Void> task = new Callable<Void>() {
+
+            @Override
+            public Void call() {
+                try {
+                    if ( result.get() == BackupResultStatus.SKIPPED ) {
+                        _readOnlyRequestCache.readOnlyRequest( requestId );
+                    } else {
+                        _readOnlyRequestCache.modifyingRequest( requestId );
+                    }
+                } catch ( final Exception e ) {
+                    _readOnlyRequestCache.modifyingRequest( requestId );
+                }
+                return null;
+            }
+
+        };
+        /* A simple future does not need to go through the executor, but we can process the result right now.
+         */
+        if ( result instanceof SimpleFuture ) {
+            try {
+                task.call();
+            } catch ( final Exception e ) { /* caught in the callable */ }
+        }
+        else {
+            _requestPatternDetectionExecutor.submit( task );
+        }
+    }
+
+    protected MemcachedBackupSession loadFromMemcachedWithCheck( final String sessionId ) {
+        if ( !canHitMemcached( sessionId ) ) {
             return null;
         }
+        return loadFromMemcached( sessionId );
+    }
+
+    /**
+     * Checks if this manager {@link #isEnabled()}, if the given sessionId is valid (contains a memcached id)
+     * and if this sessionId is not in our missingSessionsCache.
+     */
+    private boolean canHitMemcached( @Nonnull final String sessionId ) {
+        return _enabled.get() && _sessionIdFormat.isValid( sessionId ) && _missingSessionsCache.get( sessionId ) == null;
+    }
+
+    /**
+     * Assumes that before you checked {@link #canHitMemcached(String)}.
+     */
+    private MemcachedBackupSession loadFromMemcached( final String sessionId ) {
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
         if ( !_nodeIdService.isNodeAvailable( nodeId ) ) {
             _log.debug( "Asked for session " + sessionId + ", but the related"
@@ -722,10 +836,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Loading session from memcached: " + sessionId );
             }
+
+            LockStatus lockStatus = null;
             try {
 
                 if ( !_sticky ) {
-                    aquireLock( sessionId, 10, 500, 2000 );
+                    lockStatus = acquireLock( sessionId, LOCK_RETRY_INTERVAL, LOCK_MAX_RETRY_INTERVAL, LOCK_TIMEOUT );
                 }
 
                 final long start = System.currentTimeMillis();
@@ -737,7 +853,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                  * specializations.
                  */
                 final Object object = _memcached.get( sessionId, _upgradeSupportTranscoder );
-
                 _nodeIdService.setNodeAvailable( nodeId, true );
 
                 if ( object != null ) {
@@ -748,6 +863,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     else {
                         result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
                     }
+                    result.setLockStatus( lockStatus );
+
                     _statistics.getLoadFromMemcachedProbe().registerSince( start );
                     if ( _log.isDebugEnabled() ) {
                         _log.debug( "Found session with id " + sessionId );
@@ -755,6 +872,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     return result;
                 }
                 else {
+                    if ( lockStatus == LockStatus.LOCKED ) {
+                        releaseLock( sessionId );
+                    }
                     _missingSessionsCache.put( sessionId, Boolean.TRUE );
                     if ( _log.isDebugEnabled() ) {
                         _log.debug( "Session " + sessionId + " not found in memcached." );
@@ -767,23 +887,47 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 _nodeIdService.setNodeAvailable( nodeId, false );
             } catch ( final Exception e ) {
                 _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
+                if ( lockStatus == LockStatus.LOCKED ) {
+                    releaseLock( sessionId );
+                }
             }
         }
         return null;
     }
 
-    private void aquireLock( final String sessionId, final long retryInterval, final long maxRetryInterval, final long timeout ) throws InterruptedException,
+    private LockStatus acquireLock( final String sessionId, final long retryInterval, final long maxRetryInterval, final long timeout ) throws InterruptedException,
         ExecutionException {
+
+        if ( _lockingMode == LockingMode.AUTO ) {
+            final Request request = _requestsThreadLocal.get();
+
+            if ( request == null ) {
+                throw new RuntimeException( "There's no request set, this indicates that this findSession" +
+                		"was triggered by the container which should already be handled in findSession." );
+            }
+
+            /* lets see if we can skip the locking as we consider this beeing a readonly request
+             */
+            if ( _readOnlyRequestCache.isReadOnlyRequest( SessionTrackerValve.getURIWithQueryString( request ) ) ) {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Not getting lock for readonly request " + SessionTrackerValve.getURIWithQueryString( request ) );
+                }
+                return LockStatus.LOCK_NOT_REQUIRED;
+            }
+        }
+
         try {
-            aquireLock( sessionId, retryInterval, maxRetryInterval, timeout, System.currentTimeMillis() );
+            acquireLock( sessionId, retryInterval, maxRetryInterval, timeout, System.currentTimeMillis() );
+            return LockStatus.LOCKED;
         } catch ( final TimeoutException e ) {
             _log.warn( "Reached timeout when trying to aquire lock for session " + sessionId + ". Will use this session without this lock." );
+            return LockStatus.COULD_NOT_AQUIRE_LOCK;
         }
     }
 
-    private void aquireLock( final String sessionId, final long retryInterval, final long maxRetryInterval,
+    private void acquireLock( final String sessionId, final long retryInterval, final long maxRetryInterval,
             final long timeout, final long start ) throws InterruptedException, ExecutionException, TimeoutException {
-        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, "void" );
+        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, LOCK_VALUE );
         if ( result.get().booleanValue() ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Locked session " + sessionId );
@@ -791,15 +935,31 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             return;
         }
         else {
-            if ( System.currentTimeMillis() >= start + timeout  ) {
-                throw new TimeoutException( "Reached timeout when trying to aquire lock for session " + sessionId );
-            }
-            final long timeToWait = min( retryInterval, maxRetryInterval );
+            checkTimeoutAndWait( sessionId, retryInterval, maxRetryInterval, timeout, start );
+            acquireLock( sessionId, retryInterval * 2, maxRetryInterval, timeout, start );
+        }
+    }
+
+    private void checkTimeoutAndWait( @Nonnull final String sessionId, final long retryInterval, final long maxRetryInterval,
+            final long timeout, final long start ) throws TimeoutException, InterruptedException {
+        if ( System.currentTimeMillis() >= start + timeout  ) {
+            throw new TimeoutException( "Reached timeout when trying to aquire lock for session " + sessionId );
+        }
+        final long timeToWait = min( retryInterval, maxRetryInterval );
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "Could not aquire lock for session " + sessionId + ", waiting " + timeToWait + " millis now..." );
+        }
+        sleep( timeToWait );
+    }
+
+    private void releaseLock( @Nonnull final String sessionId ) {
+        try {
             if ( _log.isDebugEnabled() ) {
-                _log.debug( "Could not aquire lock for session " + sessionId + ", waiting " + timeToWait + " millis now..." );
+                _log.debug( "Releasing lock for session " + sessionId );
             }
-            sleep( timeToWait );
-            aquireLock( sessionId, retryInterval * 2, maxRetryInterval, timeout, start );
+            _memcached.delete( _sessionIdFormat.createLockName( sessionId ) );
+        } catch( final Exception e ) {
+            _log.warn( "Caught exception when trying to release lock for session " + sessionId );
         }
     }
 
@@ -832,8 +992,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final int oldMaxActiveSessions = _maxActiveSessions;
         _maxActiveSessions = max;
         support.firePropertyChange( "maxActiveSessions",
-                new Integer( oldMaxActiveSessions ),
-                new Integer( _maxActiveSessions ) );
+                Integer.valueOf( oldMaxActiveSessions ),
+                Integer.valueOf( _maxActiveSessions ) );
     }
 
     /**
@@ -1128,6 +1288,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public boolean isEnabled() {
         return _enabled.get();
+    }
+
+    public void setSticky( final boolean sticky ) {
+        _sticky = sticky;
     }
 
     /**
