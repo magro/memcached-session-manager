@@ -74,6 +74,14 @@ define 'msm' do
     package(:jar, :classifier => 'sources', :id => 'memcached-session-manager').include :from => compile.sources 
   end
 
+  desc 'The core module of memcached-session-manager'
+  define 'locking' do |project|
+    compile.with( projects('core'), project('core').compile.dependencies )
+    test.with( compile.dependencies, project('core').test.dependencies, CLANG, MOCKITO )
+    package :jar, :id => 'msm-lock-support'
+    package(:jar, :classifier => 'sources', :id => 'msm-lock-support').include :from => compile.sources 
+  end
+
   desc 'Javolution/xml based serialization strategy'
   define 'javolution-serializer' do |project|
     compile.with( projects('core'), project('core').compile.dependencies, JAVOLUTION, HIBERNATE, JODA_TIME, CGLIB )

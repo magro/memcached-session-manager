@@ -57,7 +57,7 @@ class SessionTrackerValve extends ValveBase {
     private final Statistics _statistics;
     private final AddCookieInteralStrategy _addCookieInteralStrategy;
     private final AtomicBoolean _enabled;
-    private @CheckForNull final ThreadLocal<Request> _requestsThreadLocal;
+    private @CheckForNull LockingStrategy _lockingStrategy;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -74,14 +74,14 @@ class SessionTrackerValve extends ValveBase {
      * @param enabled
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
-     * @param requestsThreadLocal
-     *            the threadlocal to store requests, can be <code>null</code>.
+     * @param lockingStrategy
+     *            the lockingStrategy to track requests, can be <code>null</code>.
      */
     public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final Context context,
             @Nonnull final SessionBackupService sessionBackupService,
             @Nonnull final Statistics statistics,
             @Nonnull final AtomicBoolean enabled,
-            @Nullable final ThreadLocal<Request> requestsThreadLocal ) {
+            @Nullable final LockingStrategy lockingStrategy ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -92,7 +92,7 @@ class SessionTrackerValve extends ValveBase {
         _statistics = statistics;
         _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
         _enabled = enabled;
-        _requestsThreadLocal = requestsThreadLocal;
+        _lockingStrategy = lockingStrategy;
     }
 
     /**
@@ -154,14 +154,14 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private void resetRequestThreadLocal() {
-        if ( _requestsThreadLocal != null ) {
-            _requestsThreadLocal.set( null );
+        if ( _lockingStrategy != null ) {
+            _lockingStrategy.onRequestFinished();
         }
     }
 
     private void storeRequestThreadLocal( @Nonnull final Request request ) {
-        if ( _requestsThreadLocal != null ) {
-            _requestsThreadLocal.set( request );
+        if ( _lockingStrategy != null ) {
+            _lockingStrategy.onRequestStart( request );
         }
     }
 
@@ -335,6 +335,10 @@ class SessionTrackerValve extends ValveBase {
                 SKIPPED
         }
 
+    }
+
+    public void setLockingStrategy( @Nullable final LockingStrategy lockingStrategy ) {
+        _lockingStrategy = lockingStrategy;
     }
 
 }
