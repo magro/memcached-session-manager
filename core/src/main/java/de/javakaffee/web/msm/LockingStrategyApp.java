@@ -48,7 +48,7 @@ public class LockingStrategyApp extends LockingStrategy {
         try {
             _log.info( "Loading "+ SESSION_LOCK_CLASSNAME +" using classloader " + classLoader );
             final Class<?> clazz = Class.forName( SESSION_LOCK_CLASSNAME, false, classLoader );
-            final Constructor<?> constructor = clazz.getDeclaredConstructor( MemcachedBackupSessionManager.class );
+            final Constructor<?> constructor = clazz.getDeclaredConstructor( LockingStrategy.class );
             constructor.newInstance( this );
         } catch ( final Exception e ) {
             _log.info( "Could not load "+ SESSION_LOCK_CLASSNAME +" with classloader "+ classLoader, e );

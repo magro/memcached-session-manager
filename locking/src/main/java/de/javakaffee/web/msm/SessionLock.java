@@ -16,10 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-
-import javax.servlet.http.HttpSession;
 
 import org.apache.catalina.Manager;
 import org.apache.juli.logging.Log;
@@ -48,24 +45,24 @@ public class SessionLock {
     @SuppressWarnings( "unused" )
     private static final Log _log = LogFactory.getLog( SessionLock.class );
 
-    private static MemcachedBackupSessionManager _manager;
+    private static LockingStrategy _lockingStrategy;
 
-    SessionLock( MemcachedBackupSessionManager manager ) {
-        _manager = manager;
+    SessionLock( LockingStrategy lockingStrategy ) {
+        _lockingStrategy = lockingStrategy;
     }
 
     public static boolean lock( final String sessionId, final long timeout, final TimeUnit timeUnit ) {
-        LockStatus lockStatus = _manager.lock( sessionId, timeout, timeUnit );
+        LockStatus lockStatus = _lockingStrategy.lock( sessionId, timeout, timeUnit );
         return lockStatus == LockStatus.LOCKED;
     }
 
     public static boolean lock( final String sessionId ) {
-        LockStatus lockStatus = _manager.lock( sessionId );
+        LockStatus lockStatus = _lockingStrategy.lock( sessionId );
         return lockStatus == LockStatus.LOCKED;
     }
     
     public static void unlock( final String sessionId ) {
-        _manager.releaseLock( sessionId );
+        _lockingStrategy.releaseLock( sessionId );
     }
 
 }
