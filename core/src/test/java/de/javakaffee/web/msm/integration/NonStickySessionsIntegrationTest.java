@@ -147,7 +147,7 @@ public class NonStickySessionsIntegrationTest {
     @Test( enabled = true, dataProvider = "lockingModesAllAndAuto" )
     public void testNoStaleSessionsWithNonStickySessions( @Nonnull final LockingMode lockingMode ) throws IOException, InterruptedException, HttpException {
 
-        getManager( _tomcat1 ).setLockingMode( lockingMode );
+        setLockingMode( lockingMode );
 
         final String key = "foo";
         final String value1 = "bar";
@@ -171,6 +171,11 @@ public class NonStickySessionsIntegrationTest {
 
     }
 
+    private void setLockingMode( final LockingMode lockingMode ) {
+        getManager( _tomcat1 ).setLockingMode( lockingMode );
+        getManager( _tomcat2 ).setLockingMode( lockingMode );
+    }
+
     /**
      * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
      * tomcat when the request is finished.
@@ -178,7 +183,7 @@ public class NonStickySessionsIntegrationTest {
     @Test( enabled = true, dataProvider = "lockingModesAllAndAuto" )
     public void testParallelRequestsDontCauseDataLoss( @Nonnull final LockingMode lockingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        getManager( _tomcat1 ).setLockingMode( lockingMode );
+        setLockingMode( lockingMode );
 
         final String key1 = "k1";
         final String value1 = "v1";
@@ -227,7 +232,7 @@ public class NonStickySessionsIntegrationTest {
     @Test
     public void testReadOnlyRequestsDontLockSessionForAutoLocking() throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        getManager( _tomcat1 ).setLockingMode( LockingMode.AUTO );
+        setLockingMode( LockingMode.AUTO );
 
         final String key1 = "k1";
         final String value1 = "v1";
