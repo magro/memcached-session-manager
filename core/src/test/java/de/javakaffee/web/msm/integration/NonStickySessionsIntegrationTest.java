@@ -224,6 +224,7 @@ public class NonStickySessionsIntegrationTest {
      * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
      * tomcat when the request is finished.
      */
+    @Test
     public void testReadOnlyRequestsDontLockSessionForAutoLocking() throws IOException, InterruptedException, HttpException, ExecutionException {
 
         getManager( _tomcat1 ).setLockingMode( LockingMode.AUTO );
