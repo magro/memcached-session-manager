@@ -288,4 +288,25 @@ public class NonStickySessionsIntegrationTest {
 
     }
 
+    /**
+     * Tests that non-sticky sessions are not invalidated too early when sessions are accessed readonly.
+     * Each (even session readonly request) must update the lastAccessedTime for the session in memcached.
+     */
+    @Test( enabled = true, dataProvider = "lockingModesAllAndAuto" )
+    public void testNonStickySessionIsValidEvenWhenAccessedReadonly( @Nonnull final LockingMode lockingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
+
+        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
+        getManager( _tomcat1 ).setLockingMode( lockingMode );
+
+        final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
+        assertNotNull( sessionId );
+
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        Thread.sleep( 500 );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        Thread.sleep( 500 );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+
+    }
+
 }
