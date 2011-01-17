@@ -17,13 +17,11 @@
 package de.javakaffee.web.msm;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import javax.annotation.Nonnull;
 
 import net.spy.memcached.MemcachedClient;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * Represents the session locking hooks that must be implemented by the various
@@ -33,23 +31,14 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResu
  */
 public class LockingStrategyAll extends LockingStrategy {
 
-    public LockingStrategyAll( @Nonnull final MemcachedClient memcached ) {
-        super( memcached );
-    }
-
-    @Override
-    protected void detectSessionReadOnlyRequestPattern( final Future<BackupResultStatus> result, final String requestId ) {
-        // Nothing to do
+    public LockingStrategyAll( @Nonnull final MemcachedClient memcached,
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
+        super( memcached, missingSessionsCache );
     }
 
     @Override
     protected LockStatus lockBeforeLoadingFromMemcached( @Nonnull final String sessionId ) throws InterruptedException, ExecutionException {
         return lock( sessionId );
-    }
-
-    @Override
-    protected boolean isContainerSessionLookup() {
-        return false;
     }
 
 }

@@ -40,19 +40,21 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResu
  */
 public class LockingStrategyAuto extends LockingStrategy {
 
-    private final InheritableThreadLocal<Request> _requestsThreadLocal;
     private final ExecutorService _requestPatternDetectionExecutor;
     private final ReadOnlyRequestsCache _readOnlyRequestCache;
 
-    public LockingStrategyAuto( @Nonnull final MemcachedClient memcached ) {
-        super( memcached );
-        _requestsThreadLocal = new InheritableThreadLocal<Request>();
+    public LockingStrategyAuto( @Nonnull final MemcachedClient memcached,
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
+        super( memcached, missingSessionsCache );
         _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor();
         _readOnlyRequestCache = new ReadOnlyRequestsCache();
     }
 
     @Override
-    protected void detectSessionReadOnlyRequestPattern( final Future<BackupResultStatus> result, final String requestId ) {
+    protected void onAfterBackupSession( final MemcachedBackupSession session, final Future<BackupResultStatus> result, final String requestId ) {
+
+        super.onAfterBackupSession( session, result, requestId );
+
         final Callable<Void> task = new Callable<Void>() {
 
             @Override
@@ -104,21 +106,6 @@ public class LockingStrategyAuto extends LockingStrategy {
 
         return lock( sessionId );
 
-    }
-
-    @Override
-    protected boolean isContainerSessionLookup() {
-        return _requestsThreadLocal.get() == null;
-    }
-
-    @Override
-    protected void onRequestStart( final Request request ) {
-        _requestsThreadLocal.set( request );
-    }
-
-    @Override
-    protected void onRequestFinished() {
-        _requestsThreadLocal.set( null );
     }
 
 }

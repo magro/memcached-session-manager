@@ -28,6 +28,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.annotation.Nonnull;
+
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Session;
@@ -162,7 +164,7 @@ public class BackupSessionService {
         }
 
         final long start = System.currentTimeMillis();
-            try {
+        try {
 
             if ( !hasMemcachedIdSet( session ) ) {
                 if ( _log.isDebugEnabled() ) {
@@ -180,6 +182,7 @@ public class BackupSessionService {
                     && !sessionIdChanged ) {
                 _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
                 _statistics.requestWithoutSessionAccess();
+                releaseLock( session );
                 return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
             }
 
@@ -189,6 +192,7 @@ public class BackupSessionService {
                     && !session.isNewInternal() ) {
                 _log.debug( "Session attributes were not accessed since last backup/check, therefore we can skip this" );
                 _statistics.requestWithoutAttributesAccess();
+                releaseLock( session );
                 return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
             }
 
@@ -227,6 +231,20 @@ public class BackupSessionService {
 
     private boolean hasMemcachedIdSet( final MemcachedBackupSession session ) {
         return _sessionIdFormat.isValid( session.getId() );
+    }
+
+    private void releaseLock( @Nonnull final MemcachedBackupSession session ) {
+        if ( session.isLocked()  ) {
+            try {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Releasing lock for session " + session.getIdInternal() );
+                }
+                _memcached.delete( _sessionIdFormat.createLockName( session.getIdInternal() ) );
+                session.releaseLock();
+            } catch( final Exception e ) {
+                _log.warn( "Caught exception when trying to release lock for session " + session.getIdInternal() );
+            }
+        }
     }
 
     /**

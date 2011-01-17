@@ -329,7 +329,7 @@ public class TranscoderService {
      *            the number of bytes to store for the number
      * @return the next beginIndex (<code>beginIndex + maxBytes</code>).
      */
-    private static int encodeNum( final long num, final byte[] data, final int beginIndex, final int maxBytes ) {
+    public static int encodeNum( final long num, final byte[] data, final int beginIndex, final int maxBytes ) {
         for ( int i = 0; i < maxBytes; i++ ) {
             final int pos = maxBytes - i - 1; // the position of the byte in the number
             final int idx = beginIndex + pos; // the index in the data array
@@ -338,7 +338,7 @@ public class TranscoderService {
         return beginIndex + maxBytes;
     }
 
-    private static long decodeNum( final byte[] data, final int beginIndex, final int numBytes ) {
+    public static long decodeNum( final byte[] data, final int beginIndex, final int numBytes ) {
         long result = 0;
         for ( int i = 0; i < numBytes; i++ ) {
             final byte b = data[beginIndex + i];

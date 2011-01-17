@@ -469,7 +469,7 @@ public final class MemcachedBackupSession extends StandardSession {
     /**
      * Returns if there was a lock created in memcached.
      */
-    public boolean isLocked() {
+    public synchronized boolean isLocked() {
         return _lockStatus == LockStatus.LOCKED;
     }
 

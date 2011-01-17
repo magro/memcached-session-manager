@@ -141,22 +141,22 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
 
         } finally {
             _session.setBackupRunning( false );
-            if ( _session.isLocked()  ) {
-                releaseLock();
-            }
+            releaseLock();
         }
 
     }
 
     private void releaseLock() {
-        try {
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Releasing lock for session " + _session.getIdInternal() );
+        if ( _session.isLocked()  ) {
+            try {
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Releasing lock for session " + _session.getIdInternal() );
+                }
+                _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
+                _session.releaseLock();
+            } catch( final Exception e ) {
+                _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
             }
-            _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
-            _session.releaseLock();
-        } catch( final Exception e ) {
-            _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
         }
     }
 

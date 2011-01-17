@@ -18,14 +18,12 @@ package de.javakaffee.web.msm;
 
 import java.lang.reflect.Constructor;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import net.spy.memcached.MemcachedClient;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * Represents the session locking hooks that must be implemented by the various
@@ -38,8 +36,9 @@ public class LockingStrategyApp extends LockingStrategy {
     private static final String SESSION_LOCK_CLASSNAME = "de.javakaffee.web.msm.SessionLock";
 
     public LockingStrategyApp( @Nonnull final MemcachedClient memcached,
-            @Nonnull final MemcachedBackupSessionManager manager ) {
-        super( memcached );
+            @Nonnull final MemcachedBackupSessionManager manager,
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
+        super( memcached, missingSessionsCache );
         initSessionLock( manager );
     }
 
@@ -57,22 +56,11 @@ public class LockingStrategyApp extends LockingStrategy {
     }
 
     @Override
-    protected void detectSessionReadOnlyRequestPattern( final Future<BackupResultStatus> result, final String requestId ) {
-        // Nothing to do
-    }
-
-    @Override
     @CheckForNull
     protected LockStatus lockBeforeLoadingFromMemcached( final String sessionId ) throws InterruptedException,
             ExecutionException {
         // Nothing to do
         return null;
-    }
-
-    @Override
-    protected boolean isContainerSessionLookup() {
-        // TODO Auto-generated method stub
-        return false;
     }
 
 }

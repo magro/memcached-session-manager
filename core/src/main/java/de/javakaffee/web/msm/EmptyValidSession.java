@@ -44,13 +44,22 @@ public final class EmptyValidSession extends StandardSession {
 
     private static final long serialVersionUID = 1L;
 
-    public EmptyValidSession() {
+    public EmptyValidSession(final int maxInactiveInterval, final long lastAccessedTime, final long thisAccessedTime) {
         super( null );
+        this.maxInactiveInterval = maxInactiveInterval;
+        // tomcat7 with STRICT_SERVLET_COMPLIANCE/LAST_ACCESS_AT_START compares the lastAccessedTime instead of
+        // thisAccessedTime for idle time comparison
+        this.lastAccessedTime = lastAccessedTime;
+        this.thisAccessedTime = thisAccessedTime;
+        // we assume that the session was valid the last time it was stored, otherwise we wouldn't be needed.
+        this.isValid = true;
     }
 
     @Override
     public boolean isValid() {
-        return true;
+        // explicitely override just that we definitely know that we have the "default" behavior and
+        // it does not get overridden by accident.
+        return super.isValid();
     }
 
     @Override
