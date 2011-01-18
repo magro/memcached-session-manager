@@ -490,16 +490,16 @@ public class TestUtils {
             _responseSessionId = responseSessionId;
             _keyValues = keyValues;
         }
-        String getSessionId() {
+        public String getSessionId() {
             return _sessionId;
         }
-        String getResponseSessionId() {
+        public String getResponseSessionId() {
             return _responseSessionId;
         }
-        Map<String, String> getKeyValues() {
+        public Map<String, String> getKeyValues() {
             return _keyValues;
         }
-        String get( final String key ) {
+        public String get( final String key ) {
             return _keyValues.get( key );
         }
 
