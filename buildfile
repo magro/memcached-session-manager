@@ -57,7 +57,7 @@ end
 desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
 define 'msm' do
   project.group = 'de.javakaffee.web.msm'
-  project.version = '1.3.6'
+  project.version = '1.3.7-SNAPSHOT'
 
   compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng
