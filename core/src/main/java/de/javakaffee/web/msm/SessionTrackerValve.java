@@ -17,8 +17,6 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -130,23 +128,8 @@ class SessionTrackerValve extends ValveBase {
     @Nonnull
     protected static String getURIWithQueryString( @Nonnull final Request request ) {
         final String uri = request.getRequestURI();
-        final String qs = request.getMethod().toLowerCase().equals( "post" ) ? buildQueryString( request ) : request.getQueryString();
+        final String qs = request.getMethod().toLowerCase().equals( "post" ) ? null : request.getQueryString();
         return qs != null ? uri + "?" + qs : uri;
-    }
-
-    @CheckForNull
-    private static String buildQueryString( @Nonnull final Request request ) {
-        final StringBuilder sb = new StringBuilder();
-        final Enumeration<?> enumeration = request.getParameterNames();
-        while (enumeration.hasMoreElements()) {
-            final String name = enumeration.nextElement().toString();
-            final String[] values = request.getParameterValues(name);
-            sb.append( name ).append( "=" ).append( Arrays.toString( values ) );
-            if ( enumeration.hasMoreElements() ) {
-                sb.append( "&" );
-            }
-        }
-        return sb.length() > 0 ? sb.toString() : null;
     }
 
     private void resetRequestThreadLocal() {
