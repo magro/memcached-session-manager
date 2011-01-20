@@ -24,20 +24,20 @@ import net.spy.memcached.MemcachedClient;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 
 /**
- * This locking strategy locks each request accessing the session.
+ * Ths locking strategy does not lock the session at all.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class LockingStrategyAll extends LockingStrategy {
+public class LockingStrategyNone extends LockingStrategy {
 
-    public LockingStrategyAll( @Nonnull final MemcachedClient memcached,
+    public LockingStrategyNone( @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
         super( memcached, missingSessionsCache );
     }
 
     @Override
     protected LockStatus onBeforeLoadFromMemcached( @Nonnull final String sessionId ) throws InterruptedException, ExecutionException {
-        return lock( sessionId );
+        return LockStatus.LOCK_NOT_REQUIRED;
     }
 
 }

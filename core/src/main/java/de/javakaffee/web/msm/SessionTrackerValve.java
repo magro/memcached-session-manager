@@ -74,14 +74,11 @@ class SessionTrackerValve extends ValveBase {
      * @param enabled
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
-     * @param lockingStrategy
-     *            the lockingStrategy to track requests, can be <code>null</code>.
      */
     public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final Context context,
             @Nonnull final SessionBackupService sessionBackupService,
             @Nonnull final Statistics statistics,
-            @Nonnull final AtomicBoolean enabled,
-            @Nullable final LockingStrategy lockingStrategy ) {
+            @Nonnull final AtomicBoolean enabled ) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -92,7 +89,6 @@ class SessionTrackerValve extends ValveBase {
         _statistics = statistics;
         _addCookieInteralStrategy = AddCookieInteralStrategy.createFor( context );
         _enabled = enabled;
-        _lockingStrategy = lockingStrategy;
     }
 
     /**

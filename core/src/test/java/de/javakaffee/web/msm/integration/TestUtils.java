@@ -47,6 +47,7 @@ import javax.servlet.http.HttpSessionEvent;
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
+import org.apache.catalina.Globals;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Role;
@@ -143,21 +144,22 @@ public class TestUtils {
     public static Response get( final DefaultHttpClient client, final int port, final String rsessionId,
             final Credentials credentials )
         throws IOException, HttpException {
-        return get( client, port, null, rsessionId, null, credentials );
+        return get( client, port, null, rsessionId, null, null, credentials );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId ) throws IOException,
             HttpException {
-        return get( client, port, path, rsessionId, null, null );
+        return get( client, port, path, rsessionId, null, null, null );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
             final Map<String, String> params ) throws IOException,
             HttpException {
-        return get( client, port, path, rsessionId, params, null );
+        return get( client, port, path, rsessionId, null, params, null );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
+            final SessionTrackingMode sessionTrackingMode,
             final Map<String, String> params,
             final Credentials credentials ) throws IOException,
             HttpException {
@@ -166,9 +168,12 @@ public class TestUtils {
         if ( params != null && !params.isEmpty() ) {
             url += toQueryString( params );
         }
+        if ( rsessionId != null && sessionTrackingMode == SessionTrackingMode.URL ) {
+            url += ";" + Globals.SESSION_PARAMETER_NAME + "=" + rsessionId;
+        }
         final HttpGet method = new HttpGet( url );
-        if ( rsessionId != null ) {
-            method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
+        if ( rsessionId != null && sessionTrackingMode == SessionTrackingMode.COOKIE ) {
+            method.setHeader( "Cookie", Globals.SESSION_COOKIE_NAME + "=" + rsessionId );
         }
 
         final HttpResponse response = credentials == null
@@ -648,6 +653,11 @@ public class TestUtils {
         }
 
         return result;
+    }
+
+    public static enum SessionTrackingMode {
+        COOKIE,
+        URL
     }
 
 }

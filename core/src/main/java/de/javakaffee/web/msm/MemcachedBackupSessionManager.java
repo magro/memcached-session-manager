@@ -30,6 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.MemcachedClient;
@@ -217,6 +218,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private BackupSessionService _backupSessionService;
 
     private boolean _sticky = false;
+    private String _lockingModeString;
     private LockingMode _lockingMode = LockingMode.ALL;
     private LockingStrategy _lockingStrategy;
 
@@ -293,13 +295,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
 
-        if ( !_sticky ) {
-            _lockingStrategy = LockingStrategy.create( _lockingMode, _memcached, this, _missingSessionsCache );
-        }
-
         _sessionTrackerValve = new SessionTrackerValve( _requestUriIgnorePattern,
-                (Context) getContainer(), this, _statistics, _enabled, _lockingStrategy );
+                (Context) getContainer(), this, _statistics, _enabled );
         getContainer().getPipeline().addValve( _sessionTrackerValve );
+
+        if ( !_sticky ) {
+            initLockingMode();
+        }
 
         _transcoderService = createTranscoderService( _statistics );
 
@@ -504,10 +506,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public Session findSession( final String id ) throws IOException {
         MemcachedBackupSession result = (MemcachedBackupSession) super.findSession( id );
         if ( result == null && canHitMemcached( id ) ) {
-            // when the request comes from the container, it's from CoyoteAdapter to see if the session is valid
+            // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
             if ( !_sticky && _lockingStrategy.isContainerSessionLookup() ) {
-                // return loadFromMemcached( id, true );
-                return _lockingStrategy.getSessionForContainerIsValidCheck( id );
+                // we can return just null as the requestedSessionId will still be set on
+                // the request.
+                return null;
             }
 
             // else load the session from memcached
@@ -760,7 +763,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             try {
 
                 if ( !_sticky ) {
-                    lockStatus = _lockingStrategy.lockBeforeLoadingFromMemcached( sessionId );
+                    lockStatus = _lockingStrategy.onBeforeLoadFromMemcached( sessionId );
                 }
 
                 final long start = System.currentTimeMillis();
@@ -784,7 +787,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     }
                     if ( !_sticky ) {
                         result.setLockStatus( lockStatus );
-                        _lockingStrategy.onLoadedFromMemcached( result );
+                        _lockingStrategy.onAfterLoadFromMemcached( result );
                     }
 
 
@@ -1147,11 +1150,44 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     public void setSticky( final boolean sticky ) {
         _sticky = sticky;
+        if ( !_sticky && _lockingMode == null ) {
+            setLockingMode( LockingMode.NONE, null );
+        }
     }
 
-    public void setLockingMode( final LockingMode lockingMode ) {
+    /**
+     * Sets the session locking mode. Possible values:
+     * <ul>
+     * <li><code>none</code> - does not lock the session at all (default for non-sticky sessions).</li>
+     * <li><code>all</code> - the session is locked for each request accessing the session.</li>
+     * <li><code>auto</code> - locks the session for each request except for those the were detected to access the session only readonly.</li>
+     * <li><code>uriPattern:&lt;regexp&gt;</code> - locks the session for each request with a request uri (with appended querystring) matching
+     * the provided regular expression.</li>
+     * </ul>
+     */
+    public void setLockingMode( final String lockingMode ) {
+        _lockingModeString = lockingMode;
+    }
+
+    private void initLockingMode() {
+        Pattern uriPattern = null;
+        LockingMode lockingMode = null;
+        if ( _lockingModeString != null ) {
+            if ( _lockingModeString.startsWith( "uriPattern:" ) ) {
+                lockingMode = LockingMode.URI_PATTERN;
+                uriPattern = Pattern.compile( _lockingModeString.substring( "uriPattern:".length() ) );
+            }
+            else {
+                lockingMode = LockingMode.valueOf( _lockingModeString.toUpperCase() );
+            }
+        }
+        setLockingMode( lockingMode, uriPattern );
+    }
+
+    public void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) {
+        _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
         _lockingMode = lockingMode;
-        _lockingStrategy = LockingStrategy.create( lockingMode, _memcached, this, _missingSessionsCache );
+        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache );
         _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
     }
 

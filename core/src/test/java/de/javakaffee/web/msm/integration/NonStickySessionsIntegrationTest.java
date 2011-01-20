@@ -16,8 +16,7 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.integration.TestServlet.PARAM_MILLIS;
-import static de.javakaffee.web.msm.integration.TestServlet.PATH_WAIT;
+import static de.javakaffee.web.msm.integration.TestServlet.*;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -35,8 +34,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -63,6 +64,7 @@ import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
+import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
 /**
  * Integration test testing non-sticky sessions.
  *
@@ -133,10 +135,21 @@ public class NonStickySessionsIntegrationTest {
     }
 
     @DataProvider
-    public Object[][] lockingModesAllAndAuto() {
+    public Object[][] lockingModes() {
         return new Object[][] {
-                { LockingMode.ALL },
-                { LockingMode.AUTO }
+                { LockingMode.ALL, null },
+                { LockingMode.AUTO, null },
+                { LockingMode.URI_PATTERN, Pattern.compile( ".*" ) },
+                { LockingMode.NONE, null }
+        };
+    }
+
+    @DataProvider
+    public Object[][] lockingModesWithSessionLocking() {
+        return new Object[][] {
+                { LockingMode.ALL, null },
+                { LockingMode.AUTO, null },
+                { LockingMode.URI_PATTERN, Pattern.compile( ".*" ) }
         };
     }
 
@@ -144,10 +157,13 @@ public class NonStickySessionsIntegrationTest {
      * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
      * tomcat when the request is finished.
      */
-    @Test( enabled = true, dataProvider = "lockingModesAllAndAuto" )
-    public void testNoStaleSessionsWithNonStickySessions( @Nonnull final LockingMode lockingMode ) throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true )
+    public void testNoStaleSessionsWithNonStickySessions() throws IOException, InterruptedException, HttpException {
 
-        setLockingMode( lockingMode );
+        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
+        getManager( _tomcat2 ).setMaxInactiveInterval( 1 );
+
+        setLockingMode( LockingMode.NONE, null );
 
         final String key = "foo";
         final String value1 = "bar";
@@ -171,19 +187,19 @@ public class NonStickySessionsIntegrationTest {
 
     }
 
-    private void setLockingMode( final LockingMode lockingMode ) {
-        getManager( _tomcat1 ).setLockingMode( lockingMode );
-        getManager( _tomcat2 ).setLockingMode( lockingMode );
+    private void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) {
+        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern );
+        getManager( _tomcat2 ).setLockingMode( lockingMode, uriPattern );
     }
 
     /**
      * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
      * tomcat when the request is finished.
      */
-    @Test( enabled = true, dataProvider = "lockingModesAllAndAuto" )
-    public void testParallelRequestsDontCauseDataLoss( @Nonnull final LockingMode lockingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
+    @Test( enabled = true, dataProvider = "lockingModesWithSessionLocking" )
+    public void testParallelRequestsDontCauseDataLoss( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        setLockingMode( lockingMode );
+        setLockingMode( lockingMode, uriPattern );
 
         final String key1 = "k1";
         final String value1 = "v1";
@@ -226,13 +242,13 @@ public class NonStickySessionsIntegrationTest {
     }
 
     /**
-     * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
-     * tomcat when the request is finished.
+     * Tests that for auto locking mode requests that are found to be readonly don't lock
+     * the session
      */
     @Test
     public void testReadOnlyRequestsDontLockSessionForAutoLocking() throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        setLockingMode( LockingMode.AUTO );
+        setLockingMode( LockingMode.AUTO, null );
 
         final String key1 = "k1";
         final String value1 = "v1";
@@ -289,14 +305,66 @@ public class NonStickySessionsIntegrationTest {
     }
 
     /**
+     * Tests that for uriPattern locking mode requests that don't match the pattern the
+     * session is not locked.
+     */
+    @Test
+    public void testRequestsDontLockSessionForNotMatchingUriPattern() throws IOException, InterruptedException, HttpException, ExecutionException {
+
+        final String pathToLock = "/locksession";
+        setLockingMode( LockingMode.URI_PATTERN, Pattern.compile( pathToLock + ".*" ) );
+
+        final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
+        assertNotNull( sessionId );
+
+        // perform a request not matching the uri pattern, and in parallel start another request
+        // that should lock the session
+        final long timeToWaitInMillis = 500;
+        final Map<String, String> paramsWait = asMap( PARAM_WAIT, "true", PARAM_MILLIS, String.valueOf( timeToWaitInMillis ) );
+        final long start = System.currentTimeMillis();
+        final Future<Response> response2 = _executor.submit( new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return get( _httpClient, TC_PORT_1, "/pathNotMatchingLockUriPattern", sessionId, paramsWait );
+            }
+        });
+        final Future<Response> response3 = _executor.submit( new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return get( _httpClient, TC_PORT_1, pathToLock, sessionId, paramsWait );
+            }
+        });
+        response2.get();
+        response3.get();
+        assertTrue ( ( System.currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
+                "The time for both requests should be less than 2 * the wait time if they don't block each other." );
+        assertEquals( response2.get().getSessionId(), sessionId );
+        assertEquals( response3.get().getSessionId(), sessionId );
+
+        // now perform a locking request and a not locking in parallel which should also not be blocked
+        final Future<Response> response4 = _executor.submit( new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return get( _httpClient, TC_PORT_1, pathToLock, sessionId, paramsWait );
+            }
+        });
+        Thread.sleep( 50 );
+        final Response response5 = get( _httpClient, TC_PORT_1, "/pathNotMatchingLockUriPattern", sessionId );
+        assertEquals( response5.getSessionId(), sessionId );
+        assertFalse( response4.isDone(), "The non locking request should return before the long, session locking one" );
+        assertEquals( response4.get().getSessionId(), sessionId );
+
+    }
+
+    /**
      * Tests that non-sticky sessions are not invalidated too early when sessions are accessed readonly.
      * Each (even session readonly request) must update the lastAccessedTime for the session in memcached.
      */
-    @Test( enabled = true, dataProvider = "lockingModesAllAndAuto" )
-    public void testNonStickySessionIsValidEvenWhenAccessedReadonly( @Nonnull final LockingMode lockingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
+    @Test( enabled = true, dataProvider = "lockingModes" )
+    public void testNonStickySessionIsValidEvenWhenAccessedReadonly( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
         getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat1 ).setLockingMode( lockingMode );
+        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern );
 
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
@@ -307,6 +375,40 @@ public class NonStickySessionsIntegrationTest {
         Thread.sleep( 500 );
         assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
 
+    }
+
+    /**
+     * Tests that non-sticky sessions are seen as valid (request.isRequestedSessionIdValid) and from
+     * the correct source for different session tracking modes (uri/cookie).
+     */
+    @Test( enabled = true, dataProvider = "sessionTrackingModesProvider" )
+    public void testNonStickySessionIsValidForDifferentSessionTrackingModes( @Nonnull final SessionTrackingMode sessionTrackingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
+
+        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
+        getManager( _tomcat1 ).setLockingMode( LockingMode.ALL, null );
+
+        final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
+        assertNotNull( sessionId );
+
+        Response response = get( _httpClient, TC_PORT_1, PATH_GET_REQUESTED_SESSION_INFO, sessionId );
+        assertEquals( response.getSessionId(), sessionId );
+        assertEquals( response.get( KEY_REQUESTED_SESSION_ID ), sessionId );
+        assertEquals( Boolean.parseBoolean( response.get( KEY_IS_REQUESTED_SESSION_ID_VALID ) ), true );
+        Thread.sleep( 100 );
+
+        response = get( _httpClient, TC_PORT_1, PATH_GET_REQUESTED_SESSION_INFO, sessionId );
+        assertEquals( response.getSessionId(), sessionId );
+        assertEquals( response.get( KEY_REQUESTED_SESSION_ID ), sessionId );
+        assertEquals( Boolean.parseBoolean( response.get( KEY_IS_REQUESTED_SESSION_ID_VALID ) ), true );
+
+    }
+
+    @DataProvider
+    public Object[][] sessionTrackingModesProvider() {
+        return new Object[][] {
+                { SessionTrackingMode.COOKIE },
+                { SessionTrackingMode.URL }
+        };
     }
 
 }

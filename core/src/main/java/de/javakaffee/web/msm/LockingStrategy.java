@@ -19,18 +19,18 @@ package de.javakaffee.web.msm;
 import static java.lang.Math.min;
 import static java.lang.Thread.sleep;
 
-import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -54,7 +54,9 @@ public abstract class LockingStrategy {
         /** Readonly requests are tracked and for requests that modify the session the session is locked. */
         AUTO,
         /** The application explicitely manages locks */
-        APP
+        APP,
+        /** The session is locked for configured request patterns **/
+        URI_PATTERN
     }
 
     protected static final String LOCK_VALUE = "locked";
@@ -67,7 +69,6 @@ public abstract class LockingStrategy {
     protected LRUCache<String, Boolean> _missingSessionsCache;
     protected final SessionIdFormat _sessionIdFormat;
     protected final InheritableThreadLocal<Request> _requestsThreadLocal;
-    private final LRUCache<String, SessionValidityInfo> _sessionValidityInfos;
 
     protected LockingStrategy( @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
@@ -75,22 +76,27 @@ public abstract class LockingStrategy {
         _missingSessionsCache = missingSessionsCache;
         _sessionIdFormat = new SessionIdFormat();
         _requestsThreadLocal = new InheritableThreadLocal<Request>();
-        _sessionValidityInfos = new LRUCache<String, SessionValidityInfo>( 100, 500 );
     }
 
     /**
      * Creates the appropriate {@link LockingStrategy} for the given {@link LockingMode}.
      */
     @CheckForNull
-    public static LockingStrategy create( @Nonnull final LockingMode lockingMode,
+    public static LockingStrategy create( @Nullable final LockingMode lockingMode,
+            @Nullable final Pattern uriPattern,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final MemcachedBackupSessionManager manager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
+        if ( lockingMode == null ) {
+            return null;
+        }
         switch( lockingMode ) {
             case ALL: return new LockingStrategyAll( memcached, missingSessionsCache );
             case APP: return new LockingStrategyApp( memcached, manager, missingSessionsCache );
             case AUTO: return new LockingStrategyAuto( memcached, missingSessionsCache );
-            default: return null;
+            case URI_PATTERN: return new LockingStrategyUriPattern( uriPattern, memcached, missingSessionsCache );
+            case NONE: return new LockingStrategyNone( memcached, missingSessionsCache );
+            default: throw new IllegalArgumentException( "LockingMode not yet supported: " + lockingMode );
         }
     }
 
@@ -163,8 +169,6 @@ public abstract class LockingStrategy {
      * The requestId is identifying the request.
      */
     protected void onAfterBackupSession( @Nonnull final MemcachedBackupSession session, @Nonnull final Future<BackupResultStatus> backupResult, @Nonnull final String requestId ) {
-        _sessionValidityInfos.remove( session.getIdInternal() );
-
         final byte[] data = SessionValidityInfo.encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(), session.getThisAccessedTimeInternal() );
         _memcached.set( SessionValidityInfo.createAccessedTimesKeyName( session.getIdInternal() ), session.getMaxInactiveInterval(), data );
         if ( _log.isDebugEnabled() ) {
@@ -172,36 +176,12 @@ public abstract class LockingStrategy {
         }
     }
 
-    @CheckForNull
-    protected abstract LockStatus lockBeforeLoadingFromMemcached( @Nonnull String sessionId ) throws InterruptedException, ExecutionException;
-
     /**
-     * Must return true if a dummy session object shall be used for session validation check by the container
-     * and if this request comes from the container.
-     * @return
+     * Is used to determine if this thread / the current request already hit the application
+     * or if this method invocation comes from the container.
      */
     protected final boolean isContainerSessionLookup() {
         return _requestsThreadLocal.get() == null;
-    }
-
-    /**
-     * Checks if there's a session stored in memcached for the given key.
-     */
-    @CheckForNull
-    Session getSessionForContainerIsValidCheck( @Nonnull final String id ) throws IOException {
-        final SessionValidityInfo info = loadSessionValidityInfo( id );
-        if ( info == null ) {
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "No session validity info found for session " + id );
-            }
-            _missingSessionsCache.put( id, Boolean.TRUE );
-            return null;
-        }
-        if ( _log.isDebugEnabled() ) {
-            _log.debug( "Loaded session validity info for session " + id );
-        }
-        _sessionValidityInfos.put( id, info );
-        return new EmptyValidSession( info.getMaxInactiveInterval(), info.getLastAccessedTime(), info.getThisAccessedTime() );
     }
 
     @CheckForNull
@@ -211,15 +191,17 @@ public abstract class LockingStrategy {
     }
 
     /**
+     * Invoked before the session for this sessionId is loaded from memcached.
+     */
+    @CheckForNull
+    protected abstract LockStatus onBeforeLoadFromMemcached( @Nonnull String sessionId ) throws InterruptedException, ExecutionException;
+
+    /**
      * Invoked after a non-sticky session is loaded from memcached, can be used to update some session
      * fields based on separately stored information (e.g. session validity info).
      */
-    public void onLoadedFromMemcached( @Nonnull final MemcachedBackupSession session ) {
-        SessionValidityInfo info = _sessionValidityInfos.get( session.getIdInternal() );
-        if ( info == null ) {
-            _log.warn( "No session validity info for session id "+ session.getIdInternal() +" found in cache, loading from memcached now." );
-            info = loadSessionValidityInfo( session.getIdInternal() );
-        }
+    public void onAfterLoadFromMemcached( @Nonnull final MemcachedBackupSession session ) {
+        final SessionValidityInfo info = loadSessionValidityInfo( session.getIdInternal() );
         if ( info != null ) {
             session.setLastAccessedTimeInternal( info.getLastAccessedTime() );
             session.setThisAccessedTimeInternal( info.getThisAccessedTime() );

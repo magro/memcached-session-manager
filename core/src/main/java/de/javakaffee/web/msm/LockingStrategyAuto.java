@@ -33,8 +33,8 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
- * Represents the session locking hooks that must be implemented by the various
- * locking strategies.
+ * This locking strategy locks all requests except those that are registed (via autodetection)
+ * to access the session only readonly.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
@@ -85,7 +85,7 @@ public class LockingStrategyAuto extends LockingStrategy {
     }
 
     @Override
-    protected LockStatus lockBeforeLoadingFromMemcached( final String sessionId ) throws InterruptedException,
+    protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) throws InterruptedException,
             ExecutionException {
 
         final Request request = _requestsThreadLocal.get();

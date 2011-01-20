@@ -57,7 +57,7 @@ public class LockingStrategyApp extends LockingStrategy {
 
     @Override
     @CheckForNull
-    protected LockStatus lockBeforeLoadingFromMemcached( final String sessionId ) throws InterruptedException,
+    protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) throws InterruptedException,
             ExecutionException {
         // Nothing to do
         return null;
