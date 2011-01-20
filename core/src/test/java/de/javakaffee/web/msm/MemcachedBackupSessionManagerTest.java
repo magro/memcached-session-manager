@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 
 import net.spy.memcached.MemcachedClient;
 
+import org.apache.catalina.LifecycleException;
 import org.apache.catalina.loader.WebappLoader;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -73,11 +74,12 @@ public class MemcachedBackupSessionManagerTest {
         when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
 
         _manager.init( _memcachedMock );
+        _manager.startInternal();
 
     }
 
     @Test
-    public void testConfigurationFormatMemcachedNodesFeature44() {
+    public void testConfigurationFormatMemcachedNodesFeature44() throws LifecycleException {
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
         _manager.initInternal();
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
@@ -92,7 +94,7 @@ public class MemcachedBackupSessionManagerTest {
     }
 
     @Test
-    public void testConfigurationFormatFailoverNodesFeature44() {
+    public void testConfigurationFormatFailoverNodesFeature44() throws LifecycleException {
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _manager.setFailoverNodes( "n1" );
         _manager.initInternal();

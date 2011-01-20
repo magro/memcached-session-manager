@@ -11,7 +11,7 @@ repositories.remote << 'http://repository.jboss.com/maven2'
 TC_VERSION = '7.0.6'
 #SERVLET_API = 'javax.servlet:servlet-api:jar:3.0'
 SERVLET_API = "org.apache.tomcat:tomcat-servlet-api:jar:#{TC_VERSION}"
-CATALINA = "org.apache.tomcat:tomcat-catalina:jar:#{TC_VERSION}"
+CATALINA = transitive( "org.apache.tomcat:tomcat-catalina:jar:#{TC_VERSION}" )
 CATALINA_HA = "org.apache.tomcat:tomcat-catalina-ha:jar:#{TC_VERSION}"
 TC_COYOTE = transitive( "org.apache.tomcat:tomcat-coyote:jar:#{TC_VERSION}" )
 MEMCACHED = artifact('spy.memcached:spymemcached:jar:2.5').from(file('lib/memcached-2.5.jar'))
@@ -58,7 +58,7 @@ end
 desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
 define 'msm' do
   project.group = 'de.javakaffee.web.msm'
-  project.version = '1.3.6'
+  project.version = '1.4.0-SNAPSHOT'
 
   compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng

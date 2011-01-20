@@ -240,7 +240,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public void initInternal() {
+    public void initInternal() throws LifecycleException {
+        super.initInternal();
         init( null );
     }
 
@@ -1108,7 +1109,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     public void startInternal() throws LifecycleException {
-
+        super.startInternal();
     	setState(LifecycleState.STARTING);
     }
 
@@ -1127,6 +1128,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( _memcached != null ) {
             _memcached.shutdown();
         }
+
+        super.stopInternal();
     }
 
     /**
