@@ -26,7 +26,7 @@ import java.util.Set;
 /**
  * Provides services related to node ids.
  *
- * @author <a href="mailto:martin.grotzke@freiheit.com">Martin Grotzke</a>
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class NodeIdService {
 

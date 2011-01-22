@@ -240,8 +240,11 @@ public abstract class LockingStrategy {
     /**
      * Invoked after a non-sticky session is loaded from memcached, can be used to update some session
      * fields based on separately stored information (e.g. session validity info).
+     * @param lockStatus the {@link LockStatus} that was returned from {@link #onBeforeLoadFromMemcached(String)}.
      */
-    protected void onAfterLoadFromMemcached( @Nonnull final MemcachedBackupSession session ) {
+    protected void onAfterLoadFromMemcached( @Nonnull final MemcachedBackupSession session, @Nullable final LockStatus lockStatus ) {
+        session.setLockStatus( lockStatus );
+
         final SessionValidityInfo info = loadSessionValidityInfo( session.getIdInternal() );
         if ( info != null ) {
             session.setLastAccessedTimeInternal( info.getLastAccessedTime() );

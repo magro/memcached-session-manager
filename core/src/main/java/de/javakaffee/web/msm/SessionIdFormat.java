@@ -31,7 +31,7 @@ import org.apache.juli.logging.LogFactory;
  * memcached id from a compound session id.
  * <p>
  * The session id is of the following format:
- * <code>[^-.]+-[^.]+(\.[\w]+)?</code>
+ * <code>[^-.]+-[^.]+(\.[^.]+)?</code>
  * </p>
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
