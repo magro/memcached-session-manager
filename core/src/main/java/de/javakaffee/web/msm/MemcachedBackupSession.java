@@ -58,9 +58,16 @@ public final class MemcachedBackupSession extends StandardSession {
     private transient long _thisAccessedTimeFromLastBackupCheck;
 
     /*
-     * Stores the time in millis when this session was stored in memcached
+     * Stores the time in millis when this session was stored in memcached, is set
+     * before session data is serialized.
      */
-    private transient long _lastBackupTimestamp;
+    private long _lastBackupTime;
+
+    /*
+     * The former value of _lastBackupTimestamp which is restored if the session could not be saved
+     * in memcached.
+     */
+    private transient long _previousLastBackupTime;
 
     /*
      * The expiration time that was sent to memcached with the last backup/touch.
@@ -81,6 +88,7 @@ public final class MemcachedBackupSession extends StandardSession {
 
     private transient boolean _attributesAccessed;
 
+    private transient boolean _sticky;
     private volatile transient LockStatus _lockStatus;
 
     /**
@@ -130,6 +138,15 @@ public final class MemcachedBackupSession extends StandardSession {
         super.setAttribute( name, value, notify );
     }
 
+    @Override
+    public void recycle() {
+        super.recycle();
+        _dataHashCode = 0;
+        _expirationUpdateRunning = false;
+        _backupRunning = false;
+        _lockStatus = null;
+    }
+
     /**
      * Calculates the expiration time that must be sent to memcached,
      * based on the sessions maxInactiveInterval and the time the session
@@ -144,6 +161,11 @@ public final class MemcachedBackupSession extends StandardSession {
      * @return the expiration time in seconds
      */
     int getMemcachedExpirationTimeToSet() {
+
+        if ( !_sticky ) {
+            return 2 * maxInactiveInterval;
+        }
+
         final long timeIdleInMillis = System.currentTimeMillis() - getThisAccessedTimeInternal();
         /* rounding is just for tests, as they are using actually seconds for testing.
          * with a default setup 1 second difference wouldn't matter...
@@ -159,7 +181,10 @@ public final class MemcachedBackupSession extends StandardSession {
      * @return the time in seconds
      */
     int getMemcachedExpirationTime() {
-        final long timeIdleInMillis = System.currentTimeMillis() - _lastBackupTimestamp;
+        if ( !_sticky ) {
+            throw new IllegalStateException( "The memcached expiration time cannot be determined in non-sticky mode." );
+        }
+        final long timeIdleInMillis = _lastBackupTime == 0 ? 0 : System.currentTimeMillis() - _lastBackupTime;
         /* rounding is just for tests, as they are using actually seconds for testing.
          * with a default setup 1 second difference wouldn't matter...
          */
@@ -169,11 +194,34 @@ public final class MemcachedBackupSession extends StandardSession {
     }
 
     /**
-     * Store the time in millis when this session was successfully stored in memcached.
-     * @param lastBackupTimestamp the lastBackupTimestamp to set
+     * Store the time in millis when this session was successfully stored in memcached. This timestamp
+     * is stored in memcached also to support non-sticky session mode. It's reset on backup failure
+     * (see {@link #backupFailed()}), not on skipped backup, therefore it must be set after skip checks
+     * before session serialization.
+     * @param lastBackupTime the lastBackupTimestamp to set
      */
-    void setLastBackupTimestamp( final long lastBackupTimestamp ) {
-        _lastBackupTimestamp = lastBackupTimestamp;
+    void setLastBackupTime( final long lastBackupTime ) {
+        _previousLastBackupTime = _lastBackupTime;
+        _lastBackupTime = lastBackupTime;
+    }
+
+    /**
+     * The time in millis when this session was the last time successfully stored in memcached. There's a short time when
+     * this timestamp represents just the current time (right before backup) - it's updated just after
+     * {@link #setBackupRunning(boolean)} was set to false and is reset in the case of backup failure, therefore when
+     * {@link #isBackupRunning()} is <code>false</code>, it definitely represents the timestamp when this session was
+     * stored in memcached the last time.
+     */
+    long getLastBackupTime() {
+        return _lastBackupTime;
+    }
+
+    /**
+     * The time in seconds that passed since this session was stored in memcached.
+     */
+    int getSecondsSinceLastBackup() {
+        final long timeNotUpdatedInMemcachedInMillis = System.currentTimeMillis() - _lastBackupTime;
+        return Math.round( (float)timeNotUpdatedInMemcachedInMillis / 1000L );
     }
 
     /**
@@ -198,7 +246,7 @@ public final class MemcachedBackupSession extends StandardSession {
      * @return <code>true</code>, if <code>thisAccessedTime > lastBackupTimestamp</code>.
      */
     boolean wasAccessedSinceLastBackup() {
-        return super.thisAccessedTime > _lastBackupTimestamp;
+        return super.thisAccessedTime > _lastBackupTime;
     }
 
     /**
@@ -450,6 +498,21 @@ public final class MemcachedBackupSession extends StandardSession {
     public void backupFinished() {
         _authenticationChanged = false;
         _attributesAccessed = false;
+    }
+
+    /**
+     * Is invoked when session backup failed for this session (result was {@link BackupResultStatus#SUCCESS}).
+     */
+    public void backupFailed() {
+        _lastBackupTime = _previousLastBackupTime;
+    }
+
+    /**
+     * Sets the current operation mode of msm, which is important for determining
+     * the {@link #getMemcachedExpirationTimeToSet()}.
+     */
+    public void setSticky( final boolean sticky ) {
+        _sticky = sticky;
     }
 
     /**

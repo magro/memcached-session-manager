@@ -122,6 +122,7 @@ public class BackupSessionService {
         }
 
         session.setExpirationUpdateRunning( true );
+        session.setLastBackupTime( System.currentTimeMillis() );
         try {
             final Map<String, Object> attributes = session.getAttributesInternal();
             final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
@@ -151,14 +152,15 @@ public class BackupSessionService {
      *
      * @param session
      *            the session to save
-     * @param sessionIdChanged
-     *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
+     * @param force
+     *            specifies, if session backup shall be forced, e.g. because the
+     *            session id was changed due to a memcached failover or tomcat failover.
      * @return a {@link Future} providing the result of the backup task.
      *
      * @see MemcachedBackupSessionManager#setSessionBackupAsync(boolean)
      * @see BackupSessionTask#call()
      */
-    public Future<BackupResultStatus> backupSession( final MemcachedBackupSession session, final boolean sessionIdChanged ) {
+    public Future<BackupResultStatus> backupSession( final MemcachedBackupSession session, final boolean force ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Starting for session id " + session.getId() );
         }
@@ -179,7 +181,7 @@ public class BackupSessionService {
              * have changed (and can skip serialization and hash calucation)
              */
             if ( !session.wasAccessedSinceLastBackupCheck()
-                    && !sessionIdChanged ) {
+                    && !force ) {
                 _log.debug( "Session was not accessed since last backup/check, therefore we can skip this" );
                 _statistics.requestWithoutSessionAccess();
                 releaseLock( session );
@@ -187,7 +189,7 @@ public class BackupSessionService {
             }
 
             if ( !session.attributesAccessedSinceLastBackup()
-                    && !sessionIdChanged
+                    && !force
                     && !session.authenticationChanged()
                     && !session.isNewInternal() ) {
                 _log.debug( "Session attributes were not accessed since last backup/check, therefore we can skip this" );
@@ -196,7 +198,7 @@ public class BackupSessionService {
                 return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
             }
 
-            final BackupSessionTask task = createBackupSessionTask( session, sessionIdChanged );
+            final BackupSessionTask task = createBackupSessionTask( session, force );
 
             final Future<BackupResultStatus> result = _executorService.submit( task );
 
@@ -218,9 +220,9 @@ public class BackupSessionService {
 
     }
 
-    private BackupSessionTask createBackupSessionTask( final MemcachedBackupSession session, final boolean sessionIdChanged ) {
+    private BackupSessionTask createBackupSessionTask( final MemcachedBackupSession session, final boolean force ) {
         return new BackupSessionTask( session,
-                sessionIdChanged,
+                force,
                 _transcoderService,
                 _sessionBackupAsync,
                 _sessionBackupTimeout,

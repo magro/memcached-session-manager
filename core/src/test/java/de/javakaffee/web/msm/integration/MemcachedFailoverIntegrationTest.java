@@ -224,6 +224,8 @@ public class MemcachedFailoverIntegrationTest {
     @Test( enabled = true )
     public void testAllMemcachedNodesFailure() throws Throwable {
 
+        getManager( _tomcat1 ).setSticky( true );
+
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( "No session created.", sid1 );
 

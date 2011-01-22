@@ -82,6 +82,7 @@ import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
 import org.apache.naming.NamingContext;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 
 import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.CacheImpl;
@@ -108,6 +109,8 @@ public class TestUtils {
     protected static final String PASSWORD = "secret";
     protected static final String USER_NAME = "testuser";
     protected static final String ROLE_NAME = "test";
+
+    public static final String STICKYNESS_PROVIDER = "stickynessProvider";
 
     public static String makeRequest( final HttpClient client, final int port, final String rsessionId ) throws IOException,
             HttpException {
@@ -658,6 +661,25 @@ public class TestUtils {
     public static enum SessionTrackingMode {
         COOKIE,
         URL
+    }
+
+    public static enum SessionAffinityMode {
+        STICKY {
+            @Override public boolean isSticky() { return true; }
+        },
+        NON_STICKY {
+            @Override public boolean isSticky() { return false; }
+        };
+
+        public abstract boolean isSticky();
+    }
+
+    @DataProvider
+    public static Object[][] stickynessProvider() {
+        return new Object[][] {
+                { SessionAffinityMode.STICKY },
+                { SessionAffinityMode.NON_STICKY }
+        };
     }
 
 }

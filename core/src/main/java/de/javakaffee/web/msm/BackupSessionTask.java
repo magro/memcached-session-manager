@@ -104,6 +104,8 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
             if ( _session.getDataHashCode() != hashCode
                     || _force
                     || _session.authenticationChanged() ) {
+
+                _session.setLastBackupTime( System.currentTimeMillis() );
                 final byte[] data = _transcoderService.serialize( _session, attributesData );
 
                 final BackupResult backupResult = doBackupSession( _session, data, attributesData );
@@ -119,6 +121,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
             switch ( result ) {
                 case FAILURE:
                     _statistics.requestWithBackupFailure();
+                    _session.backupFailed();
                     break;
                 case SKIPPED:
                     _statistics.requestWithoutSessionModification();
@@ -214,7 +217,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 try {
                     future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
                     session.setLastMemcachedExpirationTime( expirationTime );
-                    session.setLastBackupTimestamp( System.currentTimeMillis() );
+                    session.setLastBackupTime( System.currentTimeMillis() );
                 } catch ( final Exception e ) {
                     if ( _log.isInfoEnabled() ) {
                         _log.info( "Could not store session " + session.getId() + " in memcached." );
@@ -228,7 +231,7 @@ public class BackupSessionTask implements Callable<BackupResultStatus> {
                 /* in async mode, we asume the session was stored successfully
                  */
                 session.setLastMemcachedExpirationTime( expirationTime );
-                session.setLastBackupTimestamp( System.currentTimeMillis() );
+                session.setLastBackupTime( System.currentTimeMillis() );
             }
         } finally {
             _statistics.getMemcachedUpdateProbe().registerSince( start );

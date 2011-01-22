@@ -191,6 +191,7 @@ class SessionTrackerValve extends ValveBase {
          * invoking getSessionInternal, as getSessionInternal triggers a
          * memcached lookup if the session is not available locally.
          */
+        // TODO: in non-sticky mode we should not load the session to just store it afterwards...
         final Session session = request.getRequestedSessionId() != null || getCookie( response, JSESSIONID ) != null
             ? request.getSessionInternal( false )
             : null;
@@ -253,6 +254,10 @@ class SessionTrackerValve extends ValveBase {
          * different jvmRoute load if from memcached. If the session was found in memcached and
          * if it's valid it must be associated with this tomcat and therefore the session id has to
          * be changed. The new session id must be returned if it was changed.
+         * <p>
+         * This is only useful for sticky sessions, in non-sticky operation mode <code>null</code> should
+         * always be returned.
+         * </p>
          *
          * @param requestedSessionId
          *            the sessionId that was requested.

@@ -51,9 +51,10 @@ public class LockingStrategyAuto extends LockingStrategy {
     }
 
     @Override
-    protected void onAfterBackupSession( final MemcachedBackupSession session, final Future<BackupResultStatus> result, final String requestId ) {
+    protected void onAfterBackupSession( final MemcachedBackupSession session, final boolean backupWasForced, final Future<BackupResultStatus> result, final String requestId,
+            final BackupSessionService backupSessionService ) {
 
-        super.onAfterBackupSession( session, result, requestId );
+        super.onAfterBackupSession( session, backupWasForced, result, requestId, backupSessionService );
 
         final Callable<Void> task = new Callable<Void>() {
 

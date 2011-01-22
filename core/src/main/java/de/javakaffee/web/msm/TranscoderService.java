@@ -54,7 +54,8 @@ public class TranscoderService {
             + 4 // maxInactiveInterval: int
             + 1 // isNew: boolean
             + 1 // isValid: boolean
-            + 8; // thisAccessedTime
+            + 8 // thisAccessedTime
+            + 8; // lastBackupTime
 
     private final SessionAttributesTranscoder _attributesTranscoder;
 
@@ -203,6 +204,7 @@ public class TranscoderService {
         idx = encodeBoolean( session.isNewInternal(), data, idx );
         idx = encodeBoolean( session.isValidInternal(), data, idx );
         idx = encodeNum( session.getThisAccessedTimeInternal(), data, idx, 8 );
+        idx = encodeNum( session.getLastBackupTime(), data, idx, 8 );
         idx = encodeNum( idData.length, data, idx, 2 );
         idx = copy( idData, data, idx );
         idx = encodeNum( AuthType.valueOfValue( session.getAuthType() ).getId(), data, idx, 2 );
@@ -229,14 +231,15 @@ public class TranscoderService {
         result.setIsNewInternal( decodeBoolean( data, 24 ) );
         result.setIsValidInternal( decodeBoolean( data, 25 ) );
         result.setThisAccessedTimeInternal( decodeNum( data, 26, 8 ) );
+        result.setLastBackupTime( decodeNum( data, 34, 8 ) );
 
-        final short idLength = (short) decodeNum( data, 34, 2 );
-        result.setIdInternal( decodeString( data, 36, idLength ) );
+        final short idLength = (short) decodeNum( data, 42, 2 );
+        result.setIdInternal( decodeString( data, 44, idLength ) );
 
-        final short authTypeId = (short)decodeNum( data, 36 + idLength, 2 );
+        final short authTypeId = (short)decodeNum( data, 44 + idLength, 2 );
         result.setAuthType( AuthType.valueOfId( authTypeId ).getValue() );
 
-        final int currentIdx = 36 + idLength + 2;
+        final int currentIdx = 44 + idLength + 2;
         final short principalDataLength = (short) decodeNum( data, currentIdx, 2 );
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];

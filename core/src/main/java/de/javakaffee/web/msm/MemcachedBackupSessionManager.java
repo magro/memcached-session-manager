@@ -600,7 +600,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public MemcachedBackupSession createEmptySession() {
-        return new MemcachedBackupSession( this );
+        final MemcachedBackupSession result = new MemcachedBackupSession( this );
+        result.setSticky( _sticky );
+        return result;
     }
 
     /**
@@ -608,6 +610,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public String changeSessionIdOnTomcatFailover( final String requestedSessionId ) {
+        if ( !_sticky ) {
+            return null;
+        }
         final String localJvmRoute = getJvmRoute();
         if ( localJvmRoute != null && !localJvmRoute.equals( _sessionIdFormat.extractJvmRoute( requestedSessionId ) ) ) {
             final MemcachedBackupSession session = loadFromMemcachedWithCheck( requestedSessionId );
@@ -663,6 +668,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
          */
         try {
             final MemcachedBackupSession session = (MemcachedBackupSession) super.findSession( requestedSessionId );
+
+            // TODO: for non-sticky sessions we have to extend this
 
             if ( session != null && session.isValid() ) {
                 final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
@@ -722,11 +729,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
         }
+
         final MemcachedBackupSession msmSession = (MemcachedBackupSession) session;
-        final Future<BackupResultStatus> result = _backupSessionService.backupSession( msmSession, sessionIdChanged );
+
+        final boolean force = sessionIdChanged || !_sticky && (msmSession.getSecondsSinceLastBackup() >= session.getMaxInactiveInterval());
+        final Future<BackupResultStatus> result = _backupSessionService.backupSession( msmSession, force );
         if ( !_sticky ) {
             remove( session, false );
-            _lockingStrategy.onAfterBackupSession( msmSession, result, requestId );
+            _lockingStrategy.onAfterBackupSession( msmSession, force, result, requestId, _backupSessionService );
         }
         return result;
     }
@@ -1131,8 +1141,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * If disabled, sessions are neither looked up in memcached nor stored in memcached.
      *
      * @param enabled specifies if msm shall be disabled or not.
+     * @throws IllegalStateException it's not allowed to disable this session manager when running in non-sticky mode.
      */
-    public void setEnabled( final boolean enabled ) {
+    public void setEnabled( final boolean enabled ) throws IllegalStateException {
+        if ( !enabled && !_sticky ) {
+            throw new IllegalStateException( "Disabling this session manager is not allowed in non-sticky mode. You must switch to sticky operation mode before." );
+        }
         if ( _enabled.compareAndSet( !enabled, enabled ) ) {
             reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
             _log.info( "Changed enabled status to " + enabled + "." );
@@ -1149,10 +1163,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     public void setSticky( final boolean sticky ) {
+        if ( !sticky && getJvmRoute() != null ) {
+            _log.warn( "Setting sticky to false while there's still a jvmRoute configured (" + getJvmRoute() + "), this might cause trouble." +
+            		" You should remve the jvmRoute configuration for non-sticky mode." );
+        }
         _sticky = sticky;
         if ( !_sticky && _lockingMode == null ) {
             setLockingMode( LockingMode.NONE, null );
         }
+    }
+
+    public boolean isSticky() {
+        return _sticky;
     }
 
     /**
@@ -1180,6 +1202,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             else {
                 lockingMode = LockingMode.valueOf( _lockingModeString.toUpperCase() );
             }
+        }
+        if ( !_sticky ) {
+            lockingMode = LockingMode.NONE;
         }
         setLockingMode( lockingMode, uriPattern );
     }
