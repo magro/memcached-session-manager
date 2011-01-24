@@ -31,6 +31,7 @@ import net.spy.memcached.MemcachedClient;
 import org.apache.catalina.Session;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 
 /**
@@ -58,7 +59,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
     private final ExecutorService _executorService = Executors.newSingleThreadExecutor();
 
     @Override
-    protected MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids,
+    protected MemcachedClient createMemcachedClient( final NodeIdList nodeIds, final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids,
             final Statistics statistics ) {
         return null;
     }
@@ -91,7 +92,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged, String requestURI ) {
+    public Future<BackupResult> backupSession( final Session session, final boolean sessionIdChanged, final String requestURI ) {
         _log.info( "Serializing session data for session " + session.getIdInternal() );
         final long startSerialization = System.currentTimeMillis();
         final byte[] data = _transcoderService.serializeAttributes( (MemcachedBackupSession) session, ((MemcachedBackupSession) session).getAttributesInternal() );
@@ -100,7 +101,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
         _sessionData.put( session.getIdInternal(), data );
         _statistics.getAttributesSerializationProbe().registerSince( startSerialization );
         _statistics.getCachedDataSizeProbe().register( data.length );
-        return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS );
+        return new SimpleFuture<BackupResult>( new BackupResult( BackupResultStatus.SUCCESS ) );
     }
 
     @Override

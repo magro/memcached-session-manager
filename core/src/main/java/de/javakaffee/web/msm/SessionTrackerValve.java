@@ -35,6 +35,8 @@ import org.apache.catalina.valves.ValveBase;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
+
 /**
  * This valve is used for tracking requests for that the session must be sent to
  * memcached.
@@ -298,7 +300,7 @@ class SessionTrackerValve extends ValveBase {
          *
          * @return a {@link Future} providing the {@link BackupResultStatus}.
          */
-        Future<BackupResultStatus> backupSession( Session session, boolean sessionIdChanged, String requestId );
+        Future<BackupResult> backupSession( Session session, boolean sessionIdChanged, String requestId );
 
         /**
          * The enumeration of possible backup results.

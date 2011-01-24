@@ -86,6 +86,7 @@ public class MemcachedSessionManagerIntegrationTest {
             _memcachedNodeId = "n1";
             final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
             _tomcat1 = createCatalina( _portTomcat1, memcachedNodes, "app1" );
+            getManager( _tomcat1 ).setSticky( true );
             _tomcat1.start();
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
@@ -98,7 +99,7 @@ public class MemcachedSessionManagerIntegrationTest {
     }
 
     private MemcachedClient createMemcachedClient( final InetSocketAddress address ) throws IOException, InterruptedException {
-        final MemcachedClient result = new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+        final MemcachedClient result = new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( _memcachedNodeId ),  NodeIdResolver.node(
                 _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
                 Arrays.asList( address ) );
 
@@ -145,15 +146,21 @@ public class MemcachedSessionManagerIntegrationTest {
      * @throws InterruptedException
      * @throws HttpException
      */
-    @Test( enabled = true )
-    public void testInvalidSessionId() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testInvalidSessionId( final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, "12345" );
         assertNotNull( sessionId1, "No session created." );
         assertTrue( sessionId1.indexOf( '-' ) > -1, "Invalid session id format" );
     }
 
-    @Test( enabled = true )
-    public void testSessionAvailableInMemcached() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionAvailableInMemcached( final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
         Thread.sleep( 50 );
@@ -162,7 +169,9 @@ public class MemcachedSessionManagerIntegrationTest {
 
     @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
     public void testExpiredSessionRemovedFromMemcached( @Nonnull final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
         getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
 
@@ -171,8 +180,11 @@ public class MemcachedSessionManagerIntegrationTest {
         assertNull( _memcached.get( sessionId1 ), "Expired session still existing in memcached" );
     }
 
-    @Test( enabled = true )
-    public void testInvalidSessionNotFound() throws IOException, InterruptedException, HttpException {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testInvalidSessionNotFound( @Nonnull final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
 
@@ -184,30 +196,6 @@ public class MemcachedSessionManagerIntegrationTest {
 
         final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
         assertNotSame( sessionId1, sessionId2, "Expired session returned." );
-    }
-
-    /**
-     * Tests, that relocated sessions are no longer available under the
-     * old/former session id.
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     * @throws HttpException
-     */
-    @Test( enabled = true )
-    public void testRelocateSession() throws IOException, InterruptedException, HttpException {
-        // FIXME implementation does not match docs
-        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
-        assertNotNull( sessionId1, "No session created." );
-
-        /*
-         * wait some time, as processExpires runs every second and the
-         * maxInactiveTime is set to 1 sec...
-         */
-        Thread.sleep( 2100 );
-
-        final String sessionId2 = makeRequest( _httpClient, _portTomcat1, sessionId1 );
-        assertNotSame( sessionId1, sessionId2, "Expired session returned" );
     }
 
     /**
@@ -345,7 +333,7 @@ public class MemcachedSessionManagerIntegrationTest {
         _daemon.start();
 
         // Wait so that the daemon will be available and the client can reconnect (async get didn't do the trick)
-        Thread.sleep( 2500 );
+        Thread.sleep( 4000 );
 
         final String newSessionId = manager.changeSessionIdOnMemcachedFailover( session.getId() );
         assertNotNull( newSessionId );

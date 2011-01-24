@@ -340,7 +340,7 @@ public class TestUtils {
                 EvictionPolicy.LRU, 100000, 1024*1024 );
         daemon.setCache( new CacheImpl( cacheStorage ) );
         daemon.setAddr( address );
-        daemon.setVerbose( false );
+        daemon.setVerbose( true );
         return daemon;
     }
 

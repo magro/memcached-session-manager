@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.integration.TestServlet.*;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static org.testng.Assert.assertEquals;
@@ -59,6 +60,7 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
+import de.javakaffee.web.msm.NodeIdList;
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
@@ -74,7 +76,8 @@ public class NonStickySessionsIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( NonStickySessionsIntegrationTest.class );
 
-    private MemCacheDaemon<?> _daemon;
+    private MemCacheDaemon<?> _daemon1;
+    private MemCacheDaemon<?> _daemon2;
     private MemcachedClient _client;
 
     private Embedded _tomcat1;
@@ -83,9 +86,12 @@ public class NonStickySessionsIntegrationTest {
     private static final int TC_PORT_1 = 18888;
     private static final int TC_PORT_2 = 18889;
 
-    private static final String NODE_ID = "n1";
-    private static final int MEMCACHED_PORT = 21211;
-    private static final String MEMCACHED_NODES = NODE_ID + ":localhost:" + MEMCACHED_PORT;
+    private static final String NODE_ID_1 = "n1";
+    private static final String NODE_ID_2 = "n2";
+    private static final int MEMCACHED_PORT_1 = 21211;
+    private static final int MEMCACHED_PORT_2 = 21212;
+    private static final String MEMCACHED_NODES = NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 + "," +
+                                                  NODE_ID_2 + ":localhost:" + MEMCACHED_PORT_2;
 
     private DefaultHttpClient _httpClient;
     private ExecutorService _executor;
@@ -93,9 +99,13 @@ public class NonStickySessionsIntegrationTest {
     @BeforeMethod
     public void setUp() throws Throwable {
 
-        final InetSocketAddress address = new InetSocketAddress( "localhost", MEMCACHED_PORT );
-        _daemon = createDaemon( address );
-        _daemon.start();
+        final InetSocketAddress address1 = new InetSocketAddress( "localhost", MEMCACHED_PORT_1 );
+        _daemon1 = createDaemon( address1 );
+        _daemon1.start();
+
+        final InetSocketAddress address2 = new InetSocketAddress( "localhost", MEMCACHED_PORT_2 );
+        _daemon2 = createDaemon( address2 );
+        _daemon2.start();
 
         try {
             _tomcat1 = startTomcat( TC_PORT_1 );
@@ -106,9 +116,9 @@ public class NonStickySessionsIntegrationTest {
         }
 
         _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
-                        NODE_ID, address ).build(), new SessionIdFormat(), Statistics.create() ),
-                        Arrays.asList( address ) );
+                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( NODE_ID_1, NODE_ID_2 ), NodeIdResolver.node(
+                        NODE_ID_1, address1 ).node( NODE_ID_2, address2 ).build(), new SessionIdFormat(), Statistics.create() ),
+                        Arrays.asList( address1, address2 ) );
 
         final SchemeRegistry schemeRegistry = new SchemeRegistry();
         schemeRegistry.register(
@@ -120,6 +130,7 @@ public class NonStickySessionsIntegrationTest {
 
     private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
         final Embedded tomcat = createCatalina( port, 5, MEMCACHED_NODES );
+        getManager( tomcat ).setSticky( false );
         tomcat.start();
         return tomcat;
     }
@@ -127,7 +138,8 @@ public class NonStickySessionsIntegrationTest {
     @AfterMethod
     public void tearDown() throws Exception {
         _client.shutdown();
-        _daemon.stop();
+        _daemon1.stop();
+        _daemon2.stop();
         _tomcat1.stop();
         _tomcat2.stop();
         _httpClient.getConnectionManager().shutdown();
@@ -162,8 +174,6 @@ public class NonStickySessionsIntegrationTest {
 
         getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
         getManager( _tomcat2 ).setMaxInactiveInterval( 1 );
-
-        setLockingMode( LockingMode.NONE, null );
 
         final String key = "foo";
         final String value1 = "bar";
@@ -390,16 +400,50 @@ public class NonStickySessionsIntegrationTest {
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
 
-        Response response = get( _httpClient, TC_PORT_1, PATH_GET_REQUESTED_SESSION_INFO, sessionId );
+        Response response = get( _httpClient, TC_PORT_1, PATH_GET_REQUESTED_SESSION_INFO, sessionId, sessionTrackingMode, null, null );
         assertEquals( response.getSessionId(), sessionId );
         assertEquals( response.get( KEY_REQUESTED_SESSION_ID ), sessionId );
         assertEquals( Boolean.parseBoolean( response.get( KEY_IS_REQUESTED_SESSION_ID_VALID ) ), true );
         Thread.sleep( 100 );
 
-        response = get( _httpClient, TC_PORT_1, PATH_GET_REQUESTED_SESSION_INFO, sessionId );
+        response = get( _httpClient, TC_PORT_1, PATH_GET_REQUESTED_SESSION_INFO, sessionId, sessionTrackingMode, null, null );
         assertEquals( response.getSessionId(), sessionId );
         assertEquals( response.get( KEY_REQUESTED_SESSION_ID ), sessionId );
         assertEquals( Boolean.parseBoolean( response.get( KEY_IS_REQUESTED_SESSION_ID_VALID ) ), true );
+
+    }
+
+    /**
+     * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
+     * tomcat when the request is finished.
+     */
+    @Test( enabled = true )
+    public void testNonStickySessionIsStoredInSecondaryMemcachedForBackup() throws IOException, InterruptedException, HttpException {
+
+        LOG.info ( "===================================================================");
+
+        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
+        getManager( _tomcat2 ).setMaxInactiveInterval( 1 );
+
+        final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
+        assertNotNull( sessionId1 );
+
+        final SessionIdFormat fmt = new SessionIdFormat();
+
+        final String nodeId = fmt.extractMemcachedId( sessionId1 );
+
+        final MemCacheDaemon<?> primary = nodeId.equals( NODE_ID_1 ) ? _daemon1 : _daemon2;
+        final MemCacheDaemon<?> secondary = nodeId.equals( NODE_ID_1 ) ? _daemon2 : _daemon1;
+
+        assertNotNull( primary.getCache().get( sessionId1 )[0] );
+        assertNotNull( primary.getCache().get( createValidityInfoKeyName( sessionId1 ) )[0] );
+
+        // The executor needs some time to finish the backup...
+        Thread.sleep( 20 );
+
+        assertNotNull( secondary.getCache().get( fmt.createBackupKey( sessionId1 ) )[0] );
+        assertNotNull( secondary.getCache().get( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+        LOG.info ( "===================================================================");
 
     }
 

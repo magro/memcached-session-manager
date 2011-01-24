@@ -39,6 +39,8 @@ import org.apache.juli.logging.LogFactory;
  */
 public class SessionIdFormat {
 
+    private static final String BACKUP_PREFIX = "bak:";
+
     private static final Log LOG = LogFactory.getLog( SessionIdFormat.class );
 
     /**
@@ -198,6 +200,27 @@ public class SessionIdFormat {
             throw new IllegalArgumentException( "The sessionId must not be null." );
         }
         return "lock:" + sessionId;
+    }
+
+    /**
+     * Creates the name/key that is used for the data (session or validity info)
+     * that is additionally stored in a secondary memcached node for non-sticky sessions.
+     * @param origKey the session id (or validity info key) for that a key shall be created.
+     * @return a String.
+     */
+    @Nonnull
+    public String createBackupKey( @Nonnull final String origKey ) {
+        if ( origKey == null ) {
+            throw new IllegalArgumentException( "The origKey must not be null." );
+        }
+        return BACKUP_PREFIX + origKey;
+    }
+
+    /**
+     * Determines, if the given key is a backup key, if it was created via {@link #createBackupKey(String)}.
+     */
+    public boolean isBackupKey( @Nonnull final String key ) {
+        return key.startsWith( BACKUP_PREFIX );
     }
 
 }

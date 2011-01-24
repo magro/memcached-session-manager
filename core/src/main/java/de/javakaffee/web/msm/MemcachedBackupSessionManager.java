@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -50,6 +51,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
@@ -83,7 +85,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private static final String NODES_REGEX = NODE_REGEX + "(?:(?:\\s+|,)" + NODE_REGEX + ")*";
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
 
-    private static final int NODE_AVAILABILITY_CACHE_TTL = 1000;
+    private static final int NODE_AVAILABILITY_CACHE_TTL = 10;
 
     private static final String PROTOCOL_TEXT = "text";
     private static final String PROTOCOL_BINARY = "binary";
@@ -218,8 +220,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private BackupSessionService _backupSessionService;
 
     private boolean _sticky = false;
-    private String _lockingModeString;
-    private LockingMode _lockingMode = LockingMode.ALL;
+    private String _lockingMode;
     private LockingStrategy _lockingStrategy;
 
     private SessionTrackerValve _sessionTrackerValve;
@@ -286,7 +287,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         /* init memcached
          */
         final MemcachedConfig config = createMemcachedConfig( _memcachedNodes, _failoverNodes );
-        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( config.getAddresses(),
+        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( config.getNodeIds(), config.getAddresses(),
                 config.getAddress2Ids(), _statistics );
         _nodeIdService = new NodeIdService( createNodeAvailabilityCache( config.getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, _memcached ),
                 config.getNodeIds(), config.getFailoverNodeIds() );
@@ -299,15 +300,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 (Context) getContainer(), this, _statistics, _enabled );
         getContainer().getPipeline().addValve( _sessionTrackerValve );
 
-        if ( !_sticky ) {
-            initLockingMode();
-        }
+        initNonStickyLockingMode();
 
         _transcoderService = createTranscoderService( _statistics );
 
         _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( this );
 
-        _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
+        _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
+                _backupThreadCount, _memcached, _nodeIdService, _statistics, _sticky );
 
         _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + config.getNodeIds() + " and failover node ids " + config.getFailoverNodeIds() );
 
@@ -333,7 +333,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
         }
 
-        return new MemcachedConfig( memcachedNodes, failoverNodes, nodeIds, failoverNodeIds, addresses, address2Ids );
+        return new MemcachedConfig( memcachedNodes, failoverNodes, new NodeIdList( nodeIds ), failoverNodeIds, addresses, address2Ids );
     }
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
@@ -351,14 +351,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _transcoderFactory;
     }
 
-    protected MemcachedClient createMemcachedClient( final List<InetSocketAddress> addresses,
+    protected MemcachedClient createMemcachedClient( final NodeIdList nodeIds, final List<InetSocketAddress> addresses,
             final Map<InetSocketAddress, String> address2Ids,
             final Statistics statistics ) {
         if ( ! _enabled.get() ) {
             return null;
         }
         try {
-            final ConnectionFactory connectionFactory = createConnectionFactory( address2Ids, statistics );
+            final ConnectionFactory connectionFactory = createConnectionFactory( nodeIds, address2Ids, statistics );
             return new MemcachedClient( connectionFactory, addresses );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
@@ -366,13 +366,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     private ConnectionFactory createConnectionFactory(
-            final Map<InetSocketAddress, String> address2Ids,
+            final NodeIdList nodeIds, final Map<InetSocketAddress, String> address2Ids,
             final Statistics statistics ) {
         final MapBasedResolver resolver = new MapBasedResolver( address2Ids );
         if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) ) {
-            return new SuffixLocatorBinaryConnectionFactory( resolver, _sessionIdFormat, statistics );
+            return new SuffixLocatorBinaryConnectionFactory( nodeIds, resolver, _sessionIdFormat, statistics );
         }
-        return new SuffixLocatorConnectionFactory( resolver, _sessionIdFormat, statistics );
+        return new SuffixLocatorConnectionFactory( nodeIds, resolver, _sessionIdFormat, statistics );
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
@@ -662,29 +662,83 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public String changeSessionIdOnMemcachedFailover( final String requestedSessionId ) {
 
-        /* We can just lookup the session in the local session map, as we wouldn't get
-         * the session from memcached if the node was not available - or, the other way round,
-         * if we would get the session from memcached, the session would not have to be relocated.
-         */
         try {
-            final MemcachedBackupSession session = (MemcachedBackupSession) super.findSession( requestedSessionId );
+            if ( _sticky ) {
+                /* We can just lookup the session in the local session map, as we wouldn't get
+                 * the session from memcached if the node was not available - or, the other way round,
+                 * if we would get the session from memcached, the session would not have to be relocated.
+                 */
+                final MemcachedBackupSession session = (MemcachedBackupSession) super.findSession( requestedSessionId );
 
-            // TODO: for non-sticky sessions we have to extend this
+                if ( session != null && session.isValid() ) {
+                    final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+                    final String newNodeId = getNewNodeIdIfUnavailable( nodeId );
+                    if ( newNodeId != null ) {
+                        final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId );
+                        _log.debug( "Session needs to be relocated, setting new id on session..." );
+                        session.setIdForRelocate( newSessionId );
+                        _statistics.requestWithMemcachedFailover();
+                        return newSessionId;
+                    }
+                }
+            }
+            else {
 
-            if ( session != null && session.isValid() ) {
-                final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-                final String newNodeId = getNewNodeIdIfUnavailable( nodeId );
-                if ( newNodeId != null ) {
-                    final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId );
-                    _log.debug( "Session needs to be relocated, setting new id on session..." );
-                    session.setIdForRelocate( newSessionId );
+                /* for non-sticky sessions we check the validity info
+                 */
+                final String nodeId = _sessionIdFormat.extractMemcachedId( requestedSessionId );
+                if ( nodeId == null || _nodeIdService.isNodeAvailable( nodeId ) ) {
+                    return null;
+                }
+
+                final MemcachedBackupSession backupSession = loadBackupSession( requestedSessionId, nodeId );
+                if ( backupSession != null ) {
+                    addValidLoadedSession( backupSession );
                     _statistics.requestWithMemcachedFailover();
-                    return newSessionId;
+                    return backupSession.getId();
                 }
             }
 
         } catch ( final IOException e ) {
             _log.warn( "Could not find session in local session map.", e );
+        }
+        return null;
+    }
+
+    @CheckForNull
+    private MemcachedBackupSession loadBackupSession( @Nonnull final String requestedSessionId, @Nonnull final String nodeId ) {
+        /* check the node that holds the backup of the session
+         */
+        final String nextNodeId = _nodeIdService.getNextNodeId( nodeId );
+        if ( !_nodeIdService.isNodeAvailable( nextNodeId ) ) {
+            _log.info( "Node "+ nodeId +" that stores the backup of the session "+ requestedSessionId +" is not available." );
+            return null;
+        }
+
+        try {
+            final SessionValidityInfo validityInfo = _lockingStrategy.loadBackupSessionValidityInfo( requestedSessionId );
+            if ( validityInfo == null || !validityInfo.isValid() ) {
+                _log.info( "No validity info (or no valid one) found for sessionId " + requestedSessionId );
+                return null;
+            }
+
+            final Object obj = _memcached.get( _sessionIdFormat.createBackupKey( requestedSessionId ) );
+            if ( obj == null ) {
+                _log.info( "No backup found for sessionId " + requestedSessionId );
+                return null;
+            }
+
+            final MemcachedBackupSession session = _transcoderService.deserialize( (byte[]) obj, getContainer().getRealm(), this );
+            session.setLastAccessedTimeInternal( validityInfo.getLastAccessedTime() );
+            session.setThisAccessedTimeInternal( validityInfo.getThisAccessedTime() );
+
+            _log.debug( "Session needs to be relocated, setting new id on session..." );
+            final String newSessionId = _sessionIdFormat.createNewSessionId( requestedSessionId, nextNodeId );
+            session.setIdInternal( newSessionId );
+            return session;
+
+        } catch( final Exception e ) {
+            _log.error( "Could not get backup validityInfo or backup session for sessionId " + requestedSessionId, e );
         }
         return null;
     }
@@ -725,15 +779,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the uri/id of the request for that the session backup shall be performed, used for readonly tracking.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public Future<BackupResultStatus> backupSession( final Session session, final boolean sessionIdChanged, final String requestId ) {
+    public Future<BackupResult> backupSession( final Session session, final boolean sessionIdChanged, final String requestId ) {
         if ( !_enabled.get() ) {
-            return new SimpleFuture<BackupResultStatus>( BackupResultStatus.SKIPPED );
+            return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
         }
 
         final MemcachedBackupSession msmSession = (MemcachedBackupSession) session;
 
         final boolean force = sessionIdChanged || !_sticky && (msmSession.getSecondsSinceLastBackup() >= session.getMaxInactiveInterval());
-        final Future<BackupResultStatus> result = _backupSessionService.backupSession( msmSession, force );
+        final Future<BackupResult> result = _backupSessionService.backupSession( msmSession, force );
         if ( !_sticky ) {
             remove( session, false );
             _lockingStrategy.onAfterBackupSession( msmSession, force, result, requestId, _backupSessionService );
@@ -931,13 +985,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         /* first create all dependent services
          */
         final MemcachedConfig config = createMemcachedConfig( memcachedNodes, failoverNodes );
-        final MemcachedClient memcachedClient = createMemcachedClient( config.getAddresses(),
+        final MemcachedClient memcachedClient = createMemcachedClient( config.getNodeIds(), config.getAddresses(),
                 config.getAddress2Ids(), _statistics );
         final NodeIdService nodeIdService = new NodeIdService(
                 createNodeAvailabilityCache( config.getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, memcachedClient ),
                 config.getNodeIds(), config.getFailoverNodeIds() );
         final BackupSessionService backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync,
-                _sessionBackupTimeout, _backupThreadCount, memcachedClient, nodeIdService, _statistics );
+                _sessionBackupTimeout, _backupThreadCount, memcachedClient, nodeIdService, _statistics, _sticky );
 
         /* then assign new services
          */
@@ -947,6 +1001,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _memcached = memcachedClient;
         _nodeIdService = nodeIdService;
         _backupSessionService = backupSessionService;
+
+        initNonStickyLockingMode();
 
         return config;
     }
@@ -1161,13 +1217,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     public void setSticky( final boolean sticky ) {
+        if ( sticky == _sticky ) {
+            return;
+        }
         if ( !sticky && getJvmRoute() != null ) {
             _log.warn( "Setting sticky to false while there's still a jvmRoute configured (" + getJvmRoute() + "), this might cause trouble." +
             		" You should remve the jvmRoute configuration for non-sticky mode." );
         }
         _sticky = sticky;
-        if ( !_sticky && _lockingMode == null ) {
-            setLockingMode( LockingMode.NONE, null );
+        if ( initialized ) {
+            _log.info( "Changed sticky to " + _sticky + ". Reloading configuration..." );
+            reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
+            _log.info( "Finished reloading configuration." );
         }
     }
 
@@ -1186,22 +1247,34 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * </ul>
      */
     public void setLockingMode( final String lockingMode ) {
-        _lockingModeString = lockingMode;
+        if ( lockingMode == null && _lockingMode == null
+                || lockingMode.equals( _lockingMode ) ) {
+            return;
+        }
+        _lockingMode = lockingMode;
+        if ( initialized ) {
+            initNonStickyLockingMode();
+        }
     }
 
-    private void initLockingMode() {
+    private void initNonStickyLockingMode() {
+        if ( _sticky ) {
+            setLockingMode( null, null );
+            return;
+        }
+
         Pattern uriPattern = null;
         LockingMode lockingMode = null;
-        if ( _lockingModeString != null ) {
-            if ( _lockingModeString.startsWith( "uriPattern:" ) ) {
+        if ( _lockingMode != null ) {
+            if ( _lockingMode.startsWith( "uriPattern:" ) ) {
                 lockingMode = LockingMode.URI_PATTERN;
-                uriPattern = Pattern.compile( _lockingModeString.substring( "uriPattern:".length() ) );
+                uriPattern = Pattern.compile( _lockingMode.substring( "uriPattern:".length() ) );
             }
             else {
-                lockingMode = LockingMode.valueOf( _lockingModeString.toUpperCase() );
+                lockingMode = LockingMode.valueOf( _lockingMode.toUpperCase() );
             }
         }
-        if ( !_sticky ) {
+        if ( lockingMode == null ) {
             lockingMode = LockingMode.NONE;
         }
         setLockingMode( lockingMode, uriPattern );
@@ -1209,9 +1282,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     public void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
-        _lockingMode = lockingMode;
         _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache );
-        _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
+        if ( _sessionTrackerValve != null ) {
+            _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
+        }
     }
 
     /**
@@ -1342,7 +1416,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _sessionBackupAsync = sessionBackupAsync;
         if ( initialized && oldSessionBackupAsync != sessionBackupAsync ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
-            _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
+            _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
+                    _backupThreadCount, _memcached, _nodeIdService, _statistics, _sticky );
         }
     }
 
@@ -1372,7 +1447,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
-        _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout, _backupThreadCount, _memcached, _nodeIdService, _statistics );
+        _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
+                _backupThreadCount, _memcached, _nodeIdService, _statistics, _sticky );
     }
 
     /**
@@ -1395,6 +1471,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     List<String> getFailoverNodeIds() {
         return _nodeIdService.getFailoverNodeIds();
+    }
+
+    /**
+     * The memcached client.
+     */
+    MemcachedClient getMemcached() {
+        return _memcached;
     }
 
     // -------------------------  statistics via jmx ----------------
@@ -1545,12 +1628,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private static class MemcachedConfig {
         private final String _memcachedNodes;
         private final String _failoverNodes;
-        private final List<String> _nodeIds;
+        private final NodeIdList _nodeIds;
         private final List<String> _failoverNodeIds;
         private final List<InetSocketAddress> _addresses;
         private final Map<InetSocketAddress, String> _address2Ids;
         public MemcachedConfig( final String memcachedNodes, final String failoverNodes,
-                final List<String> nodeIds, final List<String> failoverNodeIds, final List<InetSocketAddress> addresses,
+                final NodeIdList nodeIds, final List<String> failoverNodeIds, final List<InetSocketAddress> addresses,
                 final Map<InetSocketAddress, String> address2Ids ) {
             _memcachedNodes = memcachedNodes;
             _failoverNodes = failoverNodes;
@@ -1573,7 +1656,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         public String getFailoverNodes() {
             return _failoverNodes;
         }
-        public List<String> getNodeIds() {
+        public NodeIdList getNodeIds() {
             return _nodeIds;
         }
         public List<String> getFailoverNodeIds() {

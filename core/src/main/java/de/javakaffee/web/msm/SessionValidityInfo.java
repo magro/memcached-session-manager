@@ -55,7 +55,7 @@ public class SessionValidityInfo {
      * Creates the name/key that can be used for storing the encoded session validity information.
      */
     @Nonnull
-    public static String createAccessedTimesKeyName( @Nonnull final String sessionId ) {
+    public static String createValidityInfoKeyName( @Nonnull final String sessionId ) {
         if ( sessionId == null ) {
             throw new IllegalArgumentException( "The sessionId must not be null." );
         }
@@ -98,6 +98,12 @@ public class SessionValidityInfo {
 
     public long getThisAccessedTime() {
         return _thisAccessedTime;
+    }
+
+    public boolean isValid() {
+        final long timeNow = System.currentTimeMillis();
+        final int timeIdle = (int) ((timeNow - _thisAccessedTime) / 1000L);
+        return timeIdle < _maxInactiveInterval;
     }
 
 }

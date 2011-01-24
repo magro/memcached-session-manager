@@ -29,6 +29,7 @@ import net.spy.memcached.MemcachedClient;
 import org.apache.catalina.connector.Request;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
@@ -51,7 +52,9 @@ public class LockingStrategyAuto extends LockingStrategy {
     }
 
     @Override
-    protected void onAfterBackupSession( final MemcachedBackupSession session, final boolean backupWasForced, final Future<BackupResultStatus> result, final String requestId,
+    protected void onAfterBackupSession( final MemcachedBackupSession session, final boolean backupWasForced,
+            final Future<BackupResult> result,
+            final String requestId,
             final BackupSessionService backupSessionService ) {
 
         super.onAfterBackupSession( session, backupWasForced, result, requestId, backupSessionService );
@@ -61,7 +64,7 @@ public class LockingStrategyAuto extends LockingStrategy {
             @Override
             public Void call() {
                 try {
-                    if ( result.get() == BackupResultStatus.SKIPPED ) {
+                    if ( result.get().getStatus() == BackupResultStatus.SKIPPED ) {
                         _readOnlyRequestCache.readOnlyRequest( requestId );
                     } else {
                         _readOnlyRequestCache.modifyingRequest( requestId );

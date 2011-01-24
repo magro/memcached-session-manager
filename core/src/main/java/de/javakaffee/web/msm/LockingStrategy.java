@@ -39,6 +39,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
@@ -174,28 +175,36 @@ public abstract class LockingStrategy {
      * Is invoked after the backup of the session is initiated, it's represented by the provided backupResult.
      * The requestId is identifying the request.
      */
-    protected void onAfterBackupSession( @Nonnull final MemcachedBackupSession session, final boolean backupWasForced, @Nonnull final Future<BackupResultStatus> result,
-            @Nonnull final String requestId, @Nonnull final BackupSessionService backupSessionService ) {
+    protected void onAfterBackupSession( @Nonnull final MemcachedBackupSession session, final boolean backupWasForced,
+            @Nonnull final Future<BackupResult> result,
+            @Nonnull final String requestId,
+            @Nonnull final BackupSessionService backupSessionService ) {
 
         if ( !backupWasForced ) {
             pingSessionIfBackupWasSkipped( session, result, backupSessionService );
         }
 
         final byte[] data = SessionValidityInfo.encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(), session.getThisAccessedTimeInternal() );
-        _memcached.set( SessionValidityInfo.createAccessedTimesKeyName( session.getIdInternal() ), session.getMaxInactiveInterval(), data );
+        final String key = SessionValidityInfo.createValidityInfoKeyName( session.getIdInternal() );
+        _memcached.set( key, session.getMaxInactiveInterval(), data );
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Stored session validity info for session " + session.getIdInternal() );
         }
+
+        // store backup in secondary memcached
+        final String backupKey = _sessionIdFormat.createBackupKey( key );
+        _memcached.set( backupKey, session.getMaxInactiveInterval(), data );
+
     }
 
-    private void pingSessionIfBackupWasSkipped( @Nonnull final MemcachedBackupSession session, @Nonnull final Future<BackupResultStatus> result,
+    private void pingSessionIfBackupWasSkipped( @Nonnull final MemcachedBackupSession session, @Nonnull final Future<BackupResult> result,
             @Nonnull final BackupSessionService backupSessionService ) {
         final Callable<Void> task = new Callable<Void>() {
 
             @Override
             public Void call() {
                 try {
-                    if ( result.get() == BackupResultStatus.SKIPPED ) {
+                    if ( result.get().getStatus() == BackupResultStatus.SKIPPED ) {
                         pingSession( session, backupSessionService );
                     }
                 } catch ( final Exception e ) {
@@ -226,8 +235,16 @@ public abstract class LockingStrategy {
     }
 
     @CheckForNull
-    private SessionValidityInfo loadSessionValidityInfo( @Nonnull final String id ) {
-        final byte[] validityInfo = (byte[]) _memcached.get( SessionValidityInfo.createAccessedTimesKeyName( id ) );
+    protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String id ) {
+        final byte[] validityInfo = (byte[]) _memcached.get( SessionValidityInfo.createValidityInfoKeyName( id ) );
+        return validityInfo != null ? SessionValidityInfo.decode( validityInfo ) : null;
+    }
+
+    @CheckForNull
+    protected SessionValidityInfo loadBackupSessionValidityInfo( @Nonnull final String id ) {
+        final String key = SessionValidityInfo.createValidityInfoKeyName( id );
+        final String backupKey = _sessionIdFormat.createBackupKey( key );
+        final byte[] validityInfo = (byte[]) _memcached.get( backupKey );
         return validityInfo != null ? SessionValidityInfo.decode( validityInfo ) : null;
     }
 
@@ -279,9 +296,9 @@ public abstract class LockingStrategy {
 
     private void updateSession( @Nonnull final MemcachedBackupSession session, @Nonnull final BackupSessionService backupSessionService )
             throws InterruptedException {
-        final Future<BackupResultStatus> result = backupSessionService.backupSession( session, true );
+        final Future<BackupResult> result = backupSessionService.backupSession( session, true );
         try {
-            if ( result.get() != BackupResultStatus.SUCCESS ) {
+            if ( result.get().getStatus() != BackupResultStatus.SUCCESS ) {
                 _log.warn( "Update for session (after unsuccessful ping) did not return SUCCESS, but " + result.get() );
             }
         } catch ( final ExecutionException e ) {
