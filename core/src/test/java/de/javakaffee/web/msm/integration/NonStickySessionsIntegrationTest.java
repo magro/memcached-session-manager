@@ -437,7 +437,7 @@ public class NonStickySessionsIntegrationTest {
         assertNotNull( primary.getCache().get( createValidityInfoKeyName( sessionId1 ) )[0] );
 
         // The executor needs some time to finish the backup...
-        Thread.sleep( 50 );
+        Thread.sleep( 100 );
 
         assertNotNull( secondary.getCache().get( fmt.createBackupKey( sessionId1 ) )[0] );
         assertNotNull( secondary.getCache().get( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) )[0] );
