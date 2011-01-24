@@ -197,7 +197,7 @@ public class MemcachedFailoverIntegrationTest {
         final Map.Entry<String, MemCacheDaemon<?>> otherNodeWithId = info.otherNode();
         otherNodeWithId.getValue().stop();
 
-        Thread.sleep( 50 );
+        Thread.sleep( 100 );
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
         final String secondNode = extractNodeId( sid2 );

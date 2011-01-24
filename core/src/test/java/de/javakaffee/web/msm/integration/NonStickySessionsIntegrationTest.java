@@ -420,8 +420,6 @@ public class NonStickySessionsIntegrationTest {
     @Test( enabled = true )
     public void testNonStickySessionIsStoredInSecondaryMemcachedForBackup() throws IOException, InterruptedException, HttpException {
 
-        LOG.info ( "===================================================================");
-
         getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
         getManager( _tomcat2 ).setMaxInactiveInterval( 1 );
 
@@ -439,11 +437,10 @@ public class NonStickySessionsIntegrationTest {
         assertNotNull( primary.getCache().get( createValidityInfoKeyName( sessionId1 ) )[0] );
 
         // The executor needs some time to finish the backup...
-        Thread.sleep( 20 );
+        Thread.sleep( 50 );
 
         assertNotNull( secondary.getCache().get( fmt.createBackupKey( sessionId1 ) )[0] );
         assertNotNull( secondary.getCache().get( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) )[0] );
-        LOG.info ( "===================================================================");
 
     }
 
