@@ -87,7 +87,7 @@ public class XStreamMemcachedSessionManagerIntegrationTest {
         }
 
         _memcached =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdResolver.node(
+                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( _memcachedNodeId ), NodeIdResolver.node(
                         _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
                         Arrays.asList( new InetSocketAddress( "localhost", _memcachedPort ) ) );
 
@@ -119,7 +119,7 @@ public class XStreamMemcachedSessionManagerIntegrationTest {
         final SessionTranscoder oldSessionTranscoder = manager.getTranscoderFactory().createSessionTranscoder( manager );
         Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
         Assert.assertTrue( future.get() );
-        final Session loadedFromMemcached = manager.loadFromMemcached( session.getId() );
+        final Session loadedFromMemcached = manager.loadFromMemcachedWithCheck( session.getId() );
         Assert.assertNotNull( loadedFromMemcached );
         assertDeepEquals( session, loadedFromMemcached );
     }
