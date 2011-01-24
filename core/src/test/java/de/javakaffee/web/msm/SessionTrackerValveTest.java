@@ -112,7 +112,10 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
-        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( false ) )
+        _requestControl.expects( once() ).method( "getRequestURI" ).will( returnValue( "/foo" ) );
+        _requestControl.expects( once() ).method( "getMethod" ).will( returnValue( "GET" ) );
+        _requestControl.expects( once() ).method( "getQueryString" );
+        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( false ), ANYTHING )
             .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
@@ -144,7 +147,10 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _nextValve.expects( once() ).method( "invoke" );
         _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
             .will( returnValue( session ) );
-        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( true ) )
+        _requestControl.expects( once() ).method( "getRequestURI" ).will( returnValue( "/foo" ) );
+        _requestControl.expects( once() ).method( "getMethod" ).will( returnValue( "GET" ) );
+        _requestControl.expects( once() ).method( "getQueryString" );
+        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( true ), ANYTHING )
             .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
 
         _sessionTrackerValve.invoke( _request, _response );
