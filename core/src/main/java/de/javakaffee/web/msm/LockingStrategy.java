@@ -99,7 +99,6 @@ public abstract class LockingStrategy {
         }
         switch( lockingMode ) {
             case ALL: return new LockingStrategyAll( memcached, missingSessionsCache );
-            case APP: return new LockingStrategyApp( memcached, manager, missingSessionsCache );
             case AUTO: return new LockingStrategyAuto( memcached, missingSessionsCache );
             case URI_PATTERN: return new LockingStrategyUriPattern( uriPattern, memcached, missingSessionsCache );
             case NONE: return new LockingStrategyNone( memcached, missingSessionsCache );
