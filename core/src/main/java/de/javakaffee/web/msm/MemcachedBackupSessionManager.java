@@ -220,7 +220,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private BackupSessionService _backupSessionService;
 
-    private boolean _sticky = false;
+    private boolean _sticky = true;
     private String _lockingMode;
     private LockingStrategy _lockingStrategy;
 
