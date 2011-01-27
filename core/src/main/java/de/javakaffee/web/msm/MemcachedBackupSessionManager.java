@@ -263,8 +263,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void initInternal() throws LifecycleException {
-        super.initInternal();
-        init( null );
+        initInternal( null );
     }
 
     /**
@@ -274,7 +273,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *
      * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
      */
-    void init( final MemcachedClient memcachedClient ) {
+    void initInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
+        super.initInternal();
+
         _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
                 " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
 
@@ -1202,6 +1203,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             throw new IllegalStateException( "Disabling this session manager is not allowed in non-sticky mode. You must switch to sticky operation mode before." );
         }
         if ( _enabled.compareAndSet( !enabled, enabled ) ) {
+            reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
             _log.info( "Changed enabled status to " + enabled + "." );
         }
     }

@@ -47,7 +47,6 @@ import javax.servlet.http.HttpSessionEvent;
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
-import org.apache.catalina.Globals;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Role;
@@ -55,6 +54,7 @@ import org.apache.catalina.User;
 import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
+import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
@@ -176,11 +176,11 @@ public class TestUtils {
             url += toQueryString( params );
         }
         if ( rsessionId != null && sessionTrackingMode == SessionTrackingMode.URL ) {
-            url += ";" + Globals.SESSION_PARAMETER_NAME + "=" + rsessionId;
+            url += ";" +  ApplicationSessionCookieConfig.getSessionUriParamName( null ) + "=" + rsessionId;
         }
         final HttpGet method = new HttpGet( url );
         if ( rsessionId != null && sessionTrackingMode == SessionTrackingMode.COOKIE ) {
-            method.setHeader( "Cookie", Globals.SESSION_COOKIE_NAME + "=" + rsessionId );
+            method.setHeader( "Cookie",  ApplicationSessionCookieConfig.getSessionCookieName( null ) + "=" + rsessionId );
         }
 
         final HttpResponse response = credentials == null
