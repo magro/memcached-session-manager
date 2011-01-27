@@ -22,9 +22,9 @@ import static org.testng.Assert.*;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -194,10 +194,10 @@ public class MemcachedFailoverIntegrationTest {
          */
         final FailoverInfo info = getFailoverInfo( firstNode );
         info.activeNode.stop();
-        final Map.Entry<String, MemCacheDaemon<?>> otherNodeWithId = info.otherNode();
+        final Map.Entry<String, MemCacheDaemon<?>> otherNodeWithId = info.previousNode();
         otherNodeWithId.getValue().stop();
 
-        Thread.sleep( 300 );
+        Thread.sleep( 100 );
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
         final String secondNode = extractNodeId( sid2 );
@@ -409,7 +409,7 @@ public class MemcachedFailoverIntegrationTest {
 
     private Map<String, MemCacheDaemon<?>> asMap( final String nodeId1, final MemCacheDaemon<?> daemon1,
             final String nodeId2, final MemCacheDaemon<?> daemon2 ) {
-        final Map<String, MemCacheDaemon<?>> result = new HashMap<String, MemCacheDaemon<?>>( 2 );
+        final Map<String, MemCacheDaemon<?>> result = new LinkedHashMap<String, MemCacheDaemon<?>>( 2 );
         result.put( nodeId1, daemon1 );
         result.put( nodeId2, daemon2 );
         return result;
@@ -423,8 +423,12 @@ public class MemcachedFailoverIntegrationTest {
             this.activeNode = first;
             this.otherNodes = otherNodes;
         }
-        public Entry<String, MemCacheDaemon<?>> otherNode() {
-            return otherNodes.entrySet().iterator().next();
+        public Entry<String, MemCacheDaemon<?>> previousNode() {
+            Entry<String, MemCacheDaemon<?>> last = null;
+            for ( final Entry<String, MemCacheDaemon<?>> entry : otherNodes.entrySet() ) {
+                last = entry;
+            }
+            return last;
         }
         public Entry<String, MemCacheDaemon<?>> otherNodeExcept( final String key ) {
             for( final Map.Entry<String, MemCacheDaemon<?>> entry : otherNodes.entrySet() ) {
