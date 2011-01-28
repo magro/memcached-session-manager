@@ -59,7 +59,7 @@ end
 desc 'memcached-session-manager (msm for short): memcached based session failover for Apache Tomcat'
 define 'msm' do
   project.group = 'de.javakaffee.web.msm'
-  project.version = '1.4.0-SNAPSHOT'
+  project.version = '1.4.0-RC1'
 
   compile.using :source=>'1.6', :target=>'1.6'
   test.using :testng
@@ -72,8 +72,8 @@ define 'msm' do
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED, JSR305 )
     test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO, HIBERNATE, HIBERNATE_ANNOTATIONS, JAVASSIST, HSQLDB )
-    package :jar, :id => 'memcached-session-manager'
-    package(:jar, :classifier => 'sources', :id => 'memcached-session-manager').include :from => compile.sources 
+    package :jar, :id => 'memcached-session-manager-tc7'
+    package(:jar, :classifier => 'sources', :id => 'memcached-session-manager-tc7').include :from => compile.sources 
   end
 
   desc 'Javolution/xml based serialization strategy'
