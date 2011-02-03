@@ -239,7 +239,7 @@ public class MemcachedBackupSessionManagerTest {
 
         _manager.setStickyInternal( stickyness.isSticky() );
         if ( !stickyness.isSticky() ) {
-            _manager.setLockingMode( LockingMode.NONE, null );
+            _manager.setLockingMode( LockingMode.NONE, null, false );
         }
 
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );

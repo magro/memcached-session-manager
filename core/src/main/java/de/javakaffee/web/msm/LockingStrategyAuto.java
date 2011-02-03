@@ -45,8 +45,9 @@ public class LockingStrategyAuto extends LockingStrategy {
     private final ReadOnlyRequestsCache _readOnlyRequestCache;
 
     public LockingStrategyAuto( @Nonnull final MemcachedClient memcached,
-            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
-        super( memcached, missingSessionsCache );
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
+            final boolean storeSecondaryBackup ) {
+        super( memcached, missingSessionsCache, storeSecondaryBackup );
         _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor();
         _readOnlyRequestCache = new ReadOnlyRequestsCache();
     }

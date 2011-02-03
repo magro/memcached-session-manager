@@ -198,8 +198,8 @@ public class NonStickySessionsIntegrationTest {
     }
 
     private void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) {
-        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern );
-        getManager( _tomcat2 ).setLockingMode( lockingMode, uriPattern );
+        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern, true );
+        getManager( _tomcat2 ).setLockingMode( lockingMode, uriPattern, true );
     }
 
     /**
@@ -374,7 +374,7 @@ public class NonStickySessionsIntegrationTest {
     public void testNonStickySessionIsValidEvenWhenAccessedReadonly( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
         getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern );
+        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern, true );
 
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
@@ -395,7 +395,7 @@ public class NonStickySessionsIntegrationTest {
     public void testNonStickySessionIsValidForDifferentSessionTrackingModes( @Nonnull final SessionTrackingMode sessionTrackingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
         getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat1 ).setLockingMode( LockingMode.ALL, null );
+        getManager( _tomcat1 ).setLockingMode( LockingMode.ALL, null, true );
 
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
@@ -442,6 +442,26 @@ public class NonStickySessionsIntegrationTest {
         assertNotNull( secondary.getCache().get( fmt.createBackupKey( sessionId1 ) )[0] );
         assertNotNull( secondary.getCache().get( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) )[0] );
 
+    }
+
+    /**
+     * Test for issue #79: In non-sticky sessions mode with only a single memcached the backup is done in the primary node.
+     */
+    @Test( enabled = true )
+    public void testNoBackupWhenRunningASingleMemcachedOnly() throws IOException, HttpException {
+        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        try {
+            final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
+            assertNotNull( sessionId1 );
+
+            // 2 for session and validity, if backup would be stored this would be 4 instead
+            assertEquals( _daemon1.getCache().getSetCmds(), 2 );
+
+            // just to be sure that node2 was not hit at all
+            assertEquals( _daemon2.getCache().getSetCmds(), 0 );
+        } finally {
+            getManager( _tomcat1 ).setMemcachedNodes( MEMCACHED_NODES );
+        }
     }
 
     @DataProvider

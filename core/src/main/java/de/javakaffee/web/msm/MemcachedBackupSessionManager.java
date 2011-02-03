@@ -300,20 +300,20 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 (Context) getContainer(), this, _statistics, _enabled );
         getContainer().getPipeline().addValve( _sessionTrackerValve );
 
-        initNonStickyLockingMode();
+        initNonStickyLockingMode( config );
 
         _transcoderService = createTranscoderService( _statistics );
 
         _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( this );
 
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                _backupThreadCount, _memcached, _nodeIdService, _statistics, _sticky );
+                _backupThreadCount, _memcached, _nodeIdService, _statistics );
 
         _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + config.getNodeIds() + " and failover node ids " + config.getFailoverNodeIds() );
 
     }
 
-    private MemcachedConfig createMemcachedConfig( final String memcachedNodes, final String failoverNodes ) {
+    protected static MemcachedConfig createMemcachedConfig( final String memcachedNodes, final String failoverNodes ) {
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() ) {
             throw new IllegalArgumentException( "Configured memcachedNodes attribute has wrong format, must match " + NODES_REGEX );
         }
@@ -416,7 +416,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         } );
     }
 
-    private List<String> initFailoverNodes( final String failoverNodes, final List<String> nodeIds ) {
+    private static List<String> initFailoverNodes( final String failoverNodes, final List<String> nodeIds ) {
         final List<String> failoverNodeIds = new ArrayList<String>();
         if ( failoverNodes != null && failoverNodes.trim().length() != 0 ) {
             final String[] failoverNodesArray = failoverNodes.split( " |," );
@@ -432,7 +432,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return failoverNodeIds;
     }
 
-    private void initHandleNodeDefinitionMatch( final Matcher matcher, final List<InetSocketAddress> addresses,
+    private static void initHandleNodeDefinitionMatch( final Matcher matcher, final List<InetSocketAddress> addresses,
             final Map<InetSocketAddress, String> address2Ids, final List<String> nodeIds ) {
         final String nodeId = matcher.group( 1 );
         nodeIds.add( nodeId );
@@ -1002,7 +1002,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 createNodeAvailabilityCache( config.getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, memcachedClient ),
                 config.getNodeIds(), config.getFailoverNodeIds() );
         final BackupSessionService backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync,
-                _sessionBackupTimeout, _backupThreadCount, memcachedClient, nodeIdService, _statistics, _sticky );
+                _sessionBackupTimeout, _backupThreadCount, memcachedClient, nodeIdService, _statistics );
 
         /* then assign new services
          */
@@ -1013,7 +1013,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _nodeIdService = nodeIdService;
         _backupSessionService = backupSessionService;
 
-        initNonStickyLockingMode();
+        initNonStickyLockingMode( config );
 
         return config;
     }
@@ -1268,13 +1268,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
         _lockingMode = lockingMode;
         if ( initialized ) {
-            initNonStickyLockingMode();
+            initNonStickyLockingMode( createMemcachedConfig( _memcachedNodes, _failoverNodes ) );
         }
     }
 
-    private void initNonStickyLockingMode() {
+    private void initNonStickyLockingMode( @Nonnull final MemcachedConfig config ) {
         if ( _sticky ) {
-            setLockingMode( null, null );
+            setLockingMode( null, null, false );
             return;
         }
 
@@ -1292,12 +1292,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( lockingMode == null ) {
             lockingMode = LockingMode.NONE;
         }
-        setLockingMode( lockingMode, uriPattern );
+        final boolean storeSecondaryBackup = config.getCountNodes() > 1;
+        setLockingMode( lockingMode, uriPattern, storeSecondaryBackup );
     }
 
-    public void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) {
+    public void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
-        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache );
+        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache, storeSecondaryBackup );
         if ( _sessionTrackerValve != null ) {
             _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
         }
@@ -1432,7 +1433,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( initialized && oldSessionBackupAsync != sessionBackupAsync ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                    _backupThreadCount, _memcached, _nodeIdService, _statistics, _sticky );
+                    _backupThreadCount, _memcached, _nodeIdService, _statistics );
         }
     }
 
@@ -1463,7 +1464,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
         _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                _backupThreadCount, _memcached, _nodeIdService, _statistics, _sticky );
+                _backupThreadCount, _memcached, _nodeIdService, _statistics );
     }
 
     /**
