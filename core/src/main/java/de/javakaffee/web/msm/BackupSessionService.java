@@ -37,7 +37,6 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * This service is responsible for storing sessions memcached. This includes
@@ -58,10 +57,8 @@ public class BackupSessionService {
     private final MemcachedClient _memcached;
     private final NodeIdService _nodeIdService;
     private final Statistics _statistics;
-    private final boolean _sticky;
 
     private final ExecutorService _executorService;
-    private final ExecutorService _nonStickySessionBackupExecutor;
 
 
     /**
@@ -79,21 +76,17 @@ public class BackupSessionService {
             final int backupThreadCount,
             final MemcachedClient memcached,
             final NodeIdService nodeIdService,
-            final Statistics statistics,
-            @Nonnull final boolean sticky ) {
+            final Statistics statistics ) {
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
         _memcached = memcached;
         _nodeIdService = nodeIdService;
         _statistics = statistics;
-        _sticky = sticky;
 
         _executorService = sessionBackupAsync
             ? Executors.newFixedThreadPool( backupThreadCount )
             : new SynchronousExecutorService();
-
-        _nonStickySessionBackupExecutor = sticky ? null : Executors.newSingleThreadExecutor();
 
     }
 
@@ -102,9 +95,6 @@ public class BackupSessionService {
      */
     public void shutdown() throws InterruptedException {
         _executorService.shutdown();
-        if ( _nonStickySessionBackupExecutor != null ) {
-            _nonStickySessionBackupExecutor.shutdown();
-        }
     }
 
     /**
@@ -210,14 +200,6 @@ public class BackupSessionService {
 
             final BackupSessionTask task = createBackupSessionTask( session, force );
             final Future<BackupResult> result = _executorService.submit( task );
-
-            /* For non-sticky sessions we store a backup of the session in a secondary memcached node
-             * (under a special key that's resolved by the SuffixBasedNodeLocator)
-             */
-            if ( !_sticky ) {
-                final Callable<?> backupTask = new StoreNonStickySessionBackupTask( session, result );
-                _nonStickySessionBackupExecutor.submit( backupTask );
-            }
 
             if ( !_sessionBackupAsync ) {
                 try {
@@ -475,38 +457,6 @@ public class BackupSessionService {
             return true;
         }
 
-    }
-
-    private final class StoreNonStickySessionBackupTask implements Callable<Void> {
-
-        private final MemcachedBackupSession _session;
-        private final Future<BackupResult> _result;
-
-        private StoreNonStickySessionBackupTask( final MemcachedBackupSession session, final Future<BackupResult> result ) {
-            _session = session;
-            _result = result;
-        }
-
-        @Override
-        public Void call() throws Exception {
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Storing backup in secondary memcached for non-sticky session " + _session.getId() );
-            }
-            final BackupResult backupResult = _result.get();
-            if ( backupResult.getStatus() != BackupResultStatus.SKIPPED ) {
-                final byte[] data = backupResult.getData();
-                if ( data != null ) {
-                    final String key = _sessionIdFormat.createBackupKey( _session.getId() );
-                    _memcached.set( key, _session.getMemcachedExpirationTimeToSet(), data );
-                }
-                else {
-                    _log.warn( "No data set for backupResultStatus " + backupResult.getStatus() +
-                            " for sessionId " + _session.getIdInternal() + ", skipping backup" +
-                            " of non-sticky session in secondary memcached." );
-                }
-            }
-            return null;
-        }
     }
 
 }

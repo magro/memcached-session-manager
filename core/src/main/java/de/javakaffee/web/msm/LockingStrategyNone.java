@@ -31,8 +31,9 @@ import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 public class LockingStrategyNone extends LockingStrategy {
 
     public LockingStrategyNone( @Nonnull final MemcachedClient memcached,
-            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
-        super( memcached, missingSessionsCache );
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
+            final boolean storeSecondaryBackup ) {
+        super( memcached, missingSessionsCache, storeSecondaryBackup );
     }
 
     @Override

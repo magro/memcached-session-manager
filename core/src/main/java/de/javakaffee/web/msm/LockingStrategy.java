@@ -78,13 +78,16 @@ public abstract class LockingStrategy {
     protected final SessionIdFormat _sessionIdFormat;
     protected final InheritableThreadLocal<Request> _requestsThreadLocal;
     private final ExecutorService _executor;
+    private final boolean _storeSecondaryBackup;
 
     protected LockingStrategy( @Nonnull final MemcachedClient memcached,
-            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
+            final boolean storeSecondaryBackup ) {
         _memcached = memcached;
         _missingSessionsCache = missingSessionsCache;
         _sessionIdFormat = new SessionIdFormat();
         _requestsThreadLocal = new InheritableThreadLocal<Request>();
+        _storeSecondaryBackup = storeSecondaryBackup;
         _executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
     }
 
@@ -96,15 +99,16 @@ public abstract class LockingStrategy {
             @Nullable final Pattern uriPattern,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final MemcachedBackupSessionManager manager,
-            @Nonnull final LRUCache<String, Boolean> missingSessionsCache ) {
+            @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
+            final boolean storeSecondaryBackup ) {
         if ( lockingMode == null ) {
             return null;
         }
         switch( lockingMode ) {
-            case ALL: return new LockingStrategyAll( memcached, missingSessionsCache );
-            case AUTO: return new LockingStrategyAuto( memcached, missingSessionsCache );
-            case URI_PATTERN: return new LockingStrategyUriPattern( uriPattern, memcached, missingSessionsCache );
-            case NONE: return new LockingStrategyNone( memcached, missingSessionsCache );
+            case ALL: return new LockingStrategyAll( memcached, missingSessionsCache, storeSecondaryBackup );
+            case AUTO: return new LockingStrategyAuto( memcached, missingSessionsCache, storeSecondaryBackup );
+            case URI_PATTERN: return new LockingStrategyUriPattern( uriPattern, memcached, missingSessionsCache, storeSecondaryBackup );
+            case NONE: return new LockingStrategyNone( memcached, missingSessionsCache, storeSecondaryBackup );
             default: throw new IllegalArgumentException( "LockingMode not yet supported: " + lockingMode );
         }
     }
@@ -193,9 +197,17 @@ public abstract class LockingStrategy {
             _log.debug( "Stored session validity info for session " + session.getIdInternal() );
         }
 
-        // store backup in secondary memcached
-        final String backupKey = _sessionIdFormat.createBackupKey( key );
-        _memcached.set( backupKey, session.getMaxInactiveInterval(), data );
+        /* For non-sticky sessions we store a backup of the session in a secondary memcached node
+         * (under a special key that's resolved by the SuffixBasedNodeLocator),
+         * but only when we have more than 1 memcached node...
+         */
+        if ( _storeSecondaryBackup ) {
+            final Callable<?> backupTask = new StoreNonStickySessionBackupTask( session, result );
+            _executor.submit( backupTask );
+
+            final String backupKey = _sessionIdFormat.createBackupKey( key );
+            _memcached.set( backupKey, session.getMaxInactiveInterval(), data );
+        }
 
     }
 
@@ -316,6 +328,38 @@ public abstract class LockingStrategy {
             }
         } catch ( final ExecutionException e ) {
             _log.warn( "An exception occurred when trying to update session " + session.getIdInternal(), e );
+        }
+    }
+
+    private final class StoreNonStickySessionBackupTask implements Callable<Void> {
+
+        private final MemcachedBackupSession _session;
+        private final Future<BackupResult> _result;
+
+        private StoreNonStickySessionBackupTask( final MemcachedBackupSession session, final Future<BackupResult> result ) {
+            _session = session;
+            _result = result;
+        }
+
+        @Override
+        public Void call() throws Exception {
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Storing backup in secondary memcached for non-sticky session " + _session.getId() );
+            }
+            final BackupResult backupResult = _result.get();
+            if ( backupResult.getStatus() != BackupResultStatus.SKIPPED ) {
+                final byte[] data = backupResult.getData();
+                if ( data != null ) {
+                    final String key = _sessionIdFormat.createBackupKey( _session.getId() );
+                    _memcached.set( key, _session.getMemcachedExpirationTimeToSet(), data );
+                }
+                else {
+                    _log.warn( "No data set for backupResultStatus " + backupResult.getStatus() +
+                            " for sessionId " + _session.getIdInternal() + ", skipping backup" +
+                            " of non-sticky session in secondary memcached." );
+                }
+            }
+            return null;
         }
     }
 
