@@ -93,7 +93,7 @@ public class BackupSessionService {
     /**
      * Shutdown this service, this stops the possibly existing threads used for session backup.
      */
-    public void shutdown() throws InterruptedException {
+    public void shutdown() {
         _executorService.shutdown();
     }
 

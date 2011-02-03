@@ -1339,11 +1339,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void stop() throws LifecycleException {
         if ( initialized ) {
-            try {
-                _backupSessionService.shutdown();
-            } catch ( final InterruptedException e ) {
-                _log.info( "Got interrupted during backupSessionService shutdown," +
-                        " continuing to shutdown memcached client and to destroy myself...", e );
+            _backupSessionService.shutdown();
+            if ( _lockingStrategy != null ) {
+                _lockingStrategy.shutdown();
             }
             if ( _memcached != null ) {
                 _memcached.shutdown();
