@@ -113,6 +113,13 @@ public abstract class LockingStrategy {
         }
     }
 
+    /**
+     * Shutdown this lockingStrategy, which frees all resources / releases threads.
+     */
+    public void shutdown() {
+        _executor.shutdown();
+    }
+
     protected LockStatus lock( final String sessionId ) {
         return lock( sessionId, LOCK_TIMEOUT, TimeUnit.MILLISECONDS );
     }
