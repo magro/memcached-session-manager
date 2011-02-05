@@ -47,6 +47,7 @@ public class TestServlet extends HttpServlet {
     public static final String PATH_GET_REQUESTED_SESSION_INFO = "/requestedSessionInfo";
     public static final String KEY_REQUESTED_SESSION_ID = "requestedSessionId";
     public static final String KEY_IS_REQUESTED_SESSION_ID_VALID = "isRequestedSessionIdValid";
+    public static final String PATH_NO_SESSION_ACCESS = "/noSessionAccess";
 
     private static final long serialVersionUID = 7954803132860358448L;
 
@@ -67,6 +68,10 @@ public class TestServlet extends HttpServlet {
             final PrintWriter out = response.getWriter();
             out.println( KEY_REQUESTED_SESSION_ID + "=" + request.getRequestedSessionId() );
             out.println( KEY_IS_REQUESTED_SESSION_ID_VALID + "=" + request.isRequestedSessionIdValid() );
+        }
+        else if ( PATH_NO_SESSION_ACCESS.equals( pathInfo ) ) {
+            LOG.info( "skipping session access" );
+            response.getWriter().println( "Skipped session access" );
         }
         else {
 
