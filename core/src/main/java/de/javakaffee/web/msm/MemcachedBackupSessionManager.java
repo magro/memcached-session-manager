@@ -740,6 +740,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             }
 
             final MemcachedBackupSession session = _transcoderService.deserialize( (byte[]) obj, getContainer().getRealm(), this );
+            session.setSticky( _sticky );
             session.setLastAccessedTimeInternal( validityInfo.getLastAccessedTime() );
             session.setThisAccessedTimeInternal( validityInfo.getThisAccessedTime() );
 
@@ -860,6 +861,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     else {
                         result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
                     }
+                    result.setSticky( _sticky );
                     if ( !_sticky ) {
                         _lockingStrategy.onAfterLoadFromMemcached( result, lockStatus );
                     }
