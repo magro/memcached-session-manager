@@ -1341,6 +1341,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void stop() throws LifecycleException {
         if ( initialized ) {
+
+            if ( _sticky ) {
+                _log.info( "Removing sessions from local session map." );
+                for( final Session session : sessions.values() ) {
+                    swapOut( (StandardSession) session );
+                }
+            }
+
+            _log.info( "Stopping services." );
             _backupSessionService.shutdown();
             if ( _lockingStrategy != null ) {
                 _lockingStrategy.shutdown();
@@ -1348,8 +1357,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             if ( _memcached != null ) {
                 _memcached.shutdown();
             }
+
             destroy();
         }
+    }
+
+    private void swapOut( @Nonnull final StandardSession session ) {
+        // implementation like the one in PersistentManagerBase.swapOut
+        if (!session.isValid()) {
+            return;
+        }
+        session.passivate();
+        remove( session, false );
+        session.recycle();
     }
 
     /**
