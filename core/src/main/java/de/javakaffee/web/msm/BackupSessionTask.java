@@ -16,6 +16,12 @@
  */
 package de.javakaffee.web.msm;
 
+
+import static de.javakaffee.web.msm.Statistics.StatsType.ATTRIBUTES_SERIALIZATION;
+import static de.javakaffee.web.msm.Statistics.StatsType.BACKUP;
+import static de.javakaffee.web.msm.Statistics.StatsType.MEMCACHED_UPDATE;
+import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
+
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -130,8 +136,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                     _session.storeThisAccessedTimeFromLastBackupCheck();
                     break;
                 case SUCCESS:
-                    _statistics.requestWithBackup();
-                    _statistics.getBackupProbe().registerSince( startBackup );
+                    _statistics.registerSince( BACKUP, startBackup );
                     _session.storeThisAccessedTimeFromLastBackupCheck();
                     _session.backupFinished();
                     break;
@@ -157,7 +162,9 @@ public class BackupSessionTask implements Callable<BackupResult> {
                 if ( _log.isDebugEnabled() ) {
                     _log.debug( "Releasing lock for session " + _session.getIdInternal() );
                 }
+                final long start = System.currentTimeMillis();
                 _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
+                _statistics.registerSince( RELEASE_LOCK, start );
                 _session.releaseLock();
             } catch( final Exception e ) {
                 _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
@@ -168,7 +175,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
     private byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
         final long start = System.currentTimeMillis();
         final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
-        _statistics.getAttributesSerializationProbe().registerSince( start );
+        _statistics.registerSince( ATTRIBUTES_SERIALIZATION, start );
         return attributesData;
     }
 
@@ -236,7 +243,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                 session.setLastBackupTime( System.currentTimeMillis() );
             }
         } finally {
-            _statistics.getMemcachedUpdateProbe().registerSince( start );
+            _statistics.registerSince( MEMCACHED_UPDATE, start );
         }
     }
 

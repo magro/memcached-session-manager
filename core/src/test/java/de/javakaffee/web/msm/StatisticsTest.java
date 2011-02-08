@@ -32,10 +32,18 @@ import de.javakaffee.web.msm.Statistics.MinMaxAvgProbe;
  */
 public class StatisticsTest {
 
+    public static void main( final String[] args ) {
+        final Method[] methods = Statistics.class.getMethods();
+        for ( final Method method : methods ) {
+            if ( method.getName().startsWith( "get" )) {
+                System.out.println( method.getName() );
+            }
+        }
+    }
+
     @DataProvider( name = "methodNamesProvider" )
     public Object[][] createStatisticMethodNames() {
         return new Object[][] {
-                { "getRequestsWithBackup", "requestWithBackup" },
                 { "getRequestsWithBackupFailure", "requestWithBackupFailure" },
                 { "getRequestsWithTomcatFailover", "requestWithTomcatFailover" },
                 { "getRequestsWithMemcachedFailover", "requestWithMemcachedFailover" },
@@ -44,7 +52,8 @@ public class StatisticsTest {
                 { "getRequestsWithoutAttributesAccess", "requestWithoutAttributesAccess" },
                 { "getRequestsWithoutSessionModification", "requestWithoutSessionModification" },
                 { "getRequestsWithSession", "requestWithSession" },
-                { "getSessionsLoadedFromMemcached", "sessionLoadedFromMemcached" }
+                { "getNonStickySessionsPingFailed", "nonStickySessionsPingFailed" },
+                { "getNonStickySessionsReadOnlyRequest", "nonStickySessionsReadOnlyRequest" }
         };
     }
 
@@ -60,9 +69,9 @@ public class StatisticsTest {
     @Test
     public void testDisabledRequestWithBackup() {
         final Statistics cut = Statistics.create( false );
-        assertEquals( cut.getRequestsWithBackup(), 0 );
-        cut.requestWithBackup();
-        assertEquals( cut.getRequestsWithBackup(), 0 );
+        assertEquals( cut.getRequestsWithBackupFailure(), 0 );
+        cut.requestWithBackupFailure();
+        assertEquals( cut.getRequestsWithBackupFailure(), 0 );
     }
 
     @Test

@@ -16,6 +16,9 @@
  */
 package de.javakaffee.web.msm;
 
+
+import static de.javakaffee.web.msm.Statistics.StatsType.*;
+
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
@@ -657,7 +660,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 _log.debug( "Deleting session from memcached: " + sessionId );
             }
             try {
+                final long start = System.currentTimeMillis();
                 _memcached.delete( sessionId );
+                _statistics.registerSince( DELETE_FROM_MEMCACHED, start );
                 if ( !_sticky ) {
                     _lockingStrategy.onAfterDeleteFromMemcached( sessionId );
                 }
@@ -859,14 +864,17 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                         result = (MemcachedBackupSession) object;
                     }
                     else {
+                        final long startDeserialization = System.currentTimeMillis();
                         result = _transcoderService.deserialize( (byte[]) object, getContainer().getRealm(), this );
+                        _statistics.registerSince( SESSION_DESERIALIZATION, startDeserialization );
                     }
+                    _statistics.registerSince( LOAD_FROM_MEMCACHED, start );
+
                     result.setSticky( _sticky );
                     if ( !_sticky ) {
                         _lockingStrategy.onAfterLoadFromMemcached( result, lockStatus );
                     }
 
-                    _statistics.getLoadFromMemcachedProbe().registerSince( start );
                     if ( _log.isDebugEnabled() ) {
                         _log.debug( "Found session with id " + sessionId );
                     }
@@ -1300,7 +1308,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     public void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
-        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache, storeSecondaryBackup );
+        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache, storeSecondaryBackup, _statistics );
         if ( _sessionTrackerValve != null ) {
             _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
         }
@@ -1520,14 +1528,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * @return
-     * @see de.javakaffee.web.msm.Statistics#getRequestsWithBackup()
-     */
-    public long getMsmStatNumBackups() {
-        return _statistics.getRequestsWithBackup();
-    }
-
-    /**
-     * @return
      * @see de.javakaffee.web.msm.Statistics#getRequestsWithBackupFailure()
      */
     public long getMsmStatNumBackupFailures() {
@@ -1590,12 +1590,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _statistics.getRequestsWithSession();
     }
 
-    /**
-     * @return
-     * @see de.javakaffee.web.msm.Statistics#getSessionsLoadedFromMemcached()
-     */
-    public long getMsmStatNumSessionsLoadedFromMemcached() {
-        return _statistics.getSessionsLoadedFromMemcached();
+    public long getMsmStatNumNonStickySessionsPingFailed() {
+        return _statistics.getNonStickySessionsPingFailed();
+    }
+    public long getMsmStatNumNonStickySessionsReadOnlyRequest() {
+        return _statistics.getNonStickySessionsReadOnlyRequest();
     }
 
     /**
@@ -1604,7 +1603,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return a String array for statistics inspection via jmx.
      */
     public String[] getMsmStatAttributesSerializationInfo() {
-        return _statistics.getAttributesSerializationProbe().getInfo();
+        return _statistics.getProbe( ATTRIBUTES_SERIALIZATION ).getInfo();
     }
 
     /**
@@ -1616,7 +1615,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return a String array for statistics inspection via jmx.
      */
     public String[] getMsmStatEffectiveBackupInfo() {
-        return _statistics.getEffectiveBackupProbe().getInfo();
+        return _statistics.getProbe( EFFECTIVE_BACKUP ).getInfo();
     }
 
     /**
@@ -1628,16 +1627,37 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return a String array for statistics inspection via jmx.
      */
     public String[] getMsmStatBackupInfo() {
-        return _statistics.getBackupProbe().getInfo();
+        return _statistics.getProbe( BACKUP ).getInfo();
     }
 
     /**
      * Returns a string array with labels and values of count, min, avg and max
      * of the time that loading sessions from memcached took (including deserialization).
      * @return a String array for statistics inspection via jmx.
+     * @see #getMsmStatSessionDeserializationInfo()
+     * @see #getMsmStatNonStickyAfterLoadFromMemcachedInfo()
      */
     public String[] getMsmStatSessionsLoadedFromMemcachedInfo() {
-        return _statistics.getLoadFromMemcachedProbe().getInfo();
+        return _statistics.getProbe( LOAD_FROM_MEMCACHED ).getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that deleting sessions from memcached took.
+     * @return a String array for statistics inspection via jmx.
+     * @see #getMsmStatNonStickyAfterDeleteFromMemcachedInfo()
+     */
+    public String[] getMsmStatSessionsDeletedFromMemcachedInfo() {
+        return _statistics.getProbe( DELETE_FROM_MEMCACHED ).getInfo();
+    }
+
+    /**
+     * Returns a string array with labels and values of count, min, avg and max
+     * of the time that deserialization of session data took.
+     * @return a String array for statistics inspection via jmx.
+     */
+    public String[] getMsmStatSessionDeserializationInfo() {
+        return _statistics.getProbe( SESSION_DESERIALIZATION ).getInfo();
     }
 
     /**
@@ -1646,7 +1666,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return a String array for statistics inspection via jmx.
      */
     public String[] getMsmStatCachedDataSizeInfo() {
-        return _statistics.getCachedDataSizeProbe().getInfo();
+        return _statistics.getProbe( CACHED_DATA_SIZE ).getInfo();
     }
 
     /**
@@ -1656,7 +1676,57 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return a String array for statistics inspection via jmx.
      */
     public String[] getMsmStatMemcachedUpdateInfo() {
-        return _statistics.getMemcachedUpdateProbe().getInfo();
+        return _statistics.getProbe( MEMCACHED_UPDATE ).getInfo();
+    }
+
+    /**
+     * Info about locks acquired in non-sticky mode.
+     */
+    public String[] getMsmStatNonStickyAcquireLockInfo() {
+        return _statistics.getProbe( ACQUIRE_LOCK ).getInfo();
+    }
+
+    /**
+     * Lock acquiration in non-sticky session mode.
+     */
+    public String[] getMsmStatNonStickyAcquireLockFailureInfo() {
+        return _statistics.getProbe( ACQUIRE_LOCK_FAILURE ).getInfo();
+    }
+
+    /**
+     * Lock release in non-sticky session mode.
+     */
+    public String[] getMsmStatNonStickyReleaseLockInfo() {
+        return _statistics.getProbe( RELEASE_LOCK ).getInfo();
+    }
+
+    /**
+     * Store metadata / validity info in memcached.
+     */
+    public String[] getMsmStatNonStickyStoreMetaDataInfo() {
+        return _statistics.getProbe( NON_STICKY_STORE_METADATA ).getInfo();
+    }
+
+    /**
+     * Tasks executed for non-sticky sessions after session backup (ping session, store validity info / meta data,
+     * store additional backup in secondary memcached).
+     */
+    public String[] getMsmStatNonStickyAfterBackupInfo() {
+        return _statistics.getProbe( NON_STICKY_AFTER_BACKUP ).getInfo();
+    }
+
+    /**
+     * Tasks executed for non-sticky sessions after a session was loaded from memcached (load validity info / meta data).
+     */
+    public String[] getMsmStatNonStickyAfterLoadFromMemcachedInfo() {
+        return _statistics.getProbe( NON_STICKY_AFTER_LOAD_FROM_MEMCACHED ).getInfo();
+    }
+
+    /**
+     * Tasks executed for non-sticky sessions after a session was deleted from memcached (delete validity info and backup data).
+     */
+    public String[] getMsmStatNonStickyAfterDeleteFromMemcachedInfo() {
+        return _statistics.getProbe( NON_STICKY_AFTER_DELETE_FROM_MEMCACHED ).getInfo();
     }
 
     // ---------------------------------------------------------------------------

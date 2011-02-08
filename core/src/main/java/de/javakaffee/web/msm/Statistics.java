@@ -16,8 +16,12 @@
  */
 package de.javakaffee.web.msm;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.annotation.Nonnull;
 
 /**
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
@@ -27,22 +31,21 @@ public class Statistics {
     private final AtomicLong _numRequestsWithoutSession = new AtomicLong();
     private final AtomicLong _numRequestsWithTomcatFailover = new AtomicLong();
     private final AtomicLong _numRequestsWithSession = new AtomicLong();
-    private final AtomicLong _numRequestsWithBackup = new AtomicLong();
     private final AtomicLong _numRequestsWithMemcachedFailover = new AtomicLong();
     private final AtomicLong _numRequestsWithBackupFailure = new AtomicLong();
     private final AtomicLong _numRequestsWithoutSessionAccess = new AtomicLong();
     private final AtomicLong _numRequestsWithoutAttributesAccess = new AtomicLong();
     private final AtomicLong _numRequestsWithoutSessionModification = new AtomicLong();
-    private final AtomicLong _numSessionsLoadedFromMemcached = new AtomicLong();
+    private final AtomicLong _numNonStickySessionsPingFailed = new AtomicLong();
+    private final AtomicLong _numNonStickySessionsReadOnlyRequest = new AtomicLong();
 
-    private final MinMaxAvgProbe _effectiveBackupProbe = new MinMaxAvgProbe();
-    private final MinMaxAvgProbe _backupProbe = new MinMaxAvgProbe();
-    private final MinMaxAvgProbe _attributesSerializationProbe = new MinMaxAvgProbe();
-    private final MinMaxAvgProbe _memcachedUpdateProbe = new MinMaxAvgProbe();
-    private final MinMaxAvgProbe _loadFromMemcachedProbe = new MinMaxAvgProbe();
-    private final MinMaxAvgProbe _cachedDataSizeProbe = new MinMaxAvgProbe();
+    private final Map<StatsType, MinMaxAvgProbe> _probes;
 
     private Statistics() {
+        _probes = new ConcurrentHashMap<Statistics.StatsType, Statistics.MinMaxAvgProbe>();
+        for( final StatsType item : StatsType.values() ) {
+            _probes.put( item, new MinMaxAvgProbe() );
+        }
     }
 
     /**
@@ -64,6 +67,31 @@ public class Statistics {
         return enabled ? new Statistics() : DISABLED_STATS;
     }
 
+    /**
+     * A utility method that calculates the difference of the time
+     * between the given <code>startInMillis</code> and {@link System#currentTimeMillis()}
+     * and registers the difference via {@link #register(long)} for the probe of the given {@link StatsType}.
+     * @param statsType the specific execution type that is measured.
+     * @param startInMillis the time in millis that shall be subtracted from {@link System#currentTimeMillis()}.
+     */
+    public void registerSince( @Nonnull final StatsType statsType, final long startInMillis ) {
+        register( statsType, System.currentTimeMillis() - startInMillis );
+    }
+
+    /**
+     * Register the given value via {@link MinMaxAvgProbe#register(long)} for the probe of the given {@link StatsType}.
+     * @param statsType the specific execution type that is measured.
+     * @param value the value to register.
+     */
+    public void register( @Nonnull final StatsType statsType, final long value ) {
+        _probes.get( statsType ).register( value );
+    }
+
+    @Nonnull
+    public MinMaxAvgProbe getProbe( @Nonnull final StatsType statsType ) {
+        return _probes.get( statsType );
+    }
+
     public void requestWithoutSession() {
         _numRequestsWithoutSession.incrementAndGet();
     }
@@ -75,12 +103,6 @@ public class Statistics {
     }
     public long getRequestsWithSession() {
         return _numRequestsWithSession.get();
-    }
-    public void requestWithBackup() {
-        _numRequestsWithBackup.incrementAndGet();
-    }
-    public long getRequestsWithBackup() {
-        return _numRequestsWithBackup.get();
     }
     public void requestWithTomcatFailover() {
         _numRequestsWithTomcatFailover.incrementAndGet();
@@ -118,62 +140,82 @@ public class Statistics {
     public long getRequestsWithoutSessionModification() {
         return _numRequestsWithoutSessionModification.get();
     }
-    public void sessionLoadedFromMemcached() {
-        _numSessionsLoadedFromMemcached.incrementAndGet();
+
+    public void nonStickySessionsPingFailed() {
+        _numNonStickySessionsPingFailed.incrementAndGet();
     }
-    public long getSessionsLoadedFromMemcached() {
-        return _numSessionsLoadedFromMemcached.get();
+    public long getNonStickySessionsPingFailed() {
+        return _numNonStickySessionsPingFailed.get();
     }
 
-    /**
-     * Provides info regarding the effective time that was required for session
-     * backup in the request thread and it's measured for every request with a session,
-     * even if the session id has not set memcached id (this is the time that was effectively
-     * required as part of the client request). It should differ from {@link #getBackupProbe()}
-     * if async session backup shall be done.
-     *
-     * @return the effectiveBackupProbe
-     * @see BackupSessionService#backupSession(MemcachedBackupSession, boolean)
-     */
-    public MinMaxAvgProbe getEffectiveBackupProbe() {
-        return _effectiveBackupProbe;
+    public void nonStickySessionsReadOnlyRequest() {
+        _numNonStickySessionsReadOnlyRequest.incrementAndGet();
+    }
+    public long getNonStickySessionsReadOnlyRequest() {
+        return _numNonStickySessionsReadOnlyRequest.get();
     }
 
-    /**
-     * Provides info regarding the time that was required for session backup,
-     * excluding skipped backups and excluding backups where a session was relocated.
-     * @return the backupProbe
-     */
-    public MinMaxAvgProbe getBackupProbe() {
-        return _backupProbe;
-    }
+    public static enum StatsType {
 
-    /**
-     * @return the attributesSerializationProbe
-     */
-    public MinMaxAvgProbe getAttributesSerializationProbe() {
-        return _attributesSerializationProbe;
-    }
+        /**
+         * Provides info regarding the effective time that was required for session
+         * backup in the request thread and it's measured for every request with a session,
+         * even if the session id has not set memcached id (this is the time that was effectively
+         * required as part of the client request). It should differ from {@link #getBackupProbe()}
+         * if async session backup shall be done.
+         *
+         * @see BackupSessionService#backupSession(MemcachedBackupSession, boolean)
+         */
+        EFFECTIVE_BACKUP,
 
-    /**
-     * @return the storeInMemcachedProbe
-     */
-    public MinMaxAvgProbe getMemcachedUpdateProbe() {
-        return _memcachedUpdateProbe;
-    }
+        /**
+         * Provides info regarding the time that was required for session backup,
+         * excluding skipped backups and excluding backups where a session was relocated.
+         */
+        BACKUP,
+        ATTRIBUTES_SERIALIZATION,
+        SESSION_DESERIALIZATION,
+        MEMCACHED_UPDATE,
+        LOAD_FROM_MEMCACHED,
+        DELETE_FROM_MEMCACHED,
+        CACHED_DATA_SIZE,
 
-    /**
-     * @return the loadFromMemcachedProbe
-     */
-    public MinMaxAvgProbe getLoadFromMemcachedProbe() {
-        return _loadFromMemcachedProbe;
-    }
+        /**
+         * Lock acquiration in non-sticky session mode.
+         */
+        ACQUIRE_LOCK,
 
-    /**
-     * @return the sessionSizeProbe
-     */
-    public MinMaxAvgProbe getCachedDataSizeProbe() {
-        return _cachedDataSizeProbe;
+        /**
+         * Lock acquiration failures in non-sticky session mode.
+         */
+        ACQUIRE_LOCK_FAILURE,
+
+        /**
+         * Lock release in non-sticky session mode.
+         */
+        RELEASE_LOCK,
+
+        /**
+         * Store metadata / validity info in memcached.
+         */
+        NON_STICKY_STORE_METADATA,
+
+        /**
+         * Tasks executed for non-sticky sessions after session backup (ping session, store validity info / meta data,
+         * store additional backup in secondary memcached).
+         */
+        NON_STICKY_AFTER_BACKUP,
+
+        /**
+         * Tasks executed for non-sticky sessions after a session was loaded from memcached (load validity info / meta data).
+         */
+        NON_STICKY_AFTER_LOAD_FROM_MEMCACHED,
+
+        /**
+         * Tasks executed for non-sticky sessions after a session was deleted from memcached (delete validity info and backup data).
+         */
+        NON_STICKY_AFTER_DELETE_FROM_MEMCACHED
+
     }
 
     public static class MinMaxAvgProbe {
@@ -252,18 +294,16 @@ public class Statistics {
 
     }
 
-    private static final MinMaxAvgProbe DISABLED_PROBE = new MinMaxAvgProbe() {
-        public void registerSince( final long startInMillis ) {};
-        public void register( final long value ) {};
-    };
-
     private static final Statistics DISABLED_STATS = new Statistics() {
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-        public void requestWithBackup() {
+        public void registerSince(final StatsType statsType, final long startInMillis) {};
+
+        @Override
+        public void register(final StatsType statsType, final long startInMillis) {};
+
+        public MinMaxAvgProbe getProbe( @Nonnull final StatsType statsType ) {
+            return new MinMaxAvgProbe();
         }
 
         /**
@@ -305,13 +345,6 @@ public class Statistics {
          * {@inheritDoc}
          */
         @Override
-        public void sessionLoadedFromMemcached() {
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
         public void requestWithMemcachedFailover() {
         }
 
@@ -322,44 +355,16 @@ public class Statistics {
         public void requestWithTomcatFailover() {
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-        public MinMaxAvgProbe getAttributesSerializationProbe() {
-            return DISABLED_PROBE;
+        public void nonStickySessionsPingFailed() {
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-        public MinMaxAvgProbe getBackupProbe() {
-            return DISABLED_PROBE;
+        public void nonStickySessionsReadOnlyRequest() {
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-        public MinMaxAvgProbe getLoadFromMemcachedProbe() {
-            return DISABLED_PROBE;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public MinMaxAvgProbe getMemcachedUpdateProbe() {
-            return DISABLED_PROBE;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public MinMaxAvgProbe getCachedDataSizeProbe() {
-            return DISABLED_PROBE;
+        public void requestWithoutAttributesAccess() {
         }
 
     };

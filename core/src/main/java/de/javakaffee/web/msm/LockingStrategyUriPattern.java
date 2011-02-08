@@ -38,8 +38,9 @@ public class LockingStrategyUriPattern extends LockingStrategy {
 
     public LockingStrategyUriPattern( @Nonnull final Pattern uriPattern, @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
-            final boolean storeSecondaryBackup ) {
-        super( memcached, missingSessionsCache, storeSecondaryBackup );
+            final boolean storeSecondaryBackup,
+            @Nonnull final Statistics stats ) {
+        super( memcached, missingSessionsCache, storeSecondaryBackup, stats );
         if ( uriPattern == null ) {
             throw new IllegalArgumentException( "The uriPattern is null" );
         }
@@ -69,6 +70,7 @@ public class LockingStrategyUriPattern extends LockingStrategy {
 
         _log.info( "Not lock request for request " + SessionTrackerValve.getURIWithQueryString( request ) );
 
+        _stats.nonStickySessionsReadOnlyRequest();
         return LockStatus.LOCK_NOT_REQUIRED;
 
     }

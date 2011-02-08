@@ -16,6 +16,9 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.Statistics.StatsType.EFFECTIVE_BACKUP;
+import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -217,7 +220,7 @@ public class BackupSessionService {
             return result;
 
         } finally {
-            _statistics.getEffectiveBackupProbe().registerSince( start );
+            _statistics.registerSince( EFFECTIVE_BACKUP, start );
         }
 
     }
@@ -243,7 +246,9 @@ public class BackupSessionService {
                 if ( _log.isDebugEnabled() ) {
                     _log.debug( "Releasing lock for session " + session.getIdInternal() );
                 }
+                final long start = System.currentTimeMillis();
                 _memcached.delete( _sessionIdFormat.createLockName( session.getIdInternal() ) );
+                _statistics.registerSince( RELEASE_LOCK, start );
                 session.releaseLock();
             } catch( final Exception e ) {
                 _log.warn( "Caught exception when trying to release lock for session " + session.getIdInternal() );
