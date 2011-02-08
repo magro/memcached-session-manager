@@ -46,8 +46,9 @@ public class LockingStrategyAuto extends LockingStrategy {
 
     public LockingStrategyAuto( @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
-            final boolean storeSecondaryBackup ) {
-        super( memcached, missingSessionsCache, storeSecondaryBackup );
+            final boolean storeSecondaryBackup,
+            @Nonnull final Statistics stats ) {
+        super( memcached, missingSessionsCache, storeSecondaryBackup, stats );
         _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor();
         _readOnlyRequestCache = new ReadOnlyRequestsCache();
     }
@@ -106,6 +107,7 @@ public class LockingStrategyAuto extends LockingStrategy {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Not getting lock for readonly request " + SessionTrackerValve.getURIWithQueryString( request ) );
             }
+            _stats.nonStickySessionsReadOnlyRequest();
             return LockStatus.LOCK_NOT_REQUIRED;
         }
 

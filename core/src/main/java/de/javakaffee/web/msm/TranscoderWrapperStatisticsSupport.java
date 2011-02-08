@@ -19,6 +19,7 @@ package de.javakaffee.web.msm;
 import net.spy.memcached.CachedData;
 import net.spy.memcached.transcoders.Transcoder;
 import de.javakaffee.web.msm.Statistics.MinMaxAvgProbe;
+import de.javakaffee.web.msm.Statistics.StatsType;
 
 /**
  * A {@link Transcoder} that delegates all calls to a provided delegate.
@@ -66,7 +67,7 @@ public class TranscoderWrapperStatisticsSupport implements Transcoder<Object> {
      */
     public CachedData encode( final Object object ) {
         final CachedData result = _delegate.encode( object );
-        _statistics.getCachedDataSizeProbe().register( result.getData().length );
+        _statistics.register( StatsType.CACHED_DATA_SIZE, result.getData().length );
         return result;
     }
 
