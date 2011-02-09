@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import net.spy.memcached.MemcachedClient;
 
+import org.apache.catalina.LifecycleException;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
@@ -86,46 +87,41 @@ public class MemcachedBackupSessionManagerTest {
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
         when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
 
-        _manager.init( _memcachedMock );
+        _manager.startInternal( _memcachedMock );
 
     }
 
     @Test
-    public void testConfigurationFormatMemcachedNodesFeature44() {
-        _manager.resetInitialized();
+    public void testConfigurationFormatMemcachedNodesFeature44() throws LifecycleException {
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
-        _manager.init(_memcachedMock);
+        _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
-        _manager.init(_memcachedMock);
+        _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211,n2:127.0.0.1:11212" );
-        _manager.init(_memcachedMock);
+        _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
     @Test
-    public void testConfigurationFormatFailoverNodesFeature44() {
+    public void testConfigurationFormatFailoverNodesFeature44() throws LifecycleException {
         _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _manager.setFailoverNodes( "n1" );
-        _manager.init(_memcachedMock);
+        _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1 n2" );
-        _manager.init(_memcachedMock);
+        _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
 
-        _manager.resetInitialized();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _manager.setFailoverNodes( "n1,n2" );
-        _manager.init(_memcachedMock);
+        _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 

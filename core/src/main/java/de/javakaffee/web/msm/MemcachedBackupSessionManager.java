@@ -99,6 +99,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private final LifecycleSupport _lifecycle = new LifecycleSupport( this );
 
+    /**
+     * Has this component been _started yet?
+     */
+    protected boolean _started = false;
+
     private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
 
     // -------------------- configuration properties --------------------
@@ -265,7 +270,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void init() {
-        init( null );
+        super.init();
     }
 
     /**
@@ -275,15 +280,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *
      * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
      */
-    void init( final MemcachedClient memcachedClient ) {
+    void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
         _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
                 " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
-
-        if ( initialized ) {
-            return;
-        }
-
-        super.init();
 
         _statistics = Statistics.create( _enableStatistics );
 
@@ -977,7 +976,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the memcached node definitions, whitespace or comma separated
      */
     public void setMemcachedNodes( final String memcachedNodes ) {
-
         if ( initialized ) {
             final MemcachedConfig config = reloadMemcachedConfig( memcachedNodes, _failoverNodes );
             _log.info( "Loaded new memcached node configuration." +
@@ -986,7 +984,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     "\n- New node ids: " + config.getNodeIds() +
                     "\n- New failover node ids: " + config.getFailoverNodeIds() );
         }
-
         _memcachedNodes = memcachedNodes;
     }
 
@@ -1168,7 +1165,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param enableStatistics <code>true</code> if statistics shall be gathered.
      */
     public void setEnableStatistics( final boolean enableStatistics ) {
+        final boolean oldEnableStatistics = _enableStatistics;
         _enableStatistics = enableStatistics;
+        if ( oldEnableStatistics != enableStatistics && initialized ) {
+            _log.info( "Changed enableStatistics from " + oldEnableStatistics + " to " + enableStatistics + "." +
+            " Reloading configuration..." );
+            reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
+        }
     }
 
     /**
@@ -1222,7 +1225,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( !enabled && !_sticky ) {
             throw new IllegalStateException( "Disabling this session manager is not allowed in non-sticky mode. You must switch to sticky operation mode before." );
         }
-        if ( _enabled.compareAndSet( !enabled, enabled ) ) {
+        final boolean changed = _enabled.compareAndSet( !enabled, enabled );
+        if ( changed && initialized ) {
             reloadMemcachedConfig( _memcachedNodes, _failoverNodes );
             _log.info( "Changed enabled status to " + enabled + "." );
         }
@@ -1339,15 +1343,50 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     public void start() throws LifecycleException {
-        if ( !initialized ) {
+
+        if( ! initialized ) {
             init();
         }
+
+        // Validate and update our current component state
+        if (_started) {
+            return;
+        }
+        _lifecycle.fireLifecycleEvent(START_EVENT, null);
+        _started = true;
+
+        // Force initialization of the random number generator
+        if (log.isDebugEnabled()) {
+            log.debug("Force random number initialization starting");
+        }
+        super.generateSessionId();
+        if (log.isDebugEnabled()) {
+            log.debug("Force random number initialization completed");
+        }
+
+        startInternal( null );
     }
 
     /**
      * {@inheritDoc}
      */
     public void stop() throws LifecycleException {
+
+        if (log.isDebugEnabled()) {
+            log.debug("Stopping");
+        }
+
+        // Validate and update our current component state
+        if (!_started) {
+            throw new LifecycleException
+                (sm.getString("standardManager.notStarted"));
+        }
+        _lifecycle.fireLifecycleEvent(STOP_EVENT, null);
+        _started = false;
+
+        // Require a new random number generator if we are restarted
+        random = null;
+
         if ( initialized ) {
 
             if ( _sticky ) {
@@ -1458,7 +1497,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void setSessionBackupAsync( final boolean sessionBackupAsync ) {
         final boolean oldSessionBackupAsync = _sessionBackupAsync;
         _sessionBackupAsync = sessionBackupAsync;
-        if ( initialized && oldSessionBackupAsync != sessionBackupAsync ) {
+        if ( ( oldSessionBackupAsync != sessionBackupAsync ) && initialized ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                     _backupThreadCount, _memcached, _nodeIdService, _statistics );

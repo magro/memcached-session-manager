@@ -20,6 +20,7 @@ import static de.javakaffee.web.msm.integration.TestUtils.assertDeepEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Realm;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.core.StandardContext;
@@ -42,7 +43,7 @@ public class TranscoderServiceTest {
     private static MemcachedBackupSessionManager _manager;
 
     @BeforeClass
-    public static void setup() {
+    public static void setup() throws LifecycleException {
 
         _manager = new MemcachedBackupSessionManager();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
@@ -60,7 +61,7 @@ public class TranscoderServiceTest {
         Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
 
         _manager.getContainer().setLoader( webappLoader );
-        _manager.init();
+        _manager.start();
 
     }
 
