@@ -63,7 +63,6 @@ public class TranscoderServiceTest {
         Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
 
         _manager.getContainer().setLoader( webappLoader );
-        _manager.initInternal();
         _manager.startInternal();
 
     }
