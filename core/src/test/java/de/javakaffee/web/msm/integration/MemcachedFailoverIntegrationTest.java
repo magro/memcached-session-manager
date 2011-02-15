@@ -185,7 +185,9 @@ public class MemcachedFailoverIntegrationTest {
 
         getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
-        final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
+        final String paramKey = "foo";
+        final String paramValue = "bar";
+        final String sid1 = post( _httpClient, _portTomcat1, null, paramKey, paramValue ).getResponseSessionId();
         assertNotNull( "No session created.", sid1 );
         final String firstNode = extractNodeId( sid1 );
         assertNotNull( "No node id encoded in session id.", firstNode );
@@ -199,7 +201,7 @@ public class MemcachedFailoverIntegrationTest {
 
         Thread.sleep( 100 );
 
-        final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
+        final String sid2 = get( _httpClient, _portTomcat1, sid1 ).getResponseSessionId();
         final String secondNode = extractNodeId( sid2 );
         LOG.debug( "Have secondNode " + secondNode );
         final String expectedNode = info.otherNodeExcept( otherNodeWithId.getKey() ).getKey();
@@ -212,8 +214,10 @@ public class MemcachedFailoverIntegrationTest {
                 "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
 
         // we must get the same session back
-        assertEquals( makeRequest( _httpClient, _portTomcat1, sid2 ), sid2, "We should keep the sessionId." );
+        final Response response2 = get( _httpClient, _portTomcat1, sid2 );
+        assertEquals( response2.getSessionId(), sid2, "We should keep the sessionId." );
         assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+        assertEquals( response2.get( paramKey ), paramValue, "The session should still contain the previously stored value." );
 
         // some more checks in sticky mode
         if ( sessionAffinity.isSticky() ) {

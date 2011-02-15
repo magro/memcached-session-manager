@@ -44,11 +44,12 @@ public class LockingStrategyAuto extends LockingStrategy {
     private final ExecutorService _requestPatternDetectionExecutor;
     private final ReadOnlyRequestsCache _readOnlyRequestCache;
 
-    public LockingStrategyAuto( @Nonnull final MemcachedClient memcached,
+    public LockingStrategyAuto( @Nonnull final MemcachedBackupSessionManager manager,
+            @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats ) {
-        super( memcached, missingSessionsCache, storeSecondaryBackup, stats );
+        super( manager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
         _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor();
         _readOnlyRequestCache = new ReadOnlyRequestsCache();
     }
