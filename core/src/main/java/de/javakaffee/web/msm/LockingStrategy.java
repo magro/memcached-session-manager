@@ -219,12 +219,10 @@ public abstract class LockingStrategy {
                 pingSessionIfBackupWasSkipped( session, result, backupSessionService );
             }
 
-            final long startValidity = System.currentTimeMillis();
             final byte[] validityData = encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(),
                     session.getThisAccessedTimeInternal() );
             final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
             _memcached.set( validityKey, session.getMaxInactiveInterval(), validityData );
-            _stats.registerSince( RELEASE_LOCK, startValidity );
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Stored session validity info for session " + session.getIdInternal() );
             }
