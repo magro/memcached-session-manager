@@ -201,7 +201,7 @@ public class Statistics {
         NON_STICKY_STORE_METADATA,
 
         /**
-         * Tasks executed for non-sticky sessions after session backup (ping session, store validity info / meta data,
+         * Time spent for non-sticky sessions after session backup in the request thread (ping session, store validity info / meta data,
          * store additional backup in secondary memcached).
          */
         NON_STICKY_AFTER_BACKUP,
