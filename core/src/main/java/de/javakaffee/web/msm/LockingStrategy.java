@@ -42,7 +42,6 @@ import org.apache.catalina.connector.Request;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
@@ -215,10 +214,6 @@ public abstract class LockingStrategy {
 
             final long start = System.currentTimeMillis();
 
-            if ( !backupWasForced ) {
-                pingSessionIfBackupWasSkipped( session, result, backupSessionService );
-            }
-
             final byte[] validityData = encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(),
                     session.getThisAccessedTimeInternal() );
             final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
@@ -227,23 +222,19 @@ public abstract class LockingStrategy {
                 _log.debug( "Stored session validity info for session " + session.getIdInternal() );
             }
 
-            /*
-             * For non-sticky sessions we store a backup of the session in a secondary memcached node (under a special key
-             * that's resolved by the SuffixBasedNodeLocator), but only when we have more than 1 memcached node configured...
+            /* The following task are performed outside of the request thread (includes waiting for the backup result):
+             * - ping session if the backup was skipped (depends on the backup result)
+             * - save secondary session backup if session was modified (backup not skipped)
+             * - ping secondary session backup if the backup was skipped
+             * - save secondary validity backup
              */
-            if ( _storeSecondaryBackup ) {
-                try {
-                    final Callable<?> backupSessionTask = new StoreNonStickySessionBackupTask( session, result );
-                    _executor.submit( backupSessionTask );
+            final boolean pingSessionIfBackupWasSkipped = !backupWasForced;
+            final boolean performAsyncTasks = pingSessionIfBackupWasSkipped || _storeSecondaryBackup;
 
-                    final String backupValidityKey = _sessionIdFormat.createBackupKey( validityKey );
-                    _memcached.set( backupValidityKey, session.getMaxInactiveInterval(), validityData );
-                } catch( final NodeFailureException e ) {
-                    // handle an unavailable secondary/backup node (fix for issue #83)
-                    _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional backup of session " + session.getIdInternal() );
-                } catch( final RuntimeException e ) {
-                    _log.info( "Could not store secondary backup of session " + session.getIdInternal(), e );
-                }
+            if ( performAsyncTasks ) {
+                final Callable<?> backupSessionTask = new OnAfterBackupSessionTask( session, result,
+                        pingSessionIfBackupWasSkipped, backupSessionService, _storeSecondaryBackup, validityKey, validityData );
+                _executor.submit( backupSessionTask );
             }
 
             _stats.registerSince( NON_STICKY_AFTER_BACKUP, start );
@@ -252,37 +243,6 @@ public abstract class LockingStrategy {
             _log.warn( "An error occurred during onAfterBackupSession.", e );
         }
 
-    }
-
-    private void pingSessionIfBackupWasSkipped( @Nonnull final MemcachedBackupSession session,
-            @Nonnull final Future<BackupResult> result, @Nonnull final BackupSessionService backupSessionService ) {
-        final Callable<Void> task = new Callable<Void>() {
-
-            @Override
-            public Void call() {
-                try {
-                    if ( result.get().getStatus() == BackupResultStatus.SKIPPED ) {
-                        pingSession( session, backupSessionService );
-                    }
-                } catch ( final Exception e ) {
-                    _log.warn( "An exception occurred during backup.", e );
-                }
-                return null;
-            }
-
-        };
-        /*
-         * A simple future does not need to go through the executor, but we can process the result right now.
-         */
-        if ( result instanceof SimpleFuture ) {
-            try {
-                task.call();
-            } catch ( final Exception e ) { /* caught in the callable */
-            }
-        }
-        else {
-            _executor.submit( task );
-        }
     }
 
     /**
@@ -389,38 +349,87 @@ public abstract class LockingStrategy {
         }
     }
 
-    private final class StoreNonStickySessionBackupTask implements Callable<Void> {
+    private final class OnAfterBackupSessionTask implements Callable<Void> {
 
         private final MemcachedBackupSession _session;
         private final Future<BackupResult> _result;
+        private final boolean _pingSessionIfBackupWasSkipped;
+        private final boolean _storeSecondaryBackup;
+        private final BackupSessionService _backupSessionService;
+        private final String _validityKey;
+        private final byte[] _validityData;
 
-        private StoreNonStickySessionBackupTask( final MemcachedBackupSession session, final Future<BackupResult> result ) {
+        private OnAfterBackupSessionTask( @Nonnull final MemcachedBackupSession session, @Nonnull final Future<BackupResult> result,
+                final boolean pingSessionIfBackupWasSkipped,
+                @Nonnull final BackupSessionService backupSessionService,
+                final boolean storeSecondaryBackup,
+                @Nonnull final String validityKey,
+                @Nonnull final byte[] validityData ) {
             _session = session;
             _result = result;
+            _pingSessionIfBackupWasSkipped = pingSessionIfBackupWasSkipped;
+            _storeSecondaryBackup = storeSecondaryBackup;
+            _validityKey = validityKey;
+            _validityData = validityData;
+            _backupSessionService = backupSessionService;
         }
 
         @Override
         public Void call() throws Exception {
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Storing backup in secondary memcached for non-sticky session " + _session.getId() );
-            }
+
             final BackupResult backupResult = _result.get();
-            if ( backupResult.getStatus() != BackupResultStatus.SKIPPED ) {
-                final byte[] data = backupResult.getData();
-                if ( data != null ) {
-                    final String key = _sessionIdFormat.createBackupKey( _session.getId() );
-                    _memcached.set( key, _session.getMemcachedExpirationTimeToSet(), data );
+
+            if ( _pingSessionIfBackupWasSkipped ) {
+                if ( backupResult.getStatus() == BackupResultStatus.SKIPPED ) {
+                    pingSession( _session, _backupSessionService );
                 }
-                else {
-                    _log.warn( "No data set for backupResultStatus " + backupResult.getStatus() + " for sessionId "
-                            + _session.getIdInternal() + ", skipping backup"
-                            + " of non-sticky session in secondary memcached." );
+            }
+
+            /*
+             * For non-sticky sessions we store a backup of the session in a secondary memcached node (under a special key
+             * that's resolved by the SuffixBasedNodeLocator), but only when we have more than 1 memcached node configured...
+             */
+            if ( _storeSecondaryBackup ) {
+                try {
+                    if ( _log.isDebugEnabled() ) {
+                        _log.debug( "Storing backup in secondary memcached for non-sticky session " + _session.getId() );
+                    }
+                    if ( backupResult.getStatus() == BackupResultStatus.SKIPPED ) {
+                        pingSessionBackup( _session );
+                    }
+                    else {
+                        saveSessionBackupFromResult( backupResult );
+                    }
+
+                    saveValidityBackup();
+                } catch( final NodeFailureException e ) {
+                    // handle an unavailable secondary/backup node (fix for issue #83)
+                    _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional backup of session " + _session.getIdInternal() );
+                } catch( final RuntimeException e ) {
+                    _log.info( "Could not store secondary backup of session " + _session.getIdInternal(), e );
                 }
+
+            }
+
+            return null;
+        }
+
+        public void saveSessionBackupFromResult( final BackupResult backupResult ) {
+            final byte[] data = backupResult.getData();
+            if ( data != null ) {
+                final String key = _sessionIdFormat.createBackupKey( _session.getId() );
+                _memcached.set( key, _session.getMemcachedExpirationTimeToSet(), data );
             }
             else {
-                pingSessionBackup( _session );
+                _log.warn( "No data set for backupResultStatus " + backupResult.getStatus() + " for sessionId "
+                        + _session.getIdInternal() + ", skipping backup"
+                        + " of non-sticky session in secondary memcached." );
             }
-            return null;
+        }
+
+        public void saveValidityBackup() {
+            final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
+            _memcached.set( backupValidityKey, _session.getMaxInactiveInterval(), _validityData );
         }
 
         private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
@@ -433,7 +442,7 @@ public abstract class LockingStrategy {
                     _log.warn( "The secondary backup for session " + session.getIdInternal()
                             + " should be touched in memcached, but it seemed to be"
                             + " not existing. Will store in memcached again." );
-                    updateSessionBackup( session, key );
+                    saveSessionBackup( session, key );
                 }
             } catch ( final TimeoutException e ) {
                 _log.warn( "The secondary backup for session " + session.getIdInternal()
@@ -443,7 +452,7 @@ public abstract class LockingStrategy {
             }
         }
 
-        public void updateSessionBackup( @Nonnull final MemcachedBackupSession session, @Nonnull final String key )
+        public void saveSessionBackup( @Nonnull final MemcachedBackupSession session, @Nonnull final String key )
                 throws InterruptedException {
             try {
                 final byte[] data = _manager.serialize( session );
@@ -452,7 +461,7 @@ public abstract class LockingStrategy {
                     _log.warn( "Update for secondary backup of session "+ session.getIdInternal() +" (after unsuccessful ping) did not return sucess." );
                 }
             } catch ( final ExecutionException e ) {
-                _log.warn( "An exception occurred when trying to update session " + session.getIdInternal(), e );
+                _log.warn( "An exception occurred when trying to update secondary session backup for " + session.getIdInternal(), e );
             }
         }
     }
