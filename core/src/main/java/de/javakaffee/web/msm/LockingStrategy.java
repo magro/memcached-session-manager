@@ -211,42 +211,48 @@ public abstract class LockingStrategy {
             @Nonnull final Future<BackupResult> result, @Nonnull final String requestId,
             @Nonnull final BackupSessionService backupSessionService ) {
 
-        final long start = System.currentTimeMillis();
+        try {
 
-        if ( !backupWasForced ) {
-            pingSessionIfBackupWasSkipped( session, result, backupSessionService );
-        }
+            final long start = System.currentTimeMillis();
 
-        final long startValidity = System.currentTimeMillis();
-        final byte[] validityData = encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(),
-                session.getThisAccessedTimeInternal() );
-        final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
-        _memcached.set( validityKey, session.getMaxInactiveInterval(), validityData );
-        _stats.registerSince( RELEASE_LOCK, startValidity );
-        if ( _log.isDebugEnabled() ) {
-            _log.debug( "Stored session validity info for session " + session.getIdInternal() );
-        }
-
-        /*
-         * For non-sticky sessions we store a backup of the session in a secondary memcached node (under a special key
-         * that's resolved by the SuffixBasedNodeLocator), but only when we have more than 1 memcached node configured...
-         */
-        if ( _storeSecondaryBackup ) {
-            try {
-                final Callable<?> backupSessionTask = new StoreNonStickySessionBackupTask( session, result );
-                _executor.submit( backupSessionTask );
-
-                final String backupValidityKey = _sessionIdFormat.createBackupKey( validityKey );
-                _memcached.set( backupValidityKey, session.getMaxInactiveInterval(), validityData );
-            } catch( final NodeFailureException e ) {
-                // handle an unavailable secondary/backup node (fix for issue #83)
-                _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional backup of session " + session.getIdInternal() );
-            } catch( final RuntimeException e ) {
-                _log.info( "Could not store secondary backup of session " + session.getIdInternal(), e );
+            if ( !backupWasForced ) {
+                pingSessionIfBackupWasSkipped( session, result, backupSessionService );
             }
-        }
 
-        _stats.registerSince( NON_STICKY_AFTER_BACKUP, start );
+            final long startValidity = System.currentTimeMillis();
+            final byte[] validityData = encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(),
+                    session.getThisAccessedTimeInternal() );
+            final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
+            _memcached.set( validityKey, session.getMaxInactiveInterval(), validityData );
+            _stats.registerSince( RELEASE_LOCK, startValidity );
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Stored session validity info for session " + session.getIdInternal() );
+            }
+
+            /*
+             * For non-sticky sessions we store a backup of the session in a secondary memcached node (under a special key
+             * that's resolved by the SuffixBasedNodeLocator), but only when we have more than 1 memcached node configured...
+             */
+            if ( _storeSecondaryBackup ) {
+                try {
+                    final Callable<?> backupSessionTask = new StoreNonStickySessionBackupTask( session, result );
+                    _executor.submit( backupSessionTask );
+
+                    final String backupValidityKey = _sessionIdFormat.createBackupKey( validityKey );
+                    _memcached.set( backupValidityKey, session.getMaxInactiveInterval(), validityData );
+                } catch( final NodeFailureException e ) {
+                    // handle an unavailable secondary/backup node (fix for issue #83)
+                    _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional backup of session " + session.getIdInternal() );
+                } catch( final RuntimeException e ) {
+                    _log.info( "Could not store secondary backup of session " + session.getIdInternal(), e );
+                }
+            }
+
+            _stats.registerSince( NON_STICKY_AFTER_BACKUP, start );
+
+        } catch( final Throwable e ) {
+            _log.warn( "An error occurred during onAfterBackupSession.", e );
+        }
 
     }
 
@@ -421,15 +427,19 @@ public abstract class LockingStrategy {
 
         private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( session.getId() );
-            final Future<Boolean> touchResult = _memcached.add( key, session.getMaxInactiveInterval(), 1 );
+            final Future<Boolean> touchResultFuture = _memcached.add( key, session.getMaxInactiveInterval(), 1 );
             try {
-                _log.debug( "Got backup ping result " + touchResult.get() );
-                if ( touchResult.get() ) {
+                final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
+                _log.debug( "Got backup ping result " + touchResult );
+                if ( touchResult ) {
                     _log.warn( "The secondary backup for session " + session.getIdInternal()
                             + " should be touched in memcached, but it seemed to be"
                             + " not existing. Will store in memcached again." );
                     updateSessionBackup( session, key );
                 }
+            } catch ( final TimeoutException e ) {
+                _log.warn( "The secondary backup for session " + session.getIdInternal()
+                        + " could not be completed within 200 millis, was cancelled now." );
             } catch ( final ExecutionException e ) {
                 _log.warn( "An exception occurred when trying to ping session " + session.getIdInternal(), e );
             }
