@@ -21,13 +21,17 @@ import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+
+import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
@@ -43,6 +47,7 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
@@ -225,6 +230,104 @@ public class MemcachedFailoverIntegrationTest {
             assertFalse( session.getNoteNames().hasNext(), "Some notes are set: " + toArray( session.getNoteNames() ) );
         }
 
+    }
+
+    /**
+     * Tests that after a memcached failure (with only 1 memcached left) and reactivation the backup of the session is
+     * stored again in the secondary memcached, so that the primary memcached can die and the session is still available.
+     */
+    @Test( enabled = true )
+    public void testSecondaryBackupForNonStickySessionAfterMemcachedFailover() throws Throwable {
+
+        getManager( _tomcat1 ).setSticky( false );
+
+        final String paramKey = "foo";
+        final String paramValue = "bar";
+        final String sid1 = post( _httpClient, _portTomcat1, null, paramKey, paramValue ).getResponseSessionId();
+        assertNotNull( "No session created.", sid1 );
+        final String firstNode = extractNodeId( sid1 );
+        assertNotNull( "No node id encoded in session id.", firstNode );
+
+        /* shutdown other nodes
+         */
+        LOG.info( "-------------- stopping other nodes..." );
+        final FailoverInfo info = getFailoverInfo( firstNode );
+        for( final MemCacheDaemon<?> node : info.otherNodes.values() ) {
+            node.stop();
+        }
+        Thread.sleep( 100 );
+
+        /* make a request with only one memcached
+         */
+        assertEquals( get( _httpClient, _portTomcat1, sid1 ).getSessionId(), sid1 );
+        Thread.sleep( 300 ); // wait for the async processes to complete / be cancelleds
+
+        /* now start the next node that shall get the backup again and make a request
+         * that does not modify the session
+         */
+        LOG.info( "-------------- starting next node..." );
+        info.nextNode().getValue().start();
+        waitForReconnect( getManager( _tomcat1 ), info.nextNode().getValue(), 5000 );
+        assertEquals( get( _httpClient, _portTomcat1, sid1 ).getSessionId(), sid1 );
+        Thread.sleep( 300 ); // wait for the async processes to complete / be cancelleds
+
+        /* now shutdown the active node so that the session is loaded from the secondary node
+         */
+        LOG.info( "-------------- stopping active node..." );
+        info.activeNode.stop();
+        Thread.sleep( 100 );
+
+        /* make the request and check that we still have all session data
+         */
+        final String sid2 = get( _httpClient, _portTomcat1, sid1 ).getSessionId();
+        final String secondNode = extractNodeId( sid2 );
+        final String expectedNode = info.nextNode().getKey();
+
+        assertEquals( secondNode, expectedNode, "Unexpected nodeId: " + secondNode + "." );
+
+        assertEquals(
+                sid2,
+                sid1.substring( 0, sid1.indexOf( "-" ) + 1 ) + expectedNode,
+                "Unexpected sessionId, sid1: " + sid1 + ", sid2: " + sid2 );
+
+        // we must get the same session back
+        final Response response2 = get( _httpClient, _portTomcat1, sid2 );
+        assertEquals( response2.getSessionId(), sid2, "We should keep the sessionId." );
+        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+        assertEquals( response2.get( paramKey ), paramValue, "The session should still contain the previously stored value." );
+
+    }
+
+    private void waitForReconnect( final MemcachedBackupSessionManager manager, final MemCacheDaemon<?> value, final long timeToWait ) throws InterruptedException {
+        MemcachedClient client;
+        InetSocketAddress serverAddress;
+        try {
+            final Method m = MemcachedBackupSessionManager.class.getDeclaredMethod( "getMemcached" );
+            m.setAccessible( true );
+            client = (MemcachedClient) m.invoke( manager );
+
+            final Field field = MemCacheDaemon.class.getDeclaredField( "addr" );
+            field.setAccessible( true );
+            serverAddress = (InetSocketAddress) field.get( value );
+        } catch ( final Exception e ) {
+            throw new RuntimeException( e );
+        }
+
+        waitForReconnect( client, serverAddress, timeToWait );
+    }
+
+    public void waitForReconnect( final MemcachedClient client, final InetSocketAddress serverAddressToCheck, final long timeToWait )
+            throws InterruptedException, RuntimeException {
+        final long start = System.currentTimeMillis();
+        while( System.currentTimeMillis() < start + timeToWait ) {
+            for( final SocketAddress address : client.getAvailableServers() ) {
+                if ( address.equals( serverAddressToCheck ) ) {
+                    return;
+                }
+            }
+            Thread.sleep( 100 );
+        }
+        throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
     }
 
     private Set<String> toArray( final Iterator<String> noteNames ) {
@@ -426,6 +529,9 @@ public class MemcachedFailoverIntegrationTest {
                 final Map<String, MemCacheDaemon<?>> otherNodes ) {
             this.activeNode = first;
             this.otherNodes = otherNodes;
+        }
+        public Entry<String, MemCacheDaemon<?>> nextNode() {
+            return otherNodes.entrySet().iterator().next();
         }
         public Entry<String, MemCacheDaemon<?>> previousNode() {
             Entry<String, MemCacheDaemon<?>> last = null;
