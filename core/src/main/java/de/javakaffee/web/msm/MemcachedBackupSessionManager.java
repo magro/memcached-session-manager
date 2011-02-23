@@ -527,7 +527,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private void addValidLoadedSession( final StandardSession session ) {
         // make sure the listeners know about it. (as done by PersistentManagerBase)
-        session.tellNew();
+        if ( session.isNew() ) {
+            session.tellNew();
+        }
         add( session );
         session.activate();
         // endAccess() to ensure timeouts happen correctly.
@@ -824,12 +826,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         final MemcachedBackupSession msmSession = (MemcachedBackupSession) session;
 
+        if ( !_sticky ) {
+            msmSession.passivate();
+        }
+
         final boolean force = sessionIdChanged || msmSession.isSessionIdChanged() || !_sticky && (msmSession.getSecondsSinceLastBackup() >= session.getMaxInactiveInterval());
         final Future<BackupResult> result = _backupSessionService.backupSession( msmSession, force );
+
         if ( !_sticky ) {
             remove( session, false );
             _lockingStrategy.onAfterBackupSession( msmSession, force, result, requestId, _backupSessionService );
         }
+
         return result;
     }
 
