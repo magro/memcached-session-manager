@@ -151,15 +151,23 @@ class SessionTrackerValve extends ValveBase {
             }
 
             if ( _log.isDebugEnabled() ) {
-                final Cookie respCookie = getCookie( response, _sessionCookieName );
-                if ( respCookie != null ) {
-                    _log.debug( "Sent response cookie: " + toString( respCookie ) );
-                }
+                logDebugRequestSessionCookie( request );
+                logDebugResponseCookie( response );
                 _log.debug( "<<<<<< Request finished: " + getURIWithQueryString( request ) + " ==================" );
             }
 
         }
 
+    }
+
+    private void logDebugRequestSessionCookie( final Request request ) {
+        for( final javax.servlet.http.Cookie cookie : request.getCookies() ) {
+            if ( cookie.getName().equals( _sessionCookieName ) ) {
+                _log.debug( "Have request session cookie: domain=" + cookie.getDomain() + ", maxAge=" + cookie.getMaxAge() +
+                        ", path=" + cookie.getPath() + ", value=" + cookie.getValue() +
+                        ", version=" + cookie.getVersion() + ", secure=" + cookie.getSecure() );
+            }
+        }
     }
 
     @Nonnull
@@ -234,11 +242,11 @@ class SessionTrackerValve extends ValveBase {
 
     }
 
-    private String toString( final Cookie cookie ) {
-        return new StringBuilder( cookie.getClass().getName() ).append( "[name=" ).append( cookie.getName() ).append( ", value=" ).append(
-                cookie.getValue() ).append( ", domain=" ).append( cookie.getDomain() ).append( ", path=" ).append( cookie.getPath() ).append(
-                ", maxAge=" ).append( cookie.getMaxAge() ).append( ", secure=" ).append( cookie.getSecure() ).append( ", version=" ).append(
-                cookie.getVersion() ).toString();
+    private void logDebugResponseCookie( final Response response ) {
+        final String header = response.getHeader("Set-Cookie");
+        if ( header != null && header.contains( _sessionCookieName ) ) {
+            _log.debug( "Request finished, with Set-Cookie header: " + header );
+        }
     }
 
     private Cookie getCookie( final Response response, final String name ) {

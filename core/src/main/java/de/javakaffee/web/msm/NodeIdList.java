@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 /**
@@ -47,12 +48,19 @@ public class NodeIdList extends ArrayList<String> {
     /**
      * Get the next node id for the given one. For the last node id
      * the first one is returned.
+     * If this list contains only a single node, conceptionally there's no next node
+     * so that <code>null</code> is returned.
+     * @return the next node id or <code>null</code> if there's no next node id.
+     * @throws IllegalArgumentException thrown if the given nodeId is not part of this list.
      */
-    @Nonnull
-    public String getNextNodeId( @Nonnull final String nodeId ) {
+    @CheckForNull
+    public String getNextNodeId( @Nonnull final String nodeId ) throws IllegalArgumentException {
         final int idx = indexOf( nodeId );
         if ( idx < 0 ) {
             throw new IllegalArgumentException( "The given node id is not part of this list" );
+        }
+        if ( size() == 1 ) {
+            return null;
         }
         return ( idx == size() - 1 ) ? get( 0 ) : get( idx + 1 );
     }

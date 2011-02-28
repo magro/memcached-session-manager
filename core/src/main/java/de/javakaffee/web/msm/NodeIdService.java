@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import org.apache.juli.logging.Log;
@@ -87,7 +88,7 @@ public class NodeIdService {
      * @param nodeId the node to check, not <code>null</code>.
      * @return <code>true</code>, if the node is marked as available
      */
-    public boolean isNodeAvailable( final String nodeId ) {
+    public boolean isNodeAvailable( @Nonnull final String nodeId ) {
         return _nodeAvailabilityCache.isNodeAvailable( nodeId );
     }
 
@@ -131,13 +132,17 @@ public class NodeIdService {
 
     /**
      * Gets the next node id for the given one from the list of all node ids.
+     * If there's only a single node known, conceptionally there's no next node
+     * and therefore <code>null</code> is returned.
      * @param nodeId the node id for that the next one is determined.
-     * @return the next node id, never <code>null</code>
+     * @return the next node id or <code>null</code>.
+     *
+     * @throws IllegalArgumentException thrown if the given nodeId is not part of this list.
      *
      * @see NodeIdList#getNextNodeId(String)
      */
-    @Nonnull
-    public String getNextNodeId( @Nonnull final String nodeId ) {
+    @CheckForNull
+    public String getNextNodeId( @Nonnull final String nodeId ) throws IllegalArgumentException {
         return _nodeIds.getNextNodeId( nodeId );
     }
 

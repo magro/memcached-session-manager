@@ -36,6 +36,7 @@ import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
  */
 public class NodeIdServiceTest {
 
+    @Test
     public void testSetNodeAvailability() {
         final String nodeId1 = "n1";
         final CacheLoader<String> cacheLoader = new CacheLoader<String>() {

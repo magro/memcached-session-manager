@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.annotation.Nonnull;
+
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -105,7 +107,7 @@ public class NodeAvailabilityCache<K> {
      *            the key to check
      * @return <code>true</code> if the node is marked as available.
      */
-    public boolean isNodeAvailable( final K key ) {
+    public boolean isNodeAvailable( @Nonnull final K key ) {
         final ManagedItem<Boolean> item = _map.get( key );
         if ( item == null ) {
             return updateIsNodeAvailable( key );
