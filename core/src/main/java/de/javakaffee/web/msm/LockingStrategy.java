@@ -210,6 +210,10 @@ public abstract class LockingStrategy {
             @Nonnull final Future<BackupResult> result, @Nonnull final String requestId,
             @Nonnull final BackupSessionService backupSessionService ) {
 
+        if ( !_sessionIdFormat.isValid( session.getIdInternal() ) ) {
+            return;
+        }
+
         try {
 
             final long start = System.currentTimeMillis();
