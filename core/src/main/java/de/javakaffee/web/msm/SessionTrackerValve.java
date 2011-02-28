@@ -114,12 +114,23 @@ class SessionTrackerValve extends ValveBase {
             }
 
             if ( _log.isDebugEnabled() ) {
+                logDebugRequestSessionCookie( request );
                 logDebugResponseCookie( response );
                 _log.debug( "<<<<<< Request finished: " + getURIWithQueryString( request ) + " ==================" );
             }
 
         }
 
+    }
+
+    private void logDebugRequestSessionCookie( final Request request ) {
+        for( final javax.servlet.http.Cookie cookie : request.getCookies() ) {
+            if ( cookie.getName().equals( _sessionCookieName ) ) {
+                _log.debug( "Have request session cookie: domain=" + cookie.getDomain() + ", maxAge=" + cookie.getMaxAge() +
+                        ", path=" + cookie.getPath() + ", value=" + cookie.getValue() +
+                        ", version=" + cookie.getVersion() + ", secure=" + cookie.getSecure() + ", httpOnly=" + cookie.isHttpOnly() );
+            }
+        }
     }
 
     @Nonnull
@@ -195,11 +206,9 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private void logDebugResponseCookie( final Response response ) {
-        if ( _log.isDebugEnabled() ) {
-            final String header = response.getHeader("Set-Cookie");
-            if ( header != null && header.contains( _sessionCookieName ) ) {
-                _log.debug( "Finished, " + header );
-            }
+        final String header = response.getHeader("Set-Cookie");
+        if ( header != null && header.contains( _sessionCookieName ) ) {
+            _log.debug( "Request finished, with Set-Cookie header: " + header );
         }
     }
 

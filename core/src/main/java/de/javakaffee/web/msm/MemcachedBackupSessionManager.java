@@ -495,7 +495,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public Session findSession( final String id ) throws IOException {
         MemcachedBackupSession result = (MemcachedBackupSession) super.findSession( id );
-        if ( result == null && canHitMemcached( id ) ) {
+        if ( result == null && canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
             if ( !_sticky && _lockingStrategy.isContainerSessionLookup() ) {
                 // we can return just null as the requestedSessionId will still be set on
@@ -696,8 +696,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                     return null;
                 }
 
+                _log.info( "Session needs to be relocated as node "+ nodeId +" is not available, loading backup session for " + requestedSessionId );
                 final MemcachedBackupSession backupSession = loadBackupSession( requestedSessionId );
                 if ( backupSession != null ) {
+                    _log.debug( "Loaded backup session for " + requestedSessionId + ", adding locally with "+ backupSession.getIdInternal() +"." );
                     addValidLoadedSession( backupSession );
                     _statistics.requestWithMemcachedFailover();
                     return backupSession.getId();
@@ -714,6 +716,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private MemcachedBackupSession loadBackupSession( @Nonnull final String requestedSessionId ) {
 
         final String backupNodeId = getBackupNodeId( requestedSessionId );
+        if ( backupNodeId == null ) {
+            _log.info( "No backup node found for nodeId "+ _sessionIdFormat.extractMemcachedId( requestedSessionId ) );
+            return null;
+        }
+
         if ( !_nodeIdService.isNodeAvailable( backupNodeId ) ) {
             _log.info( "Node "+ backupNodeId +" that stores the backup of the session "+ requestedSessionId +" is not available." );
             return null;
@@ -737,8 +744,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             session.setLastAccessedTimeInternal( validityInfo.getLastAccessedTime() );
             session.setThisAccessedTimeInternal( validityInfo.getThisAccessedTime() );
 
-            _log.debug( "Session needs to be relocated, setting new id on session..." );
             final String newSessionId = _sessionIdFormat.createNewSessionId( requestedSessionId, backupNodeId );
+            _log.info( "Session backup loaded from secondary memcached for "+ requestedSessionId +" (will be relocated)," +
+            		" setting new id "+ newSessionId +" on session..." );
             session.setIdInternal( newSessionId );
             return session;
 
@@ -751,24 +759,27 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * Determines if the (secondary) memcached node used for failover backup of non-sticky sessions is available.
      * @param sessionId the id of the session that shall be stored in another, secondary memcached node.
-     * @return <code>true</code> if the backup node is available.
+     * @return <code>true</code> if the backup node is available. If there's no secondary memcached node
+     *         (e.g. as there's only a single memcached), <code>false</code> is returned.
      * @see #getBackupNodeId(String)
      */
     boolean isBackupNodeAvailable( @Nonnull final String sessionId ) {
-        return _nodeIdService.isNodeAvailable( getBackupNodeId( sessionId ) );
+        final String backupNodeId = getBackupNodeId( sessionId );
+        return backupNodeId == null ? false : _nodeIdService.isNodeAvailable( backupNodeId );
     }
 
     /**
      * Determines the id of the (secondary) memcached node that's used for additional backup
      * of non-sticky sessions.
      * @param sessionId the id of the session
-     * @return the nodeId, e.g. "n2"
+     * @return the nodeId, e.g. "n2", or <code>null</code>.
      * @see #isBackupNodeAvailable(String)
+     * @see NodeIdService#getNextNodeId(String)
      */
-    @Nonnull
+    @CheckForNull
     String getBackupNodeId( @Nonnull final String sessionId ) {
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
-        return _nodeIdService.getNextNodeId( nodeId );
+        return nodeId == null ? null : _nodeIdService.getNextNodeId( nodeId );
     }
 
     /**
@@ -835,7 +846,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     protected MemcachedBackupSession loadFromMemcachedWithCheck( final String sessionId ) {
-        if ( !canHitMemcached( sessionId ) ) {
+        if ( !canHitMemcached( sessionId ) || _missingSessionsCache.get( sessionId ) != null ) {
             return null;
         }
         return loadFromMemcached( sessionId );
@@ -846,7 +857,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * and if this sessionId is not in our missingSessionsCache.
      */
     private boolean canHitMemcached( @Nonnull final String sessionId ) {
-        return _enabled.get() && _sessionIdFormat.isValid( sessionId ) && _missingSessionsCache.get( sessionId ) == null;
+        return _enabled.get() && _sessionIdFormat.isValid( sessionId );
     }
 
     /**
@@ -854,6 +865,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     private MemcachedBackupSession loadFromMemcached( final String sessionId ) {
         final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
+        if ( nodeId == null ) {
+            throw new IllegalArgumentException( "The sessionId should contain a nodeId, this should be checked" +
+            		" by invoking canHitMemcached before invoking this method (bug, needs fix)." );
+        }
         if ( !_nodeIdService.isNodeAvailable( nodeId ) ) {
             _log.debug( "Asked for session " + sessionId + ", but the related"
                     + " memcached node is still marked as unavailable (won't load from memcached)." );
@@ -1303,9 +1318,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * the provided regular expression.</li>
      * </ul>
      */
-    public void setLockingMode( final String lockingMode ) {
+    public void setLockingMode( @Nullable final String lockingMode ) {
         if ( lockingMode == null && _lockingMode == null
-                || lockingMode.equals( _lockingMode ) ) {
+                || lockingMode != null && lockingMode.equals( _lockingMode ) ) {
             return;
         }
         _lockingMode = lockingMode;
@@ -1338,7 +1353,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         setLockingMode( lockingMode, uriPattern, storeSecondaryBackup );
     }
 
-    public void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
+    public void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
         _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache, storeSecondaryBackup, _statistics );
         if ( _sessionTrackerValve != null ) {
