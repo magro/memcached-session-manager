@@ -810,30 +810,42 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * Store the provided session in memcached if the session was modified
      * or if the session needs to be relocated.
      *
-     * @param session
-     *            the session to save
+     * @param sessionId
+     *            the id of the session to save
      * @param sessionRelocationRequired
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
      * @param requestId
      *            the uri/id of the request for that the session backup shall be performed, used for readonly tracking.
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    public Future<BackupResult> backupSession( final Session session, final boolean sessionIdChanged, final String requestId ) {
+    public Future<BackupResult> backupSession( final String sessionId, final boolean sessionIdChanged, final String requestId ) {
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
         }
 
-        final MemcachedBackupSession msmSession = (MemcachedBackupSession) session;
+        final MemcachedBackupSession msmSession = (MemcachedBackupSession) sessions.get( sessionId );
+        if ( msmSession == null ) {
+            _log.debug( "No session found in session map for " + sessionId );
+            if ( !_sticky ) {
+                _lockingStrategy.onBackupWithoutLoadedSession( sessionId, requestId, _backupSessionService );
+            }
+            return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
+        }
+
+        if ( !msmSession.isValidInternal() ) {
+            _log.debug( "Non valid session found in session map for " + sessionId );
+            return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
+        }
 
         if ( !_sticky ) {
             msmSession.passivate();
         }
 
-        final boolean force = sessionIdChanged || msmSession.isSessionIdChanged() || !_sticky && (msmSession.getSecondsSinceLastBackup() >= session.getMaxInactiveInterval());
+        final boolean force = sessionIdChanged || msmSession.isSessionIdChanged() || !_sticky && (msmSession.getSecondsSinceLastBackup() >= msmSession.getMaxInactiveInterval());
         final Future<BackupResult> result = _backupSessionService.backupSession( msmSession, force );
 
         if ( !_sticky ) {
-            removeInternal( session, false, false );
+            removeInternal( msmSession, false, false );
             _lockingStrategy.onAfterBackupSession( msmSession, force, result, requestId, _backupSessionService );
         }
 
@@ -1742,6 +1754,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public String[] getMsmStatNonStickyStoreMetaDataInfo() {
         return _statistics.getProbe( NON_STICKY_STORE_METADATA ).getInfo();
+    }
+
+    /**
+     * Tasks executed (in the request thread) for non-sticky sessions at the end of requests that did not access
+     * the session (validity load/update, ping session, ping 2nd session backup, update validity backup).
+     */
+    public String[] getMsmStatNonStickyOnBackupWithoutLoadedSessionInfo() {
+        return _statistics.getProbe( NON_STICKY_ON_BACKUP_WITHOUT_LOADED_SESSION ).getInfo();
     }
 
     /**

@@ -131,7 +131,7 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the second request, with session access
@@ -140,12 +140,12 @@ public class MemcachedBackupSessionManagerTest {
         session.endAccess();
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         /* simulate the third request, without session access
          */
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
     }
@@ -171,12 +171,12 @@ public class MemcachedBackupSessionManagerTest {
         session.access();
         session.endAccess();
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.endAccess();
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
@@ -200,15 +200,15 @@ public class MemcachedBackupSessionManagerTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
         session.access();
         session.getAttribute( "foo" );
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        _manager.backupSession( session, false, null ).get();
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
     }
@@ -233,13 +233,13 @@ public class MemcachedBackupSessionManagerTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
         session.setAttribute( "foo", "bar" );
-        _manager.backupSession( session, false, "foo" ).get();
+        _manager.backupSession( session.getIdInternal(), false, "foo" ).get();
 
         final String oldSessionId = session.getId();
         _manager.changeSessionId( session );
 
         // on session backup we specify sessionIdChanged as false as we're not aware of this fact
-        _manager.backupSession( session, false, "foo" );
+        _manager.backupSession( session.getIdInternal(), false, "foo" );
 
         // remove session with old id and add it with the new id
         verify( _memcachedMock, times( 1 ) ).delete( eq( oldSessionId ) );

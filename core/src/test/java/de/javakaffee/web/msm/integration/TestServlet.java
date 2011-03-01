@@ -59,9 +59,10 @@ public class TestServlet extends HttpServlet {
     @Override
     protected void doGet( final HttpServletRequest request, final HttpServletResponse response )
             throws ServletException, IOException {
-        LOG.info( " + starting..." );
 
         final String pathInfo = request.getPathInfo();
+        LOG.info( " + starting "+ pathInfo +"..." );
+
         if ( PATH_GET_REQUESTED_SESSION_INFO.equals( pathInfo ) ) {
             LOG.info( "getRequestedSessionId: " + request.getRequestedSessionId() );
             LOG.info( "isRequestedSessionIdValid: " + request.isRequestedSessionIdValid() );

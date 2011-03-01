@@ -187,22 +187,37 @@ class SessionTrackerValve extends ValveBase {
 
         /*
          * Do we have a session?
-         *
-         * Prior check for requested sessionId or response cookie before
-         * invoking getSessionInternal, as getSessionInternal triggers a
-         * memcached lookup if the session is not available locally.
          */
-        final Session session = request.getRequestedSessionId() != null || responseContainsSessionCookie( response )
-            ? request.getSessionInternal( false )
-            : null;
-        if ( session != null ) {
+        String sessionId = getSessionIdFromResponseSessionCookie( response );
+        if ( sessionId == null ) {
+            sessionId = request.getRequestedSessionId();
+        }
+        if ( sessionId != null ) {
             _statistics.requestWithSession();
-            _sessionBackupService.backupSession( session, sessionIdChanged, getURIWithQueryString( request ) );
+            _sessionBackupService.backupSession( sessionId, sessionIdChanged, getURIWithQueryString( request ) );
         }
         else {
             _statistics.requestWithoutSession();
         }
 
+    }
+
+    private String getSessionIdFromResponseSessionCookie( final Response response ) {
+        final String header = response.getHeader( "Set-Cookie" );
+        if ( header != null && header.contains( _sessionCookieName ) ) {
+            final String sessionIdPrefix = _sessionCookieName + "=";
+            final int idxNameStart = header.indexOf( sessionIdPrefix );
+            final int idxValueStart = idxNameStart + sessionIdPrefix.length();
+            int idxValueEnd = header.indexOf( ';', idxNameStart );
+            if ( idxValueEnd == -1 ) {
+                idxValueEnd = header.indexOf( ' ', idxValueStart );
+            }
+            if ( idxValueEnd == -1 ) {
+                idxValueEnd = header.length();
+            }
+            return header.substring( idxValueStart, idxValueEnd );
+        }
+        return null;
     }
 
     private void logDebugResponseCookie( final Response response ) {
@@ -270,11 +285,12 @@ class SessionTrackerValve extends ValveBase {
         String changeSessionIdOnMemcachedFailover( final String requestedSessionId );
 
         /**
-         * Backup the provided session in memcached if the session was modified or
-         * if the session needs to be relocated.
+         * Backup the session for the provided session id in memcached if the session was modified or
+         * if the session needs to be relocated. In non-sticky session-mode the session should not be
+         * loaded from memcached for just storing it again but only metadata should be updated.
          *
-         * @param session
-         *            the session to backup
+         * @param sessionId
+         *            the if of the session to backup
          * @param sessionIdChanged
          *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
          * @param requestId
@@ -282,7 +298,7 @@ class SessionTrackerValve extends ValveBase {
          *
          * @return a {@link Future} providing the {@link BackupResultStatus}.
          */
-        Future<BackupResult> backupSession( Session session, boolean sessionIdChanged, String requestId );
+        Future<BackupResult> backupSession( @Nonnull String sessionId, boolean sessionIdChanged, String requestId );
 
         /**
          * The enumeration of possible backup results.

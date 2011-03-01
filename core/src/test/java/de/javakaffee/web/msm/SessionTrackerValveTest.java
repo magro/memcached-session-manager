@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
-import org.apache.catalina.Session;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -36,9 +35,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * Test the {@link SessionTrackerValve}.
@@ -99,15 +96,17 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     }
 
     @Test
-    public final void testGetSessionInternalInvokedWhenResponseCookiePresent() throws IOException, ServletException {
+    public final void testBackupSessionInvokedWhenResponseCookiePresent() throws IOException, ServletException {
 
         _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getRequestedSessionId" ).will( returnValue( null ) );
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), "foo" );
         _responseControl.expects( once() ).method( "getHeader" ).with( eq( "Set-Cookie" ) )
             .will( returnValue( generateCookieString( cookie ) ) );
-        _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
+        _requestControl.expects( once() ).method( "getRequestURI" ).will( returnValue( "/someRequest" ) );
+        _requestControl.expects( once() ).method( "getMethod" ).will( returnValue( "GET" ) );
+        _requestControl.expects( once() ).method( "getQueryString" ).will( returnValue( null ) );
+        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( "foo" ), eq( false), ANYTHING )
             .will( returnValue( null ) );
         _sessionTrackerValve.invoke( _request, _response );
 
@@ -129,20 +128,20 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     @Test
     public final void testBackupSessionInvokedWhenSessionExisting() throws IOException, ServletException {
 
-        final Session session = (Session) mock( Session.class ).proxy();
-
         final String sessionId = "foo";
         _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnTomcatFailover" ).with( eq( sessionId)  );
         _sessionBackupServiceControl.expects( once() ).method( "changeSessionIdOnMemcachedFailover" ).with( eq( sessionId)  );
         _requestControl.expects( atLeastOnce() ).method( "getRequestedSessionId" ).will( returnValue( sessionId ) );
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
-            .will( returnValue( session ) );
+
+        final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), sessionId );
+        _responseControl.expects( once() ).method( "getHeader" ).with( eq( "Set-Cookie" ) )
+            .will( returnValue( generateCookieString( cookie ) ) );
         _requestControl.expects( once() ).method( "getRequestURI" ).will( returnValue( "/foo" ) );
         _requestControl.expects( once() ).method( "getMethod" ).will( returnValue( "GET" ) );
         _requestControl.expects( once() ).method( "getQueryString" );
-        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( false ), ANYTHING )
-            .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
+        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( sessionId ), eq( false), ANYTHING )
+            .will( returnValue( null ) );
 
         _sessionTrackerValve.invoke( _request, _response );
 
@@ -153,8 +152,6 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
     @Test
     public final void testChangeSessionIdForRelocatedSession() throws IOException, ServletException {
 
-        final Mock sessionControl = mock( Session.class );
-        final Session session = (Session) sessionControl.proxy();
         final String sessionId = "bar";
         final String newSessionId = "newId";
 
@@ -165,13 +162,16 @@ public class SessionTrackerValveTest extends MockObjectTestCase {
         _requestControl.expects( once() ).method( "changeSessionId" ).with( eq( newSessionId ) );
 
         _nextValve.expects( once() ).method( "invoke" );
-        _requestControl.expects( once() ).method( "getSessionInternal" ).with( eq( false ) )
-            .will( returnValue( session ) );
+
+        final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );
+        _responseControl.expects( once() ).method( "getHeader" ).with( eq( "Set-Cookie" ) )
+            .will( returnValue( generateCookieString( cookie ) ) );
+
         _requestControl.expects( once() ).method( "getRequestURI" ).will( returnValue( "/foo" ) );
         _requestControl.expects( once() ).method( "getMethod" ).will( returnValue( "GET" ) );
         _requestControl.expects( once() ).method( "getQueryString" );
-        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( session ), eq( true ), ANYTHING )
-            .will( returnValue( new SimpleFuture<BackupResultStatus>( BackupResultStatus.SUCCESS ) ) );
+        _sessionBackupServiceControl.expects( once() ).method( "backupSession" ).with( eq( newSessionId ), eq( true ), ANYTHING )
+            .will( returnValue( null ) );
 
         _sessionTrackerValve.invoke( _request, _response );
 
