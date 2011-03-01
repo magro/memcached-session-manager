@@ -203,6 +203,52 @@ public abstract class LockingStrategy {
     }
 
     /**
+     * Is invoked for the backup of a non-sticky session that was not accessed for the current request.
+     */
+    protected void onBackupWithoutLoadedSession( @Nonnull final String sessionId, @Nonnull final String requestId,
+            @Nonnull final BackupSessionService backupSessionService ) {
+
+        if ( !_sessionIdFormat.isValid( sessionId ) ) {
+            return;
+        }
+
+        try {
+
+            final long start = System.currentTimeMillis();
+
+            final String validityKey = createValidityInfoKeyName( sessionId );
+            final SessionValidityInfo validityInfo = loadSessionValidityInfoForValidityKey( validityKey );
+            if ( validityInfo == null ) {
+                _log.warn( "Found no validity info for session id " + sessionId );
+                return;
+            }
+
+            final byte[] validityData = encode( validityInfo.getMaxInactiveInterval(), System.currentTimeMillis(),
+                    System.currentTimeMillis() );
+            _memcached.set( validityKey, validityInfo.getMaxInactiveInterval(), validityData );
+
+            /*
+             * - ping session
+             * - ping session backup
+             * - save validity backup
+             */
+            final Callable<?> backupSessionTask = new OnBackupWithoutLoadedSessionTask( sessionId,
+                    _storeSecondaryBackup, validityKey, validityData, validityInfo.getMaxInactiveInterval() );
+            _executor.submit( backupSessionTask );
+
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Stored session validity info for session " + sessionId );
+            }
+
+            _stats.registerSince( NON_STICKY_ON_BACKUP_WITHOUT_LOADED_SESSION, start );
+
+        } catch( final Throwable e ) {
+            _log.warn( "An error when trying to load/update validity info.", e );
+        }
+
+    }
+
+    /**
      * Is invoked after the backup of the session is initiated, it's represented by the provided backupResult. The
      * requestId is identifying the request.
      */
@@ -258,17 +304,21 @@ public abstract class LockingStrategy {
     }
 
     @CheckForNull
-    protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String id ) {
-        final byte[] validityInfo = (byte[]) _memcached.get( createValidityInfoKeyName( id ) );
+    protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String sessionId ) {
+        return loadSessionValidityInfoForValidityKey( createValidityInfoKeyName( sessionId ) );
+    }
+
+    @CheckForNull
+    protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) {
+        final byte[] validityInfo = (byte[]) _memcached.get( validityInfoKey );
         return validityInfo != null ? decode( validityInfo ) : null;
     }
 
     @CheckForNull
-    protected SessionValidityInfo loadBackupSessionValidityInfo( @Nonnull final String id ) {
-        final String key = createValidityInfoKeyName( id );
+    protected SessionValidityInfo loadBackupSessionValidityInfo( @Nonnull final String sessionId ) {
+        final String key = createValidityInfoKeyName( sessionId );
         final String backupKey = _sessionIdFormat.createBackupKey( key );
-        final byte[] validityInfo = (byte[]) _memcached.get( backupKey );
-        return validityInfo != null ? decode( validityInfo ) : null;
+        return loadSessionValidityInfoForValidityKey( backupKey );
     }
 
     /**
@@ -322,6 +372,24 @@ public abstract class LockingStrategy {
 
     protected final void onRequestFinished() {
         _requestsThreadLocal.set( null );
+    }
+
+    private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {
+        final Future<Boolean> touchResult = _memcached.add( sessionId, 1, 1 );
+        try {
+            _log.debug( "Got ping result " + touchResult.get() );
+            if ( touchResult.get() ) {
+                _stats.nonStickySessionsPingFailed();
+                _log.warn( "The session " + sessionId
+                        + " should be touched in memcached, but it seemed to be"
+                        + " not existing anymore." );
+                return false;
+            }
+            return true;
+        } catch ( final ExecutionException e ) {
+            _log.warn( "An exception occurred when trying to ping session " + sessionId, e );
+            return false;
+        }
     }
 
     private void pingSession( @Nonnull final MemcachedBackupSession session,
@@ -466,6 +534,79 @@ public abstract class LockingStrategy {
                 }
             } catch ( final ExecutionException e ) {
                 _log.warn( "An exception occurred when trying to update secondary session backup for " + session.getIdInternal(), e );
+            }
+        }
+    }
+
+    private final class OnBackupWithoutLoadedSessionTask implements Callable<Void> {
+
+        private final String _sessionId;
+        private final boolean _storeSecondaryBackup;
+        private final String _validityKey;
+        private final byte[] _validityData;
+        private final int _maxInactiveInterval;
+
+        private OnBackupWithoutLoadedSessionTask( @Nonnull final String sessionId,
+                final boolean storeSecondaryBackup,
+                @Nonnull final String validityKey,
+                @Nonnull final byte[] validityData,
+                final int maxInactiveInterval ) {
+            _sessionId = sessionId;
+            _storeSecondaryBackup = storeSecondaryBackup;
+            _validityKey = validityKey;
+            _validityData = validityData;
+            _maxInactiveInterval = maxInactiveInterval;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            pingSession( _sessionId );
+
+            /*
+             * For non-sticky sessions we store/ping a backup of the session in a secondary memcached node (under a special key
+             * that's resolved by the SuffixBasedNodeLocator), but only when we have more than 1 memcached node configured...
+             */
+            if ( _storeSecondaryBackup ) {
+                try {
+
+                    pingSessionBackup( _sessionId );
+
+                    final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
+                    _memcached.set( backupValidityKey, _maxInactiveInterval, _validityData );
+
+                } catch( final NodeFailureException e ) {
+                    // handle an unavailable secondary/backup node (fix for issue #83)
+                    _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional ping of session " + _sessionId );
+                } catch( final RuntimeException e ) {
+                    _log.info( "Could not store secondary backup of session " + _sessionId, e );
+                }
+
+            }
+
+            return null;
+        }
+
+        private boolean pingSessionBackup( @Nonnull final String sessionId ) throws InterruptedException {
+            final String key = _sessionIdFormat.createBackupKey( sessionId );
+            final Future<Boolean> touchResultFuture = _memcached.add( key, 1, 1 );
+            try {
+                final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
+                _log.debug( "Got backup ping result " + touchResult );
+                if ( touchResult ) {
+                    _log.warn( "The secondary backup for session " + sessionId
+                            + " should be touched in memcached, but it seemed to be"
+                            + " not existing." );
+                    return false;
+                }
+                return true;
+            } catch ( final TimeoutException e ) {
+                _log.warn( "The secondary backup for session " + sessionId
+                        + " could not be completed within 200 millis, was cancelled now." );
+                return false;
+            } catch ( final ExecutionException e ) {
+                _log.warn( "An exception occurred when trying to ping session " + sessionId, e );
+                return false;
             }
         }
     }

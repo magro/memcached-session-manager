@@ -465,12 +465,13 @@ public class NonStickySessionsIntegrationTest {
     }
 
     @Test( enabled = true )
-    public void testSessionNotLoadedForReadonlyRequest() throws IOException, HttpException {
+    public void testSessionNotLoadedForReadonlyRequest() throws IOException, HttpException, InterruptedException {
         getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
         try {
 
             final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
             assertNotNull( sessionId1 );
+            Thread.sleep( 200 );
 
             // 2 for session and validity, if backup would be stored this would be 4 instead
             assertEquals( _daemon1.getCache().getSetCmds(), 2 );
@@ -479,7 +480,9 @@ public class NonStickySessionsIntegrationTest {
 
             // a request without session access should not pull the session from memcached
             // but update the validity info (get + set)
-            get( _httpClient, TC_PORT_1, sessionId1, PATH_NO_SESSION_ACCESS );
+            get( _httpClient, TC_PORT_1, PATH_NO_SESSION_ACCESS, sessionId1 );
+            Thread.sleep( 200 );
+
             assertEquals( _daemon1.getCache().getGetHits(), 1 );
             assertEquals( _daemon1.getCache().getSetCmds(), 3 );
 

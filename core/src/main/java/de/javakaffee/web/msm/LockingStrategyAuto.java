@@ -55,10 +55,27 @@ public class LockingStrategyAuto extends LockingStrategy {
     }
 
     @Override
+    protected void onBackupWithoutLoadedSession( @Nonnull final String sessionId, @Nonnull final String requestId,
+            @Nonnull final BackupSessionService backupSessionService ) {
+
+        if ( !_sessionIdFormat.isValid( sessionId ) ) {
+            return;
+        }
+
+        super.onBackupWithoutLoadedSession( sessionId, requestId, backupSessionService );
+
+        _readOnlyRequestCache.readOnlyRequest( requestId );
+    }
+
+    @Override
     protected void onAfterBackupSession( final MemcachedBackupSession session, final boolean backupWasForced,
             final Future<BackupResult> result,
             final String requestId,
             final BackupSessionService backupSessionService ) {
+
+        if ( !_sessionIdFormat.isValid( session.getIdInternal() ) ) {
+            return;
+        }
 
         super.onAfterBackupSession( session, backupWasForced, result, requestId, backupSessionService );
 
