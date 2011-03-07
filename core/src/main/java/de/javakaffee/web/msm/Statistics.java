@@ -196,11 +196,6 @@ public class Statistics {
         RELEASE_LOCK,
 
         /**
-         * Store metadata / validity info in memcached.
-         */
-        NON_STICKY_STORE_METADATA,
-
-        /**
          * Time spent (in the request thread) for non-sticky sessions at the end of requests that did not access
          * the session (performs validity load/update, ping session, ping 2nd session backup, update validity backup in secondary memcached).
          */
