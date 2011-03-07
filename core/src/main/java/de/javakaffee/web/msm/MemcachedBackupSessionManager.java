@@ -1750,13 +1750,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
-     * Store metadata / validity info in memcached.
-     */
-    public String[] getMsmStatNonStickyStoreMetaDataInfo() {
-        return _statistics.getProbe( NON_STICKY_STORE_METADATA ).getInfo();
-    }
-
-    /**
      * Tasks executed (in the request thread) for non-sticky sessions at the end of requests that did not access
      * the session (validity load/update, ping session, ping 2nd session backup, update validity backup).
      */
