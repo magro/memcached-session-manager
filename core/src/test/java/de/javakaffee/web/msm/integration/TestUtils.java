@@ -408,7 +408,8 @@ public class TestUtils {
 
         final URL root = new URL( TestUtils.class.getResource( "/" ), "../resources" );
 
-        final String docBase = root.getFile() + File.separator + TestUtils.class.getPackage().getName().replaceAll( "\\.", File.separator );
+        final String fileSeparator = File.separator.equals( "\\" ) ? "\\\\" : File.separator;
+        final String docBase = root.getFile() + File.separator + TestUtils.class.getPackage().getName().replaceAll( "\\.", fileSeparator );
         final Host host = catalina.createHost( DEFAULT_HOST, docBase );
         engine.addChild( host );
         new File( docBase ).mkdirs();
