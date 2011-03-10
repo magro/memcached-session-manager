@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -407,9 +408,11 @@ public class TestUtils {
         engine.setRealm( realm );
 
         final URL root = new URL( TestUtils.class.getResource( "/" ), "../resources" );
+        // use file to get correct separator char, replace %20 introduced by URL for spaces
+        final String cleanedRoot = new File( root.getFile().replaceAll("%20", " ") ).toString();
 
         final String fileSeparator = File.separator.equals( "\\" ) ? "\\\\" : File.separator;
-        final String docBase = root.getFile() + File.separator + TestUtils.class.getPackage().getName().replaceAll( "\\.", fileSeparator );
+        final String docBase = cleanedRoot + File.separator + TestUtils.class.getPackage().getName().replaceAll( "\\.", fileSeparator );
         final Host host = catalina.createHost( DEFAULT_HOST, docBase );
         engine.addChild( host );
         new File( docBase ).mkdirs();

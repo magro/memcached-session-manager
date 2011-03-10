@@ -64,6 +64,7 @@ public class MemcachedBackupSessionManagerTest {
 
         _manager = new MemcachedBackupSessionManager();
         _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _manager.setSessionBackupAsync( false );
         _manager.setSticky( true );
 
         final StandardContext container = new StandardContext();
@@ -142,6 +143,9 @@ public class MemcachedBackupSessionManagerTest {
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
+        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(1L);
+
         /* simulate the second request, with session access
          */
         session.access();
@@ -150,6 +154,9 @@ public class MemcachedBackupSessionManagerTest {
         session.setAttribute( "bar", "baz" );
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
+
+        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(1L);
 
         /* simulate the third request, without session access
          */
@@ -211,10 +218,16 @@ public class MemcachedBackupSessionManagerTest {
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
+        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(1L);
+
         session.access();
         session.getAttribute( "foo" );
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
+
+        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(1L);
 
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
