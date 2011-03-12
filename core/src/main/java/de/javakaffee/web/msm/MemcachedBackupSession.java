@@ -164,6 +164,13 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     int getMemcachedExpirationTimeToSet() {
 
+        /* SRV.13.4 ("Deployment Descriptor"): If the timeout is 0 or less, the container
+         * ensures the default behaviour of sessions is never to time out.
+         */
+        if ( maxInactiveInterval <= 0 ) {
+            return 0;
+        }
+
         if ( !_sticky ) {
             return 2 * maxInactiveInterval;
         }
@@ -179,6 +186,8 @@ public final class MemcachedBackupSession extends StandardSession {
 
     /**
      * Gets the time in seconds when this session will expire in memcached.
+     * If the session was stored in memcached with expiration 0 this method will just
+     * return 0.
      *
      * @return the time in seconds
      */
@@ -186,6 +195,10 @@ public final class MemcachedBackupSession extends StandardSession {
         if ( !_sticky ) {
             throw new IllegalStateException( "The memcached expiration time cannot be determined in non-sticky mode." );
         }
+        if ( _lastMemcachedExpirationTime == 0 ) {
+            return 0;
+        }
+
         final long timeIdleInMillis = _lastBackupTime == 0 ? 0 : System.currentTimeMillis() - _lastBackupTime;
         /* rounding is just for tests, as they are using actually seconds for testing.
          * with a default setup 1 second difference wouldn't matter...
