@@ -1510,6 +1510,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                         && !session.isBackupRunning()
                         && !session.isExpirationUpdateRunning()
                         && session.wasAccessedSinceLastBackup()
+                        && session.getMaxInactiveInterval() > 0 // for <= 0 the session was stored in memcached with expiration 0
                         && session.getMemcachedExpirationTime() <= 2 * delay ) {
                     try {
                         _backupSessionService.updateExpiration( session );
@@ -1623,6 +1624,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     MemcachedClient getMemcached() {
         return _memcached;
+    }
+
+    /**
+     * The currently set locking strategy.
+     */
+    @Nullable
+    LockingStrategy getLockingStrategy() {
+        return _lockingStrategy;
     }
 
     // -------------------------  statistics via jmx ----------------

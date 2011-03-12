@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
+import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
@@ -272,6 +273,106 @@ public class MemcachedBackupSessionManagerTest {
             verify( _memcachedMock, times( 1 ) ).set( eq( createValidityInfoKeyName( session.getId() ) ), anyInt(), any() );
         }
 
+    }
+
+    /**
+     * Test that sessions with a timeout of 0 or less are stored in memcached with unlimited
+     * expiration time (0) also (see http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt).
+     * For non-sticky sessions that must hold true for all related items stored in memcached (validation,
+     * backup etc.)
+     *
+     * This is the test for issue #88 "Support session-timeout of 0 or less (no session expiration)"
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=88
+     */
+    @Test( dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionTimeoutUnlimitedWithSessionLoaded( final SessionAffinityMode stickyness ) throws InterruptedException, ExecutionException, LifecycleException {
+
+        _manager.setStickyInternal( stickyness.isSticky() );
+        if ( !stickyness.isSticky() ) {
+            _manager.setLockingMode( LockingMode.NONE, null, false );
+            _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" ); // for backup support
+            _manager.startInternal(_memcachedMock); // we must put in our mock again
+        }
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        session.setMaxInactiveInterval( -1 );
+
+        session.access();
+        session.endAccess();
+        session.setAttribute( "foo", "bar" );
+        final String sessionId = session.getId();
+
+        _manager.backupSession( sessionId, false, null ).get();
+
+        verify( _memcachedMock, times( 1 ) ).set( eq( sessionId ), eq( 0 ), any() );
+
+        if ( !stickyness.isSticky() ) {
+            // check validity info
+            final String validityKey = createValidityInfoKeyName( sessionId );
+            verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
+
+            // As the backup is done asynchronously, we shutdown the executor so that we know the backup
+            // task is executed/finished.
+            _manager.getLockingStrategy().getExecutorService().shutdown();
+
+            final String backupSessionKey = new SessionIdFormat().createBackupKey( sessionId );
+            verify( _memcachedMock, times( 1 ) ).set( eq( backupSessionKey ), eq( 0 ), any() );
+            final String backupValidityKey = new SessionIdFormat().createBackupKey( validityKey );
+            verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any() );
+        }
+    }
+
+    /**
+     * Test that non-sticky sessions with a timeout of 0 or less that have not been loaded by a request
+     * the validity info is stored in memcached with unlimited
+     * expiration time (0) also (see http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt).
+     * For non-sticky sessions that must hold true for all related items stored in memcached (validation,
+     * backup etc.)
+     *
+     * This is the test for issue #88 "Support session-timeout of 0 or less (no session expiration)"
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=88
+     */
+    @Test
+    public void testSessionTimeoutUnlimitedWithNonStickySessionNotLoaded() throws InterruptedException, ExecutionException, LifecycleException, TimeoutException {
+
+        _manager.setStickyInternal( false );
+        _manager.setLockingMode( LockingMode.NONE, null, false );
+        _manager.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" ); // for backup support
+        _manager.startInternal(_memcachedMock); // we must put in our mock again
+
+        final String sessionId = "someSessionNotLoaded-n1";
+
+        // stub loading of validity info
+        final String validityKey = createValidityInfoKeyName( sessionId );
+        final byte[] validityData = encode( -1, System.currentTimeMillis(), System.currentTimeMillis() );
+        when( _memcachedMock.get( eq( validityKey ) ) ).thenReturn( validityData );
+
+        // stub session (backup) ping
+        @SuppressWarnings( "unchecked" )
+        final Future<Boolean> futureMock = mock( Future.class );
+        when( futureMock.get() ).thenReturn( Boolean.FALSE );
+        when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.FALSE );
+        when( _memcachedMock.add(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
+
+        _manager.backupSession( sessionId, false, null ).get();
+
+        // update validity info
+        verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
+
+        // As the backup is done asynchronously, we shutdown the executor so that we know the backup
+        // task is executed/finished.
+        _manager.getLockingStrategy().getExecutorService().shutdown();
+
+        // ping session
+        verify( _memcachedMock, times( 1 ) ).add( eq( sessionId ), anyInt(), any() );
+
+        // ping session backup
+        final String backupSessionKey = new SessionIdFormat().createBackupKey( sessionId );
+        verify( _memcachedMock, times( 1 ) ).add( eq( backupSessionKey ), anyInt(), any() );
+
+        // update validity backup
+        final String backupValidityKey = new SessionIdFormat().createBackupKey( validityKey );
+        verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any() );
     }
 
 }

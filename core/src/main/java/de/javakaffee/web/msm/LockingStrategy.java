@@ -223,9 +223,12 @@ public abstract class LockingStrategy {
                 return;
             }
 
-            final byte[] validityData = encode( validityInfo.getMaxInactiveInterval(), System.currentTimeMillis(),
+            final int maxInactiveInterval = validityInfo.getMaxInactiveInterval();
+            final byte[] validityData = encode( maxInactiveInterval, System.currentTimeMillis(),
                     System.currentTimeMillis() );
-            _memcached.set( validityKey, validityInfo.getMaxInactiveInterval(), validityData );
+            // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
+            final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
+            _memcached.set( validityKey, expiration, validityData );
 
             /*
              * - ping session
@@ -233,7 +236,7 @@ public abstract class LockingStrategy {
              * - save validity backup
              */
             final Callable<?> backupSessionTask = new OnBackupWithoutLoadedSessionTask( sessionId,
-                    _storeSecondaryBackup, validityKey, validityData, validityInfo.getMaxInactiveInterval() );
+                    _storeSecondaryBackup, validityKey, validityData, maxInactiveInterval );
             _executor.submit( backupSessionTask );
 
             if ( _log.isDebugEnabled() ) {
@@ -264,10 +267,13 @@ public abstract class LockingStrategy {
 
             final long start = System.currentTimeMillis();
 
-            final byte[] validityData = encode( session.getMaxInactiveInterval(), session.getLastAccessedTimeInternal(),
+            final int maxInactiveInterval = session.getMaxInactiveInterval();
+            final byte[] validityData = encode( maxInactiveInterval, session.getLastAccessedTimeInternal(),
                     session.getThisAccessedTimeInternal() );
             final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
-            _memcached.set( validityKey, session.getMaxInactiveInterval(), validityData );
+            // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
+            final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
+            _memcached.set( validityKey, expiration, validityData );
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Stored session validity info for session " + session.getIdInternal() );
             }
@@ -394,7 +400,7 @@ public abstract class LockingStrategy {
 
     private void pingSession( @Nonnull final MemcachedBackupSession session,
             @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( session.getIdInternal(), session.getMaxInactiveInterval(), 1 );
+        final Future<Boolean> touchResult = _memcached.add( session.getIdInternal(), 5, 1 );
         try {
             _log.debug( "Got ping result " + touchResult.get() );
             if ( touchResult.get() ) {
@@ -501,12 +507,15 @@ public abstract class LockingStrategy {
 
         public void saveValidityBackup() {
             final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
-            _memcached.set( backupValidityKey, _session.getMaxInactiveInterval(), _validityData );
+            final int maxInactiveInterval = _session.getMaxInactiveInterval();
+            // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
+            final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
+            _memcached.set( backupValidityKey, expiration, _validityData );
         }
 
         private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( session.getId() );
-            final Future<Boolean> touchResultFuture = _memcached.add( key, session.getMaxInactiveInterval(), 1 );
+            final Future<Boolean> touchResultFuture = _memcached.add( key, 5, 1 );
             try {
                 final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
                 _log.debug( "Got backup ping result " + touchResult );
@@ -573,7 +582,9 @@ public abstract class LockingStrategy {
                     pingSessionBackup( _sessionId );
 
                     final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
-                    _memcached.set( backupValidityKey, _maxInactiveInterval, _validityData );
+                    // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
+                    final int expiration = _maxInactiveInterval <= 0 ? 0 : _maxInactiveInterval;
+                    _memcached.set( backupValidityKey, expiration, _validityData );
 
                 } catch( final NodeFailureException e ) {
                     // handle an unavailable secondary/backup node (fix for issue #83)
@@ -609,6 +620,13 @@ public abstract class LockingStrategy {
                 return false;
             }
         }
+    }
+
+    // ---------------- for testing
+
+    @Nonnull
+    ExecutorService getExecutorService() {
+        return _executor;
     }
 
 }
