@@ -25,6 +25,7 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.Session;
@@ -124,7 +125,11 @@ class SessionTrackerValve extends ValveBase {
     }
 
     private void logDebugRequestSessionCookie( final Request request ) {
-        for( final javax.servlet.http.Cookie cookie : request.getCookies() ) {
+        final Cookie[] cookies = request.getCookies();
+        if ( cookies == null ) {
+            return;
+        }
+        for( final javax.servlet.http.Cookie cookie : cookies ) {
             if ( cookie.getName().equals( _sessionCookieName ) ) {
                 _log.debug( "Have request session cookie: domain=" + cookie.getDomain() + ", maxAge=" + cookie.getMaxAge() +
                         ", path=" + cookie.getPath() + ", value=" + cookie.getValue() +
@@ -225,11 +230,6 @@ class SessionTrackerValve extends ValveBase {
         if ( header != null && header.contains( _sessionCookieName ) ) {
             _log.debug( "Request finished, with Set-Cookie header: " + header );
         }
-    }
-
-    private boolean responseContainsSessionCookie( final Response response ) {
-        final String header = response.getHeader( "Set-Cookie" );
-        return header != null && header.contains( _sessionCookieName );
     }
 
     /**
