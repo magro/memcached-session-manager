@@ -107,8 +107,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
      * {@inheritDoc}
      */
     public Iterator<MemcachedNode> getSequence( final String key ) {
-        final String nodeId = getNodeId( key );
-        throw new NodeFailureException( "The node " + nodeId + " is not available.", nodeId );
+        throw new UnsupportedOperationException( "This should not be called as we specified FailureMode.Cancel." );
     }
 
     /**
