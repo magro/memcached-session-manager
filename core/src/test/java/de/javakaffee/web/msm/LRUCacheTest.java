@@ -89,7 +89,7 @@ public class LRUCacheTest {
         final LRUCache<String,String> cut = new LRUCache<String, String>(1, 100);
         cut.put("foo", "bar");
         Assert.assertEquals( "bar", cut.get("foo") );
-        Thread.sleep( 101 );
+        Thread.sleep( 120 );
         Assert.assertNull( cut.get("foo"), "expired key still existing, unexpected cache size" );
     }
 

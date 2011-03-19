@@ -426,6 +426,9 @@ public class NonStickySessionsIntegrationTest {
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
         assertNotNull( sessionId1 );
 
+        // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
+        waitForMemcachedClient( 15 );
+
         final SessionIdFormat fmt = new SessionIdFormat();
 
         final String nodeId = fmt.extractMemcachedId( sessionId1 );
@@ -453,6 +456,9 @@ public class NonStickySessionsIntegrationTest {
         try {
             final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
             assertNotNull( sessionId1 );
+            
+            // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
+            waitForMemcachedClient( 15 );
 
             // 2 for session and validity, if backup would be stored this would be 4 instead
             assertEquals( _daemon1.getCache().getSetCmds(), 2 );
@@ -463,6 +469,14 @@ public class NonStickySessionsIntegrationTest {
             getManager( _tomcat1 ).setMemcachedNodes( MEMCACHED_NODES );
         }
     }
+
+	private void waitForMemcachedClient( final long millis ) {
+		try {
+			Thread.sleep( millis );
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
     @Test( enabled = true )
     public void testSessionNotLoadedForReadonlyRequest() throws IOException, HttpException, InterruptedException {
