@@ -144,8 +144,8 @@ public class MemcachedBackupSessionManagerTest {
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
-        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
-        Thread.sleep(1L);
+        // we need some millis between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(5L);
 
         /* simulate the second request, with session access
          */
@@ -156,8 +156,8 @@ public class MemcachedBackupSessionManagerTest {
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
 
-        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
-        Thread.sleep(1L);
+        // we need some millis between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(5L);
 
         /* simulate the third request, without session access
          */
@@ -219,16 +219,16 @@ public class MemcachedBackupSessionManagerTest {
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
-        Thread.sleep(1L);
+        // we need some millis between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(5L);
 
         session.access();
         session.getAttribute( "foo" );
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
 
-        // we need at least 1 milli between last backup and next access (due to check in BackupSessionService)
-        Thread.sleep(1L);
+        // we need some millis between last backup and next access (due to check in BackupSessionService)
+        Thread.sleep(5L);
 
         _manager.backupSession( session.getIdInternal(), false, null ).get();
         verify( transcoderServiceMock, times( 2 ) ).serializeAttributes( eq( session ), eq( session.getAttributesInternal() ) );
@@ -315,6 +315,9 @@ public class MemcachedBackupSessionManagerTest {
             // task is executed/finished.
             _manager.getLockingStrategy().getExecutorService().shutdown();
 
+            // On windows we need to wait a little bit so that the tasks _really_ have finished (not needed on linux)
+            Thread.sleep(15);
+
             final String backupSessionKey = new SessionIdFormat().createBackupKey( sessionId );
             verify( _memcachedMock, times( 1 ) ).set( eq( backupSessionKey ), eq( 0 ), any() );
             final String backupValidityKey = new SessionIdFormat().createBackupKey( validityKey );
@@ -355,13 +358,16 @@ public class MemcachedBackupSessionManagerTest {
         when( _memcachedMock.add(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
 
         _manager.backupSession( sessionId, false, null ).get();
-
+        
         // update validity info
         verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
 
         // As the backup is done asynchronously, we shutdown the executor so that we know the backup
         // task is executed/finished.
         _manager.getLockingStrategy().getExecutorService().shutdown();
+        
+        // On windows we need to wait a little bit so that the tasks _really_ have finished (not needed on linux)
+        Thread.sleep(15);
 
         // ping session
         verify( _memcachedMock, times( 1 ) ).add( eq( sessionId ), anyInt(), any() );
