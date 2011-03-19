@@ -22,6 +22,7 @@ import java.util.List;
 
 import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
+import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.OperationFactory;
@@ -60,6 +61,15 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
         _resolver = resolver;
         _sessionIdFormat = sessionIdFormat;
         _statistics = statistics;
+    }
+
+    /**
+     * We don't want to try another memcached node and we also don't want to wait
+     * until the failed node becomes available again.
+     */
+    @Override
+    public FailureMode getFailureMode() {
+        return FailureMode.Cancel;
     }
 
     /**
