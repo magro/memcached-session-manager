@@ -124,13 +124,15 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
         final List<Object> saveValues = new ArrayList<Object>();
         for ( int i = 0; i < keys.length; i++ ) {
             final Object value = attributes.get( keys[i] );
-            if ( value == null ) {
+            if ( value == null || session.exclude( keys[i] ) ) {
                 continue;
-            } else if ( ( value instanceof Serializable ) && ( !session.exclude( keys[i] ) ) ) {
+            } else if ( value instanceof Serializable ) {
                 saveNames.add( keys[i] );
                 saveValues.add( value );
             } else {
-                session.removeAttributeInternal( keys[i], true );
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug( "Ignoring attribute '" + keys[i] + "' as it does not implement Serializable" );
+                }
             }
         }
 
