@@ -26,7 +26,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -41,6 +40,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import javax.annotation.Nullable;
 import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
 import javax.servlet.http.HttpSessionEvent;
@@ -76,6 +76,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
@@ -218,7 +219,7 @@ public class TestUtils {
         return qs;
     }
 
-    private static HttpResponse executeRequestWithAuth( final DefaultHttpClient client, final HttpGet method,
+    private static HttpResponse executeRequestWithAuth( final DefaultHttpClient client, final HttpUriRequest method,
             final Credentials credentials ) throws IOException, ClientProtocolException {
         client.getCredentialsProvider().setCredentials( AuthScope.ANY, credentials );
 
@@ -271,6 +272,15 @@ public class TestUtils {
             final String path,
             final String rsessionId,
             final Map<String, String> params ) throws IOException, HttpException {
+        return post( client, port, path, rsessionId, params, null );
+    }
+
+    public static Response post( final DefaultHttpClient client,
+            final int port,
+            final String path,
+            final String rsessionId,
+            final Map<String, String> params,
+            @Nullable final Credentials credentials ) throws IOException, HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
         final String baseUri = "http://"+ DEFAULT_HOST +":"+ port;
         final String url = getUrl( port, path );
@@ -283,7 +293,9 @@ public class TestUtils {
 
         // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
         //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
-        final HttpResponse response = client.execute( method );
+        final HttpResponse response = credentials == null
+            ? client.execute( method )
+            : executeRequestWithAuth( client, method, credentials );
 
         final int statusCode = response.getStatusLine().getStatusCode();
         if ( statusCode == 302 ) {

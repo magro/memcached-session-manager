@@ -519,19 +519,31 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             result = loadFromMemcached( id );
             // checking valid() would expire() the session if it's not valid!
             if ( result != null && result.isValid() ) {
-                addValidLoadedSession( result );
+
+                // When the sessionId will be changed later in changeSessionIdOnTomcatFailover/handleSessionTakeOver
+                // (due to a tomcat failover) we don't want to notify listeners via session.activate for the
+                // old sessionId but do that later (in handleSessionTakeOver)
+                // See also http://code.google.com/p/memcached-session-manager/issues/detail?id=92
+                String jvmRoute;
+                final boolean sessionIdWillBeChanged = _sticky && ( jvmRoute = getJvmRoute() ) != null
+                    && !jvmRoute.equals( _sessionIdFormat.extractJvmRoute( id ) );
+
+                final boolean activate = !sessionIdWillBeChanged;
+                addValidLoadedSession( result, activate );
             }
         }
         return result;
     }
 
-    private void addValidLoadedSession( final StandardSession session ) {
+    private void addValidLoadedSession( final StandardSession session, final boolean activate ) {
         // make sure the listeners know about it. (as done by PersistentManagerBase)
         if ( session.isNew() ) {
             session.tellNew();
         }
         add( session );
-        session.activate();
+        if ( activate ) {
+            session.activate();
+        }
         // endAccess() to ensure timeouts happen correctly.
         // access() to keep access count correct or it will end up
         // negative
@@ -556,7 +568,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             session = loadFromMemcachedWithCheck( sessionId );
             // checking valid() would expire() the session if it's not valid!
             if ( session != null && session.isValid() ) {
-                addValidLoadedSession( session );
+                addValidLoadedSession( session, true );
             }
         }
 
@@ -627,7 +639,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         }
         final String localJvmRoute = getJvmRoute();
         if ( localJvmRoute != null && !localJvmRoute.equals( _sessionIdFormat.extractJvmRoute( requestedSessionId ) ) ) {
-            final MemcachedBackupSession session = loadFromMemcachedWithCheck( requestedSessionId );
+
+            // the session might have been loaded already (by some valve), so let's check our session map
+            MemcachedBackupSession session = (MemcachedBackupSession) sessions.get( requestedSessionId );
+            if ( session == null ) {
+                session = loadFromMemcachedWithCheck( requestedSessionId );
+            }
+
             // checking valid() can expire() the session!
             if ( session != null && session.isValid() ) {
                 return handleSessionTakeOver( session );
@@ -643,9 +661,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final String origSessionId = session.getIdInternal();
 
         final String newSessionId = _sessionIdFormat.changeJvmRoute( session.getIdInternal(), getJvmRoute() );
+
+        // If this session was already loaded we need to remove it from the session map
+        // See http://code.google.com/p/memcached-session-manager/issues/detail?id=92
+        if ( sessions.containsKey( origSessionId ) ) {
+            sessions.remove( origSessionId );
+        }
+
         session.setIdInternal( newSessionId );
 
-        addValidLoadedSession( session );
+        addValidLoadedSession( session, true );
 
         deleteFromMemcached( origSessionId );
 
@@ -712,7 +737,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 final MemcachedBackupSession backupSession = loadBackupSession( requestedSessionId );
                 if ( backupSession != null ) {
                     _log.debug( "Loaded backup session for " + requestedSessionId + ", adding locally with "+ backupSession.getIdInternal() +"." );
-                    addValidLoadedSession( backupSession );
+                    addValidLoadedSession( backupSession, true );
                     _statistics.requestWithMemcachedFailover();
                     return backupSession.getId();
                 }
