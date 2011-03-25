@@ -307,7 +307,7 @@ public class TomcatFailoverIntegrationTest {
          * with the first request
          */
         final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
-        assertEquals( sessionId, tc2Response1.get( TestServlet.ID ) );
+        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
 
     }
 
@@ -336,7 +336,64 @@ public class TomcatFailoverIntegrationTest {
          * with the first request
          */
         final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
-        assertEquals( sessionId, tc2Response1.get( TestServlet.ID ) );
+        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+
+    }
+
+    @Test( enabled = true )
+    public void testSessionOnlyLoadedOnceWithAuth() throws Exception {
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.BASIC );
+        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.BASIC );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
+
+        /* tomcat1: request secured resource, login and check that secured resource is accessable
+         */
+        final Response tc1Response1 = get( _httpClient, TC_PORT_1, null,
+                new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ) );
+        final String sessionId = tc1Response1.getSessionId();
+
+        assertEquals( sessionId, tc1Response1.get( TestServlet.ID ) );
+        assertEquals( _daemon.getCache().getGetHits(), 0 );
+
+        /* on tomcat1 failover and session takeover by tomcat2, msm in tomcat2 should
+         * load the session only once.
+         */
+        final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
+        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        assertEquals( _daemon.getCache().getGetHits(), 1 );
+
+    }
+
+    @Test( enabled = true )
+    public void testSessionModificationOnTomcatFailoverNotLostWithAuth() throws Exception {
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.BASIC );
+        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.BASIC );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
+
+        final Response tc1Response1 = get( _httpClient, TC_PORT_1, null, new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ) );
+        final String sessionId = tc1Response1.getSessionId();
+        assertEquals( sessionId, tc1Response1.get( TestServlet.ID ) );
+
+        /* on tomcat1 failover and session takeover by tomcat2, the changes made to the
+         * session during this request must be available in the following request(s)
+         */
+        final Response tc2Response1 = post( _httpClient, TC_PORT_2, "/", sessionId, asMap( "foo", "bar" ) );
+        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+
+        final Response tc2Response2 = get( _httpClient, TC_PORT_2, tc2Response1.getResponseSessionId() );
+        assertEquals( tc2Response2.get( "foo" ), "bar" );
 
     }
 
