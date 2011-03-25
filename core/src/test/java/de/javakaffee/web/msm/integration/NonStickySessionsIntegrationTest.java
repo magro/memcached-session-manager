@@ -45,6 +45,7 @@ import net.spy.memcached.MemcachedClient;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Embedded;
 import org.apache.http.HttpException;
+import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.conn.scheme.PlainSocketFactory;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
@@ -65,6 +66,7 @@ import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
+import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
 /**
@@ -456,7 +458,7 @@ public class NonStickySessionsIntegrationTest {
         try {
             final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
             assertNotNull( sessionId1 );
-            
+
             // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
             waitForMemcachedClient( 15 );
 
@@ -473,7 +475,7 @@ public class NonStickySessionsIntegrationTest {
 	private void waitForMemcachedClient( final long millis ) {
 		try {
 			Thread.sleep( millis );
-		} catch (InterruptedException e) {
+		} catch (final InterruptedException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -503,6 +505,44 @@ public class NonStickySessionsIntegrationTest {
         } finally {
             getManager( _tomcat1 ).setMemcachedNodes( MEMCACHED_NODES );
         }
+    }
+
+    @Test( enabled = true )
+    public void testBasicAuth() throws Exception {
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
+
+        /* tomcat1: request secured resource, login and check that secured resource is accessable
+         */
+        final Response tc1Response1 = post( _httpClient, TC_PORT_2, "/", null, asMap( "foo", "bar" ),
+                new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ) );
+        final String sessionId = tc1Response1.getSessionId();
+        assertNotNull( sessionId );
+
+        /* tomcat1 failover "simulation":
+         * on tomcat2, we now should be able to access the secured resource directly
+         * with the first request
+         */
+        final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
+        assertEquals( sessionId, tc2Response1.get( TestServlet.ID ) );
+        assertEquals( tc2Response1.get( "foo" ), "bar" );
+
+    }
+
+    @SuppressWarnings( "deprecation" )
+    private Embedded startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
+        final Embedded result = createCatalina( port, MEMCACHED_NODES, null, LoginType.BASIC );
+        getManager( result ).setSticky( false );
+        getManager( result ).setLockingMode( lockingMode.name() );
+        result.start();
+        return result;
     }
 
     @DataProvider
