@@ -438,14 +438,14 @@ public class NonStickySessionsIntegrationTest {
         final MemCacheDaemon<?> primary = nodeId.equals( NODE_ID_1 ) ? _daemon1 : _daemon2;
         final MemCacheDaemon<?> secondary = nodeId.equals( NODE_ID_1 ) ? _daemon2 : _daemon1;
 
-        assertNotNull( primary.getCache().get( sessionId1 )[0] );
-        assertNotNull( primary.getCache().get( createValidityInfoKeyName( sessionId1 ) )[0] );
+        assertNotNull( primary.getCache().get( key( sessionId1 ) )[0] );
+        assertNotNull( primary.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
 
         // The executor needs some time to finish the backup...
         Thread.sleep( 100 );
 
-        assertNotNull( secondary.getCache().get( fmt.createBackupKey( sessionId1 ) )[0] );
-        assertNotNull( secondary.getCache().get( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+        assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
+        assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
 
     }
 
