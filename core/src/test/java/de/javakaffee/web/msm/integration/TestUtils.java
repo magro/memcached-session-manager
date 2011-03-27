@@ -439,7 +439,7 @@ public class TestUtils {
         realm.setResourceName( USER_DATABASE );
         engine.setRealm( realm );
 
-        final URL root = new URL( TestUtils.class.getResource( "/" ), "../resources" );
+        final URL root = new URL( TestUtils.class.getResource( "/" ), "../test-classes" );
         // use file to get correct separator char, replace %20 introduced by URL for spaces
         final String cleanedRoot = new File( root.getFile().replaceAll("%20", " ") ).toString();
 
