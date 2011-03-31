@@ -5,6 +5,7 @@ require 'etc/checkstyle'
 repositories.remote << 'http://repo2.maven.org/maven2'
 repositories.remote << 'http://www.ibiblio.org/maven2'
 repositories.remote << 'http://thimbleware.com/maven'
+repositories.remote << 'http://repository.jboss.com/maven2'
 repositories.remote << 'https://repository.jboss.org/nexus/content/repositories/releases'
 #repositories.remote << 'http://powermock.googlecode.com/svn/repo'
 
