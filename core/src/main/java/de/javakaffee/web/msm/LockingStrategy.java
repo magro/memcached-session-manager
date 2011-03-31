@@ -363,11 +363,13 @@ public abstract class LockingStrategy {
     protected void onAfterDeleteFromMemcached( @Nonnull final String sessionId ) {
         final long start = System.currentTimeMillis();
 
-        _memcached.delete( _sessionIdFormat.createBackupKey( sessionId ) );
-
         final String validityInfoKey = createValidityInfoKeyName( sessionId );
         _memcached.delete( validityInfoKey );
-        _memcached.delete( _sessionIdFormat.createBackupKey( validityInfoKey ) );
+
+        if (_storeSecondaryBackup) {
+            _memcached.delete( _sessionIdFormat.createBackupKey( sessionId ) );
+            _memcached.delete( _sessionIdFormat.createBackupKey( validityInfoKey ) );
+        }
 
         _stats.registerSince( NON_STICKY_AFTER_DELETE_FROM_MEMCACHED, start );
     }
