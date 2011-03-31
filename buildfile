@@ -37,7 +37,7 @@ JAVASSIST = transitive( 'javassist:javassist:jar:3.11.0.GA' )
 SPRING = group( 'spring-core', 'spring-beans', 'spring-aop', :under => 'org.springframework', :version => '2.5.6' )
 
 # Testing
-JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
+JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:1.0.0' ).reject { |a| a.group == 'org.slf4j' }
 HTTP_CLIENT = transitive( 'org.apache.httpcomponents:httpclient:jar:4.1-alpha1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
