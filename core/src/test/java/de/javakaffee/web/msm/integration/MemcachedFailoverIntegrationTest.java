@@ -170,7 +170,7 @@ public class MemcachedFailoverIntegrationTest {
 
         // we must get the same session back
         assertEquals( makeRequest( _httpClient, _portTomcat1, sid2 ), sid2, "We should keep the sessionId." );
-        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( key( sid2 ) )[0], "The session should exist in memcached." );
 
         // some more checks in sticky mode
         if ( sessionAffinity.isSticky() ) {
@@ -221,7 +221,7 @@ public class MemcachedFailoverIntegrationTest {
         // we must get the same session back
         final Response response2 = get( _httpClient, _portTomcat1, sid2 );
         assertEquals( response2.getSessionId(), sid2, "We should keep the sessionId." );
-        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( key( sid2 ) )[0], "The session should exist in memcached." );
         assertEquals( response2.get( paramKey ), paramValue, "The session should still contain the previously stored value." );
 
         // some more checks in sticky mode
@@ -293,7 +293,7 @@ public class MemcachedFailoverIntegrationTest {
         // we must get the same session back
         final Response response2 = get( _httpClient, _portTomcat1, sid2 );
         assertEquals( response2.getSessionId(), sid2, "We should keep the sessionId." );
-        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( sid2 )[0], "The session should exist in memcached." );
+        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( key( sid2 ) )[0], "The session should exist in memcached." );
         assertEquals( response2.get( paramKey ), paramValue, "The session should still contain the previously stored value." );
 
     }

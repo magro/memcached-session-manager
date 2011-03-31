@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
@@ -83,11 +84,13 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
 import org.apache.naming.NamingContext;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 
 import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.CacheImpl;
+import com.thimbleware.jmemcached.Key;
 import com.thimbleware.jmemcached.LocalCacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap;
@@ -349,7 +352,7 @@ public class TestUtils {
 
     public static MemCacheDaemon<? extends CacheElement> createDaemon( final InetSocketAddress address ) throws IOException {
         final MemCacheDaemon<LocalCacheElement> daemon = new MemCacheDaemon<LocalCacheElement>();
-        final ConcurrentLinkedHashMap<String, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(
+        final ConcurrentLinkedHashMap<Key, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(
                 EvictionPolicy.LRU, 100000, 1024*1024 );
         daemon.setCache( new CacheImpl( cacheStorage ) );
         daemon.setAddr( address );
@@ -696,6 +699,11 @@ public class TestUtils {
                 { SessionAffinityMode.STICKY },
                 { SessionAffinityMode.NON_STICKY }
         };
+    }
+
+    @Nonnull
+    public static Key key( @Nonnull final String value ) {
+        return new Key( ChannelBuffers.wrappedBuffer( value.getBytes() ) );
     }
 
 }
