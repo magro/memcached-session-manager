@@ -130,6 +130,20 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private String _requestUriIgnorePattern;
 
     /**
+     * The pattern used for including session attributes to a session-backup,
+     *  e.g. <code>^(userName|sessionHistory)$</code>. If not set, all session
+     *  attributes will be part of the session-backup.
+     */
+    private String _sessionAttributeFilter = null;
+
+    /**
+     * The compiled pattern used for including session attributes to a session-backup,
+     *  e.g. <code>^(userName|sessionHistory)$</code>. If not set, all session
+     *  attributes will be part of the session-backup.
+     */
+    private Pattern _sessionAttributePattern = null;
+
+    /**
      * Specifies if the session shall be stored asynchronously in memcached as
      * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
@@ -1164,6 +1178,51 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setRequestUriIgnorePattern( final String requestUriIgnorePattern ) {
         _requestUriIgnorePattern = requestUriIgnorePattern;
+    }
+
+    /**
+     * Return the compiled pattern used for including session attributes to a session-backup.
+     *
+     * @return the _sessionAttributePattern
+     */
+    @CheckForNull
+    Pattern getSessionAttributePattern() {
+        return _sessionAttributePattern;
+    }
+
+    /**
+     * Return the string pattern used for including session attributes to a session-backup.
+     *
+     * @return the _sessionAttributeFilter
+     */
+    @CheckForNull
+    public String getSessionAttributeFilter() {
+        return _sessionAttributeFilter;
+    }
+
+    /**
+     * Set the pattern used for including session attributes to a session-backup.
+     * If not set, all session attributes will be part of the session-backup.
+     * <p>
+     * E.g. <code>^(userName|sessionHistory)$</code>
+     * </p>
+     *
+     * @param sessionAttributeFilter
+     *            the sessionAttributeNames to set
+     */
+    public void setSessionAttributeFilter( final @Nullable String sessionAttributeFilter ) {
+        if (sessionAttributeFilter == null || sessionAttributeFilter.trim().equals("") ) {
+            _sessionAttributeFilter = null;
+        }
+        else {
+            _sessionAttributeFilter = sessionAttributeFilter;
+        }
+        if (_sessionAttributeFilter == null) {
+            _sessionAttributePattern = null;
+        }
+        else {
+            _sessionAttributePattern = Pattern.compile(_sessionAttributeFilter);
+        }     
     }
 
     /**
