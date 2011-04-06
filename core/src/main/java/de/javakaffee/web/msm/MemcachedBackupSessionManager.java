@@ -130,14 +130,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *  e.g. <code>^(userName|sessionHistory)$</code>. If not set, all session
      *  attributes will be part of the session-backup.
      */
-    private String _sessionAttributeFilter;
+    private String _sessionAttributeFilter = null;
 
     /**
      * The compiled pattern used for including session attributes to a session-backup,
      *  e.g. <code>^(userName|sessionHistory)$</code>. If not set, all session
      *  attributes will be part of the session-backup.
      */
-    private Pattern _sessionAttributePattern;
+    private Pattern _sessionAttributePattern = null;
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
@@ -1171,10 +1171,21 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * Return the compiled pattern used for including session attributes to a session-backup.
      *
-     * @return the sessionAttributePattern
+     * @return the _sessionAttributePattern
      */
+    @CheckForNull
     Pattern getSessionAttributePattern() {
         return _sessionAttributePattern;
+    }
+
+    /**
+     * Return the string pattern used for including session attributes to a session-backup.
+     *
+     * @return the _sessionAttributeFilter
+     */
+    @CheckForNull
+    public String getSessionAttributeFilter() {
+        return _sessionAttributeFilter;
     }
 
     /**
@@ -1187,8 +1198,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param sessionAttributeFilter
      *            the sessionAttributeNames to set
      */
-    public void setSessionAttributeFilter( final String sessionAttributeFilter ) {
-        if (sessionAttributeFilter.equals("")) {
+    public void setSessionAttributeFilter( final @Nullable String sessionAttributeFilter ) {
+        if (sessionAttributeFilter == null || sessionAttributeFilter.trim().equals("") ) {
             _sessionAttributeFilter = null;
         }
         else {

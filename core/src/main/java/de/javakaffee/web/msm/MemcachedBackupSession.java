@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nonnull;
+
 import org.apache.catalina.Manager;
 import org.apache.catalina.SessionListener;
 import org.apache.catalina.session.StandardSession;
@@ -162,7 +164,7 @@ public final class MemcachedBackupSession extends StandardSession {
      *
      * @return true if the name matches
      */
-    private boolean filterAttribute(String name) {
+    private boolean filterAttribute( final String name ) {
         if ( this.manager == null ) {
             throw new IllegalStateException( "There's no manager set." );
         }
@@ -178,7 +180,8 @@ public final class MemcachedBackupSession extends StandardSession {
      *
      * @return the filtered attribute map
      */
-    private Map<String, Object> filterAttributes(Map<String, Object> map) {
+    @Nonnull
+    private Map<String, Object> filterAttributes( @Nonnull final Map<String, Object> map ) {
         if ( this.manager == null ) {
             throw new IllegalStateException( "There's no manager set." );
         }
@@ -186,10 +189,10 @@ public final class MemcachedBackupSession extends StandardSession {
         if ( pattern == null ) {
             return map;
         }
-        HashMap<String, Object> result = new HashMap<String, Object>(map.size());
-        for (String name: map.keySet()) {
-            if (pattern.matcher(name).matches()) {
-                result.put(name, map.get(name));
+        Map<String, Object> result = new HashMap<String, Object>(map.size());
+        for (Map.Entry<String, Object> entry: map.entrySet()) {
+            if (pattern.matcher(entry.getKey()).matches()) {
+                result.put(entry.getKey(), entry.getValue());
             }
         }
         return result;
@@ -480,6 +483,10 @@ public final class MemcachedBackupSession extends StandardSession {
     }
 
     public Map<String, Object> getAttributesInternal() {
+        return super.attributes;
+    }
+
+    public Map<String, Object> getAttributesFiltered() {
         return filterAttributes(super.attributes);
     }
 
