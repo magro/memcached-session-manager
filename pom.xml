@@ -1,0 +1,236 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>de.javakaffee.web.msm</groupId>
+	<artifactId>memcached-session-manager-parent</artifactId>
+	<version>1.4.2-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>memcached-session-manager maven parent</name>
+	<description>
+    A tomcat session manager that provides session failover / session replication using memcached (or a memcached compatible store). It supports both sticky and non-sticky sessions.
+    </description>
+	<url>http://code.google.com/p/memcached-session-manager/</url>
+
+	<issueManagement>
+		<system>code.google.com</system>
+		<url>http://code.google.com/p/memcached-session-manager/issues</url>
+	</issueManagement>
+	<inceptionYear>2009</inceptionYear>
+	<prerequisites>
+		<maven>2.0.9</maven>
+	</prerequisites>
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+	<scm>
+		<connection>scm:git:git@github.com:magro/memcached-session-manager.git</connection>
+		<developerConnection>scm:git:git@github.com:magro/memcached-session-manager.git</developerConnection>
+		<url>scm:git:git@github.com:magro/memcached-session-manager.git</url>
+	</scm>
+	<developers>
+		<developer>
+			<id>martin.grotzke</id>
+			<name>Martin Grotzke</name>
+			<email>martin.grotzke@googlecode.com</email>
+			<roles>
+				<role>owner</role>
+				<role>developer</role>
+			</roles>
+			<timezone>+1</timezone>
+		</developer>
+	</developers>
+
+	<modules>
+		<module>core</module>
+		<module>kryo-serializer</module>
+		<module>javolution-serializer</module>
+		<module>xstream-serializer</module>
+		<module>serializer-benchmark</module>
+	</modules>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<inherited>true</inherited>
+					<configuration>
+						<source>1.6</source>
+						<target>1.6</target>
+						<encoding>utf-8</encoding>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-eclipse-plugin</artifactId>
+					<version>2.8</version>
+					<configuration>
+						<additionalBuildcommands>
+							<buildCommand>
+								<name>com.atlassw.tools.eclipse.checkstyle.CheckstyleBuilder</name>
+							</buildCommand>
+						</additionalBuildcommands>
+						<additionalProjectnatures>
+							<projectnature>com.atlassw.tools.eclipse.checkstyle.CheckstyleNature</projectnature>
+						</additionalProjectnatures>
+						<additionalConfig>
+							<file>
+								<name>.checkstyle</name>
+								<location>../etc/checkstyle-checks.xml</location>
+							</file>
+						</additionalConfig>
+						<downloadSources>true</downloadSources>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+
+	<properties>
+		<tomcat-version>7.0.6</tomcat-version>
+		<slf4j-version>1.5.8</slf4j-version>
+		<hibernate-core-version>3.3.2.GA</hibernate-core-version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>${slf4j-version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-simple</artifactId>
+				<version>${slf4j-version}</version>
+				<scope>test</scope>
+			</dependency>
+			<!-- dependency> <groupId>org.slf4j</groupId> <artifactId>slf4j</artifactId> 
+				<version>${slf4j-version}</version> </dependency -->
+			<!-- Testing -->
+			<dependency>
+				<groupId>com.thimbleware.jmemcached</groupId>
+				<artifactId>jmemcached-core</artifactId>
+				<version>1.0.0</version>
+				<scope>test</scope>
+				<exclusions>
+					<exclusion>
+						<groupId>org.slf4j</groupId>
+						<artifactId>slf4j</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.jboss.netty</groupId>
+						<artifactId>netty</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.jboss.netty</groupId>
+				<artifactId>netty</artifactId>
+				<version>3.2.4.Final</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.httpcomponents</groupId>
+				<artifactId>httpclient</artifactId>
+				<version>4.1-alpha1</version>
+				<scope>test</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.google.code.findbugs</groupId>
+			<artifactId>jsr305</artifactId>
+			<version>1.3.9</version>
+		</dependency>
+
+		<!-- Testing -->
+		<dependency>
+			<groupId>org.testng</groupId>
+			<artifactId>testng</artifactId>
+			<version>5.10</version>
+			<classifier>jdk15</classifier>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>1.8.1</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.thimbleware.jmemcached</groupId>
+			<artifactId>jmemcached-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.jboss.netty</groupId>
+			<artifactId>netty</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- For abstract hibernate test -->
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-core</artifactId>
+			<version>3.3.2.GA</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-annotations</artifactId>
+			<version>3.4.0.GA</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>${slf4j-version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>javassist</groupId>
+			<artifactId>javassist</artifactId>
+			<version>3.11.0.GA</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>hsqldb</groupId>
+			<artifactId>hsqldb</artifactId>
+			<version>1.8.0.10</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<repositories>
+
+		<!-- for javolution -->
+		<!-- repository> <id>spy</id> <name>Spy Repository</name> <url>http://bleu.west.spy.net/~dustin/m2repo/</url> 
+			</repository -->
+		<repository>
+			<id>jmemcached</id>
+			<name>jmemcached Repository</name>
+			<url>http://thimbleware.com/maven</url>
+		</repository>
+		<repository>
+			<id>jboss</id>
+			<name>jboss Repository</name>
+			<url>http://repository.jboss.org/nexus/content/groups/public</url>
+		</repository>
+	</repositories>
+
+</project>

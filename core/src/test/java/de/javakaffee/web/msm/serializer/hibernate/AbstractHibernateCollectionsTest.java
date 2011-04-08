@@ -31,6 +31,8 @@ import javax.persistence.OneToMany;
 
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.loader.WebappLoader;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 import org.hibernate.Criteria;
 import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
@@ -40,8 +42,6 @@ import org.hibernate.Transaction;
 import org.hibernate.annotations.AccessType;
 import org.hibernate.cfg.AnnotationConfiguration;
 import org.hibernate.criterion.Restrictions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -59,7 +59,7 @@ import de.javakaffee.web.msm.integration.TestUtils;
  */
 public abstract class AbstractHibernateCollectionsTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger( AbstractHibernateCollectionsTest.class );
+    private static final Log LOG = LogFactory.getLog( AbstractHibernateCollectionsTest.class );
 
     private SessionFactory _sessionFactory;
 

@@ -17,6 +17,8 @@
 package de.javakaffee.web.msm.serializer.javolution;
 
 import static de.javakaffee.web.msm.serializer.javolution.TestClasses.createPerson;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -45,10 +47,8 @@ import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.session.StandardSession;
 import org.apache.commons.lang.mutable.MutableInt;
-import org.jmock.Mock;
-import org.jmock.cglib.MockObjectTestCase;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -65,37 +65,35 @@ import de.javakaffee.web.msm.serializer.javolution.TestClasses.HolderList;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.MyContainer;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.MyXMLSerializable;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person;
-import de.javakaffee.web.msm.serializer.javolution.TestClasses.SomeInterface;
 import de.javakaffee.web.msm.serializer.javolution.TestClasses.Person.Gender;
+import de.javakaffee.web.msm.serializer.javolution.TestClasses.SomeInterface;
 
 /**
  * Test for {@link JavolutionTranscoder}
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class JavolutionTranscoderTest extends MockObjectTestCase {
+public class JavolutionTranscoderTest {
 
     private MemcachedBackupSessionManager _manager;
     private JavolutionTranscoder _transcoder;
 
-    @BeforeTest
-    protected void beforeTest() {
+    @BeforeClass
+    public void beforeTest() {
         _manager = new MemcachedBackupSessionManager();
 
         final StandardContext container = new StandardContext();
         _manager.setContainer( container );
 
-        final Mock webappLoaderControl = mock( WebappLoader.class );
-        final WebappLoader webappLoader = (WebappLoader) webappLoaderControl.proxy();
-        webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
-        webappLoaderControl.expects( atLeastOnce() ).method( "getClassLoader" ).will(
-                returnValue( Thread.currentThread().getContextClassLoader() ) );
+        final WebappLoader webappLoader = mock( WebappLoader.class );
+        when( webappLoader.getClassLoader() ).thenReturn( Thread.currentThread().getContextClassLoader() );
         Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
         _manager.getContainer().setLoader( webappLoader );
 
         Assert.assertNotNull( _manager.getContainer().getLoader().getClassLoader(), "Classloader is null." );
 
         _transcoder = new JavolutionTranscoder( _manager, true );
+
     }
 
     @Test( enabled = true )
