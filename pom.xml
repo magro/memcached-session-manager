@@ -219,8 +219,11 @@
 	<repositories>
 
 		<!-- for javolution -->
-		<!-- repository> <id>spy</id> <name>Spy Repository</name> <url>http://bleu.west.spy.net/~dustin/m2repo/</url> 
-			</repository -->
+		<repository>
+			<id>spy</id>
+			<name>Spy Repository</name>
+			<url>http://bleu.west.spy.net/~dustin/m2repo/</url>
+		</repository>
 		<repository>
 			<id>jmemcached</id>
 			<name>jmemcached Repository</name>
