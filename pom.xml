@@ -94,7 +94,7 @@
 	</build>
 
 	<properties>
-		<tomcat-version>7.0.6</tomcat-version>
+		<tomcat-version>6.0.28</tomcat-version>
 		<slf4j-version>1.5.8</slf4j-version>
 		<hibernate-core-version>3.3.2.GA</hibernate-core-version>
 	</properties>
@@ -218,7 +218,12 @@
 
 	<repositories>
 
-		<!-- for javolution -->
+		<!-- msm maven repo with custom javolution jar and kryo jars -->
+        <repository>
+            <id>msm</id>
+            <name>msm repository</name>
+            <url>http://memcached-session-manager.googlecode.com/svn/maven</url>
+        </repository>
 		<repository>
 			<id>spy</id>
 			<name>Spy Repository</name>
