@@ -20,6 +20,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Currency;
 import java.util.HashMap;
@@ -51,9 +52,9 @@ import sun.reflect.ReflectionFactory;
  * are checked for contained xml elements and in this case the values are
  * written to the object.
  * </p>
- * 
+ *
  * @param <T> the type that is read/written by this {@link XMLFormat}.
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class ReflectionFormat<T> extends XMLFormat<T> {
@@ -71,7 +72,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
 
     /**
      * Creates a new instance for the provided class.
-     * 
+     *
      * @param clazz
      *            the Class that is supported by this {@link XMLFormat}.
      * @param classLoader
@@ -413,6 +414,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         }
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings( "REC_CATCH_EXCEPTION" )
     private void setFieldFromAttribute( final T obj, final Field field, final javolution.xml.XMLFormat.InputElement input ) {
 
         try {
@@ -442,7 +444,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
                 final String value = input.getAttribute( fieldName, (String) null );
                 if ( value != null ) {
                     @SuppressWarnings( "unchecked" )
-                    final Enum enumValue = Enum.valueOf( fieldType.asSubclass( Enum.class ), value );
+                    final Enum<?> enumValue = Enum.valueOf( fieldType.asSubclass( Enum.class ), value );
                     field.set( obj, enumValue );
                 }
             } else {
@@ -489,47 +491,47 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             }
         }
     }
-    
+
     private String getAttribute( final InputElement input, final String name, final String defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? value.toString() : defaultValue;
     }
-    
+
     private Boolean getAttribute( final InputElement input, final String name, final Boolean defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Boolean.valueOf( value.toBoolean() ) : defaultValue;
     }
-    
+
     private Integer getAttribute( final InputElement input, final String name, final Integer defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Integer.valueOf( value.toInt() ) : defaultValue;
     }
-    
+
     private Long getAttribute( final InputElement input, final String name, final Long defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Long.valueOf( value.toLong() ) : defaultValue;
     }
-    
+
     private Short getAttribute( final InputElement input, final String name, final Short defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Short.valueOf( TypeFormat.parseShort( value ) ) : defaultValue;
     }
-    
+
     private Float getAttribute( final InputElement input, final String name, final Float defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Float.valueOf( value.toFloat() ) : defaultValue;
     }
-    
+
     private Double getAttribute( final InputElement input, final String name, final Double defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Double.valueOf( value.toDouble() ) : defaultValue;
     }
-    
+
     private Byte getAttribute( final InputElement input, final String name, final Byte defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         return value != null ? Byte.valueOf( TypeFormat.parseByte( value ) ) : defaultValue;
     }
-    
+
     private Character getAttribute( final InputElement input, final String name, final Character defaultValue ) throws XMLStreamException {
         final CharArray value = input.getAttribute( name );
         if ( value != null ) {
@@ -544,7 +546,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
     /**
      * Used to determine, if the given class can be serialized using the
      * {@link XMLNumberFormat}.
-     * 
+     *
      * @param clazz
      *            the class that is to be checked
      * @return
@@ -580,12 +582,12 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
             throw new RuntimeException( e );
         }
         throw new IllegalArgumentException( "No suitable constructor found for class " + clazz.getName() + ".\n"
-                + "Available constructors: " + clazz.getConstructors() );
+                + "Available constructors: " + Arrays.toString( clazz.getConstructors() ) );
     }
 
     /**
      * The base class for number formats.
-     * 
+     *
      * @param <T>
      *            the number type.
      */
@@ -602,7 +604,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
          * Creates a new instance from the associated constructor. The provided
          * class is ignored, just the provided {@link InputElement} is used to
          * read the value which will be passed to the constructor.
-         * 
+         *
          * @param clazz
          *            can be null for this {@link XMLFormat} implementation
          * @param xml
@@ -619,7 +621,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
          * provided {@link InputElement} is used to read the value from the
          * attribute with the provided name. The value read will be passed to
          * the constructor of the object to create.
-         * 
+         *
          * @param xml
          *            the input element for the object to create.
          * @param name
@@ -641,7 +643,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         /**
          * Does not perform anything, as the number is already created in
          * {@link #newInstance(Class, javolution.xml.XMLFormat.InputElement)}.
-         * 
+         *
          * @param xml
          *            the input element
          * @param the
