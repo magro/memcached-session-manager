@@ -231,8 +231,7 @@ public class LRUCache<K, V> {
      * @param <E>
      * @param <V>
      */
-    private static class ArrayList<E, V> extends AbstractList<E> implements RandomAccess, java.io.Serializable {
-        private static final long serialVersionUID = -2764017481108945198L;
+    private static class ArrayList<E, V> extends AbstractList<E> implements RandomAccess {
         private final Entry<E, ManagedItem<V>>[] a;
 
         ArrayList( final Entry<E, ManagedItem<V>>[] array ) {

@@ -28,6 +28,9 @@ import javax.annotation.Nonnull;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
+import edu.umd.cs.findbugs.annotations.CheckForNull;
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
+
 /**
  * An LRUCache that supports a maximum number of cache entries and a time to
  * live for them. The TTL is measured from insertion time to access time.
@@ -85,6 +88,8 @@ public class NodeAvailabilityCache<K> {
      * @return the previous value associated with the specified key, or null if
      *         there was no mapping for the key
      */
+    @CheckForNull
+    @SuppressWarnings( "NP_BOOLEAN_RETURN_NULL" )
     public Boolean setNodeAvailable( final K key, final boolean available ) {
         final ManagedItem<Boolean> item = _map.get( key );
         final Boolean availableObj = Boolean.valueOf( available );

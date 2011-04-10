@@ -69,6 +69,7 @@ import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 /**
  * Integration test testing non-sticky sessions.
  *
@@ -420,6 +421,7 @@ public class NonStickySessionsIntegrationTest {
      * tomcat when the request is finished.
      */
     @Test( enabled = true )
+    @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
     public void testNonStickySessionIsStoredInSecondaryMemcachedForBackup() throws IOException, InterruptedException, HttpException {
 
         getManager( _tomcat1 ).setMaxInactiveInterval( 1 );

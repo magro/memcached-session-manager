@@ -98,6 +98,7 @@ import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap.EvictionP
 
 import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 
 /**
  * Integration test utils.
@@ -391,6 +392,7 @@ public class TestUtils {
         return createCatalina( port, sessionTimeout, memcachedNodes, null, null, DEFAULT_TRANSCODER_FACTORY );
     }
 
+    @SuppressWarnings( "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" )
     public static Embedded createCatalina( final int port, final int sessionTimeout, final String memcachedNodes, final String jvmRoute,
             final LoginType loginType,
             final String transcoderFactoryClassName ) throws MalformedURLException,
@@ -669,7 +671,7 @@ public class TestUtils {
 
         final Map<T,T> result = new HashMap<T,T>();
         for ( int i = 0; i < keysAndValues.length; i++ ) {
-            if ( i % 2 == 1 ) {
+            if ( ( i & 1 ) == 1 ) {
                 result.put( keysAndValues[i - 1], keysAndValues[i] );
             }
         }

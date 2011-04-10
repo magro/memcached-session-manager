@@ -77,20 +77,21 @@ public final class MemcachedBackupSession extends StandardSession {
     /*
      * Stores, if the sessions expiration is just being updated in memcached
      */
-    private volatile transient boolean _expirationUpdateRunning;
+    private transient volatile boolean _expirationUpdateRunning;
 
     /*
      * Stores, if the sessions is just being backuped
      */
-    private volatile transient boolean _backupRunning;
+    private transient volatile boolean _backupRunning;
 
     private transient boolean _authenticationChanged;
 
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings( "SE_TRANSIENT_FIELD_NOT_RESTORED" )
     private transient boolean _attributesAccessed;
 
     private transient boolean _sessionIdChanged;
     private transient boolean _sticky;
-    private volatile transient LockStatus _lockStatus;
+    private transient volatile LockStatus _lockStatus;
 
     /**
      * Creates a new instance without a given manager. This has to be

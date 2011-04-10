@@ -138,7 +138,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
 
         // Serialize the attribute count and the Serializable attributes
         final int n = saveNames.size();
-        oos.writeObject( new Integer( n ) );
+        oos.writeObject( Integer.valueOf( n ) );
         for ( int i = 0; i < n; i++ ) {
             oos.writeObject( saveNames.get( i ) );
             try {
