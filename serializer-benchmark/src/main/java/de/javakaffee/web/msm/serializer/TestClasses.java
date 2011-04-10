@@ -86,10 +86,6 @@ public class TestClasses {
         return result;
     }
 
-    static Container createContainer( final String bodyContent ) {
-        return new Container( bodyContent );
-    }
-
     static SomeInterface createProxy() {
         return (SomeInterface) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
                 new Class<?>[] { SomeInterface.class, Serializable.class },
@@ -162,21 +158,6 @@ public class TestClasses {
 
         public Runtime getRuntime() {
             return _runtime;
-        }
-
-    }
-
-    public static class Container {
-
-        private final Body _body;
-
-        public Container( final String bodyContent ) {
-            _body = new Body();
-            _body.someContent = bodyContent;
-        }
-
-        class Body {
-            String someContent;
         }
 
     }
@@ -628,13 +609,13 @@ public class TestClasses {
             _String = "42";
             _StringBuffer = new StringBuffer( "foo" );
             _StringBuilder = new StringBuilder( "foo" );
-            _Long = new Long( 42 );
-            _Integer = new Integer( 42 );
-            _Character = new Character( 'c' );
-            _Byte = new Byte( "b".getBytes()[0] );
-            _Double = new Double( 42d );
-            _Float = new Float( 42f );
-            _Short = new Short( (short) 42 );
+            _Long = Long.valueOf( 42 );
+            _Integer = Integer.valueOf( 42 );
+            _Character = Character.valueOf( 'c' );
+            _Byte = Byte.valueOf( "b".getBytes()[0] );
+            _Double = Double.valueOf( 42d );
+            _Float = Float.valueOf( 42f );
+            _Short = Short.valueOf( (short) 42 );
             _BigDecimal = new BigDecimal( 42 );
             _AtomicInteger = new AtomicInteger( 42 );
             _AtomicLong = new AtomicLong( 42 );
@@ -885,60 +866,6 @@ public class TestClasses {
 
         public Map<String, Integer> getHashMap() {
             return _HashMap;
-        }
-
-    }
-
-    static class Holder<T> {
-        T item;
-
-        public Holder( final T item ) {
-            this.item = item;
-        }
-    }
-
-    static class HolderList<T> {
-        List<Holder<T>> holders;
-
-        public HolderList( final List<Holder<T>> holders ) {
-            this.holders = holders;
-        }
-    }
-
-    static class CounterHolder {
-        AtomicInteger item;
-
-        public CounterHolder( final AtomicInteger item ) {
-            this.item = item;
-        }
-    }
-
-    static class CounterHolderArray {
-        CounterHolder[] holders;
-
-        public CounterHolderArray( final CounterHolder... holders ) {
-            this.holders = holders;
-        }
-    }
-
-    static class HolderArray<T> {
-        Holder<T>[] holders;
-
-        public HolderArray( final Holder<T>... holders ) {
-            this.holders = holders;
-        }
-    }
-
-    public static class HashMapWithIntConstructorOnly extends HashMap<Object, Object> {
-
-        private static final long serialVersionUID = 1L;
-
-        @SuppressWarnings( "unused" )
-        private HashMapWithIntConstructorOnly() {
-        }
-
-        public HashMapWithIntConstructorOnly( final int size ) {
-            super( size );
         }
 
     }
