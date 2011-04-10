@@ -436,6 +436,10 @@ public class MemcachedFailoverIntegrationTest {
         " " + toString( _nodeId2, _address2 );
         restartTomcat( memcachedNodes1, _nodeId2 );
 
+        /* wait until everything's up and running...
+         */
+        Thread.sleep( 200 );
+
         final Response response1 = get( _httpClient, _portTomcat1, null );
         final String sessionId1 = response1.getSessionId();
         assertNotNull( sessionId1 );
