@@ -241,12 +241,15 @@ public class MemcachedFailoverIntegrationTest {
 
         getManager( _tomcat1 ).setSticky( false );
 
+        // we had a situation where no session was created, so let's take some break so that everything's up again
+        Thread.sleep( 200 );
+
         final String paramKey = "foo";
         final String paramValue = "bar";
         final String sid1 = post( _httpClient, _portTomcat1, null, paramKey, paramValue ).getResponseSessionId();
-        assertNotNull( "No session created.", sid1 );
+        assertNotNull( sid1, "No session created." );
         final String firstNode = extractNodeId( sid1 );
-        assertNotNull( "No node id encoded in session id.", firstNode );
+        assertNotNull( firstNode, "No node id encoded in session id." );
 
         /* shutdown other nodes
          */
@@ -468,6 +471,11 @@ public class MemcachedFailoverIntegrationTest {
         /* set failover nodes n2 and n3
          */
         getManager( _tomcat1 ).setFailoverNodes( _nodeId2 + " " + _nodeId3 );
+
+        /* wait for changes...
+         */
+        Thread.sleep( 200 );
+
         final Response response1 = get( _httpClient, _portTomcat1, null );
         final String sessionId1 = response1.getSessionId();
         assertNotNull( sessionId1 );
@@ -476,6 +484,11 @@ public class MemcachedFailoverIntegrationTest {
         /* set failover nodes n1 and n2
          */
         getManager( _tomcat1 ).setFailoverNodes( _nodeId1 + " " + _nodeId2 );
+
+        /* wait for changes...
+         */
+        Thread.sleep( 200 );
+
         // we need to use another http client, otherwise there's no response cookie.
         final Response response2 = get( new DefaultHttpClient(), _portTomcat1, null );
         final String sessionId2 = response2.getSessionId();

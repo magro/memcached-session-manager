@@ -431,7 +431,7 @@ public class NonStickySessionsIntegrationTest {
         assertNotNull( sessionId1 );
 
         // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
-        waitForMemcachedClient( 15 );
+        waitForMemcachedClient( 100 );
 
         final SessionIdFormat fmt = new SessionIdFormat();
 
@@ -462,7 +462,7 @@ public class NonStickySessionsIntegrationTest {
             assertNotNull( sessionId1 );
 
             // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
-            waitForMemcachedClient( 15 );
+            waitForMemcachedClient( 100 );
 
             // 2 for session and validity, if backup would be stored this would be 4 instead
             assertEquals( _daemon1.getCache().getSetCmds(), 2 );
