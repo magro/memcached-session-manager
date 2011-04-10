@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -256,11 +257,9 @@ public class BackupSessionTask implements Callable<BackupResult> {
         private final byte[] _data;
         private final byte[] _attributesData;
         public BackupResult( @Nonnull final BackupResultStatus status ) {
-            _status = status;
-            _data = null;
-            _attributesData = null;
+            this( status, null, null );
         }
-        public BackupResult( @Nonnull final BackupResultStatus status, @Nonnull final byte[] data, @Nonnull final byte[] attributesData ) {
+        public BackupResult( @Nonnull final BackupResultStatus status, @Nullable final byte[] data, @Nullable final byte[] attributesData ) {
             _status = status;
             _data = data;
             _attributesData = attributesData;
@@ -295,6 +294,8 @@ public class BackupSessionTask implements Callable<BackupResult> {
             return _attributesData;
         }
         /**
+         * Specifies if the backup was performed successfully.
+         *
          * @return <code>true</code> if the status is {@link BackupResultStatus#SUCCESS},
          * otherwise <code>false</code>.
          */
