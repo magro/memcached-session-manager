@@ -31,9 +31,9 @@ import java.util.Currency;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javolution.lang.Reflection;
@@ -73,13 +73,13 @@ public class ReflectionBinding extends XMLBinding {
 
     private final Map<Class<?>, XMLFormat<?>> _formats = new ConcurrentHashMap<Class<?>, XMLFormat<?>>();
 
-    private final ClassLoader _classLoader;
-    private final XMLEnumFormat _enumFormat;
-    private final XMLArrayFormat _arrayFormat;
-    private final XMLCollectionFormat _collectionFormat;
-    private final XMLMapFormat _mapFormat;
-    private final XMLJdkProxyFormat _jdkProxyFormat;
-    private final CustomXMLFormat<?>[] _customFormats;
+    private transient final ClassLoader _classLoader;
+    private transient final XMLEnumFormat _enumFormat;
+    private transient final XMLArrayFormat _arrayFormat;
+    private transient final XMLCollectionFormat _collectionFormat;
+    private transient final XMLMapFormat _mapFormat;
+    private transient final XMLJdkProxyFormat _jdkProxyFormat;
+    private transient final CustomXMLFormat<?>[] _customFormats;
 
     public ReflectionBinding( final ClassLoader classLoader ) {
         this( classLoader, false );
