@@ -455,14 +455,18 @@ public class NonStickySessionsIntegrationTest {
      * Test for issue #79: In non-sticky sessions mode with only a single memcached the backup is done in the primary node.
      */
     @Test( enabled = true )
-    public void testNoBackupWhenRunningASingleMemcachedOnly() throws IOException, HttpException {
+    public void testNoBackupWhenRunningASingleMemcachedOnly() throws IOException, HttpException, InterruptedException {
         getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+
+        // let's take some break so that everything's up again
+        Thread.sleep( 200 );
+
         try {
             final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
             assertNotNull( sessionId1 );
 
-            // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
-            waitForMemcachedClient( 100 );
+            // the memcached client writes async, so it's ok to wait a little bit (especially on windows) (or on cloudbees jenkins)
+            waitForMemcachedClient( 200 );
 
             // 2 for session and validity, if backup would be stored this would be 4 instead
             assertEquals( _daemon1.getCache().getSetCmds(), 2 );
