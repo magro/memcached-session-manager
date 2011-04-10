@@ -148,10 +148,13 @@ public class MemcachedFailoverIntegrationTest {
 
         getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
+        // we had a situation where no session was created, so let's take some break so that everything's up again
+        Thread.sleep( 200 );
+
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
-        assertNotNull( "No session created.", sid1 );
+        assertNotNull( sid1, "No session created." );
         final String firstNode = extractNodeId( sid1 );
-        assertNotNull( "No node id encoded in session id.", firstNode );
+        assertNotNull( firstNode, "No node id encoded in session id." );
 
         final FailoverInfo info = getFailoverInfo( firstNode );
         info.activeNode.stop();
@@ -190,12 +193,15 @@ public class MemcachedFailoverIntegrationTest {
 
         getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
 
+        // we had a situation where no session was created, so let's take some break so that everything's up again
+        Thread.sleep( 200 );
+
         final String paramKey = "foo";
         final String paramValue = "bar";
         final String sid1 = post( _httpClient, _portTomcat1, null, paramKey, paramValue ).getResponseSessionId();
-        assertNotNull( "No session created.", sid1 );
+        assertNotNull( sid1, "No session created." );
         final String firstNode = extractNodeId( sid1 );
-        assertNotNull( "No node id encoded in session id.", firstNode );
+        assertNotNull( firstNode, "No node id encoded in session id." );
 
         /* shutdown active and another memcached node
          */
@@ -352,14 +358,20 @@ public class MemcachedFailoverIntegrationTest {
 
         getManager( _tomcat1 ).setSticky( true );
 
+        // we had a situation where no session was created, so let's take some break so that everything's up again
+        Thread.sleep( 200 );
+
         final String sid1 = makeRequest( _httpClient, _portTomcat1, null );
-        assertNotNull( "No session created.", sid1 );
+        assertNotNull( sid1, "No session created." );
 
         /* shutdown all memcached nodes
          */
         _daemon1.stop();
         _daemon2.stop();
         _daemon3.stop();
+
+        // wait a little bit
+        Thread.sleep( 200 );
 
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
 
@@ -373,9 +385,12 @@ public class MemcachedFailoverIntegrationTest {
     }
 
     @Test( enabled = true )
-    public void testCookieNotSetWhenAllMemcachedsDownIssue40() throws IOException, HttpException {
+    public void testCookieNotSetWhenAllMemcachedsDownIssue40() throws IOException, HttpException, InterruptedException {
 
         getManager( _tomcat1 ).setSticky( true );
+
+        // we had a situation where no session was created, so let's take some break so that everything's up again
+        Thread.sleep( 200 );
 
         /* shutdown all memcached nodes
          */
@@ -429,6 +444,9 @@ public class MemcachedFailoverIntegrationTest {
     public void testReconfigureMemcachedNodesAtRuntimeFeature46( final SessionAffinityMode sessionAffinity ) throws Exception {
 
         getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
+        // we had a situation where no session was created, so let's take some break so that everything's up again
+        Thread.sleep( 200 );
 
         /* reconfigure tomcat with only two memcached nodes
          */
