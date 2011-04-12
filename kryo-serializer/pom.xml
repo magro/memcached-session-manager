@@ -48,6 +48,13 @@
 			<version>1.6.2</version>
 			<optional>true</optional>
 		</dependency>
+		<!-- jsf2 reference impl, mojarra -->
+		<dependency>
+			<groupId>com.sun.faces</groupId>
+			<artifactId>jsf-impl</artifactId>
+			<version>2.1.0</version>
+			<optional>true</optional>
+		</dependency>
 
 		<!-- use msm core test classes in tests -->
 		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
@@ -60,7 +67,13 @@
 		</dependency>
 	</dependencies>
 
-	<build>
-	</build>
+	<repositories>
+		<!-- Maven 2 Repository for mojarra JSF 2.0 and Later -->
+		<repository>
+			<id>java.net</id>
+			<name>java.net</name>
+			<url>http://download.java.net/maven/2</url>
+		</repository>
+	</repositories>
 
 </project>
