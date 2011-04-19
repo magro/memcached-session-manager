@@ -228,7 +228,10 @@ public abstract class LockingStrategy {
                     System.currentTimeMillis() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            _memcached.set( validityKey, expiration, validityData );
+            final Future<Boolean> validityResult = _memcached.set( validityKey, expiration, validityData );
+            if ( !_manager.isSessionBackupAsync() ) {
+                validityResult.get( _manager.getSessionBackupTimeout(), TimeUnit.MILLISECONDS );
+            }
 
             /*
              * - ping session
@@ -273,7 +276,15 @@ public abstract class LockingStrategy {
             final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            _memcached.set( validityKey, expiration, validityData );
+            final Future<Boolean> validityResult = _memcached.set( validityKey, expiration, validityData );
+            if ( !_manager.isSessionBackupAsync() ) {
+                // TODO: together with session backup wait not longer than sessionBackupTimeout.
+                // Details: Now/here we're waiting the whole session backup timeout, even if (perhaps) some time
+                // was spent before when waiting for session backup result.
+                // For sync session backup it would be better to set both the session data and
+                // validity info and afterwards wait for both results (but in sum no longer than sessionBackupTimeout)
+                validityResult.get( _manager.getSessionBackupTimeout(), TimeUnit.MILLISECONDS );
+            }
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Stored session validity info for session " + session.getIdInternal() );
             }

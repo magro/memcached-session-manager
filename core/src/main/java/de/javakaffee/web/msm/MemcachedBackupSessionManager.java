@@ -1593,6 +1593,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
+     * Specifies if the session shall be stored asynchronously in memcached as
+     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * false, the timeout from {@link #getSessionBackupTimeout()} is
+     * evaluated.
+     */
+    public boolean isSessionBackupAsync() {
+        return _sessionBackupAsync;
+    }
+
+    /**
      * The timeout in milliseconds after that a session backup is considered as
      * beeing failed.
      * <p>
@@ -1607,6 +1617,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public void setSessionBackupTimeout( final int sessionBackupTimeout ) {
         _sessionBackupTimeout = sessionBackupTimeout;
+    }
+
+    /**
+     * The timeout in milliseconds after that a session backup is considered as
+     * beeing failed when {@link #getSessionBackupAsync()}) is <code>false</code>.
+     */
+    public long getSessionBackupTimeout() {
+        return _sessionBackupTimeout;
     }
 
     // ----------------------- protected getters/setters for testing ------------------
