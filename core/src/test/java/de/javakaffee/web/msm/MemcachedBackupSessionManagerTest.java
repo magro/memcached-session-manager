@@ -21,11 +21,11 @@ import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyMap;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -41,6 +41,7 @@ import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.loader.WebappLoader;
+import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -70,6 +71,7 @@ public class MemcachedBackupSessionManagerTest {
 
         final StandardContext container = new StandardContext();
         container.setPath( "/" );
+        container.setBackgroundProcessorDelay( 1 ); // needed for test of updateExpiration
         final StandardHost host = new StandardHost();
         host.setParent( new StandardEngine() );
         container.setParent( host );
@@ -358,14 +360,14 @@ public class MemcachedBackupSessionManagerTest {
         when( _memcachedMock.add(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
 
         _manager.backupSession( sessionId, false, null ).get();
-        
+
         // update validity info
         verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
 
         // As the backup is done asynchronously, we shutdown the executor so that we know the backup
         // task is executed/finished.
         _manager.getLockingStrategy().getExecutorService().shutdown();
-        
+
         // On windows we need to wait a little bit so that the tasks _really_ have finished (not needed on linux)
         Thread.sleep(15);
 
@@ -379,6 +381,98 @@ public class MemcachedBackupSessionManagerTest {
         // update validity backup
         final String backupValidityKey = new SessionIdFormat().createBackupKey( validityKey );
         verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any() );
+    }
+
+    /**
+     * Tests sessionAttributeFilter attribute: when excluded attributes are accessed/put the session should
+     * not be marked as touched.
+     */
+    @SuppressWarnings( "unchecked" )
+    @Test
+    public void testOnlyHashAttributesOfAccessedFilteredAttributes() throws InterruptedException, ExecutionException {
+
+        final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
+        _manager.setTranscoderService( transcoderServiceMock );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        _manager.setSessionAttributeFilter( "^(foo|bar)$" );
+
+        session.setAttribute( "baz", "baz" );
+
+        session.access();
+        session.endAccess();
+
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
+
+        verify( transcoderServiceMock, never() ).serializeAttributes( (MemcachedBackupSession)any(), anyMap() );
+
+    }
+
+    /**
+     * Tests sessionAttributeFilter attribute: only filtered/allowed attributes must be serialized.
+     */
+    @SuppressWarnings( { "unchecked", "rawtypes" } )
+    @Test
+    public void testOnlyFilteredAttributesAreIncludedInSessionBackup() throws InterruptedException, ExecutionException {
+
+        final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
+        final Map<String, Object> anyMap = any( Map.class );
+        when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
+        _manager.setTranscoderService( transcoderServiceMock );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        _manager.setSessionAttributeFilter( "^(foo|bar)$" );
+
+        session.setAttribute( "foo", "foo" );
+        session.setAttribute( "bar", "bar" );
+        session.setAttribute( "baz", "baz" );
+
+        _manager.backupSession( session.getIdInternal(), false, null ).get();
+
+        // capture the supplied argument, alternatively we could have used some Matcher (but there seems to be no MapMatcher).
+        final ArgumentCaptor<Map> model = ArgumentCaptor.forClass( Map.class );
+        verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), model.capture() );
+
+        // the serialized attributes must only contain allowed ones
+        assertTrue( model.getValue().containsKey( "foo" ) );
+        assertTrue( model.getValue().containsKey( "bar" ) );
+        assertFalse( model.getValue().containsKey( "baz" ) );
+
+    }
+
+    /**
+     * Tests sessionAttributeFilter attribute: only filtered/allowed attributes must be serialized in updateExpirationInMemcached.
+     */
+    @SuppressWarnings( { "unchecked", "rawtypes" } )
+    @Test
+    public void testOnlyFilteredAttributesAreIncludedDuringUpdateExpiration() throws InterruptedException, ExecutionException {
+
+        final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
+        final Map<String, Object> anyMap = any( Map.class );
+        when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
+        _manager.setTranscoderService( transcoderServiceMock );
+
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+        _manager.setSessionAttributeFilter( "^(foo|bar)$" );
+
+        session.setAttribute( "foo", "foo" );
+        session.setAttribute( "bar", "bar" );
+        session.setAttribute( "baz", "baz" );
+
+        session.access();
+        session.endAccess();
+
+        _manager.updateExpirationInMemcached();
+
+        // capture the supplied argument, alternatively we could have used some Matcher (but there seems to be no MapMatcher).
+        final ArgumentCaptor<Map> model = ArgumentCaptor.forClass( Map.class );
+        verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), model.capture() );
+
+        // the serialized attributes must only contain allowed ones
+        assertTrue( model.getValue().containsKey( "foo" ) );
+        assertTrue( model.getValue().containsKey( "bar" ) );
+        assertFalse( model.getValue().containsKey( "baz" ) );
+
     }
 
 }

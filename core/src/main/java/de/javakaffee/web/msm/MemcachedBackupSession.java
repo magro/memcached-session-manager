@@ -20,10 +20,9 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-
-import javax.annotation.Nonnull;
 
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
@@ -160,7 +159,7 @@ public final class MemcachedBackupSession extends StandardSession {
     }
 
     /**
-     * Check whether the given attribute name matches our name pattern.
+     * Check whether the given attribute name matches our name pattern and shall be stored in memcached.
      *
      * @return true if the name matches
      */
@@ -168,36 +167,13 @@ public final class MemcachedBackupSession extends StandardSession {
         if ( this.manager == null ) {
             throw new IllegalStateException( "There's no manager set." );
         }
-        Pattern pattern = ((MemcachedBackupSessionManager)manager).getSessionAttributePattern();
+        final Pattern pattern = ((MemcachedBackupSessionManager)manager).getSessionAttributePattern();
         if ( pattern == null ) {
             return true;
         }
         return pattern.matcher(name).matches();
     }
-    
-    /**
-     * Filter map of attributes using our name pattern.
-     *
-     * @return the filtered attribute map
-     */
-    @Nonnull
-    private Map<String, Object> filterAttributes( @Nonnull final Map<String, Object> map ) {
-        if ( this.manager == null ) {
-            throw new IllegalStateException( "There's no manager set." );
-        }
-        Pattern pattern = ((MemcachedBackupSessionManager)manager).getSessionAttributePattern();
-        if ( pattern == null ) {
-            return map;
-        }
-        Map<String, Object> result = new HashMap<String, Object>(map.size());
-        for (Map.Entry<String, Object> entry: map.entrySet()) {
-            if (pattern.matcher(entry.getKey()).matches()) {
-                result.put(entry.getKey(), entry.getValue());
-            }
-        }
-        return result;
-    }
-    
+
     /**
      * Calculates the expiration time that must be sent to memcached,
      * based on the sessions maxInactiveInterval and the time the session
@@ -500,8 +476,27 @@ public final class MemcachedBackupSession extends StandardSession {
         return super.attributes;
     }
 
+    /**
+     * Filter map of attributes using our name pattern.
+     *
+     * @return the filtered attribute map that only includes attributes that shall be stored in memcached.
+     */
+    @SuppressWarnings( "unchecked" )
     public Map<String, Object> getAttributesFiltered() {
-        return filterAttributes(super.attributes);
+        if ( this.manager == null ) {
+            throw new IllegalStateException( "There's no manager set." );
+        }
+        final Pattern pattern = ((MemcachedBackupSessionManager)manager).getSessionAttributePattern();
+        if ( pattern == null ) {
+            return super.attributes;
+        }
+        final Map<String, Object> result = new ConcurrentHashMap<String, Object>( super.attributes.size() );
+        for ( final Map.Entry<String, Object> entry: (Set<Map.Entry<String, Object>>)super.attributes.entrySet() ) {
+            if ( pattern.matcher(entry.getKey()).matches() ) {
+                result.put( entry.getKey(), entry.getValue() );
+            }
+        }
+        return result;
     }
 
     void setAttributesInternal( final Map<String, Object> attributes ) {

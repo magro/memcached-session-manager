@@ -1183,7 +1183,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * Return the compiled pattern used for including session attributes to a session-backup.
      *
-     * @return the _sessionAttributePattern
+     * @return the sessionAttributePattern
      */
     @CheckForNull
     Pattern getSessionAttributePattern() {
@@ -1193,7 +1193,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     /**
      * Return the string pattern used for including session attributes to a session-backup.
      *
-     * @return the _sessionAttributeFilter
+     * @return the sessionAttributeFilter
      */
     @CheckForNull
     public String getSessionAttributeFilter() {
@@ -1210,19 +1210,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param sessionAttributeFilter
      *            the sessionAttributeNames to set
      */
-    public void setSessionAttributeFilter( final @Nullable String sessionAttributeFilter ) {
-        if (sessionAttributeFilter == null || sessionAttributeFilter.trim().equals("") ) {
+    public void setSessionAttributeFilter( @Nullable final String sessionAttributeFilter ) {
+        if ( sessionAttributeFilter == null || sessionAttributeFilter.trim().equals("") ) {
             _sessionAttributeFilter = null;
-        }
-        else {
-            _sessionAttributeFilter = sessionAttributeFilter;
-        }
-        if (_sessionAttributeFilter == null) {
             _sessionAttributePattern = null;
         }
         else {
-            _sessionAttributePattern = Pattern.compile(_sessionAttributeFilter);
-        }     
+            _sessionAttributeFilter = sessionAttributeFilter;
+            _sessionAttributePattern = Pattern.compile( sessionAttributeFilter );
+        }
     }
 
     /**
@@ -1436,6 +1432,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( _sticky ) {
             setLockingMode( null, null, false );
             return;
+        }
+
+        if ( _sessionAttributeFilter != null ) {
+            _log.warn( "There's a sessionAttributesFilter configured ('" + _sessionAttributeFilter + "')," +
+                    " all other session attributes will be lost after the request due to non-sticky configuration!" );
         }
 
         Pattern uriPattern = null;

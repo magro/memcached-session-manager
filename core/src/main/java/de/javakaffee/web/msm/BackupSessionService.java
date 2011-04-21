@@ -130,7 +130,7 @@ public class BackupSessionService {
         session.setExpirationUpdateRunning( true );
         session.setLastBackupTime( System.currentTimeMillis() );
         try {
-            final Map<String, Object> attributes = session.getAttributesInternal();
+            final Map<String, Object> attributes = session.getAttributesFiltered();
             final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
             final byte[] data = _transcoderService.serialize( session, attributesData );
             createBackupSessionTask( session, true ).doBackupSession( session, data, attributesData );

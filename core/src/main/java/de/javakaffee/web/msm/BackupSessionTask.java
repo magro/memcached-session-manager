@@ -107,8 +107,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
 
             final long startBackup = System.currentTimeMillis();
 
-            final Map<String, Object> attributes = _session.getAttributesInternal();
-
+            final Map<String, Object> attributes = _session.getAttributesFiltered();
             final byte[] attributesData = serializeAttributes( _session, attributes );
             final int hashCode = Arrays.hashCode( attributesData );
             final BackupResult result;
