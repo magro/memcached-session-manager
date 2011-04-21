@@ -100,7 +100,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
     public Future<BackupResult> backupSession( final Session session, final boolean sessionIdChanged, final String requestURI ) {
         _log.info( "Serializing session data for session " + session.getIdInternal() );
         final long startSerialization = System.currentTimeMillis();
-        final byte[] data = _transcoderService.serializeAttributes( (MemcachedBackupSession) session, ((MemcachedBackupSession) session).getAttributesInternal() );
+        final byte[] data = _transcoderService.serializeAttributes( (MemcachedBackupSession) session, ((MemcachedBackupSession) session).getAttributesFiltered() );
         _log.info( String.format( "Serializing %1$,.3f kb session data for session %2$s took %3$d ms.",
                 (double)data.length / 1000, session.getIdInternal(), System.currentTimeMillis() - startSerialization ) );
         _sessionData.put( session.getIdInternal(), data );
