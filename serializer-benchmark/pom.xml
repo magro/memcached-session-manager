@@ -17,7 +17,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>de.javakaffee.web.msm</groupId>
-			<artifactId>memcached-session-manager-tc7</artifactId>
+			<artifactId>memcached-session-manager</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

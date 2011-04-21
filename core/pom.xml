@@ -9,7 +9,7 @@
 	</parent>
 
 	<groupId>de.javakaffee.web.msm</groupId>
-	<artifactId>memcached-session-manager-tc7</artifactId>
+	<artifactId>memcached-session-manager</artifactId>
 	<version>1.4.2-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager core</name>
@@ -86,6 +86,7 @@
 	</dependencies>
 
 	<build>
+		<finalName>${artifactId}-tc7-${version}</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
