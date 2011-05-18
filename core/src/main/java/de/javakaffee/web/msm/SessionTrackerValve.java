@@ -17,7 +17,6 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -29,7 +28,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
 import org.apache.catalina.Context;
-import org.apache.catalina.Globals;
 import org.apache.catalina.Session;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -46,17 +44,17 @@ import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-class SessionTrackerValve extends ValveBase {
+abstract class SessionTrackerValve extends ValveBase {
 
     static final String RELOCATE = "session.relocate";
 
-    private final Log _log = LogFactory.getLog( MemcachedBackupSessionManager.class );
+    protected final Log _log = LogFactory.getLog( SessionTrackerValve.class );
 
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
     private final Statistics _statistics;
     private final AtomicBoolean _enabled;
-    private final String _sessionCookieName;
+    protected final String _sessionCookieName;
     private @CheckForNull LockingStrategy _lockingStrategy;
 
     /**
@@ -91,32 +89,13 @@ class SessionTrackerValve extends ValveBase {
         _sessionCookieName = getSessionCookieName( context );
     }
 
-    private String getSessionCookieName( final Context context ) {
-        String result = getSessionCookieNameFromContext( context );
-        if ( result == null ) {
-            result = Globals.SESSION_COOKIE_NAME;
-            _log.debug( "Using session cookie name from context: " + result );
-        }
-        return result;
-    }
-
-    protected String getSessionCookieNameFromContext( final Context context ) {
-        // since 6.0.27 the session cookie name, domain and path is configurable per context,
-        // see issue http://issues.apache.org/bugzilla/show_bug.cgi?id=48379
-        try {
-            final Method getSessionCookieName = Context.class.getDeclaredMethod( "getSessionCookieName" );
-            final String result = (String) getSessionCookieName.invoke( context );
-            if ( result != null ) {
-                _log.debug( "Using session cookie name from context: " + result );
-            }
-            return result;
-        } catch( final NoSuchMethodException e ) {
-            // the context does not provide the method getSessionCookieName
-        } catch ( final Exception e ) {
-            throw new RuntimeException( "Could not read session cookie name from context.", e );
-        }
-        return null;
-    }
+    /**
+     * Must return the configured session cookie name.
+     * @param context the context that might provide the session cookie name configuration.
+     * @return the session cookie name.
+     */
+    @Nonnull
+    protected abstract String getSessionCookieName( final Context context );
 
     /**
      * Returns the actually used name for the session cookie.
@@ -160,7 +139,7 @@ class SessionTrackerValve extends ValveBase {
 
     }
 
-    private void logDebugRequestSessionCookie( final Request request ) {
+    protected void logDebugRequestSessionCookie( final Request request ) {
         final Cookie[] cookies = request.getCookies();
         if ( cookies == null ) {
             return;

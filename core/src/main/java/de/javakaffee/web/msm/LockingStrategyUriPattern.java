@@ -25,7 +25,7 @@ import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.connector.Request;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
 
 /**
  * This locking strategy locks requests matching a configured uri pattern.
@@ -36,7 +36,7 @@ public class LockingStrategyUriPattern extends LockingStrategy {
 
     private final Pattern _uriPattern;
 
-    public LockingStrategyUriPattern( @Nonnull final MemcachedBackupSessionManager manager,
+    public LockingStrategyUriPattern( @Nonnull final MemcachedSessionService manager,
             @Nonnull final Pattern uriPattern,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,

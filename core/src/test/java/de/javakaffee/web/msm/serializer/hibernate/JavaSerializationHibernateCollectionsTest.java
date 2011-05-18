@@ -19,7 +19,7 @@ package de.javakaffee.web.msm.serializer.hibernate;
 import org.testng.annotations.Test;
 
 import de.javakaffee.web.msm.JavaSerializationTranscoder;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 
 /**
@@ -32,9 +32,8 @@ import de.javakaffee.web.msm.SessionAttributesTranscoder;
 public class JavaSerializationHibernateCollectionsTest extends AbstractHibernateCollectionsTest {
 
     @Override
-    protected SessionAttributesTranscoder createTranscoder( final MemcachedBackupSessionManager manager ) {
+    protected SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
         return new JavaSerializationTranscoder( manager );
     }
-
 
 }

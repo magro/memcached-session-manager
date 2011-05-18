@@ -18,6 +18,8 @@ package de.javakaffee.web.msm;
 
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+
 /**
  * This factory is used to create a {@link net.spy.memcached.transcoders.Transcoder}
  * to serialize/deserialize sessions to/from memcached. Implementations need to provide
@@ -35,7 +37,7 @@ public interface TranscoderFactory {
      *            the manager that needs to be set on deserialized sessions.
      * @return an implementation of {@link SessionAttributesTranscoder}.
      */
-    SessionAttributesTranscoder createTranscoder( Manager manager );
+    SessionAttributesTranscoder createTranscoder( SessionManager manager );
 
     /**
      * Create a {@link SessionTranscoder} that can be used to deserialize

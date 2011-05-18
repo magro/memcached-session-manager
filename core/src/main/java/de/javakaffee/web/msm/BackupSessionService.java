@@ -163,7 +163,7 @@ public class BackupSessionService {
      *            session id was changed due to a memcached failover or tomcat failover.
      * @return a {@link Future} providing the result of the backup task.
      *
-     * @see MemcachedBackupSessionManager#setSessionBackupAsync(boolean)
+     * @see MemcachedSessionService#setSessionBackupAsync(boolean)
      * @see BackupSessionTask#call()
      */
     public Future<BackupResult> backupSession( final MemcachedBackupSession session, final boolean force ) {

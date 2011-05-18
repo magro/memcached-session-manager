@@ -37,7 +37,7 @@ import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 public final class MemcachedBackupSessionJBW3 extends MemcachedBackupSession {
 
     private static final long serialVersionUID = -8459531033748538547L;
-    
+
     private int _thisAccessedTimeFromLastBackupCheck;
 
     /**
@@ -58,6 +58,21 @@ public final class MemcachedBackupSessionJBW3 extends MemcachedBackupSession {
      */
     public MemcachedBackupSessionJBW3( final SessionManager manager ) {
         super( manager );
+    }
+    
+    @Override
+    public long getThisAccessedTimeInternal() {
+        return thisAccessedTime;
+    }
+    
+    @Override
+    void setThisAccessedTimeInternal( final long thisAccessedTime ) {
+        this.thisAccessedTime = (int) thisAccessedTime;
+    }
+
+    @Override
+    void setLastAccessedTimeInternal( final long lastAccessedTime ) {
+        this.lastAccessedTime = (int) (lastAccessedTime - creationTime);
     }
 
     /**
@@ -102,12 +117,12 @@ public final class MemcachedBackupSessionJBW3 extends MemcachedBackupSession {
      */
     @Override
     boolean wasAccessedSinceLastBackup() {
-        return super.creationTime + super.thisAccessedTime > _lastBackupTime;
+        return creationTime + thisAccessedTime > _lastBackupTime;
     }
 
     @Override
     void storeThisAccessedTimeFromLastBackupCheck() {
-        _thisAccessedTimeFromLastBackupCheck = super.thisAccessedTime;
+        _thisAccessedTimeFromLastBackupCheck = thisAccessedTime;
     }
 
     /**
@@ -119,7 +134,7 @@ public final class MemcachedBackupSessionJBW3 extends MemcachedBackupSession {
      */
     @Override
     boolean wasAccessedSinceLastBackupCheck() {
-        return _thisAccessedTimeFromLastBackupCheck != super.thisAccessedTime;
+        return _thisAccessedTimeFromLastBackupCheck != thisAccessedTime;
     }
 
 }

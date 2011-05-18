@@ -47,7 +47,7 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.CacheElement;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
@@ -57,7 +57,7 @@ import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class MemcachedFailoverIntegrationTest {
+public abstract class MemcachedFailoverIntegrationTest {
 
     private static final Log LOG = LogFactory
             .getLog( MemcachedFailoverIntegrationTest.class );
@@ -107,7 +107,7 @@ public class MemcachedFailoverIntegrationTest {
             final String memcachedNodes = toString( _nodeId1, _address1 ) +
                 " " + toString( _nodeId2, _address2 ) +
                 " " + toString( _nodeId3, _address3 );
-            _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
+            _tomcat1 = getTestUtils().createCatalina( _portTomcat1, 10, memcachedNodes );
             getManager( _tomcat1 ).setSticky( true );
             _tomcat1.start();
         } catch( final Throwable e ) {
@@ -117,6 +117,8 @@ public class MemcachedFailoverIntegrationTest {
 
         _httpClient = new DefaultHttpClient();
     }
+    
+    abstract TestUtils getTestUtils();
 
     private String toString( final String nodeId, final InetSocketAddress address ) {
         return nodeId + ":" + address.getHostName() + ":" + address.getPort();
@@ -227,7 +229,8 @@ public class MemcachedFailoverIntegrationTest {
         // we must get the same session back
         final Response response2 = get( _httpClient, _portTomcat1, sid2 );
         assertEquals( response2.getSessionId(), sid2, "We should keep the sessionId." );
-        assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( key( sid2 ) )[0], "The session should exist in memcached." );
+        final MemCacheDaemon<?> activeNode = getFailoverInfo( secondNode ).activeNode;
+        assertNotNull( activeNode.getCache().get( key( sid2 ) )[0], "The session should exist in memcached." );
         assertEquals( response2.get( paramKey ), paramValue, "The session should still contain the previously stored value." );
 
         // some more checks in sticky mode
@@ -276,7 +279,7 @@ public class MemcachedFailoverIntegrationTest {
          */
         LOG.info( "-------------- starting next node..." );
         info.nextNode().getValue().start();
-        waitForReconnect( getManager( _tomcat1 ), info.nextNode().getValue(), 5000 );
+        waitForReconnect( getManager( _tomcat1 ).getMemcachedSessionService(), info.nextNode().getValue(), 5000 );
         assertEquals( get( _httpClient, _portTomcat1, sid1 ).getSessionId(), sid1 );
         Thread.sleep( 300 ); // wait for the async processes to complete / be cancelleds
 
@@ -307,13 +310,13 @@ public class MemcachedFailoverIntegrationTest {
 
     }
 
-    private void waitForReconnect( final MemcachedBackupSessionManager manager, final MemCacheDaemon<?> value, final long timeToWait ) throws InterruptedException {
+    private void waitForReconnect( final MemcachedSessionService service, final MemCacheDaemon<?> value, final long timeToWait ) throws InterruptedException {
         MemcachedClient client;
         InetSocketAddress serverAddress;
         try {
-            final Method m = MemcachedBackupSessionManager.class.getDeclaredMethod( "getMemcached" );
+            final Method m = MemcachedSessionService.class.getDeclaredMethod( "getMemcached" );
             m.setAccessible( true );
-            client = (MemcachedClient) m.invoke( manager );
+            client = (MemcachedClient) m.invoke( service );
 
             final Field field = MemCacheDaemon.class.getDeclaredField( "addr" );
             field.setAccessible( true );
@@ -522,7 +525,7 @@ public class MemcachedFailoverIntegrationTest {
     private void restartTomcat( final String memcachedNodes, final String failoverNodes ) throws Exception {
         _tomcat1.stop();
         Thread.sleep( 500 );
-        _tomcat1 = createCatalina( _portTomcat1, 10, memcachedNodes );
+        _tomcat1 = getTestUtils().createCatalina( _portTomcat1, 10, memcachedNodes );
         getManager( _tomcat1 ).setFailoverNodes( failoverNodes );
         _tomcat1.start();
     }

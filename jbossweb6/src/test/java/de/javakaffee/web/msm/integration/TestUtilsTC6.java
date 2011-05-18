@@ -28,10 +28,10 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -41,9 +41,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.management.relation.Role;
-import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
 import javax.servlet.http.HttpSessionEvent;
 
@@ -52,8 +49,8 @@ import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Realm;
 import org.apache.catalina.Valve;
-import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
@@ -63,6 +60,9 @@ import org.apache.catalina.core.StandardService;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
 import org.apache.catalina.deploy.SecurityConstraint;
+import org.apache.catalina.realm.GenericPrincipal;
+import org.apache.catalina.realm.RealmBase;
+import org.apache.catalina.startup.ContextConfig;
 import org.apache.catalina.startup.Embedded;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
@@ -75,7 +75,6 @@ import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -83,7 +82,6 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
 import org.jboss.netty.buffer.ChannelBuffers;
-import org.omg.CosNaming.NamingContext;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 
@@ -107,11 +105,16 @@ import edu.umd.cs.findbugs.annotations.SuppressWarnings;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC6 {
+public class TestUtilsTC6 extends TestUtils {
 
     @Override
     protected SessionManager createSessionManager() {
         return new MemcachedBackupSessionManager();
+    }
+    
+    @Override
+    protected Context createContext( final Embedded catalina, final String contextPath, final String docBase ) {
+        return catalina.createContext( CONTEXT_PATH, "webapp", new ContextConfig() );
     }
 
     private static final String CONTEXT_PATH = "/";
@@ -150,28 +153,6 @@ public class TestUtilsTC6 {
         response.getEntity().consumeContent();
 
         return responseSessionId == null ? rsessionId : responseSessionId;
-    }
-
-    public static Response get( final DefaultHttpClient client, final int port, final String rsessionId )
-        throws IOException, HttpException {
-        return get( client, port, null, rsessionId );
-    }
-
-    public static Response get( final DefaultHttpClient client, final int port, final String rsessionId,
-            final Credentials credentials )
-        throws IOException, HttpException {
-        return get( client, port, null, rsessionId, null, null, credentials );
-    }
-
-    public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId ) throws IOException,
-            HttpException {
-        return get( client, port, path, rsessionId, null, null, null );
-    }
-
-    public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
-            final Map<String, String> params ) throws IOException,
-            HttpException {
-        return get( client, port, path, rsessionId, null, params, null );
     }
 
     public static Response get( final DefaultHttpClient client, final int port, final String path, final String rsessionId,
@@ -268,75 +249,6 @@ public class TestUtilsTC6 {
         return new Response( responseSessionId == null ? rsessionId : responseSessionId, responseSessionId, keyValues );
     }
 
-    public static Response post( final DefaultHttpClient client,
-            final int port,
-            final String rsessionId,
-            final String paramName,
-            final String paramValue ) throws IOException, HttpException {
-        final Map<String, String> params = new HashMap<String, String>();
-        params.put( paramName, paramValue );
-        return post( client, port, null, rsessionId, params );
-    }
-
-    public static Response post( final DefaultHttpClient client,
-            final int port,
-            final String path,
-            final String rsessionId,
-            final Map<String, String> params ) throws IOException, HttpException {
-        return post( client, port, path, rsessionId, params, null );
-    }
-
-    public static Response post( final DefaultHttpClient client,
-            final int port,
-            final String path,
-            final String rsessionId,
-            final Map<String, String> params,
-            @Nullable final Credentials credentials ) throws IOException, HttpException {
-        // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
-        final String baseUri = "http://"+ DEFAULT_HOST +":"+ port;
-        final String url = getUrl( port, path );
-        final HttpPost method = new HttpPost( url );
-        if ( rsessionId != null ) {
-            method.setHeader( "Cookie", "JSESSIONID=" + rsessionId );
-        }
-
-        method.setEntity( createFormEntity( params ) );
-
-        // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
-        //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
-        final HttpResponse response = credentials == null
-            ? client.execute( method )
-            : executeRequestWithAuth( client, method, credentials );
-
-        final int statusCode = response.getStatusLine().getStatusCode();
-        if ( statusCode == 302 ) {
-            return redirect( response, client, port, rsessionId, baseUri );
-        }
-
-        if ( statusCode != 200 ) {
-            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() );
-        }
-
-        return readResponse( rsessionId, response );
-    }
-
-    private static Response redirect( final HttpResponse response, final DefaultHttpClient client, final int port,
-            final String rsessionId, final String baseUri ) throws IOException, HttpException {
-        final String location = response.getFirstHeader( "Location" ).getValue();
-        if ( !location.startsWith( baseUri ) ) {
-            throw new RuntimeException( "There's s.th. wrong, the location header should start with the base URI " + baseUri +
-                    ". The location header: " + location );
-        }
-        /* consume content so that the connection can be released
-         */
-        response.getEntity().consumeContent();
-
-        /* redirect
-         */
-        final String redirectPath = location.substring( baseUri.length(), location.length() );
-        return get( client, port, redirectPath, rsessionId );
-    }
-
     private static UrlEncodedFormEntity createFormEntity( final Map<String, String> params ) throws UnsupportedEncodingException {
         final List<NameValuePair> parameters = new ArrayList <NameValuePair>();
         for( final Map.Entry<String, String> param : params.entrySet() ) {
@@ -364,15 +276,15 @@ public class TestUtilsTC6 {
 
         final StandardContext context = new StandardContext();
         context.setPath( "/" );
-        context.setSessionCookiePath( "/" );
+        // context.setSessionCookiePath( "/" );
 
-        final WebappLoader webappLoader = new WebappLoader() {
-            @Override
-            public ClassLoader getClassLoader() {
-                return Thread.currentThread().getContextClassLoader();
-            }
-        };
-        context.setLoader( webappLoader );
+//        final WebappLoader webappLoader = new WebappLoader() {
+//            @Override
+//            public ClassLoader getClassLoader() {
+//                return Thread.currentThread().getContextClassLoader();
+//            }
+//        };
+//        context.setLoader( webappLoader );
 
         final StandardHost host = new StandardHost();
         engine.addChild( host );
@@ -391,6 +303,7 @@ public class TestUtilsTC6 {
         return daemon;
     }
 
+    @Override
     public Embedded createCatalina( final int port, final String memcachedNodes ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
         return createCatalina( port, 1, memcachedNodes );
@@ -399,27 +312,6 @@ public class TestUtilsTC6 {
     public Embedded createCatalina( final int port, final String memcachedNodes, final LoginType loginType ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
         return createCatalina( port, 1, memcachedNodes, null, loginType, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, null, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute,
-            final String transcoderFactoryClassName ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, null, transcoderFactoryClassName );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute, final LoginType loginType ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, loginType, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    public Embedded createCatalina( final int port, final int sessionTimeout, final String memcachedNodes ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, sessionTimeout, memcachedNodes, null, null, DEFAULT_TRANSCODER_FACTORY );
     }
 
     @SuppressWarnings( "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" )
@@ -431,19 +323,20 @@ public class TestUtilsTC6 {
         final Embedded catalina = new Embedded();
 
         final StandardServer server = new StandardServer();
-        catalina.setServer( server );
+        server.addService( catalina );
 
-        try {
-            final NamingContext globalNamingContext = new NamingContext( new Hashtable<String, Object>(), "ctxt" );
-            server.setGlobalNamingContext( globalNamingContext );
-            globalNamingContext.bind( USER_DATABASE, createUserDatabase() );
-        } catch ( final NamingException e ) {
-            throw new RuntimeException( e );
-        }
+//        try {
+//            final NamingContext globalNamingContext = new NamingContext( new Hashtable<String, Object>(), "ctxt" );
+//            server.setGlobalNamingContext( globalNamingContext );
+//            globalNamingContext.bind( USER_DATABASE, createUserDatabase() );
+//        } catch ( final NamingException e ) {
+//            throw new RuntimeException( e );
+//        }
 
         final Engine engine = catalina.createEngine();
         catalina.addEngine( engine );
         engine.setService( catalina );
+        catalina.setName( engine.getName() ); // needed for jbossweb / lookup in MapperListener
 
         /* we must have a unique name for mbeans
          */
@@ -451,8 +344,25 @@ public class TestUtilsTC6 {
         engine.setDefaultHost( DEFAULT_HOST );
         engine.setJvmRoute( jvmRoute );
 
-        final UserDatabaseRealm realm = new UserDatabaseRealm();
-        realm.setResourceName( USER_DATABASE );
+//        final UserDatabaseRealm realm = new UserDatabaseRealm();
+//        realm.setResourceName( USER_DATABASE );
+        final Realm realm = new RealmBase(){
+
+            @Override
+            protected String getName() {
+                return null;
+            }
+
+            @Override
+            protected String getPassword( final String username ) {
+                return PASSWORD;
+            }
+
+            @Override
+            protected Principal getPrincipal( final String username ) {
+                return new GenericPrincipal( this, USER_NAME, PASSWORD );
+            }
+        };
         engine.setRealm( realm );
 
         final URL root = new URL( TestUtils.class.getResource( "/" ), "../test-classes" );
@@ -465,7 +375,7 @@ public class TestUtilsTC6 {
         engine.addChild( host );
         new File( docBase ).mkdirs();
 
-        final Context context = catalina.createContext( CONTEXT_PATH, "webapp" );
+        final Context context = catalina.createContext( CONTEXT_PATH, "webapp", new ContextConfig() );
         host.addChild( context );
 
         final SessionManager sessionManager = createSessionManager();
@@ -515,13 +425,35 @@ public class TestUtilsTC6 {
         BASIC, FORM
     }
 
-    private static MemoryUserDatabase createUserDatabase() {
-        final MemoryUserDatabase userDatabase = new MemoryUserDatabase();
-        final Role role = userDatabase.createRole( ROLE_NAME, "the role for unit tests" );
-        final User user = userDatabase.createUser( USER_NAME, PASSWORD, "the user for unit tests" );
-        user.addRole( role );
-        return userDatabase;
-    }
+//    @Override
+//    protected UserDatabase createUserDatabase() {
+//        return new UserDatabase() {
+//            
+//            @Override
+//            public void setUserConfig( final UserConfig userConfig ) {
+//            }
+//            
+//            @Override
+//            public Enumeration getUsers() {
+//                return new Hashtable<String, String>().keys(); // ( Arrays.asList( "USER_NAME" ) );
+//            }
+//            
+//            @Override
+//            public UserConfig getUserConfig() {
+//                return null;
+//            }
+//            
+//            @Override
+//            public String getHome( final String user ) {
+//                return null;
+//            }
+//        };
+////        final MemoryUserDatabase userDatabase = new MemoryUserDatabase();
+////        final Role role = userDatabase.createRole( ROLE_NAME, "the role for unit tests" );
+////        final User user = userDatabase.createUser( USER_NAME, PASSWORD, "the user for unit tests" );
+////        user.addRole( role );
+////        return userDatabase;
+//    }
 
     public static SessionManager getManager( final Embedded tomcat ) {
         return (SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
@@ -532,9 +464,9 @@ public class TestUtilsTC6 {
         final Host host = (Host)engine.findChild( DEFAULT_HOST );
         final Container context = host.findChild( CONTEXT_PATH );
         final Valve first = context.getPipeline().getFirst();
-        if ( first instanceof AuthenticatorBase ) {
-            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( false );
-        }
+//        if ( first instanceof AuthenticatorBase ) {
+//            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( false );
+//        }
     }
 
     /**

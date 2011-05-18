@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.NodeIdList;
 import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
@@ -59,7 +59,7 @@ import de.javakaffee.web.msm.integration.TestUtils.Response;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class TomcatFailoverIntegrationTest {
+public abstract class TomcatFailoverIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( TomcatFailoverIntegrationTest.class );
 
@@ -104,13 +104,15 @@ public class TomcatFailoverIntegrationTest {
 
         _httpClient = new DefaultHttpClient();
     }
+    
+    abstract TestUtils getTestUtils();
 
     private Embedded startTomcat( final int port, final String jvmRoute ) throws MalformedURLException, UnknownHostException, LifecycleException {
         return startTomcat( port, jvmRoute, null );
     }
 
     private Embedded startTomcat( final int port, final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = createCatalina( port, MEMCACHED_NODES, jvmRoute, loginType );
+        final Embedded tomcat = getTestUtils().createCatalina( port, MEMCACHED_NODES, jvmRoute, loginType );
         tomcat.start();
         getManager( tomcat ).setSticky( true );
         return tomcat;
@@ -132,8 +134,8 @@ public class TomcatFailoverIntegrationTest {
      */
     @Test( enabled = true )
     public void testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute() throws Exception {
-        final MemcachedBackupSessionManager manager1 = getManager( _tomcat1 );
-        final MemcachedBackupSessionManager manager2 = getManager( _tomcat2 );
+        final SessionManager manager1 = getManager( _tomcat1 );
+        final SessionManager manager2 = getManager( _tomcat2 );
 
         final SessionIdFormat format = new SessionIdFormat();
 
@@ -172,8 +174,8 @@ public class TomcatFailoverIntegrationTest {
         _tomcat1 = startTomcat( TC_PORT_1, null );
         _tomcat2 = startTomcat( TC_PORT_2, null );
 
-        final MemcachedBackupSessionManager manager1 = getManager( _tomcat1 );
-        final MemcachedBackupSessionManager manager2 = getManager( _tomcat2 );
+        final SessionManager manager1 = getManager( _tomcat1 );
+        final SessionManager manager2 = getManager( _tomcat2 );
 
         final SessionIdFormat format = new SessionIdFormat();
 

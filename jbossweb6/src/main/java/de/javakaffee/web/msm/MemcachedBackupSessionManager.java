@@ -218,6 +218,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public Session createSession( final String sessionId ) {
         return _msm.createSession( sessionId );
     }
+    
+    @Override
+    public MemcachedBackupSession newMemcachedBackupSession() {
+        return new MemcachedBackupSessionJBW3( this );
+    }
 
     /**
      * {@inheritDoc}
@@ -227,14 +232,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         final MemcachedBackupSessionJBW3 result = new MemcachedBackupSessionJBW3( this );
         result.setSticky( _msm.isSticky() );
         return result;
-    }
-
-    @Override
-    public void changeSessionId( final Session session ) {
-        // e.g. invoked by the AuthenticatorBase (for BASIC auth) on login to prevent session fixation
-        // so that session backup won't be omitted we must store this event
-        super.changeSessionId( session );
-        ((MemcachedBackupSessionJBW3)session).setSessionIdChanged( true );
     }
 
     /**

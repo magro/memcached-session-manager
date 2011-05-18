@@ -30,7 +30,7 @@ import org.apache.catalina.connector.Request;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
@@ -44,7 +44,7 @@ public class LockingStrategyAuto extends LockingStrategy {
     private final ExecutorService _requestPatternDetectionExecutor;
     private final ReadOnlyRequestsCache _readOnlyRequestCache;
 
-    public LockingStrategyAuto( @Nonnull final MemcachedBackupSessionManager manager,
+    public LockingStrategyAuto( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,

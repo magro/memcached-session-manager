@@ -18,20 +18,21 @@ package de.javakaffee.web.msm;
 
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import org.apache.catalina.Manager;
+import org.apache.catalina.SessionListener;
 import org.apache.catalina.session.StandardSession;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
- * The session class used by the {@link MemcachedBackupSessionManager}.
+ * The session class used by the {@link MemcachedSessionService}.
  * <p>
  * This class is needed to e.g.
  * <ul>
@@ -44,7 +45,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResu
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public final class MemcachedBackupSession extends StandardSession {
+public class MemcachedBackupSession extends StandardSession {
 
     private static final long serialVersionUID = 1L;
 
@@ -64,7 +65,7 @@ public final class MemcachedBackupSession extends StandardSession {
      * Stores the time in millis when this session was stored in memcached, is set
      * before session data is serialized.
      */
-    private long _lastBackupTime;
+    protected long _lastBackupTime;
 
     /*
      * The former value of _lastBackupTimestamp which is restored if the session could not be saved
@@ -93,7 +94,7 @@ public final class MemcachedBackupSession extends StandardSession {
     private transient boolean _attributesAccessed;
 
     private transient boolean _sessionIdChanged;
-    private transient boolean _sticky;
+    protected transient boolean _sticky;
     private transient volatile LockStatus _lockStatus;
 
     /**
@@ -112,7 +113,7 @@ public final class MemcachedBackupSession extends StandardSession {
      * @param manager
      *            the manager
      */
-    public MemcachedBackupSession( final Manager manager ) {
+    public MemcachedBackupSession( final SessionManager manager ) {
         super( manager );
     }
 
@@ -167,7 +168,7 @@ public final class MemcachedBackupSession extends StandardSession {
         if ( this.manager == null ) {
             throw new IllegalStateException( "There's no manager set." );
         }
-        final Pattern pattern = ((MemcachedBackupSessionManager)manager).getSessionAttributePattern();
+        final Pattern pattern = ((SessionManager)manager).getMemcachedSessionService().getSessionAttributePattern();
         if ( pattern == null ) {
             return true;
         }
@@ -286,7 +287,7 @@ public final class MemcachedBackupSession extends StandardSession {
      * @return <code>true</code>, if <code>thisAccessedTime > lastBackupTimestamp</code>.
      */
     boolean wasAccessedSinceLastBackup() {
-        return super.thisAccessedTime > _lastBackupTime;
+        return this.thisAccessedTime > _lastBackupTime;
     }
 
     /**
@@ -295,9 +296,13 @@ public final class MemcachedBackupSession extends StandardSession {
      * if the current {@link #getThisAccessedTimeInternal()} value is different
      * from the previously stored value to see if the session was accessed in
      * the meantime.
+     * 
+     * @deprecated the session is always accessed for a request that comes with a session id. Therefore
+     * {@link #wasAccessedSinceLastBackup()} should always return <code>true</code>.
      */
+    @Deprecated
     void storeThisAccessedTimeFromLastBackupCheck() {
-        _thisAccessedTimeFromLastBackupCheck = super.thisAccessedTime;
+        _thisAccessedTimeFromLastBackupCheck = this.thisAccessedTime;
     }
 
     /**
@@ -306,9 +311,13 @@ public final class MemcachedBackupSession extends StandardSession {
      * differs from the value stored by {@link #storeThisAccessedTimeFromLastBackupCheck()}.
      * @return <code>true</code> if the session was accessed since the invocation
      * of {@link #storeThisAccessedTimeFromLastBackupCheck()}.
+     * 
+     * @deprecated the session is always accessed for a request that comes with a session id. Therefore
+     * {@link #wasAccessedSinceLastBackup()} should always return <code>true</code>.
      */
+    @Deprecated
     boolean wasAccessedSinceLastBackupCheck() {
-        return _thisAccessedTimeFromLastBackupCheck != super.thisAccessedTime;
+        return _thisAccessedTimeFromLastBackupCheck != this.thisAccessedTime;
     }
 
     /**
@@ -381,9 +390,9 @@ public final class MemcachedBackupSession extends StandardSession {
          * not try to remove it from memcached... (the session is removed and
          * added when the session id is changed)
          */
-        setNote( MemcachedBackupSessionManager.NODE_FAILURE, Boolean.TRUE );
+        setNote( MemcachedSessionService.NODE_FAILURE, Boolean.TRUE );
         manager.remove( this );
-        removeNote( MemcachedBackupSessionManager.NODE_FAILURE );
+        removeNote( MemcachedSessionService.NODE_FAILURE );
         this.id = id;
         manager.add( this );
 
@@ -396,10 +405,10 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     public void doAfterDeserialization() {
         if ( listeners == null ) {
-            listeners = new ArrayList<Object>();
+            listeners = new ArrayList<SessionListener>();
         }
         if ( notes == null ) {
-            notes = new Hashtable<Object, Object>();
+            notes = new ConcurrentHashMap<String, Object>();
         }
     }
 
@@ -421,28 +430,29 @@ public final class MemcachedBackupSession extends StandardSession {
         _dataHashCode = attributesDataHashCode;
     }
 
-    long getCreationTimeInternal() {
-        return super.creationTime;
+    public long getCreationTimeInternal() {
+        return this.creationTime;
     }
 
     void setCreationTimeInternal( final long creationTime ) {
-        super.creationTime = creationTime;
+        this.creationTime = creationTime;
     }
 
     boolean isNewInternal() {
-        return super.isNew;
+        return this.isNew;
     }
 
     void setIsNewInternal( final boolean isNew ) {
-        super.isNew = isNew;
+        this.isNew = isNew;
     }
 
-    protected boolean isValidInternal() {
-        return super.isValid;
+    @Override
+    public boolean isValidInternal() {
+        return this.isValid;
     }
 
     void setIsValidInternal( final boolean isValid ) {
-        super.isValid = isValid;
+        this.isValid = isValid;
     }
 
     /**
@@ -451,29 +461,29 @@ public final class MemcachedBackupSession extends StandardSession {
      *
      * @return the timestamp of the last {@link #access()} invocation.
      */
-    long getThisAccessedTimeInternal() {
-        return super.thisAccessedTime;
+    public long getThisAccessedTimeInternal() {
+        return this.thisAccessedTime;
     }
 
     void setThisAccessedTimeInternal( final long thisAccessedTime ) {
-        super.thisAccessedTime = thisAccessedTime;
+        this.thisAccessedTime = thisAccessedTime;
     }
 
     void setLastAccessedTimeInternal( final long lastAccessedTime ) {
-        super.lastAccessedTime = lastAccessedTime;
+        this.lastAccessedTime = lastAccessedTime;
     }
 
     void setIdInternal( final String id ) {
-        super.id = id;
+        this.id = id;
     }
 
     boolean isExpiring() {
-        return super.expiring;
+        return this.expiring;
     }
 
     @SuppressWarnings( "unchecked" )
     public Map<String, Object> getAttributesInternal() {
-        return super.attributes;
+        return this.attributes;
     }
 
     /**
@@ -486,12 +496,12 @@ public final class MemcachedBackupSession extends StandardSession {
         if ( this.manager == null ) {
             throw new IllegalStateException( "There's no manager set." );
         }
-        final Pattern pattern = ((MemcachedBackupSessionManager)manager).getSessionAttributePattern();
+        final Pattern pattern = ((SessionManager)manager).getMemcachedSessionService().getSessionAttributePattern();
         if ( pattern == null ) {
-            return super.attributes;
+            return this.attributes;
         }
-        final Map<String, Object> result = new ConcurrentHashMap<String, Object>( super.attributes.size() );
-        for ( final Map.Entry<String, Object> entry: (Set<Map.Entry<String, Object>>)super.attributes.entrySet() ) {
+        final Map<String, Object> result = new ConcurrentHashMap<String, Object>( this.attributes.size() );
+        for ( final Map.Entry<String, Object> entry: (Set<Map.Entry<String, Object>>)this.attributes.entrySet() ) {
             if ( pattern.matcher(entry.getKey()).matches() ) {
                 result.put( entry.getKey(), entry.getValue() );
             }
@@ -500,7 +510,7 @@ public final class MemcachedBackupSession extends StandardSession {
     }
 
     void setAttributesInternal( final Map<String, Object> attributes ) {
-        super.attributes = attributes;
+        this.attributes = attributes;
     }
 
     /**
@@ -533,7 +543,7 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     @Override
     public void setAuthType( final String authType ) {
-        if ( !equals( authType, super.authType ) ) {
+        if ( !equals( authType, this.authType ) ) {
             _authenticationChanged = true;
         }
         super.setAuthType( authType );
@@ -544,7 +554,7 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     @Override
     public void setPrincipal( final Principal principal ) {
-        if ( !equals( principal, super.principal ) ) {
+        if ( !equals( principal, this.principal ) ) {
             _authenticationChanged = true;
         }
         super.setPrincipal( principal );
@@ -592,6 +602,13 @@ public final class MemcachedBackupSession extends StandardSession {
      */
     public void setSticky( final boolean sticky ) {
         _sticky = sticky;
+    }
+    
+    /**
+     * Returns the stickyness mode of this session.
+     */
+    public boolean isSticky() {
+        return _sticky;
     }
 
     /**

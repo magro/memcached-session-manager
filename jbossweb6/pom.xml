@@ -5,18 +5,21 @@
 	<parent>
 		<groupId>de.javakaffee.web.msm</groupId>
 		<artifactId>memcached-session-manager-parent</artifactId>
-		<version>1.4.2-SNAPSHOT</version>
+		<version>1.5.0-SNAPSHOT</version>
+		<relativePath>../</relativePath>
 	</parent>
 
 	<groupId>de.javakaffee.web.msm</groupId>
 	<artifactId>msm-all-memcached-session-manager-jbossweb6</artifactId>
-	<version>1.4.2-SNAPSHOT</version>
+	<version>1.5.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>memcached-session-manager core</name>
-	<description>The msm core, provides java serialization strategy.</description>
+	<name>memcached-session-manager jbossweb6</name>
+	<description>The jbossweb6 specific versionü.</description>
 
 	<properties>
 		<jbossweb-version>3.0.0-CR1</jbossweb-version>
+        <!-- jbossweb-version>2.1.7.GA</jbossweb-version -->
+        <tomcat-version>6.0.28</tomcat-version>
 	</properties>
 
 	<dependencies>
@@ -72,11 +75,18 @@
 			</exclusions>
 		</dependency>
 
-		<dependency>
+		<!-- dependency>
 			<groupId>javax.servlet</groupId>
 			<artifactId>servlet-api</artifactId>
 			<version>2.5</version>
 			<scope>provided</scope>
+		</dependency -->
+		<!-- Servlet 3.0 Api Specification -->
+		<dependency>
+		   <groupId>org.jboss.spec.javax.servlet</groupId>
+		   <artifactId>jboss-servlet-api_3.0_spec</artifactId>
+		   <version>1.0.0.Final</version>
+		   <scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.jboss.web</groupId>
@@ -85,11 +95,17 @@
 			<scope>compile</scope>
 		</dependency>
         <dependency>
-            <groupId>jboss</groupId>
-            <artifactId>jboss-common</artifactId>
-            <version>4.0.2</version>
+            <groupId>org.jboss.logging</groupId>
+            <artifactId>jboss-logging</artifactId>
+            <version>3.0.0.Beta2</version>
             <scope>compile</scope>
         </dependency>
+        <!-- dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>juli</artifactId>
+            <version>${tomcat-version}</version>
+            <scope>test</scope>
+        </dependency -->
 		<!-- dependency> <groupId>org.apache.tomcat</groupId> <artifactId>tomcat-servlet-api</artifactId> 
 			<version>${tomcat-version}</version> <scope>compile</scope> </dependency> 
 			<dependency> <groupId>org.apache.tomcat</groupId> <artifactId>tomcat-catalina-ha</artifactId> 
@@ -142,7 +158,6 @@
 	</dependencies>
 
 	<build>
-		<finalName>${artifactId}-tc7-${version}</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -161,8 +176,9 @@
 
 	<repositories>
 		<repository>
-			<id>jboss nexus public-jboss</id>
+			<id>jboss nexus</id>
 			<url>https://repository.jboss.org/nexus/content/groups/public-jboss</url>
+            <!-- 2.x url>https://repository.jboss.org/nexus/content/repositories/releases</url -->
 			<releases>
 				<enabled>true</enabled>
 			</releases>

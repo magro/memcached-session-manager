@@ -16,12 +16,17 @@
  */
 package de.javakaffee.web.msm.serializer.hibernate;
 
+import static de.javakaffee.web.msm.integration.TestUtils.createContext;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
 import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -30,7 +35,6 @@ import javax.persistence.Id;
 import javax.persistence.OneToMany;
 
 import org.apache.catalina.core.StandardContext;
-import org.apache.catalina.loader.WebappLoader;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.hibernate.Criteria;
@@ -47,7 +51,8 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderService;
 import de.javakaffee.web.msm.integration.TestUtils;
@@ -74,7 +79,8 @@ public abstract class AbstractHibernateCollectionsTest {
     @Test( enabled = true )
     public void testDeserializeHibernateCollection() {
 
-        final MemcachedBackupSessionManager manager = createManager();
+        final SessionManager manager = createSessionManager();
+        manager.setContainer( createContext() );
 
         final Set<Animal> animals = new HashSet<Animal>( Arrays.asList( new Animal( "cat" ) ) );
         final Person person = new Person( "foo bar", animals );
@@ -91,14 +97,14 @@ public abstract class AbstractHibernateCollectionsTest {
         session.setAttribute( "person", foundPerson );
 
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, null, manager );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, manager );
 
         final Person deserializedPerson = (Person) deserialized.getAttribute( "person" );
         TestUtils.assertDeepEquals( foundPerson, deserializedPerson );
 
     }
 
-    protected abstract SessionAttributesTranscoder createTranscoder( MemcachedBackupSessionManager manager );
+    protected abstract SessionAttributesTranscoder createTranscoder( SessionManager manager );
 
     private Person findPerson( final Long personId ) {
         final Person foundPerson = withSession( new Callback<Person>() {
@@ -202,26 +208,18 @@ public abstract class AbstractHibernateCollectionsTest {
             session.close();
         }
     }
-
-    private static MemcachedBackupSessionManager createManager() {
-        final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
-
-        final StandardContext container = new StandardContext();
-        manager.setContainer( container );
-
-        final WebappLoader webappLoader = new WebappLoader() {
-            @Override
-            public ClassLoader getClassLoader() {
-                return Thread.currentThread().getContextClassLoader();
-            }
-        };
-        manager.getContainer().setLoader( webappLoader );
-
+    
+    @Nonnull
+    protected SessionManager createSessionManager() {
+        final SessionManager manager = mock( SessionManager.class );
+        when( manager.getContainer() ).thenReturn( new StandardContext() ); // needed for createSession
+        when( manager.getMemcachedSessionService() ).thenReturn( new MemcachedSessionService( manager ) );
+        when( manager.newMemcachedBackupSession() ).thenReturn( new MemcachedBackupSession( manager ) );
         return manager;
     }
 
-    private static MemcachedBackupSession createSession( final MemcachedBackupSessionManager manager, final String id ) {
-        final MemcachedBackupSession session = manager.createEmptySession();
+    private static MemcachedBackupSession createSession( final SessionManager manager, final String id ) {
+        final MemcachedBackupSession session = manager.getMemcachedSessionService().createEmptySession();
         session.setId( id );
         session.setValid( true );
         return session;

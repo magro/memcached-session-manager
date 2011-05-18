@@ -40,7 +40,7 @@ import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 
 /**
- * This {@link MemcachedBackupSessionManager} can be used for debugging session
+ * This {@link MemcachedSessionService} can be used for debugging session
  * <em>deserialization</em> - to see if serialized session data actually can be
  * deserialized. Session data is serialized at the end of the request as normal (stored
  * in a simple map), and deserialized when a following request is asking for the session.
@@ -58,10 +58,14 @@ import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionManager {
+public class DummyMemcachedSessionService<T extends MemcachedSessionService.SessionManager> extends MemcachedSessionService {
 
     private final Map<String,byte[]> _sessionData = new ConcurrentHashMap<String, byte[]>();
     private final ExecutorService _executorService = Executors.newSingleThreadExecutor();
+
+    public DummyMemcachedSessionService( final T manager ) {
+        super( manager );
+    }
 
     @Override
     protected MemcachedClient createMemcachedClient( final NodeIdList nodeIds, final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids,
@@ -121,6 +125,7 @@ public class DummyMemcachedBackupSessionManager extends MemcachedBackupSessionMa
         return result;
     }
 
+    @Override
     protected MemcachedBackupSession loadFromMemcachedWithCheck( final String sessionId ) {
         return null;
     }

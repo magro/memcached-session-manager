@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.integration.TestUtils.createContext;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
@@ -23,12 +24,12 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
-import org.apache.catalina.Globals;
+import org.apache.catalina.Context;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -46,9 +47,9 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionTrackerValveTest {
+public abstract class SessionTrackerValveTest {
 
-    private SessionBackupService _service;
+    protected SessionBackupService _service;
     private SessionTrackerValve _sessionTrackerValve;
     private Valve _nextValve;
     private Request _request;
@@ -57,12 +58,18 @@ public class SessionTrackerValveTest {
     @BeforeMethod
     public void setUp() throws Exception {
         _service = mock( SessionBackupService.class );
-        _sessionTrackerValve = new SessionTrackerValve( null, new StandardContext(), _service, Statistics.create(), new AtomicBoolean( true ) );
+        _sessionTrackerValve = createSessionTrackerValve( createContext() );
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( _nextValve );
         _request = mock( Request.class );
         _response = mock( Response.class );
     }
+
+    @Nonnull
+    protected abstract SessionTrackerValve createSessionTrackerValve( @Nonnull final Context context );
+
+    @Nonnull
+    protected abstract String getGlobalSessionCookieName( @Nonnull final Context context );
 
     @AfterMethod
     public void tearDown() throws Exception {
@@ -74,14 +81,14 @@ public class SessionTrackerValveTest {
 
     @Test
     public final void testSessionCookieName() throws IOException, ServletException {
-        final StandardContext context = new StandardContext();
+        final StandardContext context = createContext();
         context.setSessionCookieName( "foo" );
-        SessionTrackerValve cut = new SessionTrackerValve( null, context, _service, Statistics.create(), new AtomicBoolean(true) );
+        SessionTrackerValve cut = createSessionTrackerValve( context );
         assertEquals( "foo", cut.getSessionCookieName() );
 
         context.setSessionCookieName( null );
-        cut = new SessionTrackerValve( null, context, _service, Statistics.create(), new AtomicBoolean(true) );
-        assertEquals( Globals.SESSION_COOKIE_NAME, cut.getSessionCookieName() );
+        cut = createSessionTrackerValve( context );
+        assertEquals( getGlobalSessionCookieName( context ), cut.getSessionCookieName() );
     }
 
     @Test

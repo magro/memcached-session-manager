@@ -18,6 +18,8 @@ package de.javakaffee.web.msm;
 
 import org.apache.catalina.Manager;
 
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+
 /**
  * A {@link TranscoderFactory} that creates {@link JavaSerializationTranscoder} instances.
  *
@@ -29,7 +31,7 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    public SessionAttributesTranscoder createTranscoder( final Manager manager ) {
+    public SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
         return new JavaSerializationTranscoder( manager );
     }
 

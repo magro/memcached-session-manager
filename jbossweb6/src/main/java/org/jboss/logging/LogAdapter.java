@@ -1,10 +1,10 @@
 /**
  * 
  */
-package org.apache.juli.logging;
+package org.jboss.logging;
 
-import org.jboss.logging.Logger;
-import org.jboss.logging.LoggerPlugin;
+import org.apache.juli.logging.Log;
+import org.jboss.logging.Logger.Level;
 
 /**
  * Adapter from jboss logging {@link Logger} to tomcat juli {@link Log} interface.
@@ -12,6 +12,8 @@ import org.jboss.logging.LoggerPlugin;
  * @author Martin Grotzke
  */
 public class LogAdapter implements Log {
+
+    private static final String FQCN = Logger.class.getName();
 
     private final Logger _log;
 
@@ -21,12 +23,12 @@ public class LogAdapter implements Log {
 
     @Override
     public void debug( final Object message, final Throwable t ) {
-        _log.debug( message, t );
+        _log.doLog(Level.DEBUG, FQCN, message, null, t);
     }
 
     @Override
     public void debug( final Object message ) {
-        _log.debug( message );
+        _log.doLog(Level.DEBUG, FQCN, message, null, null);
     }
 
     @Override
@@ -36,26 +38,22 @@ public class LogAdapter implements Log {
 
     @Override
     public void error( final Object message, final Throwable t ) {
-        _log.error( message, t );
+        _log.doLog(Level.ERROR, FQCN, message, null, t);
     }
 
     @Override
     public void error( final Object message ) {
-        _log.error( message );
+        _log.doLog(Level.ERROR, FQCN, message, null, null);
     }
 
     @Override
     public void fatal( final Object message, final Throwable t ) {
-        _log.fatal( message, t );
+        _log.doLog(Level.FATAL, FQCN, message, null, t);
     }
 
     @Override
     public void fatal( final Object message ) {
-        _log.fatal( message );
-    }
-
-    public LoggerPlugin getLoggerPlugin() {
-        return _log.getLoggerPlugin();
+        _log.doLog(Level.FATAL, FQCN, message, null, null);
     }
 
     public String getName() {
@@ -69,12 +67,12 @@ public class LogAdapter implements Log {
 
     @Override
     public void info( final Object message, final Throwable t ) {
-        _log.info( message, t );
+        _log.doLog(Level.INFO, FQCN, message, null, t);
     }
 
     @Override
     public void info( final Object message ) {
-        _log.info( message );
+        _log.doLog(Level.INFO, FQCN, message, null, null);
     }
 
     @Override
@@ -99,37 +97,37 @@ public class LogAdapter implements Log {
 
     @Override
     public void trace( final Object message, final Throwable t ) {
-        _log.trace( message, t );
+        _log.doLog(Level.TRACE, FQCN, message, null, t);
     }
 
     @Override
     public void trace( final Object message ) {
-        _log.trace( message );
+        _log.doLog(Level.TRACE, FQCN, message, null, null);
     }
 
     @Override
     public void warn( final Object message, final Throwable t ) {
-        _log.warn( message, t );
+        _log.doLog(Level.WARN, FQCN, message, null, t);
     }
 
     @Override
     public void warn( final Object message ) {
-        _log.warn( message );
+        _log.doLog(Level.WARN, FQCN, message, null, null);
     }
 
     @Override
     public boolean isWarnEnabled() {
-        return true;
+        return _log.isEnabled(Level.WARN);
     }
 
     @Override
     public boolean isErrorEnabled() {
-        return true;
+        return _log.isEnabled(Level.ERROR);
     }
 
     @Override
     public boolean isFatalEnabled() {
-        return true;
+        return _log.isEnabled(Level.FATAL);
     }
 
 }

@@ -17,6 +17,7 @@
 
 package org.apache.juli.logging;
 
+import org.jboss.logging.LogAdapter;
 import org.jboss.logging.Logger;
 
 /**
