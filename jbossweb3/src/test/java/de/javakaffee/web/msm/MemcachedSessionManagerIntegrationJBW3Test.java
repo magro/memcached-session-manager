@@ -14,29 +14,25 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtilsJBW3;
 
 /**
- * Integration test testing tomcat failover (tomcats failing).
+ * Integration test testing basic session manager functionality.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 @Test
-public class TomcatFailoverIntegrationTC6Test extends TomcatFailoverIntegrationTest {
+public class MemcachedSessionManagerIntegrationJBW3Test extends MemcachedSessionManagerIntegrationTest {
 
     @Override
     TestUtils getTestUtils() {
-        return new TestUtilsTC6();
+        return new TestUtilsJBW3();
     }
-
-    @Override
-    @Test( enabled = true )
-    public void testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute() throws Exception {
-        super.testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute();
-    }
-
+    
 }

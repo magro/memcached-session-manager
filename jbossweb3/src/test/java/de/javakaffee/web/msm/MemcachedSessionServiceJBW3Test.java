@@ -16,23 +16,30 @@
  */
 package de.javakaffee.web.msm;
 
+import net.spy.memcached.MemcachedClient;
+
+import org.apache.catalina.LifecycleException;
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.integration.TestUtils;
-import de.javakaffee.web.msm.integration.TestUtilsTC6;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+
 
 /**
- * Integration test testing basic session manager functionality.
+ * Test the {@link MemcachedBackupSessionManager}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
- * @version $Id$
  */
 @Test
-public class MemcachedSessionManagerIntegrationTC6Test extends MemcachedSessionManagerIntegrationTest {
+public class MemcachedSessionServiceJBW3Test extends MemcachedSessionServiceTest {
 
     @Override
-    TestUtils getTestUtils() {
-        return new TestUtilsTC6();
+    protected SessionManager createSessionManager() {
+        return new MemcachedBackupSessionManager();
     }
     
+    @Override
+    protected void startInternal( final SessionManager manager, final MemcachedClient memcachedMock ) throws LifecycleException {
+        ((MemcachedBackupSessionManager)manager).startInternal( memcachedMock );
+    };
+
 }

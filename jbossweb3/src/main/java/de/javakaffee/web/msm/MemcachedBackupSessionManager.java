@@ -946,8 +946,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     // ---------------------------------------------------------------------------
 
     @Override
-    public SessionTrackerValveTC6 createSessionTrackerValve( final String requestUriIgnorePattern, final Statistics statistics, final AtomicBoolean enabled ) {
-        return new SessionTrackerValveTC6( requestUriIgnorePattern,
+    public SessionTrackerValveJBW3 createSessionTrackerValve( final String requestUriIgnorePattern, final Statistics statistics, final AtomicBoolean enabled ) {
+        return new SessionTrackerValveJBW3( requestUriIgnorePattern,
                 (Context) getContainer(), _msm, statistics, enabled );
     }
 

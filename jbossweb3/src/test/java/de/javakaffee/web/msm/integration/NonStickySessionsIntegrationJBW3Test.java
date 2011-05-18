@@ -24,11 +24,11 @@ import org.testng.annotations.Test;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 @Test
-public class NonStickySessionsIntegrationTC6Test extends NonStickySessionsIntegrationTest {
+public class NonStickySessionsIntegrationJBW3Test extends NonStickySessionsIntegrationTest {
 
     @Override
     TestUtils getTestUtils() {
-        return new TestUtilsTC6();
+        return new TestUtilsJBW3();
     }
 
 }

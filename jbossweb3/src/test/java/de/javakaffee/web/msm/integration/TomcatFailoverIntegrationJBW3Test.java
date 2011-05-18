@@ -14,32 +14,29 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm;
+package de.javakaffee.web.msm.integration;
 
-import net.spy.memcached.MemcachedClient;
-
-import org.apache.catalina.LifecycleException;
 import org.testng.annotations.Test;
-
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 
 /**
- * Test the {@link MemcachedBackupSessionManager}.
+ * Integration test testing tomcat failover (tomcats failing).
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
  */
 @Test
-public class MemcachedSessionServiceTC6Test extends MemcachedSessionServiceTest {
+public class TomcatFailoverIntegrationJBW3Test extends TomcatFailoverIntegrationTest {
 
     @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
+    TestUtils getTestUtils() {
+        return new TestUtilsJBW3();
     }
-    
+
     @Override
-    protected void startInternal( final SessionManager manager, final MemcachedClient memcachedMock ) throws LifecycleException {
-        ((MemcachedBackupSessionManager)manager).startInternal( memcachedMock );
-    };
+    @Test( enabled = true )
+    public void testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute() throws Exception {
+        super.testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute();
+    }
 
 }

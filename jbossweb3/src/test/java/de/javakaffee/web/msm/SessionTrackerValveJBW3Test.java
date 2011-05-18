@@ -16,32 +16,31 @@
  */
 package de.javakaffee.web.msm;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.catalina.realm.GenericPrincipal;
+import javax.annotation.Nonnull;
+
+import org.apache.catalina.Context;
+import org.apache.catalina.Globals;
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-
-
 /**
- * Test the {@link TranscoderService}.
+ * Test the {@link SessionTrackerValveJBW3}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
  */
 @Test
-public class TranscoderServiceTC6Test extends TranscoderServiceTest {
-
-    @Override
-    @Nonnull
-    protected GenericPrincipal createPrincipal() {
-        return new GenericPrincipal( null, "foo", "bar" );
-    }
-
-    @Override
-    protected MemcachedBackupSession newMemcachedBackupSession( @Nullable final SessionManager manager ) {
-        return new MemcachedBackupSessionJBW3( manager );
-    }
+public class SessionTrackerValveJBW3Test extends SessionTrackerValveTest {
     
+    @Override
+    protected SessionTrackerValve createSessionTrackerValve( @Nonnull final Context context ) {
+        return new SessionTrackerValveJBW3( null, context, _service, Statistics.create(), new AtomicBoolean( true ) );
+    }
+
+    @Override
+    protected String getGlobalSessionCookieName( @Nonnull final Context context ) {
+        return Globals.SESSION_COOKIE_NAME;
+    }
+
 }

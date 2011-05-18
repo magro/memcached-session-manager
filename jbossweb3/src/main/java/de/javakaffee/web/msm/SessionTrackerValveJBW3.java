@@ -33,7 +33,7 @@ import org.apache.catalina.Globals;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-class SessionTrackerValveTC6 extends SessionTrackerValve {
+class SessionTrackerValveJBW3 extends SessionTrackerValve {
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -51,7 +51,7 @@ class SessionTrackerValveTC6 extends SessionTrackerValve {
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
      */
-    public SessionTrackerValveTC6( @Nullable final String ignorePattern, @Nonnull final Context context,
+    public SessionTrackerValveJBW3( @Nullable final String ignorePattern, @Nonnull final Context context,
             @Nonnull final SessionBackupService sessionBackupService,
             @Nonnull final Statistics statistics,
             @Nonnull final AtomicBoolean enabled ) {

@@ -14,33 +14,23 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm;
+package de.javakaffee.web.msm.integration;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.annotation.Nonnull;
-
-import org.apache.catalina.Context;
-import org.apache.catalina.Globals;
 import org.testng.annotations.Test;
 
+
 /**
- * Test the {@link SessionTrackerValveTC6}.
+ * Integration test testing memcached failover.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
 @Test
-public class SessionTrackerValveTC6Test extends SessionTrackerValveTest {
-    
-    @Override
-    protected SessionTrackerValve createSessionTrackerValve( @Nonnull final Context context ) {
-        return new SessionTrackerValveTC6( null, context, _service, Statistics.create(), new AtomicBoolean( true ) );
-    }
+public class MemcachedFailoverIntegrationJBW3Test extends MemcachedFailoverIntegrationTest {
 
     @Override
-    protected String getGlobalSessionCookieName( @Nonnull final Context context ) {
-        return Globals.SESSION_COOKIE_NAME;
+    TestUtils getTestUtils() {
+        return new TestUtilsJBW3();
     }
 
 }

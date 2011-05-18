@@ -105,7 +105,7 @@ import edu.umd.cs.findbugs.annotations.SuppressWarnings;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC6 extends TestUtils {
+public class TestUtilsJBW3 extends TestUtils {
 
     @Override
     protected SessionManager createSessionManager() {
