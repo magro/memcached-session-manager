@@ -52,6 +52,10 @@ public class TestServlet extends HttpServlet {
     private static final long serialVersionUID = 7954803132860358448L;
 
     private static final Log LOG = LogFactory.getLog( TestServlet.class );
+    
+    public TestServlet() {
+        LOG.info( "---------------------------- created" );
+    }
 
     /* (non-Javadoc)
      * @see javax.servlet.http.HttpServlet#doGet(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)

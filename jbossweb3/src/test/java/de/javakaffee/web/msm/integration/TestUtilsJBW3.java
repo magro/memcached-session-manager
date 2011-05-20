@@ -114,7 +114,8 @@ public class TestUtilsJBW3 extends TestUtils {
     
     @Override
     protected Context createContext( final Embedded catalina, final String contextPath, final String docBase ) {
-        return catalina.createContext( CONTEXT_PATH, "webapp", new ContextConfig() );
+        final Context result = catalina.createContext( CONTEXT_PATH, docBase, new ContextConfig() );
+        return result;
     }
 
     private static final String CONTEXT_PATH = "/";

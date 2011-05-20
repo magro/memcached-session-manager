@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -49,6 +50,7 @@ import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Loader;
 import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
@@ -60,7 +62,6 @@ import org.apache.catalina.core.StandardService;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
 import org.apache.catalina.deploy.SecurityConstraint;
-import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.startup.Embedded;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
@@ -357,12 +358,7 @@ public abstract class TestUtils {
         context.setPath( "/" );
         context.setSessionCookiePath( "/" );
 
-        final WebappLoader webappLoader = new WebappLoader() {
-            @Override
-            public ClassLoader getClassLoader() {
-                return Thread.currentThread().getContextClassLoader();
-            }
-        };
+        final Loader webappLoader = new StandardLoader();
         context.setLoader( webappLoader );
 
         final StandardHost host = new StandardHost();
@@ -458,11 +454,12 @@ public abstract class TestUtils {
 //        realm.setResourceName( USER_DATABASE );
 //        engine.setRealm( realm );
         
-        final Host host = catalina.createHost( DEFAULT_HOST, docBase );
+        final Host host = catalina.createHost( DEFAULT_HOST, docBase + File.separator + "webapps" );
         engine.addChild( host );
         new File( docBase ).mkdirs();
 
-        final Context context = createContext( catalina, CONTEXT_PATH, "webapp" );
+        final Context context = createContext( catalina, CONTEXT_PATH, docBase + File.separator + "webapps" + File.separator + "webapp" );
+        context.setLoader( new StandardLoader() );
         host.addChild( context );
 
         final SessionManager sessionManager = createSessionManager();
@@ -517,6 +514,73 @@ public abstract class TestUtils {
             constraint.addAuthRole( role );
         }
         return constraint;
+    }
+
+    private static final class StandardLoader implements Loader {
+        private Container _container;
+        private boolean _delegate;
+
+        @Override
+        public ClassLoader getClassLoader() {
+            return Thread.currentThread().getContextClassLoader();
+        }
+
+        @Override
+        public void addPropertyChangeListener( final PropertyChangeListener arg0 ) {}
+
+        @Override
+        public void addRepository( final String arg0 ) {
+            ;
+        }
+
+        @Override
+        public void backgroundProcess() {}
+
+        @Override
+        public String[] findRepositories() {
+            return null;
+        }
+
+        @Override
+        public Container getContainer() {
+            return _container;
+        }
+
+        @Override
+        public boolean getDelegate() {
+            return _delegate;
+        }
+
+        @Override
+        public String getInfo() {
+            return "Dummy Loader";
+        }
+
+        @Override
+        public boolean getReloadable() {
+            return false;
+        }
+
+        @Override
+        public boolean modified() {
+            return false;
+        }
+
+        @Override
+        public void removePropertyChangeListener( final PropertyChangeListener arg0 ) {}
+
+        @Override
+        public void setContainer( final Container arg0 ) {
+            _container = arg0;
+        }
+
+        @Override
+        public void setDelegate( final boolean arg0 ) {
+            _delegate = arg0;
+        }
+
+        @Override
+        public void setReloadable( final boolean arg0 ) {}
     }
 
     public static enum LoginType {
