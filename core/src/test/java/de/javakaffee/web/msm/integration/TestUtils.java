@@ -52,6 +52,7 @@ import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Loader;
 import org.apache.catalina.Valve;
+import org.apache.catalina.Wrapper;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardContext;
@@ -466,6 +467,14 @@ public abstract class TestUtils {
         context.setManager( sessionManager );
         context.setBackgroundProcessorDelay( 1 );
         new File( "webapp" + File.separator + "webapp" ).mkdirs();
+        
+        // manually map servlet for jbw3
+        Wrapper wrapper = context.createWrapper();
+        wrapper.setName( "default" );
+        wrapper.setServletClass( TestServlet.class.getName() );
+        wrapper.setLoadOnStartup(1);
+        context.addChild(wrapper);
+        context.addServletMapping( "/*" , "default");
 
         if ( loginType != null ) {
             context.addConstraint( createSecurityConstraint( "/*", ROLE_NAME ) );

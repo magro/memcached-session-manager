@@ -28,6 +28,7 @@ import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Loader;
+import org.apache.catalina.Wrapper;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardServer;
@@ -123,6 +124,14 @@ public class TestEmbeddedJBW3 {
         final SessionManager sessionManager = createSessionManager();
         context.setManager( sessionManager );
         context.setBackgroundProcessorDelay( 1 );
+
+        // manually map servlet for jbw3
+        final Wrapper wrapper = context.createWrapper();
+        wrapper.setName( "default" );
+        wrapper.setServletClass( TestServlet.class.getName() );
+        wrapper.setLoadOnStartup(1);
+        context.addChild(wrapper);
+        context.addServletMapping( "/*" , "default" );
 
         /* we must set the maxInactiveInterval after the context,
          * as setContainer(context) uses the session timeout set on the context
