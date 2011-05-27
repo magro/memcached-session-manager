@@ -12,7 +12,7 @@
 	<artifactId>msm-all-memcached-session-manager-tc7</artifactId>
 	<version>1.5.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>memcached-session-manager core</name>
+	<name>memcached-session-manager tomcat7</name>
 	<description>The msm core, provides java serialization strategy.</description>
 
 	<properties>
