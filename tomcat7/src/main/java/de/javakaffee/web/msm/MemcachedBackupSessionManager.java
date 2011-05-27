@@ -136,6 +136,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _msm.createEmptySession();
     }
 
+    @Override
+    public MemcachedBackupSession newMemcachedBackupSession() {
+        return new MemcachedBackupSession( this );
+    }
+
     /**
      * {@inheritDoc}
      */

@@ -19,6 +19,8 @@ package de.javakaffee.web.msm;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+
 
 /**
  * Test the {@link TranscoderService}.
@@ -31,6 +33,11 @@ public class TranscoderServiceTC7Test extends TranscoderServiceTest {
     @Override
     protected GenericPrincipal createPrincipal() {
         return new GenericPrincipal( "foo", "bar" );
+    }
+
+    @Override
+    protected MemcachedBackupSession newMemcachedBackupSession( final SessionManager manager ) {
+        return new MemcachedBackupSession( manager );
     }
 
 }

@@ -456,11 +456,8 @@ public abstract class TestUtils {
         engine.setDefaultHost( DEFAULT_HOST );
         engine.setJvmRoute( jvmRoute );
         
-        ((StandardEngine)engine).setBaseDir( docBase ); // needed for jbossweb
-        
         catalina.addEngine( engine );
         engine.setService( catalina );
-        catalina.setName( engine.getName() ); // needed for jbossweb / lookup in MapperListener
 
         final UserDatabaseRealm realm = new UserDatabaseRealm();
         realm.setResourceName( USER_DATABASE );
