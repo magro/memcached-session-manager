@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +31,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -42,6 +42,7 @@ import java.util.Set;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
 import javax.servlet.http.HttpSessionEvent;
 
@@ -50,9 +51,10 @@ import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Loader;
+import org.apache.catalina.Role;
+import org.apache.catalina.User;
+import org.apache.catalina.UserDatabase;
 import org.apache.catalina.Valve;
-import org.apache.catalina.Wrapper;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardContext;
@@ -63,7 +65,10 @@ import org.apache.catalina.core.StandardService;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
 import org.apache.catalina.deploy.SecurityConstraint;
+import org.apache.catalina.loader.WebappLoader;
+import org.apache.catalina.realm.UserDatabaseRealm;
 import org.apache.catalina.startup.Embedded;
+import org.apache.catalina.users.MemoryUserDatabase;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpException;
@@ -82,6 +87,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
+import org.apache.naming.NamingContext;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -359,7 +365,12 @@ public abstract class TestUtils {
         context.setPath( "/" );
         context.setSessionCookiePath( "/" );
 
-        final Loader webappLoader = new StandardLoader();
+        final WebappLoader webappLoader = new WebappLoader() {
+            @Override
+            public ClassLoader getClassLoader() {
+                return Thread.currentThread().getContextClassLoader();
+            }
+        };
         context.setLoader( webappLoader );
 
         final StandardHost host = new StandardHost();
@@ -421,13 +432,13 @@ public abstract class TestUtils {
         final StandardServer server = new StandardServer();
         server.addService( catalina );
 
-//        try {
-//            final NamingContext globalNamingContext = new NamingContext( new Hashtable<String, Object>(), "ctxt" );
-//            server.setGlobalNamingContext( globalNamingContext );
-//            globalNamingContext.bind( USER_DATABASE, createUserDatabase() );
-//        } catch ( final NamingException e ) {
-//            throw new RuntimeException( e );
-//        }
+        try {
+            final NamingContext globalNamingContext = new NamingContext( new Hashtable<String, Object>(), "ctxt" );
+            server.setGlobalNamingContext( globalNamingContext );
+            globalNamingContext.bind( USER_DATABASE, createUserDatabase() );
+        } catch ( final NamingException e ) {
+            throw new RuntimeException( e );
+        }
 
 
         final URL root = new URL( TestUtils.class.getResource( "/" ), "../test-classes" );
@@ -451,30 +462,21 @@ public abstract class TestUtils {
         engine.setService( catalina );
         catalina.setName( engine.getName() ); // needed for jbossweb / lookup in MapperListener
 
-//        final UserDatabaseRealm realm = new UserDatabaseRealm();
-//        realm.setResourceName( USER_DATABASE );
-//        engine.setRealm( realm );
+        final UserDatabaseRealm realm = new UserDatabaseRealm();
+        realm.setResourceName( USER_DATABASE );
+        engine.setRealm( realm );
         
-        final Host host = catalina.createHost( DEFAULT_HOST, docBase + File.separator + "webapps" );
+        final Host host = catalina.createHost( DEFAULT_HOST, docBase );
         engine.addChild( host );
         new File( docBase ).mkdirs();
 
-        final Context context = createContext( catalina, CONTEXT_PATH, docBase + File.separator + "webapps" + File.separator + "webapp" );
-        context.setLoader( new StandardLoader() );
+        final Context context = createContext( catalina, CONTEXT_PATH, "webapp" );
         host.addChild( context );
 
         final SessionManager sessionManager = createSessionManager();
         context.setManager( sessionManager );
         context.setBackgroundProcessorDelay( 1 );
         new File( "webapp" + File.separator + "webapp" ).mkdirs();
-        
-        // manually map servlet for jbw3
-        Wrapper wrapper = context.createWrapper();
-        wrapper.setName( "default" );
-        wrapper.setServletClass( TestServlet.class.getName() );
-        wrapper.setLoadOnStartup(1);
-        context.addChild(wrapper);
-        context.addServletMapping( "/*" , "default");
 
         if ( loginType != null ) {
             context.addConstraint( createSecurityConstraint( "/*", ROLE_NAME ) );
@@ -525,84 +527,17 @@ public abstract class TestUtils {
         return constraint;
     }
 
-    private static final class StandardLoader implements Loader {
-        private Container _container;
-        private boolean _delegate;
-
-        @Override
-        public ClassLoader getClassLoader() {
-            return Thread.currentThread().getContextClassLoader();
-        }
-
-        @Override
-        public void addPropertyChangeListener( final PropertyChangeListener arg0 ) {}
-
-        @Override
-        public void addRepository( final String arg0 ) {
-            ;
-        }
-
-        @Override
-        public void backgroundProcess() {}
-
-        @Override
-        public String[] findRepositories() {
-            return null;
-        }
-
-        @Override
-        public Container getContainer() {
-            return _container;
-        }
-
-        @Override
-        public boolean getDelegate() {
-            return _delegate;
-        }
-
-        @Override
-        public String getInfo() {
-            return "Dummy Loader";
-        }
-
-        @Override
-        public boolean getReloadable() {
-            return false;
-        }
-
-        @Override
-        public boolean modified() {
-            return false;
-        }
-
-        @Override
-        public void removePropertyChangeListener( final PropertyChangeListener arg0 ) {}
-
-        @Override
-        public void setContainer( final Container arg0 ) {
-            _container = arg0;
-        }
-
-        @Override
-        public void setDelegate( final boolean arg0 ) {
-            _delegate = arg0;
-        }
-
-        @Override
-        public void setReloadable( final boolean arg0 ) {}
-    }
-
     public static enum LoginType {
         BASIC, FORM
     }
 
-//    protected UserDatabase createUserDatabase() {
-//        final MemoryUserDatabase userDatabase = new MemoryUserDatabase();
-//        final Role role = userDatabase.createRole( ROLE_NAME, "the role for unit tests" );
-//        final User user = userDatabase.createUser( USER_NAME, PASSWORD, "the user for unit tests" );
-//        user.addRole( role );
-//        return userDatabase;
-//    }
+    protected UserDatabase createUserDatabase() {
+        final MemoryUserDatabase userDatabase = new MemoryUserDatabase();
+        final Role role = userDatabase.createRole( ROLE_NAME, "the role for unit tests" );
+        final User user = userDatabase.createUser( USER_NAME, PASSWORD, "the user for unit tests" );
+        user.addRole( role );
+        return userDatabase;
+    }
 
     public static SessionManager getManager( final Embedded tomcat ) {
         return (SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
