@@ -18,8 +18,6 @@ package de.javakaffee.web.msm.integration;
 
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
-
 /**
  * Integration test testing memcached failover.
  *
@@ -32,12 +30,6 @@ public class MemcachedFailoverIntegrationTC7Test extends MemcachedFailoverIntegr
     @Override
     TestUtils getTestUtils() {
         return new TestUtilsTC7();
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test
-    public void testMultipleMemcachedNodesFailureExtra() throws Throwable {
-        super.testMultipleMemcachedNodesFailure( SessionAffinityMode.STICKY );
     }
 
 }

@@ -66,7 +66,10 @@ public abstract class TranscoderServiceTest {
 
     }
 
-    protected abstract MemcachedBackupSession newMemcachedBackupSession( @Nullable SessionManager manager );
+    @Nonnull
+    protected MemcachedBackupSession newMemcachedBackupSession( @Nullable final SessionManager manager ) {
+        return new MemcachedBackupSession( manager );
+    }
 
     @Test
     public void testSerializeSessionFields() {
