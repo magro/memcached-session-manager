@@ -540,6 +540,14 @@ public final class MemcachedBackupSession extends StandardSession {
     }
 
     /**
+     * Set the authType without modifying the {@link #authenticationChanged()} property.
+     * @param authType the auth type to set.
+     */
+    public void setAuthTypeInternal( final String authType ) {
+        super.setAuthType( authType );
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -547,6 +555,14 @@ public final class MemcachedBackupSession extends StandardSession {
         if ( !equals( principal, super.principal ) ) {
             _authenticationChanged = true;
         }
+        super.setPrincipal( principal );
+    }
+
+    /**
+     * Set the principal without modifying the {@link #authenticationChanged()} property.
+     * @param principal the principal to set.
+     */
+    public void setPrincipalInternal( final Principal principal ) {
         super.setPrincipal( principal );
     }
 
