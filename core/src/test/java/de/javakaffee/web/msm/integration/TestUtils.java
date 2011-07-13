@@ -501,7 +501,7 @@ public class TestUtils {
         final Container context = host.findChild( CONTEXT_PATH );
         final Valve first = context.getPipeline().getFirst();
         if ( first instanceof AuthenticatorBase ) {
-            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( false );
+            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( changeSessionIdOnAuth );
         }
     }
 
