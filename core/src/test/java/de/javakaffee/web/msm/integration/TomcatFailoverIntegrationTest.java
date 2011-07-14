@@ -52,6 +52,7 @@ import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.RecordingSessionActivationListener;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
+import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
 /**
  * Integration test testing tomcat failover (tomcats failing).
@@ -108,13 +109,14 @@ public abstract class TomcatFailoverIntegrationTest {
     abstract TestUtils getTestUtils();
 
     private Embedded startTomcat( final int port, final String jvmRoute ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        return startTomcat( port, jvmRoute, null );
+        return startTomcat( port, SessionAffinityMode.STICKY, jvmRoute, null );
     }
 
-    private Embedded startTomcat( final int port, final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
+    private Embedded startTomcat( final int port, final SessionAffinityMode sessionAffinityMode,
+            final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
         final Embedded tomcat = getTestUtils().createCatalina( port, MEMCACHED_NODES, jvmRoute, loginType );
         tomcat.start();
-        getManager( tomcat ).setSticky( true );
+        getManager( tomcat ).setSticky( sessionAffinityMode.isSticky() );
         return tomcat;
     }
 
@@ -280,14 +282,14 @@ public abstract class TomcatFailoverIntegrationTest {
 
     }
 
-    @Test( enabled = true )
-    public void testSerializationOfAuthStuffWithFormAuth() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSerializationOfAuthStuffWithFormAuth( final SessionAffinityMode stickyness ) throws Exception {
 
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.FORM );
-        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.FORM );
+        _tomcat1 = startTomcat( TC_PORT_1, stickyness, stickyness.isSticky() ? JVM_ROUTE_1 : null, LoginType.FORM );
+        _tomcat2 = startTomcat( TC_PORT_2, stickyness, stickyness.isSticky() ? JVM_ROUTE_2 : null, LoginType.FORM );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -311,18 +313,23 @@ public abstract class TomcatFailoverIntegrationTest {
          * with the first request
          */
         final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
-        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        if ( stickyness.isSticky() ) {
+            assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        }
+        else {
+            assertEquals( tc2Response1.getSessionId(), sessionId );
+        }
 
     }
 
-    @Test( enabled = true )
-    public void testSerializationOfAuthStuffWithBasicAuth() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSerializationOfAuthStuffWithBasicAuth( final SessionAffinityMode stickyness ) throws Exception {
 
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.BASIC );
-        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.BASIC );
+        _tomcat1 = startTomcat( TC_PORT_1, stickyness, stickyness.isSticky() ? JVM_ROUTE_1 : null, LoginType.BASIC );
+        _tomcat2 = startTomcat( TC_PORT_2, stickyness, stickyness.isSticky() ? JVM_ROUTE_2 : null, LoginType.BASIC );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -340,7 +347,12 @@ public abstract class TomcatFailoverIntegrationTest {
          * with the first request
          */
         final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
-        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        if ( stickyness.isSticky() ) {
+            assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        }
+        else {
+            assertEquals( tc2Response1.getSessionId(), sessionId );
+        }
 
     }
 
@@ -350,8 +362,8 @@ public abstract class TomcatFailoverIntegrationTest {
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.BASIC );
-        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.BASIC );
+        _tomcat1 = startTomcat( TC_PORT_1, SessionAffinityMode.STICKY, JVM_ROUTE_1, LoginType.BASIC );
+        _tomcat2 = startTomcat( TC_PORT_2, SessionAffinityMode.STICKY, JVM_ROUTE_2, LoginType.BASIC );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -374,14 +386,14 @@ public abstract class TomcatFailoverIntegrationTest {
 
     }
 
-    @Test( enabled = true )
-    public void testSessionModificationOnTomcatFailoverNotLostWithAuth() throws Exception {
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionModificationOnTomcatFailoverNotLostWithAuth( final SessionAffinityMode stickyness ) throws Exception {
 
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1, LoginType.BASIC );
-        _tomcat2 = startTomcat( TC_PORT_2, JVM_ROUTE_2, LoginType.BASIC );
+        _tomcat1 = startTomcat( TC_PORT_1, stickyness, stickyness.isSticky() ? JVM_ROUTE_1 : null, LoginType.BASIC );
+        _tomcat2 = startTomcat( TC_PORT_2, stickyness, stickyness.isSticky() ? JVM_ROUTE_2 : null, LoginType.BASIC );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -394,7 +406,12 @@ public abstract class TomcatFailoverIntegrationTest {
          * session during this request must be available in the following request(s)
          */
         final Response tc2Response1 = post( _httpClient, TC_PORT_2, "/", sessionId, asMap( "foo", "bar" ) );
-        assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        if ( stickyness.isSticky() ) {
+            assertEquals( tc2Response1.getResponseSessionId(), new SessionIdFormat().changeJvmRoute( sessionId, JVM_ROUTE_2 ) );
+        }
+        else {
+            assertEquals( tc2Response1.getSessionId(), sessionId );
+        }
 
         final Response tc2Response2 = get( _httpClient, TC_PORT_2, tc2Response1.getResponseSessionId() );
         assertEquals( tc2Response2.get( "foo" ), "bar" );

@@ -239,14 +239,14 @@ public class TranscoderService {
         result.setIdInternal( decodeString( data, 44, idLength ) );
 
         final short authTypeId = (short)decodeNum( data, 44 + idLength, 2 );
-        result.setAuthType( AuthType.valueOfId( authTypeId ).getValue() );
+        result.setAuthTypeInternal( AuthType.valueOfId( authTypeId ).getValue() );
 
         final int currentIdx = 44 + idLength + 2;
         final short principalDataLength = (short) decodeNum( data, currentIdx, 2 );
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];
             System.arraycopy( data, currentIdx + 2, principalData, 0, principalDataLength );
-            result.setPrincipal( deserializePrincipal( principalData, manager ) );
+            result.setPrincipalInternal( deserializePrincipal( principalData, manager ) );
         }
 
         final byte[] attributesData = new byte[ data.length - sessionFieldsDataLength ];

@@ -88,9 +88,10 @@ class SuffixBasedNodeLocator implements NodeLocator {
      * {@inheritDoc}
      */
     public MemcachedNode getPrimary( final String key ) {
-        final MemcachedNode result = _nodesMap.get( getNodeId( key ) );
+        final String nodeId = getNodeId( key );
+        final MemcachedNode result = _nodesMap.get( nodeId );
         if ( result == null ) {
-            throw new IllegalArgumentException( "No node found for key " + key );
+            throw new IllegalArgumentException( "No node found for key " + key + " (nodeId: " + nodeId + ", known nodeIds: " + _nodesMap.keySet() + ")" );
         }
         return result;
     }

@@ -43,9 +43,13 @@ import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.transcoders.SerializingTranscoder;
 
 import org.apache.catalina.Container;
+import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.deploy.LoginConfig;
+import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -556,7 +560,10 @@ public class MemcachedSessionService implements SessionBackupService {
         MemcachedBackupSession result = _manager.getSessionInternal( id );
         if ( result == null && canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
-            if ( !_sticky && _lockingStrategy.isContainerSessionLookup() ) {
+            // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
+            // constraint needs the session to get the authenticated principal)
+            if ( !_sticky && _lockingStrategy.isContainerSessionLookup()
+                    && !contextHasFormBasedSecurityConstraint() ) {
                 // we can return just null as the requestedSessionId will still be set on
                 // the request.
                 return null;
@@ -580,6 +587,14 @@ public class MemcachedSessionService implements SessionBackupService {
             }
         }
         return result;
+    }
+
+    private boolean contextHasFormBasedSecurityConstraint() {
+        final Context context = (Context)_manager.getContainer();
+        final SecurityConstraint[] constraints = context.findConstraints();
+        final LoginConfig loginConfig = context.getLoginConfig();
+        return constraints != null && constraints.length > 0
+                && loginConfig != null && Constants.FORM_METHOD.equals( loginConfig.getAuthMethod() );
     }
 
     private void addValidLoadedSession( final StandardSession session, final boolean activate ) {
