@@ -58,20 +58,16 @@ import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 
 /**
- * This {@link Manager} stores session in configured memcached nodes after the
- * response is finished (committed).
- * <p>
- * Use this session manager in a Context element, like this <code><pre>
- * &lt;Context path="/foo"&gt;
- *     &lt;Manager className="de.javakaffee.web.msm.MemcachedSessionService"
- *         memcachedNodes="n1.localhost:11211 n2.localhost:11212" failoverNodes="n2"
- *         requestUriIgnorePattern=".*\.(png|gif|jpg|css|js)$" /&gt;
- * &lt;/Context&gt;
- * </pre></code>
- * </p>
+ * This is the core of memcached session manager, managing sessions in memcached.
+ * A {@link SessionManager} interface represents the dependency to tomcats session manager
+ * (which normally keeps sessions in memory). This {@link SessionManager} has to be subclassed
+ * for a concrete major tomcat version (e.g. for 7.x.x) and configured in the context.xml
+ * as manager (see <a href="http://code.google.com/p/memcached-session-manager/wiki/SetupAndConfiguration">SetupAndConfiguration</a>)
+ * for more. The {@link SessionManager} then has to pass configuration settings to this
+ * {@link MemcachedSessionService}. Relevant lifecycle methods are {@link #startInternal(MemcachedClient)}
+ * and {@link #shutdown()}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
- * @version $Id$
  */
 public class MemcachedSessionService implements SessionBackupService {
 
