@@ -37,6 +37,8 @@ import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+
 /**
  * This service is responsible for serializing/deserializing session data
  * so that this can be stored in / loaded from memcached.
@@ -104,12 +106,12 @@ public class TranscoderService {
      * @return the deserialized {@link MemcachedBackupSession}
      *  or <code>null</code> if the provided <code>byte[] data</code> was <code>null</code>.
      */
-    public MemcachedBackupSession deserialize( final byte[] data, final Realm realm, final Manager manager ) {
+    public MemcachedBackupSession deserialize( final byte[] data, final SessionManager manager ) {
         if ( data == null ) {
             return null;
         }
         try {
-            final DeserializationResult deserializationResult = TranscoderService.deserializeSessionFields( data, realm );
+            final DeserializationResult deserializationResult = deserializeSessionFields( data, manager );
             final byte[] attributesData = deserializationResult.getAttributesData();
             final Map<String, Object> attributes = deserializeAttributes( attributesData );
             final MemcachedBackupSession session = deserializationResult.getSession();
@@ -214,8 +216,8 @@ public class TranscoderService {
         return data;
     }
 
-    static DeserializationResult deserializeSessionFields( final byte[] data, final Realm realm ) throws InvalidVersionException {
-        final MemcachedBackupSession result = new MemcachedBackupSession();
+    static DeserializationResult deserializeSessionFields( final byte[] data, final SessionManager manager ) throws InvalidVersionException {
+        final MemcachedBackupSession result = manager.newMemcachedBackupSession();
 
         final short version = (short) decodeNum( data, 0, 2 );
 
@@ -244,7 +246,7 @@ public class TranscoderService {
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];
             System.arraycopy( data, currentIdx + 2, principalData, 0, principalDataLength );
-            result.setPrincipalInternal( deserializePrincipal( principalData, realm ) );
+            result.setPrincipalInternal( deserializePrincipal( principalData, manager ) );
         }
 
         final byte[] attributesData = new byte[ data.length - sessionFieldsDataLength ];
@@ -300,13 +302,13 @@ public class TranscoderService {
         }
     }
 
-    private static Principal deserializePrincipal( final byte[] data, final Realm realm ) {
+    private static Principal deserializePrincipal( final byte[] data, final SessionManager manager ) {
         ByteArrayInputStream bis = null;
         ObjectInputStream ois = null;
         try {
             bis = new ByteArrayInputStream( data );
             ois = new ObjectInputStream( bis );
-            return SerializablePrincipal.readPrincipal( ois, realm );
+            return manager.readPrincipal( ois );
         } catch ( final IOException e ) {
             throw new IllegalArgumentException( "Could not deserialize principal", e );
         } catch ( final ClassNotFoundException e ) {

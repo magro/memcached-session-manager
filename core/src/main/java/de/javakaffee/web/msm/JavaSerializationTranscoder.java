@@ -31,13 +31,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.catalina.Loader;
-import org.apache.catalina.Manager;
-import org.apache.catalina.session.Constants;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
-import org.apache.catalina.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 
 /**
@@ -61,12 +60,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      */
     protected static final String NOT_SERIALIZED = "___NOT_SERIALIZABLE_EXCEPTION___";
 
-    /**
-     * The string manager for this package.
-     */
-    protected static StringManager sm = StringManager.getManager( Constants.Package );
-
-    private final Manager _manager;
+    private final SessionManager _manager;
 
     /**
      * Constructor.
@@ -84,7 +78,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      * @param manager
      *            the manager
      */
-    public JavaSerializationTranscoder( final Manager manager ) {
+    public JavaSerializationTranscoder( final SessionManager manager ) {
         _manager = manager;
     }
 
@@ -147,7 +141,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
                     LOG.debug( "  storing attribute '" + saveNames.get( i ) + "' with value '" + saveValues.get( i ) + "'" );
                 }
             } catch ( final NotSerializableException e ) {
-                LOG.warn( sm.getString( "standardSession.notSerializable", saveNames.get( i ), session.getIdInternal() ), e );
+                LOG.warn( _manager.getString( "standardSession.notSerializable", saveNames.get( i ), session.getIdInternal() ), e );
                 oos.writeObject( NOT_SERIALIZED );
                 if ( LOG.isDebugEnabled() ) {
                     LOG.debug( "  storing attribute '" + saveNames.get( i ) + "' with value NOT_SERIALIZED" );

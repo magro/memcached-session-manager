@@ -144,7 +144,7 @@ serialized size is 70122 bytes.
         for( int r = 0; r < rounds; r++ ) {
             final long start = System.currentTimeMillis();
             for( int i = 0; i < 500; i++ ) {
-                transcoderService.deserialize( data, null, null );
+                transcoderService.deserialize( data, manager );
             }
             deserializationStats.registerSince( start );
             deserializationStats.setSize( size );
@@ -167,7 +167,7 @@ serialized size is 70122 bytes.
         System.out.print("Performing warmup for deserialization...");
         final byte[] data = transcoderService.serialize( session );
         final long deserWarmupStart = System.currentTimeMillis();
-        for( int i = 0; i < loops; i++ ) transcoderService.deserialize( data, null, null );
+        for( int i = 0; i < loops; i++ ) transcoderService.deserialize( data, manager );
         System.out.println(" (" + (System.currentTimeMillis() - deserWarmupStart) + " ms)");
 
     }

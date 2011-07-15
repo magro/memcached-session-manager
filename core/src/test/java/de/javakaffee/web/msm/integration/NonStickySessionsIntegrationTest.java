@@ -75,7 +75,7 @@ import edu.umd.cs.findbugs.annotations.SuppressWarnings;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class NonStickySessionsIntegrationTest {
+public abstract class NonStickySessionsIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( NonStickySessionsIntegrationTest.class );
 
@@ -130,9 +130,11 @@ public class NonStickySessionsIntegrationTest {
 
         _executor = Executors.newCachedThreadPool();
     }
+    
+    abstract TestUtils getTestUtils();
 
     private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = createCatalina( port, 5, MEMCACHED_NODES );
+        final Embedded tomcat = getTestUtils().createCatalina( port, 5, MEMCACHED_NODES );
         getManager( tomcat ).setSticky( false );
         tomcat.start();
         return tomcat;
@@ -544,7 +546,7 @@ public class NonStickySessionsIntegrationTest {
 
     @SuppressWarnings( "deprecation" )
     private Embedded startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded result = createCatalina( port, MEMCACHED_NODES, null, LoginType.BASIC );
+        final Embedded result = getTestUtils().createCatalina( port, MEMCACHED_NODES, null, LoginType.BASIC );
         getManager( result ).setSticky( false );
         getManager( result ).setLockingMode( lockingMode.name() );
         result.start();

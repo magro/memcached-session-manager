@@ -3,35 +3,40 @@
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>de.javakaffee.web.msm</groupId>
+		<groupId>de.javakaffee.msm</groupId>
 		<artifactId>memcached-session-manager-parent</artifactId>
-		<version>1.4.2-SNAPSHOT</version>
+		<version>1.5.0-SNAPSHOT</version>
 	</parent>
 
-	<groupId>de.javakaffee.web.msm</groupId>
+	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>msm-serializer-benchmark</artifactId>
 	<name>memcached-session-manager serializer-benchmark</name>
-	<version>1.4.2-SNAPSHOT</version>
+	<version>1.5.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<dependencies>
 		<dependency>
-			<groupId>de.javakaffee.web.msm</groupId>
+			<groupId>de.javakaffee.msm</groupId>
 			<artifactId>memcached-session-manager</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+        <dependency>
+            <groupId>de.javakaffee.msm</groupId>
+            <artifactId>memcached-session-manager-tc7</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 		<dependency>
-			<groupId>de.javakaffee.web.msm</groupId>
+			<groupId>de.javakaffee.msm</groupId>
 			<artifactId>msm-kryo-serializer</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>de.javakaffee.web.msm</groupId>
+			<groupId>de.javakaffee.msm</groupId>
 			<artifactId>msm-javolution-serializer</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>de.javakaffee.web.msm</groupId>
+			<groupId>de.javakaffee.msm</groupId>
 			<artifactId>msm-xstream-serializer</artifactId>
 			<version>${project.version}</version>
 		</dependency>

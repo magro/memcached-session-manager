@@ -43,7 +43,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.MemcachedBackupSessionManager.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
@@ -73,7 +73,7 @@ public abstract class LockingStrategy {
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
-    protected MemcachedBackupSessionManager _manager;
+    protected MemcachedSessionService _manager;
     protected final MemcachedClient _memcached;
     protected LRUCache<String, Boolean> _missingSessionsCache;
     protected final SessionIdFormat _sessionIdFormat;
@@ -82,7 +82,7 @@ public abstract class LockingStrategy {
     private final boolean _storeSecondaryBackup;
     protected final Statistics _stats;
 
-    protected LockingStrategy( @Nonnull final MemcachedBackupSessionManager manager,
+    protected LockingStrategy( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats ) {
@@ -101,7 +101,7 @@ public abstract class LockingStrategy {
      */
     @CheckForNull
     public static LockingStrategy create( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern,
-            @Nonnull final MemcachedClient memcached, @Nonnull final MemcachedBackupSessionManager manager,
+            @Nonnull final MemcachedClient memcached, @Nonnull final MemcachedSessionService manager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats ) {
         if ( lockingMode == null ) {

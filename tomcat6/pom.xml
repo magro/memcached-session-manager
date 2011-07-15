@@ -1,0 +1,36 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>de.javakaffee.msm</groupId>
+		<artifactId>memcached-session-manager-parent</artifactId>
+		<version>1.5.0-SNAPSHOT</version>
+	</parent>
+
+	<groupId>de.javakaffee.msm</groupId>
+	<artifactId>memcached-session-manager-tc6</artifactId>
+	<version>1.5.0-SNAPSHOT</version>
+	<packaging>jar</packaging>
+	<name>memcached-session-manager tomcat6</name>
+	<description>The msm tomcat6 specific implementation.</description>
+
+	<dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>memcached-session-manager</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- use msm core test classes in tests -->
+        <!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
+        <dependency>
+            <groupId>de.javakaffee.msm</groupId>
+            <artifactId>memcached-session-manager</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+	</dependencies>
+
+</project>

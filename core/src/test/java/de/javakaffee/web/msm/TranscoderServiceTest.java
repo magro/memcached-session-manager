@@ -17,20 +17,27 @@
 package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.integration.TestUtils.assertDeepEquals;
+import static de.javakaffee.web.msm.integration.TestUtils.createSession;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Realm;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.core.StandardContext;
-import org.apache.catalina.core.StandardEngine;
-import org.apache.catalina.core.StandardHost;
-import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 
 /**
@@ -38,31 +45,30 @@ import org.testng.annotations.Test;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TranscoderServiceTest {
+public abstract class TranscoderServiceTest {
 
-    private static MemcachedBackupSessionManager _manager;
+    private static SessionManager _manager;
 
-    @BeforeClass
-    public static void setup() throws LifecycleException {
+    @BeforeMethod
+    public void setup() throws LifecycleException, ClassNotFoundException, IOException {
+        
+        _manager = mock( SessionManager.class );
+        
+        when( _manager.getContainer() ).thenReturn( new StandardContext() ); // needed for createSession
+        when( _manager.newMemcachedBackupSession() ).thenReturn( newMemcachedBackupSession( _manager ) );
+        
+        final MemcachedSessionService service = new MemcachedSessionService( _manager );
+        final MemcachedBackupSession session = createSession( service );
+        when( _manager.createSession( anyString() ) ).thenReturn( session );
+        
+        when( _manager.readPrincipal( (ObjectInputStream)any() ) ).thenReturn( createPrincipal() );
+        when( _manager.getMemcachedSessionService() ).thenReturn( service );
 
-        _manager = new MemcachedBackupSessionManager();
-        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+    }
 
-        final StandardContext container = new StandardContext();
-        container.setPath( "/" );
-        final StandardHost host = new StandardHost();
-        host.setParent( new StandardEngine() );
-        container.setParent( host );
-        _manager.setContainer( container );
-
-        final WebappLoader webappLoader = mock( WebappLoader.class );
-        // webappLoaderControl.expects( once() ).method( "setContainer" ).withAnyArguments();
-        when( webappLoader.getClassLoader() ).thenReturn( Thread.currentThread().getContextClassLoader() );
-        Assert.assertNotNull( webappLoader.getClassLoader(), "Webapp Classloader is null." );
-
-        _manager.getContainer().setLoader( webappLoader );
-        _manager.start();
-
+    @Nonnull
+    protected MemcachedBackupSession newMemcachedBackupSession( @Nullable final SessionManager manager ) {
+        return new MemcachedBackupSession( manager );
     }
 
     @Test
@@ -70,7 +76,7 @@ public class TranscoderServiceTest {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
         session.setLastBackupTime( System.currentTimeMillis() );
         final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager.getContainer().getRealm() ).getSession();
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager ).getSession();
 
         assertSessionFields( session, deserialized );
     }
@@ -79,18 +85,19 @@ public class TranscoderServiceTest {
     public void testSerializeSessionFieldsWithAuthenticatedPrincipal() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
-        final Realm realm = _manager.getContainer().getRealm();
-
         session.setAuthType( Constants.FORM_METHOD );
-        session.setPrincipal( new GenericPrincipal( realm, "foo", "bar" ) );
+        session.setPrincipal( createPrincipal() );
 
         session.setLastBackupTime( System.currentTimeMillis() );
 
         final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data, realm ).getSession();
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data, _manager ).getSession();
 
         assertSessionFields( session, deserialized );
     }
+
+    @Nonnull
+    protected abstract GenericPrincipal createPrincipal();
 
     @Test
     public void testSerializeSessionWithoutAttributes() {
@@ -100,7 +107,7 @@ public class TranscoderServiceTest {
 
         final TranscoderService transcoderService = new TranscoderService( new JavaSerializationTranscoder( _manager ) );
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm(), _manager );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager );
 
         assertSessionFields( session, deserialized );
     }
@@ -116,7 +123,7 @@ public class TranscoderServiceTest {
         session.setLastBackupTime( System.currentTimeMillis() );
 
         final byte[] data = transcoderService.serialize( session );
-        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager.getContainer().getRealm(), _manager );
+        final MemcachedBackupSession deserialized = transcoderService.deserialize( data, _manager );
 
         assertSessionFields( session, deserialized );
         Assert.assertEquals( value, deserialized.getAttribute( "foo" ) );
