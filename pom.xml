@@ -11,7 +11,7 @@
 	    <version>7</version>
 	</parent>
 
-	<groupId>de.javakaffee.web.msm</groupId>
+	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>memcached-session-manager-parent</artifactId>
 	<version>1.5.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
@@ -164,7 +164,7 @@
 					<threshold>Normal</threshold> <!-- High|Normal|Low|Exp|Ignore -->
 					<effort>Max</effort><!-- Min|Default|Max -->
 					<!-- excludeFilterFile>src/site/findbugs-exclude.xml</excludeFilterFile -->
-					<onlyAnalyze>de.javakaffee.web.msm.-</onlyAnalyze>
+					<onlyAnalyze>de.javakaffee.msm.-</onlyAnalyze>
 					<debug>false</debug>
 				</configuration>
 			</plugin>
