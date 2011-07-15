@@ -65,7 +65,7 @@ public class MemcachedBackupSessionManagerTest {
     public void setup() throws Exception {
 
         _manager = new MemcachedBackupSessionManager();
-        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _manager.setMemcachedNodes( "127.0.0.1:11211" );
         _manager.setSessionBackupAsync( false );
         _manager.setSticky( true );
 
@@ -97,7 +97,7 @@ public class MemcachedBackupSessionManagerTest {
 
     @Test
     public void testConfigurationFormatMemcachedNodesFeature44() throws LifecycleException {
-        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _manager.setMemcachedNodes( "127.0.0.1:11211" );
         _manager.startInternal(_memcachedMock);
         Assert.assertEquals( _manager.getNodeIds(), Arrays.asList( "n1" ) );
 

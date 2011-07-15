@@ -46,7 +46,7 @@ public class TranscoderServiceTest {
     public static void setup() throws LifecycleException {
 
         _manager = new MemcachedBackupSessionManager();
-        _manager.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _manager.setMemcachedNodes( "127.0.0.1:11211" );
 
         final StandardContext container = new StandardContext();
         container.setPath( "/" );
