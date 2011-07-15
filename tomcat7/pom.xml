@@ -50,7 +50,9 @@
             <groupId>de.javakaffee.web.msm</groupId>
             <artifactId>msm-all-memcached-session-manager</artifactId>
             <version>${project.version}</version>
-            <type>test-jar</type>
+			<!-- use classifier:tests, as type:test-jar creates a wrong classpath, 
+				see http://jira.codehaus.org/browse/MNG-5096 -->
+			<classifier>tests</classifier>
             <scope>test</scope>
             <exclusions>
                <exclusion>
