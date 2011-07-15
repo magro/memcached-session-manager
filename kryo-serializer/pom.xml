@@ -17,7 +17,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>de.javakaffee.web.msm</groupId>
-			<artifactId>memcached-session-manager</artifactId>
+			<artifactId>msm-all-memcached-session-manager</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
@@ -60,7 +60,7 @@
 		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
 		<dependency>
 			<groupId>de.javakaffee.web.msm</groupId>
-			<artifactId>memcached-session-manager</artifactId>
+			<artifactId>msm-all-memcached-session-manager</artifactId>
 			<version>${project.version}</version>
 			<type>test-jar</type>
 			<scope>test</scope>

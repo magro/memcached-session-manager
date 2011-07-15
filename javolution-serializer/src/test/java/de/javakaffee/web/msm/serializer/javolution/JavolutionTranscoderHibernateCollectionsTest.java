@@ -18,7 +18,7 @@ package de.javakaffee.web.msm.serializer.javolution;
 
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.serializer.hibernate.AbstractHibernateCollectionsTest;
 
 /**
@@ -31,8 +31,8 @@ import de.javakaffee.web.msm.serializer.hibernate.AbstractHibernateCollectionsTe
 public class JavolutionTranscoderHibernateCollectionsTest extends AbstractHibernateCollectionsTest {
 
     @Override
-    protected JavolutionTranscoder createTranscoder( final MemcachedBackupSessionManager manager ) {
-        return new JavolutionTranscoder( manager, false, new HibernateCollectionsXMLFormat() );
+    protected JavolutionTranscoder createTranscoder( final SessionManager manager ) {
+        return new JavolutionTranscoder( Thread.currentThread().getContextClassLoader(), false, new HibernateCollectionsXMLFormat() );
     }
 
 }

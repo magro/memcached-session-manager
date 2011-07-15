@@ -18,7 +18,7 @@ package de.javakaffee.web.msm.serializer.kryo;
 
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.serializer.hibernate.AbstractHibernateCollectionsTest;
 
 /**
@@ -31,7 +31,7 @@ import de.javakaffee.web.msm.serializer.hibernate.AbstractHibernateCollectionsTe
 public class KryoTranscoderHibernateCollectionsTest extends AbstractHibernateCollectionsTest {
 
     @Override
-    protected KryoTranscoder createTranscoder( final MemcachedBackupSessionManager manager ) {
+    protected KryoTranscoder createTranscoder( final SessionManager manager ) {
         final String[] customConverter = new String[] {
             HibernateCollectionsSerializerFactory.class.getName()
         };

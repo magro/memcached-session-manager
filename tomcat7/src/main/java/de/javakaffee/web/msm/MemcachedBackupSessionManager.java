@@ -127,12 +127,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     @Override
-    public Session createSession( final String sessionId ) {
+    public MemcachedBackupSession createSession( final String sessionId ) {
         return _msm.createSession( sessionId );
     }
     
     @Override
-    public Session createEmptySession() {
+    public MemcachedBackupSession createEmptySession() {
         return _msm.createEmptySession();
     }
 

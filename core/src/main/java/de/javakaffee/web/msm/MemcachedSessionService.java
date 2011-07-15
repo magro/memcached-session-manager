@@ -616,14 +616,14 @@ public class MemcachedSessionService implements SessionBackupService {
     /**
      * {@inheritDoc}
      */
-    public Session createSession( String sessionId ) {
+    public MemcachedBackupSession createSession( String sessionId ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "createSession invoked: " + sessionId );
         }
 
         checkMaxActiveSessions();
 
-        StandardSession session = null;
+        MemcachedBackupSession session = null;
 
         if ( sessionId != null ) {
             session = loadFromMemcachedWithCheck( sessionId );
