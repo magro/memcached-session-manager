@@ -9,7 +9,7 @@
 	</parent>
 
 	<groupId>de.javakaffee.web.msm</groupId>
-	<artifactId>msm-all-memcached-session-manager</artifactId>
+	<artifactId>memcached-session-manager</artifactId>
 	<version>1.5.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager core</name>

@@ -9,7 +9,7 @@
 	</parent>
 
 	<groupId>de.javakaffee.web.msm</groupId>
-	<artifactId>msm-all-memcached-session-manager-tc7</artifactId>
+	<artifactId>memcached-session-manager-tc7</artifactId>
 	<version>1.5.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager tomcat7</name>
@@ -22,7 +22,7 @@
 	<dependencies>
 	    <dependency>
 	        <groupId>${groupId}</groupId>
-	        <artifactId>msm-all-memcached-session-manager</artifactId>
+	        <artifactId>memcached-session-manager</artifactId>
 	        <version>${version}</version>
 	        <exclusions>
                <exclusion>
@@ -48,7 +48,7 @@
         <!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
         <dependency>
             <groupId>de.javakaffee.web.msm</groupId>
-            <artifactId>msm-all-memcached-session-manager</artifactId>
+            <artifactId>memcached-session-manager</artifactId>
             <version>${project.version}</version>
 			<!-- use classifier:tests, as type:test-jar creates a wrong classpath, 
 				see http://jira.codehaus.org/browse/MNG-5096 -->
