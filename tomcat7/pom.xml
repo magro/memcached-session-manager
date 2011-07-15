@@ -21,9 +21,9 @@
 
 	<dependencies>
 	    <dependency>
-	        <groupId>${groupId}</groupId>
+	        <groupId>${project.groupId}</groupId>
 	        <artifactId>memcached-session-manager</artifactId>
-	        <version>${version}</version>
+	        <version>${project.version}</version>
 	        <exclusions>
                <exclusion>
                    <groupId>javax.servlet</groupId>
