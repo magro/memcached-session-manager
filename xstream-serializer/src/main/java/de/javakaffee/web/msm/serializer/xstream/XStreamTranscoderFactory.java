@@ -20,7 +20,6 @@ import org.apache.catalina.Manager;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -45,14 +44,6 @@ public class XStreamTranscoderFactory implements TranscoderFactory {
             _transcoder = new XStreamTranscoder( manager );
         }
         return _transcoder;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
-        return getTranscoder( manager );
     }
 
     /**

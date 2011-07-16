@@ -68,14 +68,13 @@ import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
 import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.SessionTranscoder;
 
 /**
  * A {@link SessionAttributesTranscoder} that uses {@link Kryo} for serialization.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class KryoTranscoder extends SessionTranscoder implements SessionAttributesTranscoder {
+public class KryoTranscoder implements SessionAttributesTranscoder {
 
     private static final Log LOG = LogFactory.getLog( KryoTranscoder.class );
     
@@ -127,7 +126,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
         final Kryo kryo = new KryoReflectionFactorySupport() {
             
             @Override
-            @SuppressWarnings( "unchecked" )
+            @SuppressWarnings( { "rawtypes" } )
             public Serializer newSerializer(final Class clazz) {
                 final Serializer customSerializer = loadCustomSerializer( clazz );
                 if ( customSerializer != null ) {
@@ -151,7 +150,7 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
                 return super.newSerializer( clazz );
             }
             
-            @SuppressWarnings( "unchecked" )
+            @SuppressWarnings( { "rawtypes" } )
             @Override
             protected void handleUnregisteredClass( final Class clazz ) {
                 if ( _unregisteredClassHandlers != null ) {
@@ -266,14 +265,6 @@ public class KryoTranscoder extends SessionTranscoder implements SessionAttribut
          * Creates an ObjectStream with an initial buffer size of 50KB and a maximum size of 1000KB.
          */
         return new ObjectBuffer( _kryo, _initialBufferSize, _maxBufferSize  ).writeObject( attributes );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected MemcachedBackupSession deserialize( final byte[] in ) {
-        throw new UnsupportedOperationException( "Session deserialization not implemented." );
     }
 
     private Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> loadCustomConverter( final String[] customConverterClassNames, final ClassLoader classLoader,

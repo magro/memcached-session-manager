@@ -31,7 +31,6 @@ import com.thoughtworks.xstream.XStream;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.SessionTranscoder;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -39,11 +38,10 @@ import de.javakaffee.web.msm.SessionTranscoder;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class XStreamTranscoder extends SessionTranscoder implements SessionAttributesTranscoder {
+public class XStreamTranscoder implements SessionAttributesTranscoder {
 
     private static final Log LOG = LogFactory.getLog( XStreamTranscoder.class );
 
-    private final Manager _manager;
     private final XStream _xstream;
 
     /**
@@ -53,7 +51,6 @@ public class XStreamTranscoder extends SessionTranscoder implements SessionAttri
      *            the manager
      */
     public XStreamTranscoder( final Manager manager ) {
-        _manager = manager;
         _xstream = new XStream();
     }
 
@@ -98,36 +95,6 @@ public class XStreamTranscoder extends SessionTranscoder implements SessionAttri
             return result;
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
-            throw e ;
-        } finally {
-            closeSilently( bis );
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected byte[] serialize( final Object o ) {
-        return doSerialize( o );
-    }
-
-    /**
-     * Get the object represented by the given serialized bytes.
-     * 
-     * @param in
-     *            the bytes to deserialize
-     * @return the resulting object
-     */
-    @Override
-    protected MemcachedBackupSession deserialize( final byte[] in ) {
-        final ByteArrayInputStream bis = new ByteArrayInputStream( in );
-        try {
-            final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createEmptySession();
-            _xstream.fromXML( bis, session );
-            return session;
-        } catch ( final RuntimeException e ) {
-            getLogger().warn( "Caught Exception decoding %d bytes of data", in.length, e );
             throw e ;
         } finally {
             closeSilently( bis );

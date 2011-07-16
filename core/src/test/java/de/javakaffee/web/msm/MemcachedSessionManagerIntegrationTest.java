@@ -16,14 +16,16 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.integration.TestUtils.*;
+import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
+import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.getManager;
+import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
 import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -292,25 +294,6 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         assertNotSame( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1,
                 "The sessionId should have changed due to expired sessin" );
 
-    }
-
-    /**
-     * Test that a session that has been serialized with the old serialization
-     * format (the complete session was serialized by one serialization strategy)
-     * can be loaded from memcached.
-     * @throws ExecutionException
-     * @throws InterruptedException
-     */
-    @Test( enabled = true )
-    public void testLoadFromMemcachedOldSessionSerializationFormat() throws InterruptedException, ExecutionException {
-        final SessionManager manager = getManager( _tomcat1 );
-        final Session session = manager.createSession( null );
-        final SessionTranscoder oldSessionTranscoder = manager.getMemcachedSessionService().getTranscoderFactory().createSessionTranscoder( manager );
-        final Future<Boolean> future = _memcached.set( session.getId(), session.getMaxInactiveInterval(), session, oldSessionTranscoder );
-        assertTrue( future.get() );
-        final Session loadedFromMemcached = manager.getMemcachedSessionService().loadFromMemcachedWithCheck( session.getId() );
-        assertNotNull( loadedFromMemcached );
-        assertDeepEquals( session, loadedFromMemcached );
     }
 
     /**

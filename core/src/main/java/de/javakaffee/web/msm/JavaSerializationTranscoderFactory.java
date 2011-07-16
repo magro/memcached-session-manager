@@ -16,8 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import org.apache.catalina.Manager;
-
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
@@ -31,16 +29,9 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
+    @Override
     public SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
         return new JavaSerializationTranscoder( manager );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
-        return new JavaSessionSerializationTranscoder( manager );
     }
 
     /**
@@ -50,6 +41,7 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
      *
      * @param copyCollectionsForSerialization the copyCollectionsForSerialization value
      */
+    @Override
     public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         if ( copyCollectionsForSerialization ) {
             throw new UnsupportedOperationException(
@@ -63,6 +55,7 @@ public class JavaSerializationTranscoderFactory implements TranscoderFactory {
      *
      * @param customConverterClassNames a list of class names or <code>null</code>.
      */
+    @Override
     public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
         if ( customConverterClassNames != null && customConverterClassNames.length > 0 ) {
             throw new UnsupportedOperationException( "Java serialization does not support custom converter." );

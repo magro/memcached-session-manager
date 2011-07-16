@@ -40,7 +40,6 @@ import javax.annotation.Nullable;
 
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.transcoders.SerializingTranscoder;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -225,8 +224,6 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private TranscoderFactory _transcoderFactory;
 
-    private SerializingTranscoder _upgradeSupportTranscoder;
-
     private BackupSessionService _backupSessionService;
 
     private boolean _sticky = true;
@@ -391,8 +388,6 @@ public class MemcachedSessionService implements SessionBackupService {
         initNonStickyLockingMode( config );
 
         _transcoderService = createTranscoderService( _statistics );
-
-        _upgradeSupportTranscoder = getTranscoderFactory().createSessionTranscoder( _manager );
 
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                 _backupThreadCount, _memcached, _nodeIdService, _statistics );
@@ -994,19 +989,16 @@ public class MemcachedSessionService implements SessionBackupService {
                  * they get deserialized by BaseSerializingTranscoder.deserialize or the appropriate
                  * specializations.
                  */
-                final Object object = _memcached.get( sessionId, _upgradeSupportTranscoder );
+                final Object object = _memcached.get( sessionId );
                 _nodeIdService.setNodeAvailable( nodeId, true );
 
                 if ( object != null ) {
-                    final MemcachedBackupSession result;
-                    if ( object instanceof MemcachedBackupSession ) {
-                        result = (MemcachedBackupSession) object;
+                    if ( !(object instanceof byte[]) ) {
+                        throw new RuntimeException( "The loaded object for sessionId " + sessionId + " is not of required type byte[], but " + object.getClass().getName() );
                     }
-                    else {
-                        final long startDeserialization = System.currentTimeMillis();
-                        result = _transcoderService.deserialize( (byte[]) object, _manager );
-                        _statistics.registerSince( SESSION_DESERIALIZATION, startDeserialization );
-                    }
+                    final long startDeserialization = System.currentTimeMillis();
+                    final MemcachedBackupSession result = _transcoderService.deserialize( (byte[]) object, _manager );
+                    _statistics.registerSince( SESSION_DESERIALIZATION, startDeserialization );
                     _statistics.registerSince( LOAD_FROM_MEMCACHED, start );
 
                     result.setSticky( _sticky );

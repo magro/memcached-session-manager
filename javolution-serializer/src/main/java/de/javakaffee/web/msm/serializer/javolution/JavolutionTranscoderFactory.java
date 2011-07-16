@@ -23,7 +23,6 @@ import org.apache.catalina.Manager;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -57,14 +56,6 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
             _transcoder = new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
         }
         return _transcoder;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
-        return getTranscoder( manager );
     }
 
     private CustomXMLFormat<?>[] loadCustomFormats( final Manager manager ) {

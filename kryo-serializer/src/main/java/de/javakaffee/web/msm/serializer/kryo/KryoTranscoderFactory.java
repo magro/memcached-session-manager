@@ -22,7 +22,6 @@ import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.SessionTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
 
 /**
@@ -76,14 +75,6 @@ public class KryoTranscoderFactory implements TranscoderFactory {
             }
         }
         return value;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public SessionTranscoder createSessionTranscoder( final Manager manager ) {
-        return getTranscoder( manager );
     }
 
     /**

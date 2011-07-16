@@ -40,17 +40,6 @@ public interface TranscoderFactory {
     SessionAttributesTranscoder createTranscoder( SessionManager manager );
 
     /**
-     * Create a {@link SessionTranscoder} that can be used to deserialize
-     * sessions that are still stored in memcached with the old serialization
-     * format (the whole session was serialized by the serialization strategy,
-     * not only attributes).
-     * @param manager
-     *            the manager that needs to be set on deserialized sessions.
-     * @return an implementation of {@link SessionTranscoder}.
-     */
-    SessionTranscoder createSessionTranscoder( Manager manager );
-
-    /**
      * Specifies, if iterating over collection elements shall be done on a copy
      * of the collection or on the collection itself.
      * <p>

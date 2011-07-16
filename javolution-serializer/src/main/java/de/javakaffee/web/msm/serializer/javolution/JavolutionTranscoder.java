@@ -34,7 +34,6 @@ import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
-import de.javakaffee.web.msm.SessionTranscoder;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -52,7 +51,7 @@ import de.javakaffee.web.msm.SessionTranscoder;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class JavolutionTranscoder extends SessionTranscoder implements SessionAttributesTranscoder {
+public class JavolutionTranscoder implements SessionAttributesTranscoder {
 
     static final String REFERENCE_ATTRIBUTE_ID = "__id";
     static final String REFERENCE_ATTRIBUTE_REF_ID = "__ref";
@@ -113,17 +112,6 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
         return doSerialize( attributes, "attributes" );
     }
 
-    /**
-     * This is there just for testing, so that we can serialize sessions using
-     * the former serialization strategy (the whole session, not just attribtes).
-     * @param session the session to serialize.
-     * @return the serialized session data
-     */
-    @Override
-    protected byte[] serialize( final Object session ) {
-        return doSerialize( session, "session" );
-    }
-
     private byte[] doSerialize( final Object object, final String name ) {
         if ( object == null ) {
             throw new NullPointerException( "Can't serialize null" );
@@ -175,20 +163,6 @@ public class JavolutionTranscoder extends SessionTranscoder implements SessionAt
         }
 
         return doDeserialize( in, "attributes" );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected MemcachedBackupSession deserialize( final byte[] in ) {
-        /* "session" is exactly the name that was used by the former transcoder.
-         * We need to use the same name so that we can deserialize old session data.
-         */
-        final MemcachedBackupSession result = doDeserialize( in, "session" );
-        result.setManager( _manager );
-        result.doAfterDeserialization();
-        return result;
     }
 
     private <T> T doDeserialize( final byte[] in, final String name ) {
