@@ -13,7 +13,7 @@
 	<version>1.5.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager tomcat7</name>
-	<description>The msm core, provides java serialization strategy.</description>
+	<description>The msm tomcat7 specific implementation.</description>
 
 	<properties>
 		<tomcat-version>7.0.8</tomcat-version>
