@@ -19,6 +19,7 @@
 			<groupId>de.javakaffee.msm</groupId>
 			<artifactId>memcached-session-manager</artifactId>
 			<version>${project.version}</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>de.javakaffee</groupId>
