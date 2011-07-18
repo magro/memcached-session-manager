@@ -55,16 +55,11 @@ public class SessionIdFormat {
      *            the original session id, it might contain the jvm route
      * @param memcachedId
      *            the memcached id to encode in the session id, may be <code>null</code>.
-     * @param isSingleNode
      * @return the sessionId which now contains the memcachedId if one was provided, otherwise
      *  the sessionId unmodified.
      */ 
     @Nonnull
-    public String createSessionId(@Nonnull final String sessionId, @Nullable final String memcachedId,
-                                  boolean isSingleNode) {
-        if( isSingleNode ) {
-            return sessionId;
-        }
+    public String createSessionId(@Nonnull final String sessionId, @Nullable final String memcachedId) {
         if ( LOG.isDebugEnabled() ) {
             LOG.debug( "Creating new session id with orig id '" + sessionId + "' and memcached id '" + memcachedId + "'." );
         }
@@ -91,12 +86,7 @@ public class SessionIdFormat {
      *         former one.
      */
     @Nonnull
-    public String createNewSessionId( @Nonnull final String sessionId, @Nonnull final String newMemcachedId,
-                                      final boolean isSingleNode) {
-        if( isSingleNode ) {
-            return sessionId;   
-        }
-
+    public String createNewSessionId( @Nonnull final String sessionId, @Nonnull final String newMemcachedId) {
         final int idxDot = sessionId.indexOf( '.' );
         if ( idxDot != -1 ) {
             final String plainSessionId = sessionId.substring( 0, idxDot );

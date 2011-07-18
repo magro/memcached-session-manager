@@ -376,7 +376,6 @@ public class MemcachedSessionService implements SessionBackupService {
         /* init memcached
          */
         final MemcachedConfig config = createMemcachedConfig( _memcachedNodes, _failoverNodes );
-        final List<InetSocketAddress> socketAddresses = config.getAddresses();
 
         _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( config.getNodeIds(), config.getAddresses(),
                 config.getAddress2Ids(), _statistics );
@@ -417,7 +416,10 @@ public class MemcachedSessionService implements SessionBackupService {
         /**
          * If mutliple nodes are configured
          */
-        if (matcher.matches()) {
+        if (singleNodeMatcher.matches()) {    //for single 
+            initHandleSingleNodeDefinitionMatch(singleNodeMatcher, addresses);
+        }
+        else { // If mutliple nodes are configured
             while (matcher.find()) {
                 initHandleNodeDefinitionMatch(matcher, addresses, address2Ids, nodeIds);
             }
@@ -425,8 +427,6 @@ public class MemcachedSessionService implements SessionBackupService {
                 throw new IllegalArgumentException("All nodes are also configured as failover nodes,"
                         + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes.");
             }
-        } else if (singleNodeMatcher.matches()) {    //for single 
-            initHandleSingleNodeDefinitionMatch(singleNodeMatcher, addresses);
         }
         final List<String> failoverNodeIds = initFailoverNodes(failoverNodes, nodeIds);
         return new MemcachedConfig( memcachedNodes, failoverNodes, new NodeIdList( nodeIds ), failoverNodeIds, addresses, address2Ids );
@@ -503,8 +503,7 @@ public class MemcachedSessionService implements SessionBackupService {
             @Override
             public boolean isNodeAvailable( final String key ) {
                 try {
-                    final boolean isSingleNode = !_memcachedNodes.contains(" ") && (_failoverNodes== null || _failoverNodes.isEmpty());
-                    memcachedClient.get( _sessionIdFormat.createSessionId( "ping", key, isSingleNode ) );
+                    memcachedClient.get( _sessionIdFormat.createSessionId( "ping", key ) );
                     return true;
                 } catch ( final Exception e ) {
                     return false;
@@ -555,9 +554,7 @@ public class MemcachedSessionService implements SessionBackupService {
      * {@inheritDoc}
      */
     public String newSessionId( @Nonnull final String sessionId ) {
-        final boolean isSingleNode = !_memcachedNodes.contains(" ") && (_failoverNodes== null || _failoverNodes.isEmpty());
-        return _sessionIdFormat.createSessionId( sessionId, _nodeIdService.getMemcachedNodeId(),
-                isSingleNode);
+        return _sessionIdFormat.createSessionId( sessionId, _nodeIdService.getMemcachedNodeId());
     }
 
     /**
@@ -787,9 +784,7 @@ public class MemcachedSessionService implements SessionBackupService {
                     final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
                     final String newNodeId = getNewNodeIdIfUnavailable( nodeId );
                     if ( newNodeId != null ) {
-                        final boolean isSingleNode = !_memcachedNodes.contains(" ") && (_failoverNodes== null || _failoverNodes.isEmpty());
-                        final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId,
-                                isSingleNode);
+                        final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId);
                         _log.debug( "Session needs to be relocated, setting new id on session..." );
                         session.setIdForRelocate( newSessionId );
                         _statistics.requestWithMemcachedFailover();
@@ -852,8 +847,7 @@ public class MemcachedSessionService implements SessionBackupService {
             session.setSticky( _sticky );
             session.setLastAccessedTimeInternal( validityInfo.getLastAccessedTime() );
             session.setThisAccessedTimeInternal( validityInfo.getThisAccessedTime() );
-            final boolean isSingleNode = !_memcachedNodes.contains(" ") && (_failoverNodes== null || _failoverNodes.isEmpty());
-            final String newSessionId = _sessionIdFormat.createNewSessionId( requestedSessionId, backupNodeId, isSingleNode );
+            final String newSessionId = _sessionIdFormat.createNewSessionId( requestedSessionId, backupNodeId );
             _log.info( "Session backup loaded from secondary memcached for "+ requestedSessionId +" (will be relocated)," +
             		" setting new id "+ newSessionId +" on session..." );
             session.setIdInternal( newSessionId );
