@@ -1,13 +1,6 @@
 memcached-session-manager (1.5.0) stable; urgency=low
 
-  * Updating to vanilla 1.5.0 and reverting to tomcat6
+  * Added debian packaging
 
  -- Fabio Kung <fabio.kung@gmail.com>  Tue, 26 Jul 2011 10:15:00 -0300
-
-
-memcached-session-manager (1.4.1-tomcat5) stable; urgency=low
-
-  * Making it work with tomcat5
-
- -- Fabio Kung <fabio.kung@gmail.com>  Tue, 5 Apr 2011 08:11:00 -0300
 
