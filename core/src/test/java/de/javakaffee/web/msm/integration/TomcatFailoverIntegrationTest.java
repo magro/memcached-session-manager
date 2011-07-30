@@ -43,9 +43,9 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
+import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.NodeIdList;
-import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
@@ -66,6 +66,13 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private MemCacheDaemon<?> _daemon;
     private MemcachedClient _client;
+    
+    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+        @Override
+        public Object get(final String key) {
+            return _client.get(key);
+        }
+    };
 
     private Embedded _tomcat1;
     private Embedded _tomcat2;
@@ -98,9 +105,9 @@ public abstract class TomcatFailoverIntegrationTest {
             throw e;
         }
 
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, _memcachedClientCallback);
         _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( NODE_ID ), NodeIdResolver.node(
-                        NODE_ID, address ).build(), new SessionIdFormat(), Statistics.create() ),
+                new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create() ),
                         Arrays.asList( address ) );
 
         _httpClient = new DefaultHttpClient();

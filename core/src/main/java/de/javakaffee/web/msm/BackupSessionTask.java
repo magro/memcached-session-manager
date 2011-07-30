@@ -58,7 +58,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
     private final MemcachedClient _memcached;
-    private final NodeIdService _nodeIdService;
+    private final MemcachedNodesManager _memcachedNodesManager;
     private final Statistics _statistics;
 
     /**
@@ -71,8 +71,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
      *            specifies, if the session needs to be saved by all means, e.g.
      *            as it has to be relocated to another memcached
      *            node (the session id had been changed before in this case).
-     * @param nodeAvailabilityCache
-     * @param nodeIds
+     * @param memcachedNodesManager
      * @param failoverNodeIds
      */
     public BackupSessionTask( final MemcachedBackupSession session,
@@ -81,7 +80,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
             final boolean sessionBackupAsync,
             final int sessionBackupTimeout,
             final MemcachedClient memcached,
-            final NodeIdService nodeIdService,
+            final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         _session = session;
         _force = sessionIdChanged;
@@ -89,7 +88,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
         _memcached = memcached;
-        _nodeIdService = nodeIdService;
+        _memcachedNodesManager = memcachedNodesManager;
         _statistics = statistics;
     }
 
@@ -232,7 +231,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                         _log.info( "Could not store session " + session.getId() + " in memcached." );
                     }
                     final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-                    _nodeIdService.setNodeAvailable( nodeId, false );
+                    _memcachedNodesManager.setNodeAvailable( nodeId, false );
                     throw new NodeFailureException( "Could not store session in memcached.", nodeId );
                 }
             }

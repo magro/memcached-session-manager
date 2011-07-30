@@ -22,8 +22,6 @@ import static de.javakaffee.web.msm.Statistics.StatsType.CACHED_DATA_SIZE;
 import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,7 +35,7 @@ import org.apache.catalina.Session;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 
 /**
  * This {@link MemcachedSessionService} can be used for debugging session
@@ -68,22 +66,19 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
     }
 
     @Override
-    protected MemcachedClient createMemcachedClient( final NodeIdList nodeIds, final List<InetSocketAddress> addresses, final Map<InetSocketAddress, String> address2Ids,
+    protected MemcachedClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         return null;
     }
-
-    /**
-     * {@inheritDoc}
-     */
+    
     @Override
-    protected NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis, final MemcachedClient memcachedClient ) {
-        return new NodeAvailabilityCache<String>( size, ttlInMillis, new CacheLoader<String>() {
-            @Override
-            public boolean isNodeAvailable( final String key ) {
-                return true;
-            }
-        } );
+    protected MemcachedClientCallback createMemcachedClientCallback() {
+    	return new MemcachedClientCallback() {
+			@Override
+			public Object get(final String key) {
+				return null;
+			}
+		};
     }
 
     @Override

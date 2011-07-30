@@ -58,7 +58,7 @@ public class BackupSessionService {
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
     private final MemcachedClient _memcached;
-    private final NodeIdService _nodeIdService;
+    private final MemcachedNodesManager _memcachedNodesManager;
     private final Statistics _statistics;
 
     private final ExecutorService _executorService;
@@ -69,8 +69,7 @@ public class BackupSessionService {
      * @param sessionBackupTimeout
      * @param backupThreadCount TODO
      * @param memcached
-     * @param nodeAvailabilityCache
-     * @param nodeIds
+     * @param memcachedNodesManager
      * @param failoverNodeIds
      */
     public BackupSessionService( final TranscoderService transcoderService,
@@ -78,13 +77,13 @@ public class BackupSessionService {
             final int sessionBackupTimeout,
             final int backupThreadCount,
             final MemcachedClient memcached,
-            final NodeIdService nodeIdService,
+            final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
         _memcached = memcached;
-        _nodeIdService = nodeIdService;
+        _memcachedNodesManager = memcachedNodesManager;
         _statistics = statistics;
 
         _executorService = sessionBackupAsync
@@ -232,7 +231,7 @@ public class BackupSessionService {
                 _sessionBackupAsync,
                 _sessionBackupTimeout,
                 _memcached,
-                _nodeIdService,
+                _memcachedNodesManager,
                 _statistics );
     }
 
