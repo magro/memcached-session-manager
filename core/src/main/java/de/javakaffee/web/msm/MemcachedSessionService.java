@@ -1441,6 +1441,14 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     /**
+     * Return the memcached nodes manager.
+     */
+    @Nonnull
+    MemcachedNodesManager getMemcachedNodesManager() {
+        return _memcachedNodesManager;
+    }
+
+    /**
      * Return the currently configured node ids - just for testing.
      * @return the list of node ids.
      */

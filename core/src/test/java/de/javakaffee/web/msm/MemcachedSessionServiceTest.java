@@ -26,6 +26,7 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyMap;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -126,6 +127,27 @@ public abstract class MemcachedSessionServiceTest {
         _service.setFailoverNodes( "n1,n2" );
         _service.startInternal(_memcachedMock);
         Assert.assertEquals( _service.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
+    }
+
+    /**
+     * Test for issue #105: Make memcached node optional for single-node setup
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=105
+     */
+    @Test
+    public void testConfigurationFormatMemcachedNodesFeature105() throws LifecycleException {
+        _service.setMemcachedNodes( "127.0.0.1:11211" );
+        _service.startInternal(_memcachedMock);
+        assertEquals(_service.getMemcachedNodesManager().getCountNodes(), 1);
+        assertEquals(_service.getMemcachedNodesManager().isEncodeNodeIdInSessionId(), false);
+        assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456"), true);
+        _service.shutdown();
+
+        _service.setMemcachedNodes( "n1:127.0.0.1:11211" );
+        _service.startInternal(_memcachedMock);
+        assertEquals(_service.getMemcachedNodesManager().getCountNodes(), 1);
+        assertEquals(_service.getMemcachedNodesManager().isEncodeNodeIdInSessionId(), true);
+        assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456"), false);
+        assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456-n1"), true);
     }
 
     /**

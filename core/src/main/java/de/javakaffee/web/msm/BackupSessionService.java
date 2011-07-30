@@ -52,8 +52,6 @@ public class BackupSessionService {
 
     private static final Log _log = LogFactory.getLog( BackupSessionService.class );
 
-    private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
-
     private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
@@ -122,7 +120,7 @@ public class BackupSessionService {
             _log.debug( "Updating expiration time for session " + session.getId() );
         }
 
-        if ( !hasMemcachedIdSet( session ) ) {
+        if ( !_memcachedNodesManager.getSessionIdFormat().isValid( session.getId() ) ) {
             return;
         }
 
@@ -173,9 +171,9 @@ public class BackupSessionService {
         final long start = System.currentTimeMillis();
         try {
 
-            if ( !hasMemcachedIdSet( session ) ) {
+            if ( !_memcachedNodesManager.getSessionIdFormat().isValid( session.getId() ) ) {
                 if ( _log.isDebugEnabled() ) {
-                    _log.debug( "Skipping backup for session id " + session.getId() + " as no memcached id could be detected in the session id." );
+                    _log.debug( "Skipping backup for session id " + session.getId() + " as the session id is not usable for memcached." );
                 }
                 _statistics.requestWithBackupFailure();
                 return new SimpleFuture<BackupResult>( BackupResult.FAILURE );
@@ -235,10 +233,6 @@ public class BackupSessionService {
                 _statistics );
     }
 
-    private boolean hasMemcachedIdSet( final MemcachedBackupSession session ) {
-        return _sessionIdFormat.isValid( session.getId() );
-    }
-
     private void releaseLock( @Nonnull final MemcachedBackupSession session ) {
         if ( session.isLocked()  ) {
             try {
@@ -246,7 +240,7 @@ public class BackupSessionService {
                     _log.debug( "Releasing lock for session " + session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _sessionIdFormat.createLockName( session.getIdInternal() ) );
+                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( session.getIdInternal() ) );
                 _statistics.registerSince( RELEASE_LOCK, start );
                 session.releaseLock();
             } catch( final Exception e ) {

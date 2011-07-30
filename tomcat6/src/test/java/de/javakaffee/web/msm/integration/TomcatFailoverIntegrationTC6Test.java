@@ -33,10 +33,4 @@ public class TomcatFailoverIntegrationTC6Test extends TomcatFailoverIntegrationT
         return new TestUtilsTC6();
     }
 
-    @Override
-    @Test( enabled = true )
-    public void testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute() throws Exception {
-        super.testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute();
-    }
-
 }
