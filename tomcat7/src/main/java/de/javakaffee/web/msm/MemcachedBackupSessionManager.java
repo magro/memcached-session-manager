@@ -120,7 +120,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *
      * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
      */
-    void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
+    protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
         super.startInternal();
         _msm.startInternal( memcachedClient );
         setState(LifecycleState.STARTING);
