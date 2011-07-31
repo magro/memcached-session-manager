@@ -20,6 +20,7 @@ import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static org.testng.Assert.*;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
@@ -27,6 +28,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.LifecycleException;
@@ -43,9 +46,9 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
+import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.NodeIdList;
-import de.javakaffee.web.msm.NodeIdResolver;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
@@ -64,8 +67,17 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( TomcatFailoverIntegrationTest.class );
 
+    private static final String GROUP_WITHOUT_NODE_ID = "withoutNodeId";
+
     private MemCacheDaemon<?> _daemon;
     private MemcachedClient _client;
+    
+    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+        @Override
+        public Object get(final String key) {
+            return _client.get(key);
+        }
+    };
 
     private Embedded _tomcat1;
     private Embedded _tomcat2;
@@ -78,16 +90,20 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private static final String NODE_ID = "n1";
     private static final int MEMCACHED_PORT = 21211;
-    private static final String MEMCACHED_NODES = NODE_ID + ":localhost:" + MEMCACHED_PORT;
+    private String _memcachedNodes;
 
     private DefaultHttpClient _httpClient;
 
     @BeforeMethod
-    public void setUp() throws Throwable {
+    public void setUp(final Method testMethod) throws Throwable {
 
         final InetSocketAddress address = new InetSocketAddress( "localhost", MEMCACHED_PORT );
         _daemon = createDaemon( address );
         _daemon.start();
+
+        final String[] testGroups = testMethod.getAnnotation(Test.class).groups();
+        final String nodePrefix = testGroups.length == 0 || !GROUP_WITHOUT_NODE_ID.equals(testGroups[0]) ? NODE_ID + ":" : "";
+        _memcachedNodes = nodePrefix + "localhost:" + MEMCACHED_PORT;
 
         try {
             _tomcat1 = startTomcat( TC_PORT_1, JVM_ROUTE_1 );
@@ -98,10 +114,11 @@ public abstract class TomcatFailoverIntegrationTest {
             throw e;
         }
 
-        _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( NODE_ID ), NodeIdResolver.node(
-                        NODE_ID, address ).build(), new SessionIdFormat(), Statistics.create() ),
-                        Arrays.asList( address ) );
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(_memcachedNodes, null, _memcachedClientCallback);
+        final ConnectionFactory cf = nodesManager.isEncodeNodeIdInSessionId()
+            ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create() )
+            : new DefaultConnectionFactory();
+        _client = new MemcachedClient( cf, Arrays.asList( address ) );
 
         _httpClient = new DefaultHttpClient();
     }
@@ -114,7 +131,7 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private Embedded startTomcat( final int port, final SessionAffinityMode sessionAffinityMode,
             final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = getTestUtils().createCatalina( port, MEMCACHED_NODES, jvmRoute, loginType );
+        final Embedded tomcat = getTestUtils().createCatalina( port, _memcachedNodes, jvmRoute, loginType );
         tomcat.start();
         getManager( tomcat ).setSticky( sessionAffinityMode.isSticky() );
         return tomcat;
@@ -240,6 +257,17 @@ public abstract class TomcatFailoverIntegrationTest {
 
         Thread.sleep( 10 );
 
+    }
+
+    /**
+     * Related to issue/feature 105 (single memcached node without node id): tomcat failover must work with this configuration.
+     */
+    @Test( enabled = true, groups = GROUP_WITHOUT_NODE_ID )
+    public void testTomcatFailoverWithSingleNodeWithoutConfiguredNodeId() throws IOException, InterruptedException, HttpException {
+        // with this group (GROUP_WITHOUT_NODE_ID) the setup method does no set the memcached node id
+        // in the memcached nodes configuration. the tomcat failover test does not rely on the node id
+        // so that we can just reuse it...
+        testTomcatFailover();
     }
 
     /**

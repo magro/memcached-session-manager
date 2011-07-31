@@ -23,22 +23,20 @@ import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.net.InetSocketAddress;
 import java.security.Principal;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
@@ -56,8 +54,7 @@ import org.apache.juli.logging.LogFactory;
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
-import de.javakaffee.web.msm.NodeIdResolver.MapBasedResolver;
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 
 /**
@@ -83,22 +80,12 @@ public class MemcachedSessionService implements SessionBackupService {
         COULD_NOT_AQUIRE_LOCK
     }
 
-    private static final String NODE_REGEX = "([\\w]+):([^:]+):([\\d]+)";
-    private static final Pattern NODE_PATTERN = Pattern.compile( NODE_REGEX );
-
-    private static final String NODES_REGEX = NODE_REGEX + "(?:(?:\\s+|,)" + NODE_REGEX + ")*";
-    private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
-
-    private static final int NODE_AVAILABILITY_CACHE_TTL = 50;
-
     private static final String PROTOCOL_TEXT = "text";
     private static final String PROTOCOL_BINARY = "binary";
 
     protected static final String NODE_FAILURE = "node.failure";
 
     protected final Log _log = LogFactory.getLog( getClass() );
-
-    private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
 
     // -------------------- configuration properties --------------------
 
@@ -216,7 +203,7 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     private LRUCache<String, Boolean> _missingSessionsCache;
 
-    private NodeIdService _nodeIdService;
+	private MemcachedNodesManager _memcachedNodesManager;
 
     //private LRUCache<String, String> _relocatedSessions;
 
@@ -233,6 +220,7 @@ public class MemcachedSessionService implements SessionBackupService {
     private SessionTrackerValve _sessionTrackerValve;
 
     private final SessionManager _manager;
+	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
     
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
@@ -370,13 +358,9 @@ public class MemcachedSessionService implements SessionBackupService {
 
         _statistics = Statistics.create( _enableStatistics );
 
-        /* init memcached
-         */
-        final MemcachedConfig config = createMemcachedConfig( _memcachedNodes, _failoverNodes );
-        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( config.getNodeIds(), config.getAddresses(),
-                config.getAddress2Ids(), _statistics );
-        _nodeIdService = new NodeIdService( createNodeAvailabilityCache( config.getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, _memcached ),
-                config.getNodeIds(), config.getFailoverNodeIds() );
+        _memcachedNodesManager = createMemcachedNodesManager( _memcachedNodes, _failoverNodes);
+
+        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( _memcachedNodesManager, _statistics );
 
         /* create the missing sessions cache
          */
@@ -385,39 +369,30 @@ public class MemcachedSessionService implements SessionBackupService {
         _sessionTrackerValve = _manager.createSessionTrackerValve( _requestUriIgnorePattern,  _statistics, _enabled );
         _manager.getContainer().getPipeline().addValve( _sessionTrackerValve );
 
-        initNonStickyLockingMode( config );
+        initNonStickyLockingMode( _memcachedNodesManager );
 
         _transcoderService = createTranscoderService( _statistics );
 
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                _backupThreadCount, _memcached, _nodeIdService, _statistics );
+                _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
 
-        _log.info( getClass().getSimpleName() + " finished initialization, have node ids " + config.getNodeIds() + " and failover node ids " + config.getFailoverNodeIds() );
+        _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky +", with node ids " +
+        		_memcachedNodesManager.getPrimaryNodeIds() + " and failover node ids " + _memcachedNodesManager.getFailoverNodeIds() );
 
     }
 
-    protected static MemcachedConfig createMemcachedConfig( final String memcachedNodes, final String failoverNodes ) {
-        if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() ) {
-            throw new IllegalArgumentException( "Configured memcachedNodes attribute has wrong format, must match " + NODES_REGEX );
-        }
+	protected MemcachedClientCallback createMemcachedClientCallback() {
+		return new MemcachedClientCallback() {
+			@Override
+			public Object get(final String key) {
+				return _memcached.get(key);
+			}
+		};
+	}
 
-        final List<String> nodeIds = new ArrayList<String>();
-        final Matcher matcher = NODE_PATTERN.matcher( memcachedNodes  );
-        final List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
-        final Map<InetSocketAddress, String> address2Ids = new HashMap<InetSocketAddress, String>();
-        while ( matcher.find() ) {
-            initHandleNodeDefinitionMatch( matcher, addresses, address2Ids, nodeIds );
-        }
-
-        final List<String> failoverNodeIds = initFailoverNodes( failoverNodes, nodeIds );
-
-        if ( nodeIds.isEmpty() ) {
-            throw new IllegalArgumentException( "All nodes are also configured as failover nodes,"
-                    + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes." );
-        }
-
-        return new MemcachedConfig( memcachedNodes, failoverNodes, new NodeIdList( nodeIds ), failoverNodeIds, addresses, address2Ids );
-    }
+    protected MemcachedNodesManager createMemcachedNodesManager(final String memcachedNodes, final String failoverNodes) {
+		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, _memcachedClientCallback );
+	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
         return new TranscoderService( getTranscoderFactory().createTranscoder( _manager ) );
@@ -434,28 +409,29 @@ public class MemcachedSessionService implements SessionBackupService {
         return _transcoderFactory;
     }
 
-    protected MemcachedClient createMemcachedClient( final NodeIdList nodeIds, final List<InetSocketAddress> addresses,
-            final Map<InetSocketAddress, String> address2Ids,
+    protected MemcachedClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         if ( ! _enabled.get() ) {
             return null;
         }
         try {
-            final ConnectionFactory connectionFactory = createConnectionFactory( nodeIds, address2Ids, statistics );
-            return new MemcachedClient( connectionFactory, addresses );
+            final ConnectionFactory connectionFactory = createConnectionFactory( memcachedNodesManager, statistics );
+            return new MemcachedClient( connectionFactory, memcachedNodesManager.getAllMemcachedAddresses() );
         } catch ( final Exception e ) {
             throw new RuntimeException( "Could not create memcached client", e );
         }
     }
 
-    private ConnectionFactory createConnectionFactory(
-            final NodeIdList nodeIds, final Map<InetSocketAddress, String> address2Ids,
+    private ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
-        final MapBasedResolver resolver = new MapBasedResolver( address2Ids );
         if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) ) {
-            return new SuffixLocatorBinaryConnectionFactory( nodeIds, resolver, _sessionIdFormat, statistics );
+            return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+            		memcachedNodesManager.getSessionIdFormat(),
+            		statistics ) : new BinaryConnectionFactory();
         }
-        return new SuffixLocatorConnectionFactory( nodeIds, resolver, _sessionIdFormat, statistics );
+        return memcachedNodesManager.isEncodeNodeIdInSessionId()
+        		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics )
+        		: new DefaultConnectionFactory();
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
@@ -483,57 +459,11 @@ public class MemcachedSessionService implements SessionBackupService {
         return transcoderFactoryClass;
     }
 
-    protected NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
-            final MemcachedClient memcachedClient ) {
-        return new NodeAvailabilityCache<String>( size, ttlInMillis, new CacheLoader<String>() {
-
-            @Override
-            public boolean isNodeAvailable( final String key ) {
-                try {
-                    memcachedClient.get( _sessionIdFormat.createSessionId( "ping", key ) );
-                    return true;
-                } catch ( final Exception e ) {
-                    return false;
-                }
-            }
-
-        } );
-    }
-
-    private static List<String> initFailoverNodes( final String failoverNodes, final List<String> nodeIds ) {
-        final List<String> failoverNodeIds = new ArrayList<String>();
-        if ( failoverNodes != null && failoverNodes.trim().length() != 0 ) {
-            final String[] failoverNodesArray = failoverNodes.split( " |," );
-            for ( final String failoverNode : failoverNodesArray ) {
-                final String nodeId = failoverNode.trim();
-                if ( !nodeIds.remove( nodeId ) ) {
-                    throw new IllegalArgumentException( "Invalid failover node id " + nodeId + ": "
-                            + "not existing in memcachedNodes '" + nodeIds + "'." );
-                }
-                failoverNodeIds.add( nodeId );
-            }
-        }
-        return failoverNodeIds;
-    }
-
-    private static void initHandleNodeDefinitionMatch( final Matcher matcher, final List<InetSocketAddress> addresses,
-            final Map<InetSocketAddress, String> address2Ids, final List<String> nodeIds ) {
-        final String nodeId = matcher.group( 1 );
-        nodeIds.add( nodeId );
-
-        final String hostname = matcher.group( 2 );
-        final int port = Integer.parseInt( matcher.group( 3 ) );
-        final InetSocketAddress address = new InetSocketAddress( hostname, port );
-        addresses.add( address );
-
-        address2Ids.put( address, nodeId );
-    }
-
     /**
      * {@inheritDoc}
      */
     public String newSessionId( @Nonnull final String sessionId ) {
-        return _sessionIdFormat.createSessionId( sessionId, _nodeIdService.getMemcachedNodeId() );
+        return _memcachedNodesManager.createSessionId( sessionId );
     }
 
     /**
@@ -575,7 +505,7 @@ public class MemcachedSessionService implements SessionBackupService {
                 // See also http://code.google.com/p/memcached-session-manager/issues/detail?id=92
                 String jvmRoute;
                 final boolean sessionIdWillBeChanged = _sticky && ( jvmRoute = _manager.getJvmRoute() ) != null
-                    && !jvmRoute.equals( _sessionIdFormat.extractJvmRoute( id ) );
+                    && !jvmRoute.equals( getSessionIdFormat().extractJvmRoute( id ) );
 
                 final boolean activate = !sessionIdWillBeChanged;
                 addValidLoadedSession( result, activate );
@@ -636,7 +566,7 @@ public class MemcachedSessionService implements SessionBackupService {
             session.setCreationTime( System.currentTimeMillis() );
             session.setMaxInactiveInterval( _manager.getMaxInactiveInterval() );
 
-            if ( sessionId == null || !isNodeAvailableForSessionId( sessionId ) ) {
+            if ( sessionId == null || !_memcachedNodesManager.canHitMemcached( sessionId ) ) {
                 sessionId = _manager.generateSessionId();
             }
 
@@ -662,11 +592,6 @@ public class MemcachedSessionService implements SessionBackupService {
         }
     }
 
-    private boolean isNodeAvailableForSessionId( final String sessionId ) {
-        final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
-        return nodeId != null && _nodeIdService.isNodeAvailable( nodeId );
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -685,7 +610,7 @@ public class MemcachedSessionService implements SessionBackupService {
             return null;
         }
         final String localJvmRoute = _manager.getJvmRoute();
-        if ( localJvmRoute != null && !localJvmRoute.equals( _sessionIdFormat.extractJvmRoute( requestedSessionId ) ) ) {
+        if ( localJvmRoute != null && !localJvmRoute.equals( getSessionIdFormat().extractJvmRoute( requestedSessionId ) ) ) {
 
             // the session might have been loaded already (by some valve), so let's check our session map
             MemcachedBackupSession session = _manager.getSessionInternal( requestedSessionId );
@@ -701,13 +626,18 @@ public class MemcachedSessionService implements SessionBackupService {
         return null;
     }
 
+    @Nonnull
+	private SessionIdFormat getSessionIdFormat() {
+		return _memcachedNodesManager.getSessionIdFormat();
+	}
+
     private String handleSessionTakeOver( final MemcachedBackupSession session ) {
 
         checkMaxActiveSessions();
 
         final String origSessionId = session.getIdInternal();
 
-        final String newSessionId = _sessionIdFormat.changeJvmRoute( session.getIdInternal(), _manager.getJvmRoute() );
+        final String newSessionId = getSessionIdFormat().changeJvmRoute( session.getIdInternal(), _manager.getJvmRoute() );
 
         // If this session was already loaded we need to remove it from the session map
         // See http://code.google.com/p/memcached-session-manager/issues/detail?id=92
@@ -728,7 +658,7 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     protected void deleteFromMemcached(final String sessionId) {
-        if ( _enabled.get() && _sessionIdFormat.isValid( sessionId ) ) {
+        if ( _enabled.get() && _memcachedNodesManager.isValidForMemcached( sessionId ) ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Deleting session from memcached: " + sessionId );
             }
@@ -750,6 +680,10 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     @Override
     public String changeSessionIdOnMemcachedFailover( final String requestedSessionId ) {
+    	
+    	if ( !_memcachedNodesManager.isEncodeNodeIdInSessionId() ) {
+    		return null;
+    	}
 
         try {
             if ( _sticky ) {
@@ -760,23 +694,20 @@ public class MemcachedSessionService implements SessionBackupService {
                 final MemcachedBackupSession session = _manager.getSessionInternal( requestedSessionId );
 
                 if ( session != null && session.isValid() ) {
-                    final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
-                    final String newNodeId = getNewNodeIdIfUnavailable( nodeId );
-                    if ( newNodeId != null ) {
-                        final String newSessionId = _sessionIdFormat.createNewSessionId( session.getId(), newNodeId );
+                	final String newSessionId = _memcachedNodesManager.getNewSessionIdIfNodeFromSessionIdUnavailable( session.getId() );
+                    if ( newSessionId != null ) {
                         _log.debug( "Session needs to be relocated, setting new id on session..." );
                         session.setIdForRelocate( newSessionId );
                         _statistics.requestWithMemcachedFailover();
                         return newSessionId;
                     }
                 }
-            }
-            else {
+            } else {
 
                 /* for non-sticky sessions we check the validity info
                  */
-                final String nodeId = _sessionIdFormat.extractMemcachedId( requestedSessionId );
-                if ( nodeId == null || _nodeIdService.isNodeAvailable( nodeId ) ) {
+                final String nodeId = getSessionIdFormat().extractMemcachedId( requestedSessionId );
+                if ( nodeId == null || _memcachedNodesManager.isNodeAvailable( nodeId ) ) {
                     return null;
                 }
 
@@ -801,11 +732,11 @@ public class MemcachedSessionService implements SessionBackupService {
 
         final String backupNodeId = getBackupNodeId( requestedSessionId );
         if ( backupNodeId == null ) {
-            _log.info( "No backup node found for nodeId "+ _sessionIdFormat.extractMemcachedId( requestedSessionId ) );
+            _log.info( "No backup node found for nodeId "+ getSessionIdFormat().extractMemcachedId( requestedSessionId ) );
             return null;
         }
 
-        if ( !_nodeIdService.isNodeAvailable( backupNodeId ) ) {
+        if ( !_memcachedNodesManager.isNodeAvailable( backupNodeId ) ) {
             _log.info( "Node "+ backupNodeId +" that stores the backup of the session "+ requestedSessionId +" is not available." );
             return null;
         }
@@ -817,7 +748,7 @@ public class MemcachedSessionService implements SessionBackupService {
                 return null;
             }
 
-            final Object obj = _memcached.get( _sessionIdFormat.createBackupKey( requestedSessionId ) );
+            final Object obj = _memcached.get( getSessionIdFormat().createBackupKey( requestedSessionId ) );
             if ( obj == null ) {
                 _log.info( "No backup found for sessionId " + requestedSessionId );
                 return null;
@@ -827,8 +758,7 @@ public class MemcachedSessionService implements SessionBackupService {
             session.setSticky( _sticky );
             session.setLastAccessedTimeInternal( validityInfo.getLastAccessedTime() );
             session.setThisAccessedTimeInternal( validityInfo.getThisAccessedTime() );
-
-            final String newSessionId = _sessionIdFormat.createNewSessionId( requestedSessionId, backupNodeId );
+            final String newSessionId = getSessionIdFormat().createNewSessionId( requestedSessionId, backupNodeId );
             _log.info( "Session backup loaded from secondary memcached for "+ requestedSessionId +" (will be relocated)," +
             		" setting new id "+ newSessionId +" on session..." );
             session.setIdInternal( newSessionId );
@@ -849,7 +779,7 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     boolean isBackupNodeAvailable( @Nonnull final String sessionId ) {
         final String backupNodeId = getBackupNodeId( sessionId );
-        return backupNodeId == null ? false : _nodeIdService.isNodeAvailable( backupNodeId );
+        return backupNodeId == null ? false : _memcachedNodesManager.isNodeAvailable( backupNodeId );
     }
 
     /**
@@ -862,32 +792,11 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     @CheckForNull
     String getBackupNodeId( @Nonnull final String sessionId ) {
-        final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
-        return nodeId == null ? null : _nodeIdService.getNextNodeId( nodeId );
-    }
-
-    /**
-     * Returns a new node id if the given one is <code>null</code> or not available.
-     * @param nodeId the node id that is checked for availability (if not <code>null</code>).
-     * @return a new node id if the given one is <code>null</code> or not available, otherwise <code>null</code>.
-     */
-    private String getNewNodeIdIfUnavailable( final String nodeId ) {
-        final String newNodeId;
-        if ( nodeId == null ) {
-            newNodeId = _nodeIdService.getMemcachedNodeId();
-        }
-        else {
-            if ( !_nodeIdService.isNodeAvailable( nodeId ) ) {
-                newNodeId = _nodeIdService.getAvailableNodeId( nodeId );
-                if ( newNodeId == null ) {
-                    _log.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
-                }
-            }
-            else {
-                newNodeId = null;
-            }
-        }
-        return newNodeId;
+        final String nodeId = getSessionIdFormat().extractMemcachedId( sessionId );
+        // primary nodes are actually all nodes for non-sticky sessions, so this is ok.
+        // Still, for non-sticky sessions it would make more sense to have just a
+        // getNextNodeId()...
+        return nodeId == null ? null : _memcachedNodesManager.getNextPrimaryNodeId(nodeId);
     }
 
     /**
@@ -951,85 +860,75 @@ public class MemcachedSessionService implements SessionBackupService {
 
     /**
      * Checks if this manager {@link #isEnabled()}, if the given sessionId is valid (contains a memcached id)
-     * and if this sessionId is not in our missingSessionsCache.
+     * and if this sessionId can access memcached.
      */
     private boolean canHitMemcached( @Nonnull final String sessionId ) {
-        return _enabled.get() && _sessionIdFormat.isValid( sessionId );
+        return _enabled.get() && _memcachedNodesManager.canHitMemcached( sessionId );
     }
 
     /**
      * Assumes that before you checked {@link #canHitMemcached(String)}.
      */
     private MemcachedBackupSession loadFromMemcached( final String sessionId ) {
-        final String nodeId = _sessionIdFormat.extractMemcachedId( sessionId );
-        if ( nodeId == null ) {
-            throw new IllegalArgumentException( "The sessionId should contain a nodeId, this should be checked" +
-            		" by invoking canHitMemcached before invoking this method (bug, needs fix)." );
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "Loading session from memcached: " + sessionId );
         }
-        if ( !_nodeIdService.isNodeAvailable( nodeId ) ) {
-            _log.debug( "Asked for session " + sessionId + ", but the related"
-                    + " memcached node is still marked as unavailable (won't load from memcached)." );
-        } else {
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Loading session from memcached: " + sessionId );
+
+        LockStatus lockStatus = null;
+        try {
+
+            if ( !_sticky ) {
+                lockStatus = _lockingStrategy.onBeforeLoadFromMemcached( sessionId );
             }
 
-            LockStatus lockStatus = null;
-            try {
+            final long start = System.currentTimeMillis();
 
+            /* In the previous version (<1.2) the session was completely serialized by
+             * custom Transcoder implementations.
+             * Such sessions have set the SERIALIZED flag (from SerializingTranscoder) so that
+             * they get deserialized by BaseSerializingTranscoder.deserialize or the appropriate
+             * specializations.
+             */
+            final Object object = _memcached.get( sessionId );
+            _memcachedNodesManager.onLoadFromMemcachedSuccess( sessionId );
+
+            if ( object != null ) {
+                if ( !(object instanceof byte[]) ) {
+                    throw new RuntimeException( "The loaded object for sessionId " + sessionId + " is not of required type byte[], but " + object.getClass().getName() );
+                }
+                final long startDeserialization = System.currentTimeMillis();
+                final MemcachedBackupSession result = _transcoderService.deserialize( (byte[]) object, _manager );
+                _statistics.registerSince( SESSION_DESERIALIZATION, startDeserialization );
+                _statistics.registerSince( LOAD_FROM_MEMCACHED, start );
+
+                result.setSticky( _sticky );
                 if ( !_sticky ) {
-                    lockStatus = _lockingStrategy.onBeforeLoadFromMemcached( sessionId );
+                    _lockingStrategy.onAfterLoadFromMemcached( result, lockStatus );
                 }
 
-                final long start = System.currentTimeMillis();
-
-                /* In the previous version (<1.2) the session was completely serialized by
-                 * custom Transcoder implementations.
-                 * Such sessions have set the SERIALIZED flag (from SerializingTranscoder) so that
-                 * they get deserialized by BaseSerializingTranscoder.deserialize or the appropriate
-                 * specializations.
-                 */
-                final Object object = _memcached.get( sessionId );
-                _nodeIdService.setNodeAvailable( nodeId, true );
-
-                if ( object != null ) {
-                    if ( !(object instanceof byte[]) ) {
-                        throw new RuntimeException( "The loaded object for sessionId " + sessionId + " is not of required type byte[], but " + object.getClass().getName() );
-                    }
-                    final long startDeserialization = System.currentTimeMillis();
-                    final MemcachedBackupSession result = _transcoderService.deserialize( (byte[]) object, _manager );
-                    _statistics.registerSince( SESSION_DESERIALIZATION, startDeserialization );
-                    _statistics.registerSince( LOAD_FROM_MEMCACHED, start );
-
-                    result.setSticky( _sticky );
-                    if ( !_sticky ) {
-                        _lockingStrategy.onAfterLoadFromMemcached( result, lockStatus );
-                    }
-
-                    if ( _log.isDebugEnabled() ) {
-                        _log.debug( "Found session with id " + sessionId );
-                    }
-                    return result;
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Found session with id " + sessionId );
                 }
-                else {
-                    if ( lockStatus == LockStatus.LOCKED ) {
-                        _lockingStrategy.releaseLock( sessionId );
-                    }
-                    _missingSessionsCache.put( sessionId, Boolean.TRUE );
-                    if ( _log.isDebugEnabled() ) {
-                        _log.debug( "Session " + sessionId + " not found in memcached." );
-                    }
-                    return null;
-                }
-
-            } catch ( final NodeFailureException e ) {
-                _log.warn( "Could not load session with id " + sessionId + " from memcached." );
-                _nodeIdService.setNodeAvailable( nodeId, false );
-            } catch ( final Exception e ) {
-                _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
+                return result;
+            }
+            else {
                 if ( lockStatus == LockStatus.LOCKED ) {
                     _lockingStrategy.releaseLock( sessionId );
                 }
+                _missingSessionsCache.put( sessionId, Boolean.TRUE );
+                if ( _log.isDebugEnabled() ) {
+                    _log.debug( "Session " + sessionId + " not found in memcached." );
+                }
+                return null;
+            }
+
+        } catch ( final NodeFailureException e ) {
+            _log.warn( "Could not load session with id " + sessionId + " from memcached." );
+            _memcachedNodesManager.onLoadFromMemcachedFailure( sessionId );
+        } catch ( final Exception e ) {
+            _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
+            if ( lockStatus == LockStatus.LOCKED ) {
+                _lockingStrategy.releaseLock( sessionId );
             }
         }
         return null;
@@ -1050,11 +949,11 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     public void setMemcachedNodes( final String memcachedNodes ) {
         if ( _manager.isInitialized() ) {
-            final MemcachedConfig config = reloadMemcachedConfig( memcachedNodes, _failoverNodes );
+            final MemcachedNodesManager config = reloadMemcachedConfig( memcachedNodes, _failoverNodes );
             _log.info( "Loaded new memcached node configuration." +
                     "\n- Former config: "+ _memcachedNodes +
-                    "\n- New config: " + config.getMemcachedNodes() +
-                    "\n- New node ids: " + config.getNodeIds() +
+                    "\n- New config: " + memcachedNodes +
+                    "\n- New node ids: " + config.getPrimaryNodeIds() +
                     "\n- New failover node ids: " + config.getFailoverNodeIds() );
         }
         _memcachedNodes = memcachedNodes;
@@ -1071,18 +970,14 @@ public class MemcachedSessionService implements SessionBackupService {
         return _memcachedNodes;
     }
 
-    private MemcachedConfig reloadMemcachedConfig( final String memcachedNodes, final String failoverNodes ) {
+    private MemcachedNodesManager reloadMemcachedConfig( final String memcachedNodes, final String failoverNodes ) {
 
         /* first create all dependent services
          */
-        final MemcachedConfig config = createMemcachedConfig( memcachedNodes, failoverNodes );
-        final MemcachedClient memcachedClient = createMemcachedClient( config.getNodeIds(), config.getAddresses(),
-                config.getAddress2Ids(), _statistics );
-        final NodeIdService nodeIdService = new NodeIdService(
-                createNodeAvailabilityCache( config.getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, memcachedClient ),
-                config.getNodeIds(), config.getFailoverNodeIds() );
+        final MemcachedNodesManager memcachedNodesManager = createMemcachedNodesManager( memcachedNodes, failoverNodes );
+        final MemcachedClient memcachedClient = createMemcachedClient( memcachedNodesManager, _statistics );
         final BackupSessionService backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync,
-                _sessionBackupTimeout, _backupThreadCount, memcachedClient, nodeIdService, _statistics );
+                _sessionBackupTimeout, _backupThreadCount, memcachedClient, memcachedNodesManager, _statistics );
 
         /* then assign new services
          */
@@ -1090,12 +985,12 @@ public class MemcachedSessionService implements SessionBackupService {
             _memcached.shutdown();
         }
         _memcached = memcachedClient;
-        _nodeIdService = nodeIdService;
+        _memcachedNodesManager = memcachedNodesManager;
         _backupSessionService = backupSessionService;
 
-        initNonStickyLockingMode( config );
+        initNonStickyLockingMode( memcachedNodesManager );
 
-        return config;
+        return memcachedNodesManager;
     }
 
     /**
@@ -1115,11 +1010,11 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     public void setFailoverNodes( final String failoverNodes ) {
         if ( _manager.isInitialized() ) {
-            final MemcachedConfig config = reloadMemcachedConfig( _memcachedNodes, failoverNodes );
+            final MemcachedNodesManager config = reloadMemcachedConfig( _memcachedNodes, failoverNodes );
             _log.info( "Loaded new memcached failover node configuration." +
                     "\n- Former failover config: "+ _failoverNodes +
-                    "\n- New failover config: " + config.getFailoverNodes() +
-                    "\n- New node ids: " + config.getNodeIds() +
+                    "\n- New failover config: " + failoverNodes +
+                    "\n- New node ids: " + config.getPrimaryNodeIds() +
                     "\n- New failover node ids: " + config.getFailoverNodeIds() );
         }
         _failoverNodes = failoverNodes;
@@ -1396,11 +1291,11 @@ public class MemcachedSessionService implements SessionBackupService {
         }
         _lockingMode = lockingMode;
         if ( _manager.isInitialized() ) {
-            initNonStickyLockingMode( createMemcachedConfig( _memcachedNodes, _failoverNodes ) );
+            initNonStickyLockingMode( createMemcachedNodesManager( _memcachedNodes, _failoverNodes ) );
         }
     }
 
-    private void initNonStickyLockingMode( @Nonnull final MemcachedConfig config ) {
+	private void initNonStickyLockingMode( @Nonnull final MemcachedNodesManager config ) {
         if ( _sticky ) {
             setLockingMode( null, null, false );
             return;
@@ -1489,7 +1384,7 @@ public class MemcachedSessionService implements SessionBackupService {
         if ( ( oldSessionBackupAsync != sessionBackupAsync ) && _manager.isInitialized() ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                    _backupThreadCount, _memcached, _nodeIdService, _statistics );
+                    _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
         }
     }
 
@@ -1542,7 +1437,15 @@ public class MemcachedSessionService implements SessionBackupService {
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
         _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                _backupThreadCount, _memcached, _nodeIdService, _statistics );
+                _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
+    }
+
+    /**
+     * Return the memcached nodes manager.
+     */
+    @Nonnull
+    MemcachedNodesManager getMemcachedNodesManager() {
+        return _memcachedNodesManager;
     }
 
     /**
@@ -1550,14 +1453,14 @@ public class MemcachedSessionService implements SessionBackupService {
      * @return the list of node ids.
      */
     List<String> getNodeIds() {
-        return _nodeIdService.getNodeIds();
+        return _memcachedNodesManager.getPrimaryNodeIds();
     }
     /**
      * Return the currently configured failover node ids - just for testing.
      * @return the list of failover node ids.
      */
     List<String> getFailoverNodeIds() {
-        return _nodeIdService.getFailoverNodeIds();
+        return _memcachedNodesManager.getFailoverNodeIds();
     }
 
     /**
@@ -1573,53 +1476,6 @@ public class MemcachedSessionService implements SessionBackupService {
     @Nullable
     LockingStrategy getLockingStrategy() {
         return _lockingStrategy;
-    }
-
-    // ---------------------------------------------------------------------------
-
-    private static class MemcachedConfig {
-        private final String _memcachedNodes;
-        private final String _failoverNodes;
-        private final NodeIdList _nodeIds;
-        private final List<String> _failoverNodeIds;
-        private final List<InetSocketAddress> _addresses;
-        private final Map<InetSocketAddress, String> _address2Ids;
-        public MemcachedConfig( final String memcachedNodes, final String failoverNodes,
-                final NodeIdList nodeIds, final List<String> failoverNodeIds, final List<InetSocketAddress> addresses,
-                final Map<InetSocketAddress, String> address2Ids ) {
-            _memcachedNodes = memcachedNodes;
-            _failoverNodes = failoverNodes;
-            _nodeIds = nodeIds;
-            _failoverNodeIds = failoverNodeIds;
-            _addresses = addresses;
-            _address2Ids = address2Ids;
-        }
-
-        /**
-         * @return the number of all known memcached nodes.
-         */
-        public int getCountNodes() {
-            return _addresses.size();
-        }
-
-        public String getMemcachedNodes() {
-            return _memcachedNodes;
-        }
-        public String getFailoverNodes() {
-            return _failoverNodes;
-        }
-        public NodeIdList getNodeIds() {
-            return _nodeIds;
-        }
-        public List<String> getFailoverNodeIds() {
-            return _failoverNodeIds;
-        }
-        public List<InetSocketAddress> getAddresses() {
-            return _addresses;
-        }
-        public Map<InetSocketAddress, String> getAddress2Ids() {
-            return _address2Ids;
-        }
     }
 
 }

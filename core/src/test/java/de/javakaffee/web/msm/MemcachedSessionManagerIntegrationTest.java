@@ -16,13 +16,11 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
-import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
-import static de.javakaffee.web.msm.integration.TestUtils.getManager;
-import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
+import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static org.testng.Assert.*;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
@@ -31,6 +29,8 @@ import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nonnull;
 
+import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
@@ -47,8 +47,10 @@ import org.testng.annotations.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
 /**
@@ -61,6 +63,8 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog( MemcachedSessionManagerIntegrationTest.class );
 
+    private static final String GROUP_WITHOUT_NODE_ID = "withoutNodeId";
+
     private MemCacheDaemon<?> _daemon;
     private MemcachedClient _memcached;
 
@@ -68,14 +72,21 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
     private int _portTomcat1;
 
-    private String _memcachedNodeId;
+    private final String _memcachedNodeId = "n1";
 
     private DefaultHttpClient _httpClient;
 
     private int _memcachedPort;
+    
+    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+		@Override
+		public Object get(final String key) {
+			return _memcached.get(key);
+		}
+	};
 
     @BeforeMethod
-    public void setUp() throws Throwable {
+    public void setUp(final Method testMethod) throws Throwable {
 
         _portTomcat1 = 18888;
 
@@ -84,11 +95,13 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         final InetSocketAddress address = new InetSocketAddress( "localhost", _memcachedPort );
         _daemon = createDaemon( address );
         _daemon.start();
+        
+        final String[] testGroups = testMethod.getAnnotation(Test.class).groups();
+        final String nodePrefix = testGroups.length == 0 || !GROUP_WITHOUT_NODE_ID.equals(testGroups[0]) ? _memcachedNodeId + ":" : "";
+
+        final String memcachedNodes = nodePrefix + "localhost:" + _memcachedPort;
 
         try {
-            _memcachedNodeId = "n1";
-            final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
-
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
             _tomcat1 = getTestUtils().createCatalina( _portTomcat1, memcachedNodes, "app1" );
             getManager( _tomcat1 ).setSticky( true );
@@ -98,15 +111,17 @@ public abstract class MemcachedSessionManagerIntegrationTest {
             throw e;
         }
 
-        _memcached = createMemcachedClient( address );
+        _memcached = createMemcachedClient( memcachedNodes, address );
 
         _httpClient = new DefaultHttpClient();
     }
 
-    private MemcachedClient createMemcachedClient( final InetSocketAddress address ) throws IOException, InterruptedException {
-        final MemcachedClient result = new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( _memcachedNodeId ),  NodeIdResolver.node(
-                _memcachedNodeId, address ).build(), new SessionIdFormat(), Statistics.create() ),
-                Arrays.asList( address ) );
+    private MemcachedClient createMemcachedClient( final String memcachedNodes, final InetSocketAddress address ) throws IOException, InterruptedException {
+    	final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(memcachedNodes, null, _memcachedClientCallback);
+        final ConnectionFactory cf = nodesManager.isEncodeNodeIdInSessionId()
+            ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create() )
+            : new DefaultConnectionFactory();
+        final MemcachedClient result = new MemcachedClient( cf, Arrays.asList( address ) );
 
         // Wait a little bit, so that the memcached client can connect and is ready when test starts
         Thread.sleep( 100 );
@@ -132,6 +147,42 @@ public abstract class MemcachedSessionManagerIntegrationTest {
          */
         final String nodeId = sessionId1.substring( sessionId1.indexOf( '-' ) + 1, sessionId1.indexOf( '.' ) );
         assertEquals( _memcachedNodeId, nodeId, "Invalid memcached node id" );
+    }
+
+    /**
+     * Related to issue/feature 105 (single memcached node without node id): this shall be possible
+     * and the generated session id must not contain a node id.
+     */
+    @Test( enabled = true, groups = GROUP_WITHOUT_NODE_ID )
+    public void testSessionIdIsNotChangedIfSingleNodeWithNoMemcachedNodeIdConfigured() throws IOException, InterruptedException, HttpException {
+        final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
+        assertNotNull( sessionId1, "No session created." );
+        assertTrue( sessionId1.indexOf( '-' ) == -1 );
+    }
+
+    /**
+     * Related to issue/feature 105 (single memcached node without node id): the session must be
+     * found on a second request.
+     */
+    @Test( enabled = true, groups = GROUP_WITHOUT_NODE_ID, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionFoundIfSingleNodeWithNoMemcachedNodeIdConfigured( final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+        
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+        
+        final String key = "foo";
+        final String value = "bar";
+        final String sessionId1 = post( _httpClient, _portTomcat1, null, key, value ).getSessionId();
+        assertNotNull( sessionId1, "No session created." );
+
+        final Response response = get( _httpClient, _portTomcat1, sessionId1 );
+        final String sessionId2 = response.getSessionId();
+
+        assertEquals( sessionId2, sessionId1 );
+
+        /* check session attributes could be read
+         */
+        final String actualValue = response.get( key );
+        assertEquals( value, actualValue );
     }
 
     @Test( enabled = true )
@@ -371,7 +422,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
         // start memcached, client and reenable msm
         _daemon.start();
-        _memcached = createMemcachedClient( new InetSocketAddress( "localhost", _memcachedPort ) );
+        _memcached = createMemcachedClient( memcachedNodes, new InetSocketAddress( "localhost", _memcachedPort ) );
         manager.setEnabled( true );
         // Wait a little bit, so that msm's memcached client can connect and is ready when test starts
         Thread.sleep( 100 );

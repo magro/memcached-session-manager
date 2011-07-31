@@ -33,16 +33,16 @@ public class SessionIdFormatTest {
     @Test
     public void testCreateSessionId() {
         final SessionIdFormat cut = new SessionIdFormat();
-        assertEquals( "foo-n", cut.createSessionId( "foo", "n" ) );
-        assertEquals( "foo-n.jvm1", cut.createSessionId( "foo.jvm1", "n" ) );
-        assertEquals( "foo-n.j-v-m1", cut.createSessionId( "foo.j-v-m1", "n" ) );
+        assertEquals( "foo-n", cut.createSessionId( "foo", "n") );
+        assertEquals( "foo-n.jvm1", cut.createSessionId( "foo.jvm1", "n") );
+        assertEquals( "foo-n.j-v-m1", cut.createSessionId( "foo.j-v-m1", "n") );
     }
 
     @Test
     public void testCreateNewSessionId() {
         final SessionIdFormat cut = new SessionIdFormat();
 
-        assertEquals( "foo-n", cut.createNewSessionId( "foo", "n" ) );
+        assertEquals( "foo-n", cut.createNewSessionId( "foo", "n") );
         assertEquals( "foo-m", cut.createNewSessionId( "foo-n", "m" ) );
         assertEquals( "foo-m.jvm1", cut.createNewSessionId( "foo-n.jvm1", "m" ) );
         assertEquals( "foo-m.jvm1", cut.createNewSessionId( "foo.jvm1", "m" ) );

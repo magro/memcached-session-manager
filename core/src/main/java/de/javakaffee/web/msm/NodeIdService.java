@@ -196,4 +196,28 @@ public class NodeIdService {
         return new ArrayList<String>( _failoverNodeIds );
     }
 
+    /**
+     * Returns a new node id if the given one is <code>null</code> or not available.
+     * @param nodeId the node id that is checked for availability (if not <code>null</code>).
+     * @return a new node id if the given one is <code>null</code> or not available, otherwise <code>null</code>.
+     */
+    public String getNewNodeIdIfUnavailable( final String nodeId ) {
+        final String newNodeId;
+        if ( nodeId == null ) {
+            newNodeId = getMemcachedNodeId();
+        }
+        else {
+            if ( !isNodeAvailable( nodeId ) ) {
+                newNodeId = getAvailableNodeId( nodeId );
+                if ( newNodeId == null ) {
+                    LOG.warn( "The node " + nodeId + " is not available and there's no node for relocation left." );
+                }
+            }
+            else {
+                newNodeId = null;
+            }
+        }
+        return newNodeId;
+    }
+
 }

@@ -42,34 +42,29 @@ import net.spy.memcached.ops.Operation;
 class SuffixBasedNodeLocator implements NodeLocator {
 
     private final List<MemcachedNode> _nodes;
-    private final NodeIdList _nodeIds;
-    private final NodeIdResolver _resolver;
+	private MemcachedNodesManager _memcachedNodesManager;
     private final Map<String, MemcachedNode> _nodesMap;
-    private final SessionIdFormat _sessionIdFormat;
+	private SessionIdFormat _sessionIdFormat;
 
     /**
      * Create a new {@link SuffixBasedNodeLocator}.
      *
      * @param nodes
      *            the nodes to select from.
-     * @param nodeIds
-     *            the list of nodeIds.
-     * @param resolver
-     *            used to resolve the node id for the address of a memcached
-     *            node.
+     * @param memcachedNodesManager
+     *            the memcached nodes manager that holds list of nodeIds and can resolve nodeId by {@link InetSocketAddress}.
      * @param sessionIdFormat
      *            used to extract the node id from the session id.
      */
-    public SuffixBasedNodeLocator( final List<MemcachedNode> nodes, final NodeIdList nodeIds, final NodeIdResolver resolver,
-            final SessionIdFormat sessionIdFormat ) {
+    public SuffixBasedNodeLocator( final List<MemcachedNode> nodes, final MemcachedNodesManager memcachedNodesManager,
+    		SessionIdFormat sessionIdFormat) {
         _nodes = nodes;
-        _nodeIds = nodeIds;
-        _resolver = resolver;
+        _memcachedNodesManager = memcachedNodesManager;
 
         final Map<String, MemcachedNode> map = new HashMap<String, MemcachedNode>( nodes.size(), 1 );
         for ( int i = 0; i < nodes.size(); i++ ) {
             final MemcachedNode memcachedNode = nodes.get( i );
-            final String nodeId = resolver.getNodeId( (InetSocketAddress) memcachedNode.getSocketAddress() );
+            final String nodeId = memcachedNodesManager.getNodeId( (InetSocketAddress) memcachedNode.getSocketAddress() );
             map.put( nodeId, memcachedNode );
         }
         _nodesMap = map;
@@ -101,7 +96,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         if ( !_sessionIdFormat.isBackupKey( key ) ) {
             return nodeId;
         }
-        return _nodeIds.getNextNodeId( nodeId );
+        return _memcachedNodesManager.getNextPrimaryNodeId( nodeId );
     }
 
     /**
@@ -119,7 +114,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         for ( final MemcachedNode node : _nodes ) {
             nodes.add( new MyMemcachedNodeROImpl( node ) );
         }
-        return new SuffixBasedNodeLocator( nodes, _nodeIds, _resolver, _sessionIdFormat );
+        return new SuffixBasedNodeLocator( nodes, _memcachedNodesManager, _sessionIdFormat );
     }
 
     /**

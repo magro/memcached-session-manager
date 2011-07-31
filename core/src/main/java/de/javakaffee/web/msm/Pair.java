@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Martin Grotzke
+ * Copyright 2011 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,25 +12,35 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-package de.javakaffee.web.msm.integration;
-
-import org.testng.annotations.Test;
-
+package de.javakaffee.web.msm;
 
 /**
- * Integration test testing tomcat failover (tomcats failing).
- *
- * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
- * @version $Id$
+ * Represents two values, a tuple.
+ * 
+ * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-@Test
-public class TomcatFailoverIntegrationTC6Test extends TomcatFailoverIntegrationTest {
+public class Pair<A,B> {
+	
+	private final A _first;
+	private final B _second;
 
-    @Override
-    TestUtils getTestUtils() {
-        return new TestUtilsTC6();
-    }
+	public Pair(final A first, final B second) {
+		super();
+		_first = first;
+		_second = second;
+	}
 
+	public static <A, B> Pair<A, B> of( final A first, final B second ) {
+		return new Pair<A, B>( first, second );
+	}
+
+	public A getFirst() {
+		return _first;
+	}
+
+	public B getSecond() {
+		return _second;
+	}
+	
 }

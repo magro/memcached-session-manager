@@ -61,8 +61,8 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.NodeIdList;
-import de.javakaffee.web.msm.NodeIdResolver;
+import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
@@ -82,6 +82,13 @@ public abstract class NonStickySessionsIntegrationTest {
     private MemCacheDaemon<?> _daemon1;
     private MemCacheDaemon<?> _daemon2;
     private MemcachedClient _client;
+    
+    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+        @Override
+        public Object get(final String key) {
+            return _client.get(key);
+        }
+    };
 
     private Embedded _tomcat1;
     private Embedded _tomcat2;
@@ -118,9 +125,9 @@ public abstract class NonStickySessionsIntegrationTest {
             throw e;
         }
 
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, _memcachedClientCallback);
         _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( NodeIdList.create( NODE_ID_1, NODE_ID_2 ), NodeIdResolver.node(
-                        NODE_ID_1, address1 ).node( NODE_ID_2, address2 ).build(), new SessionIdFormat(), Statistics.create() ),
+                new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create() ),
                         Arrays.asList( address1, address2 ) );
 
         final SchemeRegistry schemeRegistry = new SchemeRegistry();
