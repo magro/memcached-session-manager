@@ -18,6 +18,7 @@ package de.javakaffee.web.msm.integration;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.Enumeration;
 
 import javax.servlet.ServletException;
@@ -44,6 +45,7 @@ public class TestServlet extends HttpServlet {
     public static final String PATH_WAIT = "/sleep";
     public static final String PARAM_WAIT = "sleep";
     public static final String PARAM_MILLIS = "millies";
+    public static final String PARAM_REMOVE = "remove";
     public static final String PATH_GET_REQUESTED_SESSION_INFO = "/requestedSessionInfo";
     public static final String KEY_REQUESTED_SESSION_ID = "requestedSessionId";
     public static final String KEY_IS_REQUESTED_SESSION_ID_VALID = "isRequestedSessionIdValid";
@@ -79,6 +81,15 @@ public class TestServlet extends HttpServlet {
             final HttpSession session = request.getSession();
 
             waitIfRequested( request );
+
+            final String removeKey = request.getParameter(PARAM_REMOVE);
+            if (removeKey != null && !"".equals(removeKey)) {
+                final String[] keys = removeKey.split(",");
+                LOG.info("Removing " + (keys.length > 1 ? "keys " : "key ") + Arrays.asList(keys));
+                for (final String key : keys) {
+                    session.removeAttribute(key);
+                }
+            }
 
             final PrintWriter out = response.getWriter();
             out.println( ID + "=" + session.getId() );

@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.integration.TestServlet.PARAM_REMOVE;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static org.testng.Assert.*;
 
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -135,6 +137,36 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         _tomcat1.stop();
         _httpClient.getConnectionManager().shutdown();
         _daemon.stop();
+    }
+
+    /**
+     * Test for issue 106: Session not updated in memcached when only a session attribute was removed
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=106
+     */
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionUpdatedInMemcachedWhenSessionAttributeIsRemovedIssue106( final SessionAffinityMode sessionAffinity ) throws IOException, InterruptedException, HttpException {
+
+        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+
+        final String key = "foo";
+        final String value = "bar";
+        final String sessionId1 = post( _httpClient, _portTomcat1, null, key, value ).getSessionId();
+        assertNotNull( sessionId1, "No session created." );
+
+        Response response = get( _httpClient, _portTomcat1, sessionId1 );
+        assertEquals( response.getSessionId(), sessionId1 );
+        assertEquals( response.get( key ), value );
+
+        final Map<String, String> params = asMap( PARAM_REMOVE, key );
+        response = get( _httpClient, _portTomcat1, "/", sessionId1, params );
+        assertEquals( response.getSessionId(), sessionId1 );
+        assertNull( response.get( key ) );
+
+        // also the next request must not include this session attribute
+        response = get( _httpClient, _portTomcat1, sessionId1 );
+        assertEquals( response.getSessionId(), sessionId1 );
+        assertNull( response.get( key ) );
+
     }
 
     @Test( enabled = true )

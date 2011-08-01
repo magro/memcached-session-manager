@@ -151,6 +151,14 @@ public class MemcachedBackupSession extends StandardSession {
     }
 
     @Override
+    public void removeAttribute(final String name) {
+        if (filterAttribute(name)) {
+            _attributesAccessed = true;
+        }
+        super.removeAttribute(name);
+    }
+
+    @Override
     public void recycle() {
         super.recycle();
         _dataHashCode = 0;
