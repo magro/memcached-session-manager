@@ -4,8 +4,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+
 import org.apache.catalina.Manager;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
@@ -79,11 +79,9 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 		
 		final ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		try {
-			// This performs a deep serialization of the target instance.
-			Map<?,?> sessionMap  = new HashMap<Object, Object>();
-			sessionMap = (Map<?, ?>) object;			
+			// This performs a deep serialization of the target instance.		
 			String serResult = serializer.deepSerialize(object);
-			log.info("JSON Serialised object: "+serResult);
+			log.debug("JSON Serialised object: "+serResult);
 			byte buffer[] = serResult.getBytes(); // converts to bytes
 			return buffer;
 		} catch (Exception e) {
