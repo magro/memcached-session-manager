@@ -300,6 +300,12 @@ public class BackupSessionTask implements Callable<BackupResult> {
         public boolean isSuccess() {
             return _status == BackupResultStatus.SUCCESS;
         }
+		@Override
+		public String toString() {
+			return "BackupResult [_status=" + _status + ", _data="
+					+ (_data != null ? "byte[" + _data.length + "]" : "null") + ", _attributesData="
+					+ (_attributesData != null ? "byte[" + _attributesData.length + "]" : "null") + "]";
+		}
     }
 
 }
