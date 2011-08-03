@@ -143,7 +143,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
 
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Finished for session id " + _session.getId() +
-                        ", returning status " + result );
+                        ", returning status " + result.getStatus() );
             }
 
             return result;
