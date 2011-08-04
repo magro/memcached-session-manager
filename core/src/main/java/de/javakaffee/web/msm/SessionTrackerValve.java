@@ -48,7 +48,7 @@ abstract class SessionTrackerValve extends ValveBase {
 
     static final String RELOCATE = "session.relocate";
 
-    protected final Log _log = LogFactory.getLog( SessionTrackerValve.class );
+    protected static final Log _log = LogFactory.getLog( SessionTrackerValve.class );
 
     private final Pattern _ignorePattern;
     private final SessionBackupService _sessionBackupService;
@@ -156,9 +156,18 @@ abstract class SessionTrackerValve extends ValveBase {
     @Nonnull
     protected static String getURIWithQueryString( @Nonnull final Request request ) {
         final String uri = request.getRequestURI();
-        final String qs = request.getMethod().toLowerCase().equals( "post" ) ? null : request.getQueryString();
+        final String qs = isPostMethod(request) ? null : request.getQueryString();
         return qs != null ? uri + "?" + qs : uri;
     }
+
+	protected static boolean isPostMethod(final Request request) {
+		final String method = request.getMethod();
+		if ( method == null && _log.isDebugEnabled() ) {
+			_log.debug("No method set for request " + request.getRequestURI() +
+					(request.getQueryString() != null ? "?" + request.getQueryString() : ""));
+		}
+		return method != null ? method.toLowerCase().equals( "post" ) : false;
+	}
 
     private void resetRequestThreadLocal() {
         if ( _lockingStrategy != null ) {
