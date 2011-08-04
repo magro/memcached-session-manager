@@ -54,6 +54,12 @@
 			<version>2.1.0</version>
 			<optional>true</optional>
 		</dependency>
+		<dependency>
+			<groupId>org.grails</groupId>
+			<artifactId>grails-web</artifactId>
+			<version>1.3.7</version>
+			<optional>true</optional>
+		</dependency>
 
 		<!-- use msm core test classes in tests -->
 		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
