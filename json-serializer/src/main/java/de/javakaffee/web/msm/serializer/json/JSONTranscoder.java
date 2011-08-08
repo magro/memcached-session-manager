@@ -1,9 +1,23 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package de.javakaffee.web.msm.serializer.json;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Map;
 
 import org.apache.catalina.Manager;
@@ -39,7 +53,7 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 		this.manager = manager;
 		serializer = new JSONSerializer();
 		deserializer = new JSONDeserializer<MemcachedBackupSession>();
-		log.debug("Initialized json serializer and deserializer");
+		if (log.isDebugEnabled()) log.debug("Initialized json serializer and deserializer");
 	}
 	
 	/**
@@ -50,11 +64,11 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 	 */
 	@Override
 	public Map<String, Object> deserializeAttributes(byte[] in) {		
-		String deJasonise = new String(in);
-		log.debug("deserializer the stream");
+		final InputStreamReader inputStream = new InputStreamReader( new ByteArrayInputStream( in ) );
+		if (log.isDebugEnabled()) log.debug("deserializer the stream");
 		try {			
 			//@SuppressWarnings("unchecked")
-			final Map<String, Object> result = new JSONDeserializer<Map<String, Object>>().deserialize(deJasonise);
+			final Map<String, Object> result = new JSONDeserializer<Map<String, Object>>().deserialize(inputStream);
 			return result;
 		} catch( RuntimeException e) {
 			log.warn("Caught Exception deserializing JSON "+e);
@@ -78,10 +92,11 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 		}
 		
 		final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+	
 		try {
 			// This performs a deep serialization of the target instance.		
-			String serResult = serializer.deepSerialize(object);
-			log.debug("JSON Serialised object: "+serResult);
+			String serResult = serializer.deepSerialize(object);			
+			if (log.isDebugEnabled()) log.debug("JSON Serialised object: "+serResult);
 			byte buffer[] = serResult.getBytes(); // converts to bytes
 			return buffer;
 		} catch (Exception e) {

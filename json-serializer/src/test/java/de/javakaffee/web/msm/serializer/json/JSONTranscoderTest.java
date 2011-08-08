@@ -1,3 +1,16 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package de.javakaffee.web.msm.serializer.json;
 
 import java.io.Serializable;
@@ -38,18 +51,10 @@ public class JSONTranscoderTest {
 		session.setAttribute( "person1", createPerson( "foo bar", Gender.MALE, "foo.bar@example.org", "foo.bar@example.com" ) );
 		session.setAttribute( "person2", createPerson( "bar baz", Gender.FEMALE, "bar.baz@example.org", "bar.baz@example.com" ) );
 		
-		final long start1 = System.nanoTime();
-		transcoder.serializeAttributes( session, session.getAttributesInternal() );
-		System.out.println("json-ser took " + (System.nanoTime() - start1)/1000);
-		
-		final long start2 = System.nanoTime();
-		transcoder.serializeAttributes( session, session.getAttributesInternal() );
-		System.out.println("json-ser took " + (System.nanoTime() - start2)/1000);
-		
-		final long start3 = System.nanoTime();
+		final long start = System.nanoTime();
 		final byte[] json = transcoder.serializeAttributes( session, session.getAttributesInternal() );
 		final Map<String, Object> readValue = (Map<String, Object>) transcoder.deserializeAttributes( json );
-		System.out.println("json-round took " + (System.nanoTime() - start3)/1000);
+		System.out.println("json-round took " + (System.nanoTime() - start)/1000);
 		
 		assertEquals( readValue, new HashMap(session.getAttributesInternal()) );		
 		

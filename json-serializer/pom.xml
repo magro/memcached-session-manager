@@ -7,7 +7,7 @@
 	</parent>
 
 	<groupId>de.javakaffee.msm</groupId>
-	<artifactId>msm-json-serializer</artifactId>
+	<artifactId>msm-flexjson-serializer</artifactId>
 	<name>memcached-session-manager json-serializer</name>
 	<version>1.5.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
@@ -42,14 +42,4 @@
             <scope>test</scope>
         </dependency>
 	</dependencies>
-	
-	<repositories>
-		<!-- for json -->
-		<repository>
-			<id>maven2-repository.flexjson</id>
-			<name>flexjson Repository for Maven</name>
-			<url>http://repo2.maven.org/maven2/net/sf/flexjson/flexjson/</url>
-		</repository>
-	</repositories>
-
 </project>
