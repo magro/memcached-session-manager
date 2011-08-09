@@ -59,7 +59,7 @@
 		<module>kryo-serializer</module>
 		<module>javolution-serializer</module>
 		<module>xstream-serializer</module>
-		<module>json-serializer</module>
+		<module>flexjson-serializer</module>
 		<module>serializer-benchmark</module>
 	</modules>
 

@@ -34,32 +34,32 @@ import de.javakaffee.web.msm.serializer.json.JSONTranscoderTest.Person.Gender;
  *
  */
 public class JSONTranscoderTest {
-	
+
 	@Test
     public void testReadValueIntoObject() throws Exception {
 		final MemcachedBackupSessionManager manager = new MemcachedBackupSessionManager();
 		manager.setContainer( new StandardContext() );
 		final JSONTranscoder transcoder = new JSONTranscoder(manager);
-		
+
 		final MemcachedBackupSession session = manager.createEmptySession();
 		session.setValid( true );
 		session.setCreationTime( System.currentTimeMillis() );
 		getField( StandardSession.class, "lastAccessedTime" ).set( session, System.currentTimeMillis() + 100 );
 		session.setMaxInactiveInterval( 600 );
-		
+
 		session.setId( "foo" );
 		session.setAttribute( "person1", createPerson( "foo bar", Gender.MALE, "foo.bar@example.org", "foo.bar@example.com" ) );
 		session.setAttribute( "person2", createPerson( "bar baz", Gender.FEMALE, "bar.baz@example.org", "bar.baz@example.com" ) );
-		
+
 		final long start = System.nanoTime();
 		final byte[] json = transcoder.serializeAttributes( session, session.getAttributesInternal() );
-		final Map<String, Object> readValue = (Map<String, Object>) transcoder.deserializeAttributes( json );
+		final Map<String, Object> readValue = transcoder.deserializeAttributes( json );
 		System.out.println("json-round took " + (System.nanoTime() - start)/1000);
-		
-		assertEquals( readValue, new HashMap(session.getAttributesInternal()) );		
-		
+
+		assertEquals( readValue, new HashMap<String, Object>(session.getAttributesInternal()) );
+
 	}
-	
+
 	private Person createPerson( final String name, final Gender gender, final String... emailAddresses ) {
         final Person person = new Person();
         person.setName( name );
@@ -72,13 +72,13 @@ public class JSONTranscoderTest {
         person.setProps( props );
         return person;
     }
-	
+
 	private Field getField( final Class<?> clazz, final String name ) throws NoSuchFieldException {
         final Field field = clazz.getDeclaredField( name );
         field.setAccessible( true );
         return field;
     }
-	
+
 	private void assertEquals( final Object one, final Object another ) throws Exception {
         if ( one == another ) {
             return;
@@ -100,17 +100,17 @@ public class JSONTranscoderTest {
         }
 
     }
-	
+
 	private void assertEqualDeclaredFields( final Class<? extends Object> clazz, final Object one, final Object another )
-    throws Exception, IllegalAccessException {
-    for ( final Field field : clazz.getDeclaredFields() ) {
-        field.setAccessible( true );
-        if ( !Modifier.isTransient( field.getModifiers() ) ) {
-            assertEquals( field.get( one ), field.get( another ) );
+	    throws Exception, IllegalAccessException {
+	    for ( final Field field : clazz.getDeclaredFields() ) {
+	        field.setAccessible( true );
+	        if ( !Modifier.isTransient( field.getModifiers() ) ) {
+	            assertEquals( field.get( one ), field.get( another ) );
         	}
     	}
 	}
-	
+
 	static class Person implements Serializable {
 
         private static final long serialVersionUID = 1L;
@@ -197,16 +197,16 @@ public class JSONTranscoderTest {
         }
 
     }
-	
+
 	static class Email implements Serializable {
 
         private static final long serialVersionUID = 1L;
 
         private String _name;
         private String _email;
-        
+
         public Email(){
-        	
+
         }
 
         public Email( final String name, final String email ) {
