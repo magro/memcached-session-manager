@@ -1,0 +1,45 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>de.javakaffee.msm</groupId>
+		<artifactId>memcached-session-manager-project</artifactId>
+		<version>1.5.1-SNAPSHOT</version>
+	</parent>
+
+	<groupId>de.javakaffee.msm</groupId>
+	<artifactId>msm-flexjson-serializer</artifactId>
+	<name>memcached-session-manager flexjson-serializer</name>
+	<version>1.5.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<dependencies>
+		<dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.sf.flexjson</groupId>
+			<artifactId>flexjson</artifactId>
+			<version>2.1</version>
+			<scope>compile</scope>
+		</dependency>
+
+		<!-- use msm core test classes in tests -->
+		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
+		<dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+        <dependency>
+            <groupId>de.javakaffee.msm</groupId>
+            <artifactId>memcached-session-manager-tc7</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+	</dependencies>
+</project>
