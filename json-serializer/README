@@ -1,4 +1,0 @@
-A serialization strategy for the memcached-session-manager that serialises sessions in json format using Flexjson (http://flexjson.sourceforge.net/)
-
-Needs flexjson.jar
-
