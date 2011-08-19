@@ -346,6 +346,14 @@ class SuffixBasedNodeLocator implements NodeLocator {
         public void setupForAuth() {
             throw new UnsupportedOperationException();
         }
+
+        public void setContinuousTimeout(boolean b) {
+            throw new UnsupportedOperationException();
+        }
+
+        public int getContinuousTimeout() {
+            throw new UnsupportedOperationException();
+        }
     }
 
 }

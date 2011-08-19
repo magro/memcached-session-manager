@@ -38,6 +38,9 @@ import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.ConnectionFactoryBuilder;
+import net.spy.memcached.auth.PlainCallbackHandler;
+import net.spy.memcached.auth.AuthDescriptor;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -82,6 +85,8 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private static final String PROTOCOL_TEXT = "text";
     private static final String PROTOCOL_BINARY = "binary";
+
+    private static final String SASL_CONNECTION_TYPE = "SASL";
 
     protected static final String NODE_FAILURE = "node.failure";
 
@@ -182,6 +187,10 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private String _memcachedProtocol = PROTOCOL_TEXT;
 
+    private String connectionType;     
+    private String username;
+    private String password;
+
     private final AtomicBoolean _enabled = new AtomicBoolean( true );
 
     // -------------------- END configuration properties --------------------
@@ -219,9 +228,13 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private SessionTrackerValve _sessionTrackerValve;
 
-    private final SessionManager _manager;
+    private SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
-    
+
+    public MemcachedSessionService() {
+       _manager = null; 
+    }
+
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
     }
@@ -325,7 +338,11 @@ public class MemcachedSessionService implements SessionBackupService {
         void setFailoverNodes( String failoverNodes );
         void setLockingMode( @Nullable final String lockingMode );
         void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup );
-        
+        void setUsername(String username);
+        void setPassword(String password);
+        void setConnectionType(String connectionType);
+
+
         /**
          * Creates a new instance of {@link MemcachedBackupSession} (needed so that it's possible to
          * create specialized {@link MemcachedBackupSession} instances).
@@ -422,9 +439,18 @@ public class MemcachedSessionService implements SessionBackupService {
         }
     }
 
-    private ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
+    protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
-        if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) ) {
+        if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) && SASL_CONNECTION_TYPE.equals(connectionType)) {
+            AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
+                                            new PlainCallbackHandler(username, password));
+            ConnectionFactory connectionFactory = new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+                        .setAuthDescriptor(authDescriptor).build();
+            return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+            		memcachedNodesManager.getSessionIdFormat(),
+            		statistics ) : connectionFactory;
+
+        } else if(PROTOCOL_BINARY.equals(_memcachedProtocol)) {
             return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
             		memcachedNodesManager.getSessionIdFormat(),
             		statistics ) : new BinaryConnectionFactory();
@@ -1476,6 +1502,42 @@ public class MemcachedSessionService implements SessionBackupService {
     @Nullable
     LockingStrategy getLockingStrategy() {
         return _lockingStrategy;
+    }
+
+    /**
+     * Connection Type can be SASL or default
+     * @param connectionType
+     */
+    public void setConnectionType(String connectionType) {
+        this.connectionType = connectionType;
+    }
+
+    public String getConnectionType() {
+        return connectionType;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    /**
+     * username required for SASL Connection types
+     * @return
+     */
+    public String getUsername() {
+        return username;
+    }
+
+    public void setPassword(String password) {
+       this.password = password;   
+    }
+
+    /**
+     * password required for SASL Connection types
+     * @return
+     */
+    public String getPassword() {
+        return password;
     }
 
 }

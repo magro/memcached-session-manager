@@ -58,6 +58,9 @@ import de.javakaffee.web.msm.LockingStrategy.LockingMode;
  * &lt;Context path="/foo"&gt;
  *     &lt;Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
  *         memcachedNodes="n1.localhost:11211 n2.localhost:11212" failoverNodes="n2"
+ *         connectionType="SASL" non-required
+ *         username="username" non-required
+ *         password="password" non-required
  *         requestUriIgnorePattern=".*\.(png|gif|jpg|css|js)$" /&gt;
  * &lt;/Context&gt;
  * </pre></code>
@@ -557,6 +560,21 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _msm.setLockingMode( lockingMode, uriPattern, storeSecondaryBackup );
+    }
+
+    @Override
+    public void setUsername(String username) {
+        _msm.setUsername(username); 
+    }
+
+    @Override
+    public void setPassword(String password) {
+        _msm.setPassword(password);
+    }
+
+
+    public void setConnectionType(String connectionType) {
+       _msm.setConnectionType(connectionType);
     }
 
     /**
