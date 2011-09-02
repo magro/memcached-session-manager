@@ -93,7 +93,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     public MemcachedNode createMemcachedNode(final SocketAddress sa,
             final SocketChannel c, final int bufSize) {
         final boolean doAuth = false;
-        final long defaultOpTimeout = 100L;
+        final long defaultOpTimeout = getOperationTimeout();
         return new BinaryMemcachedNodeImpl(sa, c, bufSize,
             createReadOperationQueue(),
             createWriteOperationQueue(),

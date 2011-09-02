@@ -26,9 +26,12 @@ import java.io.ObjectInputStream;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import java.net.InetSocketAddress;
+import java.net.URI;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -83,10 +86,14 @@ public class MemcachedSessionService implements SessionBackupService {
         COULD_NOT_AQUIRE_LOCK
     }
 
+    static enum ConnectionType {
+        DEFAULT,
+        SASL,
+        MEMBASE
+    }
+
     private static final String PROTOCOL_TEXT = "text";
     private static final String PROTOCOL_BINARY = "binary";
-
-    private static final String SASL_CONNECTION_TYPE = "SASL";
 
     protected static final String NODE_FAILURE = "node.failure";
 
@@ -228,12 +235,8 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private SessionTrackerValve _sessionTrackerValve;
 
-    private SessionManager _manager;
+    private final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
-
-    public MemcachedSessionService() {
-       _manager = null; 
-    }
 
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
@@ -428,32 +431,53 @@ public class MemcachedSessionService implements SessionBackupService {
 
     protected MemcachedClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
+        List<InetSocketAddress> addresses = memcachedNodesManager.getAllMemcachedAddresses();
+        ArrayList baseURIs = new ArrayList();
         if ( ! _enabled.get() ) {
             return null;
         }
         try {
-            final ConnectionFactory connectionFactory = createConnectionFactory( memcachedNodesManager, statistics );
-            return new MemcachedClient( connectionFactory, memcachedNodesManager.getAllMemcachedAddresses() );
-        } catch ( final Exception e ) {
-            throw new RuntimeException( "Could not create memcached client", e );
+            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, statistics);
+            if (ConnectionType.MEMBASE.equals(connectionType)) {
+                for (InetSocketAddress address : addresses) {
+                    String uri = address.getAddress().toString();
+                    URI baseUri = new URI(uri);
+                    baseURIs.add(baseUri);
+                }
+                String username = getUsername();
+                String password = getPassword();
+
+                /* this could also be MemcachedClient(serverList, "default", "") in the case
+                * you're using a default bucket
+                */
+                return new MemcachedClient(baseURIs, username, password);
+
+            }
+            return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
+        } catch (final Exception e) {
+            throw new RuntimeException("Could not create memcached client", e);
         }
     }
 
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
-        if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) && SASL_CONNECTION_TYPE.equals(connectionType)) {
-            AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
-                                            new PlainCallbackHandler(username, password));
-            ConnectionFactory connectionFactory = new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                        .setAuthDescriptor(authDescriptor).build();
-            return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-            		memcachedNodesManager.getSessionIdFormat(),
-            		statistics ) : connectionFactory;
+        if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
+            if (ConnectionType.SASL.equals(connectionType)) {
+                AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
+                                                new PlainCallbackHandler(username, password));
+                ConnectionFactory connectionFactory = new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+                            .setAuthDescriptor(authDescriptor).build();
+                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                        memcachedNodesManager.getSessionIdFormat(),
+                        statistics ) : connectionFactory;
 
-        } else if(PROTOCOL_BINARY.equals(_memcachedProtocol)) {
-            return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-            		memcachedNodesManager.getSessionIdFormat(),
-            		statistics ) : new BinaryConnectionFactory();
+            } else if(ConnectionType.MEMBASE.equals(connectionType)) {
+               return new BinaryConnectionFactory();
+            } else {
+                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                        memcachedNodesManager.getSessionIdFormat(),
+                        statistics ) : new BinaryConnectionFactory();
+            }
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
         		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics )
@@ -1505,7 +1529,7 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     /**
-     * Connection Type can be SASL or default
+     * Connection Type can be SASL, MEMBASE or default
      * @param connectionType
      */
     public void setConnectionType(String connectionType) {

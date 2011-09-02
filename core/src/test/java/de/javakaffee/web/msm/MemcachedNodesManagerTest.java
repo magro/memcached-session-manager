@@ -74,7 +74,8 @@ public class MemcachedNodesManagerTest {
 	public static Object[][] nodesAndExpectedCountDataProvider() {
 		return new Object[][] {
 				{ "localhost:11211", 1 },
-				{ "n1:localhost:11211", 1 },
+                { "localhost:11211/default", 1},
+                { "n1:localhost:11211", 1 },
 				{ "n1:localhost:11211,n2:localhost:11212", 2 },
 				{ "n1:localhost:11211 n2:localhost:11212", 2 }
 		};

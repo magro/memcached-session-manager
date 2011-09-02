@@ -347,10 +347,13 @@ class SuffixBasedNodeLocator implements NodeLocator {
             throw new UnsupportedOperationException();
         }
 
+       
+        @Override
         public void setContinuousTimeout(boolean b) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public int getContinuousTimeout() {
             throw new UnsupportedOperationException();
         }
