@@ -50,7 +50,7 @@ public class MemcachedNodesManager {
 		@Nullable
 		Object get(@Nonnull String key);
 	}
-	
+
 	private static final Log LOG = LogFactory.getLog(MemcachedNodesManager.class);
 
     private static final String NODE_REGEX = "([\\w]+):([^:]+):([\\d]+)";
@@ -59,7 +59,7 @@ public class MemcachedNodesManager {
     private static final String NODES_REGEX = NODE_REGEX + "(?:(?:\\s+|,)" + NODE_REGEX + ")*";
     private static final Pattern NODES_PATTERN = Pattern.compile( NODES_REGEX );
 
-    private static final String SINGLE_NODE_REGEX = "([^:]+):([\\d]+)";
+    private static final String SINGLE_NODE_REGEX = "([^:]+):([\\d]+)([\\/\\w]+)";
     private static final Pattern SINGLE_NODE_PATTERN = Pattern.compile( SINGLE_NODE_REGEX );
 
     private static final int NODE_AVAILABILITY_CACHE_TTL = 50;

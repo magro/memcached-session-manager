@@ -453,7 +453,7 @@ public abstract class NonStickySessionsIntegrationTest {
         assertNotNull( primary.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
 
         // The executor needs some time to finish the backup...
-        Thread.sleep( 100 );
+        Thread.sleep( 500 );
 
         assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
         assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
@@ -468,14 +468,14 @@ public abstract class NonStickySessionsIntegrationTest {
         getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
 
         // let's take some break so that everything's up again
-        Thread.sleep( 200 );
+        Thread.sleep( 500 );
 
         try {
             final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
             assertNotNull( sessionId1 );
 
             // the memcached client writes async, so it's ok to wait a little bit (especially on windows) (or on cloudbees jenkins)
-            waitForMemcachedClient( 200 );
+            waitForMemcachedClient( 500 );
 
             // 2 for session and validity, if backup would be stored this would be 4 instead
             assertEquals( _daemon1.getCache().getSetCmds(), 2 );
@@ -502,7 +502,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
             final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
             assertNotNull( sessionId1 );
-            Thread.sleep( 200 );
+            Thread.sleep( 500 );
 
             // 2 for session and validity, if backup would be stored this would be 4 instead
             assertEquals( _daemon1.getCache().getSetCmds(), 2 );
@@ -512,7 +512,7 @@ public abstract class NonStickySessionsIntegrationTest {
             // a request without session access should not pull the session from memcached
             // but update the validity info (get + set)
             get( _httpClient, TC_PORT_1, PATH_NO_SESSION_ACCESS, sessionId1 );
-            Thread.sleep( 200 );
+            Thread.sleep( 500 );
 
             assertEquals( _daemon1.getCache().getGetHits(), 1 );
             assertEquals( _daemon1.getCache().getSetCmds(), 3 );
