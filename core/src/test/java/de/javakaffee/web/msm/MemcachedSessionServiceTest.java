@@ -25,7 +25,11 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyMap;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -33,13 +37,13 @@ import static org.testng.Assert.assertTrue;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nonnull;
 
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.internal.OperationFuture;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.core.StandardContext;
@@ -81,7 +85,7 @@ public abstract class MemcachedSessionServiceTest {
         _memcachedMock = mock( MemcachedClient.class );
 
         @SuppressWarnings( "unchecked" )
-        final Future<Boolean> futureMock = mock( Future.class );
+        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
         when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
 
@@ -375,7 +379,7 @@ public abstract class MemcachedSessionServiceTest {
 
         // stub session (backup) ping
         @SuppressWarnings( "unchecked" )
-        final Future<Boolean> futureMock = mock( Future.class );
+        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
         when( futureMock.get() ).thenReturn( Boolean.FALSE );
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.FALSE );
         when( _memcachedMock.add(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );

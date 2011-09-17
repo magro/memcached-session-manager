@@ -44,7 +44,7 @@
 		</dependency>
 		<dependency>
 			<groupId>spy</groupId>
-			<artifactId>memcached</artifactId>
+			<artifactId>spymemcached</artifactId>
 			<version>2.7.1</version>
 			<scope>compile</scope>
 		</dependency>

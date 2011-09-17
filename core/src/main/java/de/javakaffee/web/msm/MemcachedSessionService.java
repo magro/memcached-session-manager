@@ -23,15 +23,15 @@ import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-import java.net.InetSocketAddress;
-import java.net.URI;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -39,11 +39,11 @@ import javax.annotation.Nullable;
 
 import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.ConnectionFactoryBuilder;
-import net.spy.memcached.auth.PlainCallbackHandler;
 import net.spy.memcached.auth.AuthDescriptor;
+import net.spy.memcached.auth.PlainCallbackHandler;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -89,7 +89,19 @@ public class MemcachedSessionService implements SessionBackupService {
     static enum ConnectionType {
         DEFAULT,
         SASL,
-        MEMBASE
+        MEMBASE;
+        
+        static ConnectionType valueOfIgnoreCase(final String name) {
+        	if(name == null) {
+                throw new NullPointerException("Name is null");
+        	}
+        	for(final ConnectionType item : values()) {
+        		if(item.name().equalsIgnoreCase(name)) {
+        			return item;
+        		}
+        	}
+            throw new IllegalArgumentException("No enum const " + ConnectionType.class.getName() +"." + name);
+        }
     }
 
     private static final String PROTOCOL_TEXT = "text";
@@ -194,9 +206,9 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private String _memcachedProtocol = PROTOCOL_TEXT;
 
-    private String connectionType;     
-    private String username;
-    private String password;
+    private String _connectionType = ConnectionType.DEFAULT.name();
+    private String _username;
+    private String _password;
 
     private final AtomicBoolean _enabled = new AtomicBoolean( true );
 
@@ -431,21 +443,21 @@ public class MemcachedSessionService implements SessionBackupService {
 
     protected MemcachedClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
-        List<InetSocketAddress> addresses = memcachedNodesManager.getAllMemcachedAddresses();
-        ArrayList baseURIs = new ArrayList();
         if ( ! _enabled.get() ) {
             return null;
         }
+        final List<InetSocketAddress> addresses = memcachedNodesManager.getAllMemcachedAddresses();
+        final List<URI> baseURIs = new ArrayList<URI>();
         try {
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, statistics);
-            if (ConnectionType.MEMBASE.equals(connectionType)) {
-                for (InetSocketAddress address : addresses) {
-                    String uri = address.getAddress().toString();
-                    URI baseUri = new URI(uri);
+            if (ConnectionType.MEMBASE.name().equals(_connectionType)) {
+                for (final InetSocketAddress address : addresses) {
+                    final String uri = address.getAddress().toString();
+                    final URI baseUri = new URI(uri);
                     baseURIs.add(baseUri);
                 }
-                String username = getUsername();
-                String password = getPassword();
+                final String username = getUsername();
+                final String password = getPassword();
 
                 /* this could also be MemcachedClient(serverList, "default", "") in the case
                 * you're using a default bucket
@@ -462,21 +474,25 @@ public class MemcachedSessionService implements SessionBackupService {
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
-            if (ConnectionType.SASL.equals(connectionType)) {
-                AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
-                                                new PlainCallbackHandler(username, password));
-                ConnectionFactory connectionFactory = new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                            .setAuthDescriptor(authDescriptor).build();
-                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                        memcachedNodesManager.getSessionIdFormat(),
-                        statistics ) : connectionFactory;
-
-            } else if(ConnectionType.MEMBASE.equals(connectionType)) {
-               return new BinaryConnectionFactory();
-            } else {
-                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                        memcachedNodesManager.getSessionIdFormat(),
-                        statistics ) : new BinaryConnectionFactory();
+        	final ConnectionType connectionType = ConnectionType.valueOfIgnoreCase(_connectionType);
+        	switch(connectionType) {
+	        	case SASL:
+	        		final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
+	                                                new PlainCallbackHandler(_username, _password));
+	                final ConnectionFactory connectionFactory = new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+	                            .setAuthDescriptor(authDescriptor).build();
+	                // FIXME: CF with AuthDescriptor is only used if nodeIdIsNotEncodedInSessionId.
+	                // Shouldn't the AuthDescriptor also be used if !nodeIdIsNotEncodedInSessionId?
+	                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+	                        memcachedNodesManager.getSessionIdFormat(),
+	                        statistics ) : connectionFactory;
+	        	case MEMBASE:
+	               return new BinaryConnectionFactory();
+	        	case DEFAULT:
+	        	default:
+	        		return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+	                        memcachedNodesManager.getSessionIdFormat(),
+	                        statistics ) : new BinaryConnectionFactory();
             }
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
@@ -1532,16 +1548,16 @@ public class MemcachedSessionService implements SessionBackupService {
      * Connection Type can be SASL, MEMBASE or default
      * @param connectionType
      */
-    public void setConnectionType(String connectionType) {
-        this.connectionType = connectionType;
+    public void setConnectionType(final String connectionType) {
+        _connectionType = connectionType;
     }
 
     public String getConnectionType() {
-        return connectionType;
+        return _connectionType;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setUsername(final String username) {
+        _username = username;
     }
 
     /**
@@ -1549,11 +1565,11 @@ public class MemcachedSessionService implements SessionBackupService {
      * @return
      */
     public String getUsername() {
-        return username;
+        return _username;
     }
 
-    public void setPassword(String password) {
-       this.password = password;   
+    public void setPassword(final String password) {
+       _password = password;
     }
 
     /**
@@ -1561,7 +1577,7 @@ public class MemcachedSessionService implements SessionBackupService {
      * @return
      */
     public String getPassword() {
-        return password;
+        return _password;
     }
 
 }

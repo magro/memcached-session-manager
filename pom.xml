@@ -344,6 +344,11 @@
 			<url>http://bleu.west.spy.net/~dustin/m2repo/</url>
 		</repository>
 		<repository>
+			<id>couchbase</id>
+			<name>Couchbase Repository</name>
+			<url>http://files.couchbase.com/maven2</url>
+		</repository>
+		<repository>
 			<id>jmemcached</id>
 			<name>jmemcached Repository</name>
 			<url>http://thimbleware.com/maven</url>
