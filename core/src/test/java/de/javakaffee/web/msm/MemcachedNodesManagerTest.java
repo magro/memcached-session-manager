@@ -74,7 +74,7 @@ public class MemcachedNodesManagerTest {
 	public static Object[][] nodesAndExpectedCountDataProvider() {
 		return new Object[][] {
 				{ "localhost:11211", 1 },
-                { "localhost:11211/default", 1},
+                { "http://localhost:8091/pools", 1},
                 { "n1:localhost:11211", 1 },
 				{ "n1:localhost:11211,n2:localhost:11212", 2 },
 				{ "n1:localhost:11211 n2:localhost:11212", 2 }
@@ -92,6 +92,7 @@ public class MemcachedNodesManagerTest {
 	public static Object[][] nodesAndPrimaryNodesDataProvider() {
 		return new Object[][] {
 				{ "localhost:11211", null, new NodeIdList() },
+                { "http://localhost:8091/pools", null, new NodeIdList() },
 				{ "n1:localhost:11211", null, new NodeIdList("n1") },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", new NodeIdList("n2") },
 				{ "n1:localhost:11211,n2:localhost:11212,n3:localhost:11213", "n1", new NodeIdList("n2", "n3") },
@@ -111,6 +112,7 @@ public class MemcachedNodesManagerTest {
 		return new Object[][] {
 				{ "localhost:11211", null, Collections.emptyList() },
 				{ "localhost:11211", "", Collections.emptyList() },
+                { "http://localhost:8091/pools", null, Collections.emptyList() },
 				{ "n1:localhost:11211", null, Collections.emptyList() },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", Arrays.asList("n1") },
 				{ "n1:localhost:11211,n2:localhost:11212,n3:localhost:11213", "n1,n2", Arrays.asList("n1", "n2") },
@@ -129,6 +131,7 @@ public class MemcachedNodesManagerTest {
 	public static Object[][] nodesAndExpectedEncodedInSessionIdDataProvider() {
 		return new Object[][] {
 				{ "localhost:11211", null, false },
+                { "http://localhost:8091/pools", null, false },
 				{ "n1:localhost:11211", null, true },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", true }
 		};
@@ -176,6 +179,8 @@ public class MemcachedNodesManagerTest {
 	@DataProvider
 	public static Object[][] testgGetAllMemcachedAddressesDataProvider() {
 		return new Object[][] {
+				{ "localhost:11211", null, asList(new InetSocketAddress("localhost", 11211)) },
+				{ "http://localhost:8091/pools", null, asList(new InetSocketAddress("localhost", 8091)) },
 				{ "n1:localhost:11211", null, asList(new InetSocketAddress("localhost", 11211)) },
 				{ "n1:localhost:11211,n2:localhost:11212", null, asList(new InetSocketAddress("localhost", 11211), new InetSocketAddress("localhost", 11212)) },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", asList(new InetSocketAddress("localhost", 11211), new InetSocketAddress("localhost", 11212)) }

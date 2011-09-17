@@ -23,10 +23,9 @@ import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -89,7 +88,7 @@ public class MemcachedSessionService implements SessionBackupService {
     static enum ConnectionType {
         DEFAULT,
         SASL,
-        MEMBASE;
+        MEMBASE_BUCKET;
         
         static ConnectionType valueOfIgnoreCase(final String name) {
         	if(name == null) {
@@ -446,24 +445,15 @@ public class MemcachedSessionService implements SessionBackupService {
         if ( ! _enabled.get() ) {
             return null;
         }
-        final List<InetSocketAddress> addresses = memcachedNodesManager.getAllMemcachedAddresses();
-        final List<URI> baseURIs = new ArrayList<URI>();
         try {
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, statistics);
-            if (ConnectionType.MEMBASE.name().equals(_connectionType)) {
-                for (final InetSocketAddress address : addresses) {
-                    final String uri = address.getAddress().toString();
-                    final URI baseUri = new URI(uri);
-                    baseURIs.add(baseUri);
-                }
+            if (ConnectionType.MEMBASE_BUCKET.name().equals(_connectionType)) {
+            	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
+            	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
+                final URI baseUri = new URI(memcachedNodesManager.getMemcachedNodes());
                 final String username = getUsername();
                 final String password = getPassword();
-
-                /* this could also be MemcachedClient(serverList, "default", "") in the case
-                * you're using a default bucket
-                */
-                return new MemcachedClient(baseURIs, username, password);
-
+                return new MemcachedClient(Arrays.asList(baseUri), username, password);
             }
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
         } catch (final Exception e) {
@@ -486,7 +476,7 @@ public class MemcachedSessionService implements SessionBackupService {
 	                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
 	                        memcachedNodesManager.getSessionIdFormat(),
 	                        statistics ) : connectionFactory;
-	        	case MEMBASE:
+	        	case MEMBASE_BUCKET:
 	               return new BinaryConnectionFactory();
 	        	case DEFAULT:
 	        	default:
