@@ -50,8 +50,6 @@ public class BackupSessionTask implements Callable<BackupResult> {
 
     private static final Log _log = LogFactory.getLog( BackupSessionTask.class );
 
-    private final SessionIdFormat _sessionIdFormat = new SessionIdFormat();
-
     private final MemcachedBackupSession _session;
     private final boolean _force;
     private final TranscoderService _transcoderService;
@@ -162,7 +160,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                     _log.debug( "Releasing lock for session " + _session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _sessionIdFormat.createLockName( _session.getIdInternal() ) );
+                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) );
                 _statistics.registerSince( RELEASE_LOCK, start );
                 _session.releaseLock();
             } catch( final Exception e ) {
@@ -230,7 +228,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                     if ( _log.isInfoEnabled() ) {
                         _log.info( "Could not store session " + session.getId() + " in memcached." );
                     }
-                    final String nodeId = _sessionIdFormat.extractMemcachedId( session.getId() );
+                    final String nodeId = _memcachedNodesManager.getSessionIdFormat().extractMemcachedId( session.getId() );
                     _memcachedNodesManager.setNodeAvailable( nodeId, false );
                     throw new NodeFailureException( "Could not store session in memcached.", nodeId );
                 }
