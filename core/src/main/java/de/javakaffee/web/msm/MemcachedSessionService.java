@@ -1382,7 +1382,8 @@ public class MemcachedSessionService implements SessionBackupService {
 
     public void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
-        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _missingSessionsCache, storeSecondaryBackup, _statistics );
+        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _memcachedNodesManager,
+                _missingSessionsCache, storeSecondaryBackup, _statistics );
         if ( _sessionTrackerValve != null ) {
             _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
         }

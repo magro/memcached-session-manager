@@ -19,7 +19,13 @@ package de.javakaffee.web.msm;
 import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.SessionValidityInfo.decode;
 import static de.javakaffee.web.msm.SessionValidityInfo.encode;
-import static de.javakaffee.web.msm.Statistics.StatsType.*;
+import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK;
+import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK_FAILURE;
+import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_BACKUP;
+import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_DELETE_FROM_MEMCACHED;
+import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_LOAD_FROM_MEMCACHED;
+import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_ON_BACKUP_WITHOUT_LOADED_SESSION;
+import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
 import static java.lang.Math.min;
 import static java.lang.Thread.sleep;
 
@@ -83,13 +89,14 @@ public abstract class LockingStrategy {
     protected final Statistics _stats;
 
     protected LockingStrategy( @Nonnull final MemcachedSessionService manager,
+            @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats ) {
         _manager = manager;
         _memcached = memcached;
         _missingSessionsCache = missingSessionsCache;
-        _sessionIdFormat = new SessionIdFormat();
+        _sessionIdFormat = memcachedNodesManager.getSessionIdFormat();
         _requestsThreadLocal = new InheritableThreadLocal<Request>();
         _storeSecondaryBackup = storeSecondaryBackup;
         _stats = stats;
@@ -102,6 +109,7 @@ public abstract class LockingStrategy {
     @CheckForNull
     public static LockingStrategy create( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern,
             @Nonnull final MemcachedClient memcached, @Nonnull final MemcachedSessionService manager,
+            @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats ) {
         if ( lockingMode == null ) {
@@ -109,14 +117,14 @@ public abstract class LockingStrategy {
         }
         switch ( lockingMode ) {
         case ALL:
-            return new LockingStrategyAll( manager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            return new LockingStrategyAll( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
         case AUTO:
-            return new LockingStrategyAuto( manager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            return new LockingStrategyAuto( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
         case URI_PATTERN:
-            return new LockingStrategyUriPattern( manager, uriPattern, memcached, missingSessionsCache, storeSecondaryBackup,
+            return new LockingStrategyUriPattern( manager, memcachedNodesManager, uriPattern, memcached, missingSessionsCache, storeSecondaryBackup,
                     stats );
         case NONE:
-            return new LockingStrategyNone( manager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            return new LockingStrategyNone( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
         default:
             throw new IllegalArgumentException( "LockingMode not yet supported: " + lockingMode );
         }
