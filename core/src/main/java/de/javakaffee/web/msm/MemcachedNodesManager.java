@@ -65,12 +65,16 @@ public class MemcachedNodesManager {
     private static final String MEMBASE_BUCKET_NODE_REGEX = "http://([^:]+):([\\d]+)/[\\w]+";
     private static final Pattern MEMBASE_BUCKET_NODE_PATTERN = Pattern.compile( MEMBASE_BUCKET_NODE_REGEX );
 
+    private static final String MEMBASE_BUCKET_NODES_REGEX = MEMBASE_BUCKET_NODE_REGEX + "(?:(?:\\s+|,)" + MEMBASE_BUCKET_NODE_REGEX + ")*";
+    private static final Pattern MEMBASE_BUCKET_NODES_PATTERN = Pattern.compile( MEMBASE_BUCKET_NODES_REGEX );
+
     private static final int NODE_AVAILABILITY_CACHE_TTL = 50;
 
 	private final String _memcachedNodes;
     private final NodeIdList _primaryNodeIds;
     private final List<String> _failoverNodeIds;
     private final LinkedHashMap<InetSocketAddress, String> _address2Ids;
+    private final boolean _encodeNodeIdInSessionId;
     @Nullable
 	private NodeIdService _nodeIdService;
 	private SessionIdFormat _sessionIdFormat;
@@ -92,7 +96,9 @@ public class MemcachedNodesManager {
 		_failoverNodeIds = failoverNodeIds;
 		_address2Ids = address2Ids;
 
-		if (isEncodeNodeIdInSessionId()) {
+        _encodeNodeIdInSessionId = !((getCountNodes() <= 1 || isMembaseConfig(memcachedNodes)) && _primaryNodeIds.isEmpty());
+
+		if (_encodeNodeIdInSessionId) {
 			if (memcachedClientCallback == null) {
 				throw new IllegalArgumentException("The MemcachedClientCallback must not be null.");
 			}
@@ -126,6 +132,10 @@ public class MemcachedNodesManager {
 	        _nodeIdService = null;
 		}
 	}
+
+    private boolean isMembaseConfig(final String memcachedNodes) {
+        return memcachedNodes.startsWith("http://");
+    }
 
     protected NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
             @Nonnull final MemcachedClientCallback memcachedClientCallback ) {
@@ -170,13 +180,11 @@ public class MemcachedNodesManager {
 		}
 		
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
-        		&& !MEMBASE_BUCKET_NODE_PATTERN.matcher(memcachedNodes).matches()) {
+        		&& !MEMBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {
             throw new IllegalArgumentException( "Configured memcachedNodes attribute has wrong format, must match " + NODES_REGEX );
         }
 
-        final Matcher matcher = NODE_PATTERN.matcher( memcachedNodes);
         final Matcher singleNodeMatcher = SINGLE_NODE_PATTERN.matcher(memcachedNodes);
-        final Matcher membaseBucketMatcher = MEMBASE_BUCKET_NODE_PATTERN.matcher(memcachedNodes);
 
         // we have a linked hashmap to have insertion order for addresses
         final LinkedHashMap<InetSocketAddress, String> address2Ids = new LinkedHashMap<InetSocketAddress, String>(1);
@@ -187,10 +195,20 @@ public class MemcachedNodesManager {
         if (singleNodeMatcher.matches()) {    // for single
             address2Ids.put(getSingleShortNodeDefinition(singleNodeMatcher), null);
         }
-        else if (membaseBucketMatcher.matches()) {    // for membase
-            address2Ids.put(getSingleShortNodeDefinition(membaseBucketMatcher), null);
+        else if (MEMBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {    // for membase
+            final Matcher matcher = MEMBASE_BUCKET_NODE_PATTERN.matcher(memcachedNodes);
+            while (matcher.find()) {
+                final String hostname = matcher.group( 1 );
+                final int port = Integer.parseInt( matcher.group( 2 ) );
+                address2Ids.put(new InetSocketAddress( hostname, port ), null);
+            }
+            if (address2Ids.isEmpty()) {
+                throw new IllegalArgumentException("All nodes are also configured as failover nodes,"
+                        + " this is a configuration failure. In this case, you probably want to leave out the failoverNodes.");
+            }
         }
         else { // If mutliple nodes are configured
+            final Matcher matcher = NODE_PATTERN.matcher( memcachedNodes);
             while (matcher.find()) {
                 final Pair<String, InetSocketAddress> nodeInfo = getRegularNodeDefinition(matcher);
                 address2Ids.put(nodeInfo.getSecond(), nodeInfo.getFirst());
@@ -283,10 +301,11 @@ public class MemcachedNodesManager {
 	
 	/**
 	 * Specifies if the memcached node id shall be encoded in the sessionId. This is only false
-	 * for a single memcachedNode definition without a nodeId (e.g. <code>localhost:11211</code>).
+	 * for a single memcachedNode definition without a nodeId (e.g. <code>localhost:11211</code>)
+	 * or for membase REST URIs (one or more of e.g. http://10.10.0.1:8091/pools).
 	 */
 	public boolean isEncodeNodeIdInSessionId() {
-		return getCountNodes() > 1 || !_primaryNodeIds.isEmpty();
+		return _encodeNodeIdInSessionId;
 	}
 
 	/**

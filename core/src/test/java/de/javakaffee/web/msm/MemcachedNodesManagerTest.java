@@ -18,11 +18,7 @@ package de.javakaffee.web.msm;
 import static de.javakaffee.web.msm.MemcachedNodesManager.createFor;
 import static java.util.Arrays.asList;
 import static org.mockito.Mockito.mock;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
@@ -69,12 +65,18 @@ public class MemcachedNodesManagerTest {
 	public void testSingleNodeAndFailoverNodeShouldThrowException() {
 		createFor("n1:localhost:11211", "n1", _mcc);
 	}
+    
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testMembaseNodesAndFailoverNodeShouldThrowException() {
+        createFor("http://localhost:8091/pools", "n1", _mcc);
+    }
 	
 	@DataProvider
 	public static Object[][] nodesAndExpectedCountDataProvider() {
 		return new Object[][] {
 				{ "localhost:11211", 1 },
                 { "http://localhost:8091/pools", 1},
+                { "http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", 2},
                 { "n1:localhost:11211", 1 },
 				{ "n1:localhost:11211,n2:localhost:11212", 2 },
 				{ "n1:localhost:11211 n2:localhost:11212", 2 }
@@ -93,6 +95,7 @@ public class MemcachedNodesManagerTest {
 		return new Object[][] {
 				{ "localhost:11211", null, new NodeIdList() },
                 { "http://localhost:8091/pools", null, new NodeIdList() },
+                { "http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, new NodeIdList() },
 				{ "n1:localhost:11211", null, new NodeIdList("n1") },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", new NodeIdList("n2") },
 				{ "n1:localhost:11211,n2:localhost:11212,n3:localhost:11213", "n1", new NodeIdList("n2", "n3") },
@@ -132,6 +135,7 @@ public class MemcachedNodesManagerTest {
 		return new Object[][] {
 				{ "localhost:11211", null, false },
                 { "http://localhost:8091/pools", null, false },
+                { "http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, false },
 				{ "n1:localhost:11211", null, true },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", true }
 		};
@@ -181,6 +185,8 @@ public class MemcachedNodesManagerTest {
 		return new Object[][] {
 				{ "localhost:11211", null, asList(new InetSocketAddress("localhost", 11211)) },
 				{ "http://localhost:8091/pools", null, asList(new InetSocketAddress("localhost", 8091)) },
+                { "http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null,
+				    asList(new InetSocketAddress("10.10.0.1", 8091), new InetSocketAddress("10.10.0.2", 8091)) },
 				{ "n1:localhost:11211", null, asList(new InetSocketAddress("localhost", 11211)) },
 				{ "n1:localhost:11211,n2:localhost:11212", null, asList(new InetSocketAddress("localhost", 11211), new InetSocketAddress("localhost", 11212)) },
 				{ "n1:localhost:11211,n2:localhost:11212", "n1", asList(new InetSocketAddress("localhost", 11211), new InetSocketAddress("localhost", 11212)) }
@@ -188,7 +194,7 @@ public class MemcachedNodesManagerTest {
 	}
 	
 	@Test( dataProvider = "testgGetAllMemcachedAddressesDataProvider" )
-	public void testgGetAllMemcachedAddresses(final String memcachedNodes, final String failoverNodes, final Collection<InetSocketAddress> expectedSocketAddresses) {
+	public void testGetAllMemcachedAddresses(final String memcachedNodes, final String failoverNodes, final Collection<InetSocketAddress> expectedSocketAddresses) {
 		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, _mcc );
 		assertEquals(result.getAllMemcachedAddresses(), expectedSocketAddresses);
 	}
