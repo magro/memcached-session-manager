@@ -1,8 +1,12 @@
 .classpath
 .project
 .settings
+.checkstyle
+.fbprefs
+*.patch
 target
 work
 reports
 test-output
 core/src/test/java/de/javakaffee/web/msm/integration/MemcachedFailover2IntegrationTest.java
+jbossweb3/
