@@ -143,7 +143,6 @@ public static void main(final String[] args) throws IOException, URISyntaxExcept
         
     }
     
-    @org.junit.Test
     @Test
     public void testConnect() throws IOException, URISyntaxException, InterruptedException, ExecutionException {
 
