@@ -252,6 +252,12 @@
 				<version>4.1-alpha1</version>
 				<scope>test</scope>
 			</dependency>
+			<dependency>
+				<groupId>commons-codec</groupId>
+				<artifactId>commons-codec</artifactId>
+				<version>1.5</version><!-- needed for membase runtime compatibility -->
+				<scope>test</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -337,11 +343,6 @@
 			<id>msm</id>
 			<name>msm repository</name>
 			<url>http://memcached-session-manager.googlecode.com/svn/maven</url>
-		</repository>
-		<repository>
-			<id>spy</id>
-			<name>Spy Repository</name>
-			<url>http://bleu.west.spy.net/~dustin/m2repo/</url>
 		</repository>
 		<repository>
 			<id>couchbase</id>
