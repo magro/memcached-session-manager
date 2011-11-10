@@ -74,8 +74,7 @@ public abstract class LockingStrategy {
 
     protected static final String LOCK_VALUE = "locked";
     protected static final int LOCK_RETRY_INTERVAL = 10;
-    protected static final int LOCK_MAX_RETRY_INTERVAL = 500;
-    protected static final int LOCK_TIMEOUT = 2000;
+    protected static final int LOCK_MAX_RETRY_INTERVAL = 500;    
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
@@ -138,7 +137,7 @@ public abstract class LockingStrategy {
     }
 
     protected LockStatus lock( final String sessionId ) {
-        return lock( sessionId, LOCK_TIMEOUT, TimeUnit.MILLISECONDS );
+        return lock( sessionId, _manager.getOperationTimeout(), TimeUnit.MILLISECONDS );
     }
 
     protected LockStatus lock( final String sessionId, final long timeout, final TimeUnit timeUnit ) {
@@ -538,7 +537,7 @@ public abstract class LockingStrategy {
             final String key = _sessionIdFormat.createBackupKey( session.getId() );
             final Future<Boolean> touchResultFuture = _memcached.add( key, 5, 1 );
             try {
-                final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
+                final boolean touchResult = touchResultFuture.get(_manager.getOperationTimeout(), TimeUnit.MILLISECONDS);
                 _log.debug( "Got backup ping result " + touchResult );
                 if ( touchResult ) {
                     _log.warn( "The secondary backup for session " + session.getIdInternal()
@@ -548,7 +547,7 @@ public abstract class LockingStrategy {
                 }
             } catch ( final TimeoutException e ) {
                 _log.warn( "The secondary backup for session " + session.getIdInternal()
-                        + " could not be completed within 200 millis, was cancelled now." );
+                		+ " could not be completed within " + _manager.getOperationTimeout() + " millis, was cancelled now." );
             } catch ( final ExecutionException e ) {
                 _log.warn( "An exception occurred when trying to ping session " + session.getIdInternal(), e );
             }
