@@ -182,6 +182,13 @@ public abstract class LockingStrategy {
             acquireLock( sessionId, retryInterval * 2, maxRetryInterval, timeout, start );
         }
     }
+    
+    public boolean isSessionLocked(@Nonnull final String sessionId) {
+    	if (_memcached.get( _sessionIdFormat.createLockName( sessionId )) != null) {    		
+    		return true;
+    	}
+    	return false;
+    }
 
     protected void checkTimeoutAndWait( @Nonnull final String sessionId, final long retryInterval,
             final long maxRetryInterval, final long timeout, final long start ) throws TimeoutException,
