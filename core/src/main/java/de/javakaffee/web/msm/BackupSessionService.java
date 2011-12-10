@@ -115,7 +115,7 @@ public class BackupSessionService {
      * @see Session#getMaxInactiveInterval()
      * @see MemcachedBackupSession#getThisAccessedTimeInternal()
      */
-    public void updateExpiration( final MemcachedBackupSession session ) {
+    public void updateExpiration( final MemcachedBackupSession session ) throws InterruptedException {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Updating expiration time for session " + session.getId() );
         }

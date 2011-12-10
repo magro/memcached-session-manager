@@ -16,6 +16,8 @@
 package de.javakaffee.web.msm;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -426,16 +428,30 @@ public class MemcachedNodesManager {
 		setNodeAvailableForSessionId(sessionId, false);
 	}
 
-	private void setNodeAvailableForSessionId(final String sessionId, final boolean available) {
+	/**
+	 * Mark the memcached node encoded in the given sessionId as available or not. If nodeIds shall
+	 * not be encoded in the sessionId or if the given sessionId does not contain a nodeId no
+	 * action will be taken.
+	 *
+	 * @param sessionId the sessionId that may contain a node id.
+	 * @param available specifies if the possibly referenced node is available or not.
+	 *
+	 * @return the extracted nodeId or <code>null</code>.
+	 *
+	 * @see #isEncodeNodeIdInSessionId()
+	 */
+	public String setNodeAvailableForSessionId(final String sessionId, final boolean available) {
 		if ( _nodeIdService != null && isEncodeNodeIdInSessionId() ) {
 			final String nodeId = _sessionIdFormat.extractMemcachedId(sessionId);
 			if ( nodeId != null ) {
 				_nodeIdService.setNodeAvailable(nodeId, available);
+				return nodeId;
 			}
 			else {
 				LOG.warn("Got sessionId without nodeId: " + sessionId);
 			}
 		}
+		return null;
 	}
 
     /**
@@ -454,5 +470,33 @@ public class MemcachedNodesManager {
 		}
 		return null;
 	}
+
+	/**
+	 * Determines, if the current memcachedNodes configuration is a membase bucket configuration
+	 * (like e.g. http://10.10.0.1:8091/pools).
+	 */
+    public boolean isMembaseBucketConfig() {
+        return MEMBASE_BUCKET_NODES_PATTERN.matcher(_memcachedNodes).matches();
+    }
+
+    /**
+     * Returns a list of membase REST interface uris if the current configuration is
+     * a membase bucket configuration.
+     * @see #isMembaseBucketConfig()
+     */
+    public List<URI> getMembaseBucketURIs() {
+        if(!isMembaseBucketConfig())
+            throw new IllegalStateException("This is not a membase bucket configuration.");
+        final List<URI> result = new ArrayList<URI>(_address2Ids.size());
+        final Matcher matcher = MEMBASE_BUCKET_NODE_PATTERN.matcher(_memcachedNodes);
+        while (matcher.find()) {
+            try {
+                result.add(new URI(matcher.group()));
+            } catch (final URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return result;
+    }
 
 }

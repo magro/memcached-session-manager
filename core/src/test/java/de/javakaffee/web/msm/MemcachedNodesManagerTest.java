@@ -21,6 +21,8 @@ import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -222,5 +224,19 @@ public class MemcachedNodesManagerTest {
 		assertFalse(cut.isNodeAvailable("n1"));
 		assertTrue(cut.isNodeAvailable("n2"));
 	}
+    
+    @Test
+    public void testIsMembaseBucketConfig() {
+        assertTrue(createFor("http://10.10.0.1:8091/pools", null, _mcc ).isMembaseBucketConfig());
+        assertTrue(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).isMembaseBucketConfig());
+    }
+    
+    @Test
+    public void testGetMembaseBucketURIs() throws URISyntaxException {
+        assertEquals(createFor("http://10.10.0.1:8091/pools", null, _mcc ).getMembaseBucketURIs(),
+                Arrays.asList(new URI("http://10.10.0.1:8091/pools")));
+        assertEquals(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).getMembaseBucketURIs(),
+                Arrays.asList(new URI("http://10.10.0.1:8091/pools"), new URI("http://10.10.0.2:8091/pools")));
+    }
 
 }

@@ -23,9 +23,7 @@ import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.net.URI;
 import java.security.Principal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -85,21 +83,31 @@ public class MemcachedSessionService implements SessionBackupService {
         COULD_NOT_AQUIRE_LOCK
     }
 
-    static enum ConnectionType {
-        DEFAULT,
-        SASL,
-        MEMBASE_BUCKET;
+    static class ConnectionType {
         
-        static ConnectionType valueOfIgnoreCase(final String name) {
-        	if(name == null) {
-                throw new NullPointerException("Name is null");
-        	}
-        	for(final ConnectionType item : values()) {
-        		if(item.name().equalsIgnoreCase(name)) {
-        			return item;
-        		}
-        	}
-            throw new IllegalArgumentException("No enum const " + ConnectionType.class.getName() +"." + name);
+        private final boolean membaseBucketConfig;
+        private final String username;
+        private final String password;
+        public ConnectionType(final boolean membaseBucketConfig, final String username, final String password) {
+            this.membaseBucketConfig = membaseBucketConfig;
+            this.username = username;
+            this.password = password;
+        }
+        public static ConnectionType valueOf(final boolean membaseBucketConfig, final String username, final String password) {
+            return new ConnectionType(membaseBucketConfig, username, password);
+        }
+        boolean isMembaseBucketConfig() {
+            return membaseBucketConfig;
+        }
+        boolean isSASL() {
+            return !membaseBucketConfig && !isBlank(username) && !isBlank(password);
+        }
+        boolean isDefault() {
+            return !isMembaseBucketConfig() && !isSASL();
+        }
+
+        boolean isBlank(final String value) {
+            return value == null || value.trim().length() == 0;
         }
     }
 
@@ -205,7 +213,6 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private String _memcachedProtocol = PROTOCOL_TEXT;
 
-    private String _connectionType = ConnectionType.DEFAULT.name();
     private String _username;
     private String _password;
 
@@ -354,7 +361,6 @@ public class MemcachedSessionService implements SessionBackupService {
         void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup );
         void setUsername(String username);
         void setPassword(String password);
-        void setConnectionType(String connectionType);
 
 
         /**
@@ -446,14 +452,12 @@ public class MemcachedSessionService implements SessionBackupService {
             return null;
         }
         try {
-            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, statistics);
-            if (ConnectionType.MEMBASE_BUCKET.name().equals(_connectionType)) {
+            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isMembaseBucketConfig(), _username, _password);
+            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
+            if (connectionType.isMembaseBucketConfig()) {
             	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
-                final URI baseUri = new URI(memcachedNodesManager.getMemcachedNodes());
-                final String username = getUsername();
-                final String password = getPassword();
-                return new MemcachedClient(Arrays.asList(baseUri), username, password);
+                return new MemcachedClient(memcachedNodesManager.getMembaseBucketURIs(), _username, _password);
             }
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
         } catch (final Exception e) {
@@ -462,27 +466,25 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
-            final Statistics statistics ) {
+            final ConnectionType connectionType, final Statistics statistics ) {
         if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
-        	final ConnectionType connectionType = ConnectionType.valueOfIgnoreCase(_connectionType);
-        	switch(connectionType) {
-	        	case SASL:
-	        		final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
-	                                                new PlainCallbackHandler(_username, _password));
-	                final ConnectionFactory connectionFactory = new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-	                            .setAuthDescriptor(authDescriptor).build();
-	                // FIXME: CF with AuthDescriptor is only used if nodeIdIsNotEncodedInSessionId.
-	                // Shouldn't the AuthDescriptor also be used if !nodeIdIsNotEncodedInSessionId?
-	                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-	                        memcachedNodesManager.getSessionIdFormat(),
-	                        statistics ) : connectionFactory;
-	        	case MEMBASE_BUCKET:
-	               return new BinaryConnectionFactory();
-	        	case DEFAULT:
-	        	default:
-	        		return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-	                        memcachedNodesManager.getSessionIdFormat(),
-	                        statistics ) : new BinaryConnectionFactory();
+            if (connectionType.isSASL()) {
+                // FIXME: CF with AuthDescriptor is only used if nodeIdIsNotEncodedInSessionId.
+                // Shouldn't the AuthDescriptor also be used if !nodeIdIsNotEncodedInSessionId?
+                return memcachedNodesManager.isEncodeNodeIdInSessionId()
+                        ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                                memcachedNodesManager.getSessionIdFormat(), statistics )
+                        : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+                                .setAuthDescriptor(new AuthDescriptor(new String[]{"PLAIN"},
+                                        new PlainCallbackHandler(_username, _password))).build();
+            }
+            else if (connectionType.isMembaseBucketConfig()) {
+                return new BinaryConnectionFactory();
+            }
+            else {
+                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                        memcachedNodesManager.getSessionIdFormat(),
+                        statistics ) : new BinaryConnectionFactory();
             }
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
@@ -978,9 +980,6 @@ public class MemcachedSessionService implements SessionBackupService {
                 return null;
             }
 
-        } catch ( final NodeFailureException e ) {
-            _log.warn( "Could not load session with id " + sessionId + " from memcached." );
-            _memcachedNodesManager.onLoadFromMemcachedFailure( sessionId );
         } catch ( final Exception e ) {
             _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
             if ( lockStatus == LockStatus.LOCKED ) {
@@ -1533,18 +1532,6 @@ public class MemcachedSessionService implements SessionBackupService {
     @Nullable
     LockingStrategy getLockingStrategy() {
         return _lockingStrategy;
-    }
-
-    /**
-     * Connection Type can be SASL, MEMBASE or default
-     * @param connectionType
-     */
-    public void setConnectionType(final String connectionType) {
-        _connectionType = connectionType;
-    }
-
-    public String getConnectionType() {
-        return _connectionType;
     }
 
     public void setUsername(final String username) {

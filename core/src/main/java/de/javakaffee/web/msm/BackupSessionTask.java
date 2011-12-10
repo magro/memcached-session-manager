@@ -25,8 +25,10 @@ import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -184,31 +186,37 @@ public class BackupSessionTask implements Callable<BackupResult> {
      *
      * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
      */
-    BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) {
+    BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) throws InterruptedException {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Trying to store session in memcached: " + session.getId() );
         }
 
         try {
-
             storeSessionInMemcached( session, data );
-
+            _log.info("Have SUCCESS");
             return new BackupResult( BackupResultStatus.SUCCESS, data, attributesData );
-        } catch ( final NodeFailureException e ) {
-            if ( _log.isInfoEnabled() ) {
-                String msg = "Could not store session " + session.getId() +
-                        " in memcached due to unavailable node " + e.getNodeId() + ".";
-                if ( _force ) {
-                    msg += "\nNote that this session was relocated to this node because the original node was not available.";
-                }
-                _log.info( msg );
-            }
-
-            return new BackupResult( BackupResultStatus.FAILURE, data, null );
+        } catch (final ExecutionException e) {
+            handleException(session, e);
+            return new BackupResult(BackupResultStatus.FAILURE, data, null);
+        } catch (final TimeoutException e) {
+            handleException(session, e);
+            return new BackupResult(BackupResultStatus.FAILURE, data, null);
         }
     }
 
-    private void storeSessionInMemcached( final MemcachedBackupSession session, final byte[] data) throws NodeFailureException {
+    private void handleException(final MemcachedBackupSession session, final Exception e) {
+        //if ( _log.isWarnEnabled() ) {
+            String msg = "Could not store session " + session.getId() + " in memcached.";
+            if ( _force ) {
+                msg += "\nNote that this session was relocated to this node because the" +
+                    " original node was not available.";
+            }
+            _log.warn(msg, e);
+        //}
+        _memcachedNodesManager.setNodeAvailableForSessionId(session.getId(), false);
+    }
+
+    private void storeSessionInMemcached( final MemcachedBackupSession session, final byte[] data) throws InterruptedException, ExecutionException, TimeoutException {
 
         /* calculate the expiration time (instead of using just maxInactiveInterval), as
          * this is relevant for the update of the expiration time: if we would just use
@@ -220,18 +228,9 @@ public class BackupSessionTask implements Callable<BackupResult> {
         try {
             final Future<Boolean> future = _memcached.set( session.getId(), expirationTime, data );
             if ( !_sessionBackupAsync ) {
-                try {
-                    future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
-                    session.setLastMemcachedExpirationTime( expirationTime );
-                    session.setLastBackupTime( System.currentTimeMillis() );
-                } catch ( final Exception e ) {
-                    if ( _log.isInfoEnabled() ) {
-                        _log.info( "Could not store session " + session.getId() + " in memcached." );
-                    }
-                    final String nodeId = _memcachedNodesManager.getSessionIdFormat().extractMemcachedId( session.getId() );
-                    _memcachedNodesManager.setNodeAvailable( nodeId, false );
-                    throw new NodeFailureException( "Could not store session in memcached.", nodeId );
-                }
+                future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
+                session.setLastMemcachedExpirationTime( expirationTime );
+                session.setLastBackupTime( System.currentTimeMillis() );
             }
             else {
                 /* in async mode, we asume the session was stored successfully

@@ -25,11 +25,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyMap;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -52,8 +48,10 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 import de.javakaffee.web.msm.integration.TestUtils;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
@@ -152,6 +150,32 @@ public abstract class MemcachedSessionServiceTest {
         assertEquals(_service.getMemcachedNodesManager().isEncodeNodeIdInSessionId(), true);
         assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456"), false);
         assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456-n1"), true);
+    }
+
+    /**
+     * Test for issue #105: Make memcached node optional for single-node setup
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=105
+     */
+    @Test
+    public void testBackupSessionFailureWithoutMemcachedNodeIdConfigured105() throws Exception {
+        _service.setMemcachedNodes( "127.0.0.1:11211" );
+        _service.setSessionBackupAsync(false);
+        _service.startInternal(_memcachedMock);
+
+        final MemcachedBackupSession session = createSession( _service );
+
+        session.access();
+        session.endAccess();
+        session.setAttribute( "foo", "bar" );
+
+        @SuppressWarnings( "unchecked" )
+        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
+        when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenThrow(new ExecutionException(new RuntimeException("Simulated exception.")));
+        when( _memcachedMock.set(  eq( session.getId() ), anyInt(), any() ) ).thenReturn( futureMock );
+
+        final BackupResult backupResult = _service.backupSession( session.getIdInternal(), false, null ).get();
+        assertEquals(backupResult.getStatus(), BackupResultStatus.FAILURE);
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
     }
 
     /**

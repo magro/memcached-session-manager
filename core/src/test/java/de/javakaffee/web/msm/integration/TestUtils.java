@@ -123,6 +123,7 @@ public abstract class TestUtils {
     protected static final String ROLE_NAME = "test";
 
     public static final String STICKYNESS_PROVIDER = "stickynessProvider";
+    public static final String BOOLEAN_PROVIDER = "booleanProvider";
 
     public static String makeRequest( final HttpClient client, final int port, final String rsessionId ) throws IOException,
             HttpException {
@@ -540,6 +541,10 @@ public abstract class TestUtils {
         return (SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
     }
 
+    public static MemcachedSessionService getService( final Embedded tomcat ) {
+        return ((SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager()).getMemcachedSessionService();
+    }
+
     public static void setChangeSessionIdOnAuth( final Embedded tomcat, final boolean changeSessionIdOnAuth ) {
         final Engine engine = (StandardEngine)tomcat.getContainer();
         final Host host = (Host)engine.findChild( DEFAULT_HOST );
@@ -745,6 +750,14 @@ public abstract class TestUtils {
         return new Object[][] {
                 { SessionAffinityMode.STICKY },
                 { SessionAffinityMode.NON_STICKY }
+        };
+    }
+
+    @DataProvider
+    public static Object[][] booleanProvider() {
+        return new Object[][] {
+                { true },
+                { false }
         };
     }
 
