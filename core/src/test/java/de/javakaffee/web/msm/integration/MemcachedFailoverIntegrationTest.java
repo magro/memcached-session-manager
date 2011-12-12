@@ -166,7 +166,7 @@ public abstract class MemcachedFailoverIntegrationTest {
         final String sid2 = makeRequest( _httpClient, _portTomcat1, sid1 );
         final String secondNode = extractNodeId( sid2 );
 
-        assertNotSame( secondNode, firstNode, "First node again selected" );
+        assertTrue(!secondNode.equals(firstNode), "First node again selected" );
 
         assertEquals(
                 sid2,
@@ -175,6 +175,9 @@ public abstract class MemcachedFailoverIntegrationTest {
 
         // we must get the same session back
         assertEquals( makeRequest( _httpClient, _portTomcat1, sid2 ), sid2, "We should keep the sessionId." );
+        
+
+        
         assertNotNull( getFailoverInfo( secondNode ).activeNode.getCache().get( key( sid2 ) )[0], "The session should exist in memcached." );
 
         // some more checks in sticky mode

@@ -538,6 +538,15 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public boolean isSticky() {
         return _msm.isSticky();
     }
+    
+	@Override
+	public void setOperationTimeout(final long operationTimeout ) {
+		_msm.setOperationTimeout(operationTimeout);
+	}
+
+	public long getOperationTimeout() {
+		return _msm.getOperationTimeout();
+	}
 
     /**
      * Sets the session locking mode. Possible values:

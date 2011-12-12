@@ -216,6 +216,7 @@ public class MemcachedSessionService implements SessionBackupService {
     private boolean _sticky = true;
     private String _lockingMode;
     private LockingStrategy _lockingStrategy;
+    private long _operationTimeout = 1000;
 
     private SessionTrackerValve _sessionTrackerValve;
 
@@ -316,6 +317,8 @@ public class MemcachedSessionService implements SessionBackupService {
          */
         void setSticky( boolean sticky );
         void setEnabled( boolean b );
+        void setOperationTimeout(long operationTimeout);
+        
         /**
          * Set the manager checks frequency in seconds.
          * @param processExpiresFrequency the new manager checks frequency
@@ -376,7 +379,7 @@ public class MemcachedSessionService implements SessionBackupService {
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                 _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
 
-        _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky +", with node ids " +
+        _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky + ", operation timeout " + _operationTimeout +", with node ids " +
         		_memcachedNodesManager.getPrimaryNodeIds() + " and failover node ids " + _memcachedNodesManager.getFailoverNodeIds() );
 
     }
@@ -427,10 +430,10 @@ public class MemcachedSessionService implements SessionBackupService {
         if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) ) {
             return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
             		memcachedNodesManager.getSessionIdFormat(),
-            		statistics ) : new BinaryConnectionFactory();
+            		statistics, _operationTimeout ) : new BinaryConnectionFactory();
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
-        		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics )
+        		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
         		: new DefaultConnectionFactory();
     }
 
@@ -483,6 +486,7 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     public Session findSession( final String id ) throws IOException {
         MemcachedBackupSession result = _manager.getSessionInternal( id );
+        
         if ( result == null && canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
             // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
@@ -513,7 +517,7 @@ public class MemcachedSessionService implements SessionBackupService {
         }
         return result;
     }
-
+    
     private boolean contextHasFormBasedSecurityConstraint() {
         final Context context = (Context)_manager.getContainer();
         final SecurityConstraint[] constraints = context.findConstraints();
@@ -1427,6 +1431,14 @@ public class MemcachedSessionService implements SessionBackupService {
     public Statistics getStatistics() {
         return _statistics;
     }
+    
+	public long getOperationTimeout() {
+		return _operationTimeout;
+	}
+
+	public void setOperationTimeout(long operationTimeout ) {
+		_operationTimeout = operationTimeout;
+	}
 
     // ----------------------- protected getters/setters for testing ------------------
 

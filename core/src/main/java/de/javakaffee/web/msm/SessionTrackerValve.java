@@ -17,6 +17,9 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -55,7 +58,8 @@ abstract class SessionTrackerValve extends ValveBase {
     private final Statistics _statistics;
     private final AtomicBoolean _enabled;
     protected final String _sessionCookieName;
-    private @CheckForNull LockingStrategy _lockingStrategy;
+    private @CheckForNull LockingStrategy _lockingStrategy;    
+    private Map<String, String> _internalSessionLocks;
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -87,6 +91,7 @@ abstract class SessionTrackerValve extends ValveBase {
         _statistics = statistics;
         _enabled = enabled;
         _sessionCookieName = getSessionCookieName( context );
+        _internalSessionLocks = Collections.synchronizedMap(new HashMap<String, String>());
     }
 
     /**
@@ -118,15 +123,34 @@ abstract class SessionTrackerValve extends ValveBase {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " ==================" );
             }
-
+            
+            final String sessionId = request.getRequestedSessionId();
+            
+            if (_lockingStrategy instanceof LockingStrategyAll) {     
+            	// for LockingStrategyAll, lock internal session to prevent concurrent access.
+            	final long start = System.currentTimeMillis();  
+            	long retryInterval = 10;
+            	while (_internalSessionLocks.containsKey(sessionId) ) {            		
+            		try {
+            			_lockingStrategy.checkTimeoutAndWait(sessionId, retryInterval, start);
+            			retryInterval = retryInterval * 2;
+            		} catch (Exception e) {
+            			_log.warn( "Exception waiting for lock to release: " + sessionId, e);
+            			break;
+            		}
+            	}            	
+            }
+            	
             boolean sessionIdChanged = false;
             try {
+            	_internalSessionLocks.put(sessionId, "LOCKED");
                 storeRequestThreadLocal( request );
                 sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
-                backupSession( request, response, sessionIdChanged );
+            	backupSession( request, response, sessionIdChanged );            	
                 resetRequestThreadLocal();
+                _internalSessionLocks.remove(sessionId);
             }
 
             if ( _log.isDebugEnabled() ) {
@@ -134,6 +158,8 @@ abstract class SessionTrackerValve extends ValveBase {
                 logDebugResponseCookie( response );
                 _log.debug( "<<<<<< Request finished: " + getURIWithQueryString( request ) + " ==================" );
             }
+            
+            
 
         }
 
