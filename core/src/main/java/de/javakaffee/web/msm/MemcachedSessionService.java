@@ -485,12 +485,7 @@ public class MemcachedSessionService implements SessionBackupService {
      *                request
      */
     public Session findSession( final String id ) throws IOException {
-        MemcachedBackupSession result = null;
-        
-        // if session is locked, don't use internal session cache, instead load from memcached, which will wait until lock expires.
-        if (_sticky || _lockingStrategy.equals(LockingStrategy.LockingMode.NONE) || !_memcachedNodesManager.isEncodeNodeIdInSessionId() || !_memcachedNodesManager.canHitMemcached(id) || !_lockingStrategy.isSessionLocked(id)) {        	
-        	result = _manager.getSessionInternal( id );
-        }
+        MemcachedBackupSession result = _manager.getSessionInternal( id );
         
         if ( result == null && canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest

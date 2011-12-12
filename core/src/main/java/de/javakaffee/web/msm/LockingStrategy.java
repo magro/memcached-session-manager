@@ -188,8 +188,13 @@ public abstract class LockingStrategy {
     		return true;
     	}
     	return false;
-    }
+    }    
 
+    public void checkTimeoutAndWait( @Nonnull final String sessionId, final long retryInterval, final long start ) throws TimeoutException,
+            InterruptedException {
+        checkTimeoutAndWait(sessionId, retryInterval, LOCK_MAX_RETRY_INTERVAL, _manager.getOperationTimeout(), start);
+    }
+    
     protected void checkTimeoutAndWait( @Nonnull final String sessionId, final long retryInterval,
             final long maxRetryInterval, final long timeout, final long start ) throws TimeoutException,
             InterruptedException {

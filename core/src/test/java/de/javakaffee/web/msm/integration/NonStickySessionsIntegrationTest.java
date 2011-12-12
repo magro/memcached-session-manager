@@ -266,10 +266,11 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Tests that parallel request to the same Tomcat instance don't lead to stale data.
      */
-    @Test( enabled = true, dataProvider = "lockingModesWithSessionLocking" )
-    public void testParallelRequestsToSameTomcatInstance( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
+    @Test( enabled = true )
+    public void testParallelRequestsToSameTomcatInstance() throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        setLockingMode( lockingMode, uriPattern );
+    	// Only LockingMode.ALL locks the session internally.
+        setLockingMode( LockingMode.ALL, null );
 
         final String key1 = "k1";
         final String value1 = "v1";
