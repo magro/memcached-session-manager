@@ -39,11 +39,7 @@ import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Container;
-import org.apache.catalina.Context;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Manager;
-import org.apache.catalina.Session;
+import org.apache.catalina.*;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityConstraint;
@@ -222,7 +218,7 @@ public class MemcachedSessionService implements SessionBackupService {
 
     private final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
-    
+
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
     }
@@ -235,7 +231,7 @@ public class MemcachedSessionService implements SessionBackupService {
     public SessionManager getManager() {
         return _manager;
     }
-    
+
     public static interface SessionManager extends Manager {
         SessionTrackerValve createSessionTrackerValve(
                 @Nullable final String requestUriIgnorePattern,
@@ -245,7 +241,7 @@ public class MemcachedSessionService implements SessionBackupService {
         void expireSession( final String sessionId );
         MemcachedBackupSession getSessionInternal( String sessionId );
         Map<String, Session> getSessionsInternal();
-        
+
         String getJvmRoute();
 
         /**
@@ -269,7 +265,7 @@ public class MemcachedSessionService implements SessionBackupService {
          * @throws IllegalArgumentException if <i>key</i> is null.
          */
         String getString(final String key, final Object... args);
-        
+
         int getMaxActiveSessions();
         void incrementSessionCounter();
         void incrementRejectedSessions();
@@ -299,7 +295,7 @@ public class MemcachedSessionService implements SessionBackupService {
         @Override
         @Nonnull
         Container getContainer();
-        
+
         /**
          * Reads the Principal from the given OIS.
          * @param ois the object input stream to read from. Will be closed by the caller.
@@ -309,7 +305,7 @@ public class MemcachedSessionService implements SessionBackupService {
          */
         @Nonnull
         Principal readPrincipal( @Nonnull ObjectInputStream ois ) throws ClassNotFoundException, IOException;
-        
+
         // --------------------- setters for testing
         /**
          * Sets the sticky mode, must be provided for tests at least.
@@ -318,7 +314,7 @@ public class MemcachedSessionService implements SessionBackupService {
         void setSticky( boolean sticky );
         void setEnabled( boolean b );
         void setOperationTimeout(long operationTimeout);
-        
+
         /**
          * Set the manager checks frequency in seconds.
          * @param processExpiresFrequency the new manager checks frequency
@@ -328,7 +324,7 @@ public class MemcachedSessionService implements SessionBackupService {
         void setFailoverNodes( String failoverNodes );
         void setLockingMode( @Nullable final String lockingMode );
         void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup );
-        
+
         /**
          * Creates a new instance of {@link MemcachedBackupSession} (needed so that it's possible to
          * create specialized {@link MemcachedBackupSession} instances).
@@ -484,9 +480,14 @@ public class MemcachedSessionService implements SessionBackupService {
      *                if an input/output error occurs while processing this
      *                request
      */
-    public Session findSession( final String id ) throws IOException {
+    public MemcachedBackupSession findSession( final String id ) throws IOException {
         MemcachedBackupSession result = _manager.getSessionInternal( id );
-        if ( result == null && canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
+        if ( result != null ) {
+            if (!_sticky && !_lockingStrategy.isContainerSessionLookup()) {
+                result.registerReference();
+            }
+        }
+        else if ( canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
             // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
             // constraint needs the session to get the authenticated principal)
@@ -501,20 +502,41 @@ public class MemcachedSessionService implements SessionBackupService {
             result = loadFromMemcached( id );
             // checking valid() would expire() the session if it's not valid!
             if ( result != null && result.isValid() ) {
-
-                // When the sessionId will be changed later in changeSessionIdOnTomcatFailover/handleSessionTakeOver
-                // (due to a tomcat failover) we don't want to notify listeners via session.activate for the
-                // old sessionId but do that later (in handleSessionTakeOver)
-                // See also http://code.google.com/p/memcached-session-manager/issues/detail?id=92
-                String jvmRoute;
-                final boolean sessionIdWillBeChanged = _sticky && ( jvmRoute = _manager.getJvmRoute() ) != null
-                    && !jvmRoute.equals( getSessionIdFormat().extractJvmRoute( id ) );
-
-                final boolean activate = !sessionIdWillBeChanged;
-                addValidLoadedSession( result, activate );
+                if(!_sticky) {
+                    // synchronized to have correct refcounts
+                    synchronized (_manager.getSessionsInternal()) {
+                        // in the meantime another request might have loaded and added the session,
+                        // and we must ensure to have a single session instance per id to have
+                        // correct refcounts (otherwise a session might be removed from the map at
+                        // the end of #backupSession
+                        if(_manager.getSessionInternal(id) != null) {
+                            result = _manager.getSessionInternal(id);
+                        }
+                        else {
+                            addValidLoadedSession(result);
+                        }
+                        result.registerReference();
+                    }
+                }
+                else {
+                    addValidLoadedSession(result);
+                }
             }
         }
         return result;
+    }
+
+    private void addValidLoadedSession(final MemcachedBackupSession result) {
+        // When the sessionId will be changed later in changeSessionIdOnTomcatFailover/handleSessionTakeOver
+        // (due to a tomcat failover) we don't want to notify listeners via session.activate for the
+        // old sessionId but do that later (in handleSessionTakeOver)
+        // See also http://code.google.com/p/memcached-session-manager/issues/detail?id=92
+        String jvmRoute;
+        final boolean sessionIdWillBeChanged = _sticky && ( jvmRoute = _manager.getJvmRoute() ) != null
+            && !jvmRoute.equals( getSessionIdFormat().extractJvmRoute( result.getId() ) );
+
+        final boolean activate = !sessionIdWillBeChanged;
+        addValidLoadedSession( result, activate );
     }
 
     private boolean contextHasFormBasedSecurityConstraint() {
@@ -683,7 +705,7 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     @Override
     public String changeSessionIdOnMemcachedFailover( final String requestedSessionId ) {
-    	
+
     	if ( !_memcachedNodesManager.isEncodeNodeIdInSessionId() ) {
     		return null;
     	}
@@ -822,7 +844,8 @@ public class MemcachedSessionService implements SessionBackupService {
 
         final MemcachedBackupSession msmSession = _manager.getSessionInternal( sessionId );
         if ( msmSession == null ) {
-            _log.debug( "No session found in session map for " + sessionId );
+            if(_log.isDebugEnabled())
+                _log.debug( "No session found in session map for " + sessionId );
             if ( !_sticky ) {
                 _lockingStrategy.onBackupWithoutLoadedSession( sessionId, requestId, _backupSessionService );
             }
@@ -830,19 +853,30 @@ public class MemcachedSessionService implements SessionBackupService {
         }
 
         if ( !msmSession.isValidInternal() ) {
-            _log.debug( "Non valid session found in session map for " + sessionId );
+            if(_log.isDebugEnabled())
+                _log.debug( "Non valid session found in session map for " + sessionId );
             return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
         }
 
         if ( !_sticky ) {
-            msmSession.passivate();
+            synchronized (_manager.getSessionsInternal()) {
+                // if another thread in the meantime retrieved the session
+                // we must not remove it as this would case session data loss
+                // for the other request
+                if ( msmSession.releaseReference() > 0 ) {
+                    if(_log.isDebugEnabled())
+                        _log.debug( "Session " + sessionId + " is still used by another request, skipping backup and (optional) lock handling/release." );
+                    return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
+                }
+                msmSession.passivate();
+                _manager.removeInternal( msmSession, false );
+            }
         }
 
         final boolean force = sessionIdChanged || msmSession.isSessionIdChanged() || !_sticky && (msmSession.getSecondsSinceLastBackup() >= msmSession.getMaxInactiveInterval());
         final Future<BackupResult> result = _backupSessionService.backupSession( msmSession, force );
 
         if ( !_sticky ) {
-            _manager.removeInternal( msmSession, false );
             _lockingStrategy.onAfterBackupSession( msmSession, force, result, requestId, _backupSessionService );
         }
 
@@ -1426,16 +1460,16 @@ public class MemcachedSessionService implements SessionBackupService {
     public long getSessionBackupTimeout() {
         return _sessionBackupTimeout;
     }
-    
+
     public Statistics getStatistics() {
         return _statistics;
     }
-    
+
 	public long getOperationTimeout() {
 		return _operationTimeout;
 	}
 
-	public void setOperationTimeout(long operationTimeout ) {
+	public void setOperationTimeout(final long operationTimeout ) {
 		_operationTimeout = operationTimeout;
 	}
 

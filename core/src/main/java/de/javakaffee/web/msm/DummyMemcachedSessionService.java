@@ -23,11 +23,7 @@ import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -70,7 +66,7 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
             final Statistics statistics ) {
         return null;
     }
-    
+
     @Override
     protected MemcachedClientCallback createMemcachedClientCallback() {
     	return new MemcachedClientCallback() {
@@ -109,8 +105,8 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
     }
 
     @Override
-    public Session findSession( final String id ) throws IOException {
-        final Session result = super.findSession( id );
+    public MemcachedBackupSession findSession( final String id ) throws IOException {
+        final MemcachedBackupSession result = super.findSession( id );
         if ( result != null ) {
             final byte[] data = _sessionData.remove( id );
             if ( data != null ) {
