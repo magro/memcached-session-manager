@@ -22,12 +22,7 @@
 		<dependency>
 			<groupId>de.javakaffee</groupId>
 			<artifactId>kryo-serializers</artifactId>
-			<version>0.8</version>
-		</dependency>
-		<dependency>
-			<groupId>com.esotericsoftware</groupId>
-			<artifactId>kryo</artifactId>
-			<version>1.04</version>
+			<version>0.9</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.wicket</groupId>

@@ -30,11 +30,7 @@ import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
@@ -61,11 +57,8 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.*;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
-import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.Statistics;
-import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
@@ -82,7 +75,7 @@ public abstract class NonStickySessionsIntegrationTest {
     private MemCacheDaemon<?> _daemon1;
     private MemCacheDaemon<?> _daemon2;
     private MemcachedClient _client;
-    
+
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
         @Override
         public Object get(final String key) {
@@ -127,7 +120,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, _memcachedClientCallback);
         _client =
-                new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create() ),
+                new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000 ),
                         Arrays.asList( address1, address2 ) );
 
         final SchemeRegistry schemeRegistry = new SchemeRegistry();
@@ -137,7 +130,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         _executor = Executors.newCachedThreadPool();
     }
-    
+
     abstract TestUtils getTestUtils();
 
     private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
@@ -175,6 +168,46 @@ public abstract class NonStickySessionsIntegrationTest {
                 { LockingMode.AUTO, null },
                 { LockingMode.URI_PATTERN, Pattern.compile( ".*" ) }
         };
+    }
+
+    /**
+     * Tests that parallel request to the same Tomcat instance don't lead to stale data.
+     */
+    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    public void testParallelRequestsToSameTomcatInstanceIssue111(@Nonnull final LockingMode lockingMode,
+            @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
+            ExecutionException {
+
+        setLockingMode(lockingMode, uriPattern);
+
+        final String sessionId = post(_httpClient, TC_PORT_1, null, "k1", "v1").getSessionId();
+        assertNotNull(sessionId);
+
+        // this request should lock and update the session.
+        final Future<Response> response2 = _executor.submit(new Callable<Response>() {
+
+            @Override
+            public Response call() throws Exception {
+                return post(_httpClient, TC_PORT_1, PATH_WAIT, sessionId, asMap(PARAM_MILLIS, "500", "k2", "v2"));
+            }
+
+        });
+
+        Thread.sleep(200);
+
+        // this request should update the same session instance and reuse the lock.
+        post(_httpClient, TC_PORT_1, sessionId, "k3", "v3");
+
+        // this request should wait until the second and third requests have released the
+        // session lock.
+        final Response finalResponse = get(_httpClient, TC_PORT_2, sessionId);
+        assertEquals(finalResponse.getSessionId(), sessionId);
+        assertEquals(response2.get().getSessionId(), sessionId);
+
+        // the final response should contain all keys/values
+        assertEquals(finalResponse.get("k1"), "v1");
+        assertEquals(finalResponse.get("k2"), "v2");
+        assertEquals(finalResponse.get("k3"), "v3");
     }
 
     /**

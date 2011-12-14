@@ -18,6 +18,7 @@ package de.javakaffee.web.msm;
 
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -97,6 +98,9 @@ public class MemcachedBackupSession extends StandardSession {
     protected transient boolean _sticky;
     private transient volatile LockStatus _lockStatus;
 
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings( "SE_TRANSIENT_FIELD_NOT_RESTORED" )
+    private transient final Set<Long> _refCount;
+
     /**
      * Creates a new instance without a given manager. This has to be
      * assigned via {@link #setManager(Manager)} before this session is
@@ -104,7 +108,7 @@ public class MemcachedBackupSession extends StandardSession {
      *
      */
     public MemcachedBackupSession() {
-        super( null );
+        this(null);
     }
 
     /**
@@ -115,6 +119,7 @@ public class MemcachedBackupSession extends StandardSession {
      */
     public MemcachedBackupSession( final SessionManager manager ) {
         super( manager );
+        _refCount = new HashSet<Long>();
     }
 
     /**
@@ -304,7 +309,7 @@ public class MemcachedBackupSession extends StandardSession {
      * if the current {@link #getThisAccessedTimeInternal()} value is different
      * from the previously stored value to see if the session was accessed in
      * the meantime.
-     * 
+     *
      * @deprecated the session is always accessed for a request that comes with a session id. Therefore
      * {@link #wasAccessedSinceLastBackup()} should always return <code>true</code>.
      */
@@ -319,7 +324,7 @@ public class MemcachedBackupSession extends StandardSession {
      * differs from the value stored by {@link #storeThisAccessedTimeFromLastBackupCheck()}.
      * @return <code>true</code> if the session was accessed since the invocation
      * of {@link #storeThisAccessedTimeFromLastBackupCheck()}.
-     * 
+     *
      * @deprecated the session is always accessed for a request that comes with a session id. Therefore
      * {@link #wasAccessedSinceLastBackup()} should always return <code>true</code>.
      */
@@ -627,7 +632,7 @@ public class MemcachedBackupSession extends StandardSession {
     public void setSticky( final boolean sticky ) {
         _sticky = sticky;
     }
-    
+
     /**
      * Returns the stickyness mode of this session.
      */
@@ -661,6 +666,39 @@ public class MemcachedBackupSession extends StandardSession {
      */
     public void releaseLock() {
         _lockStatus = null;
+    }
+
+    /**
+     * Register the current thread to hold a reference on this session.
+     * @return <code>true</code> if this thread did not hold already the reference,
+     * otherwise <code>false</code>.
+     *
+     * @see #releaseReference()
+     * @see #getRefCount()
+     */
+    public synchronized boolean registerReference() {
+        return _refCount.add(Thread.currentThread().getId());
+    }
+
+    /**
+     * The number of registered references.
+     *
+     * @see #registerReference()
+     * @see #releaseReference()
+     */
+    public int getRefCount() {
+        return _refCount.size();
+    }
+
+    /**
+     * Decrement the refcount and return the number of references left.
+     *
+     * @see #registerReference()
+     * @see #getRefCount()
+     */
+    public synchronized int releaseReference() {
+        _refCount.remove(Thread.currentThread().getId());
+        return _refCount.size();
     }
 
 }

@@ -21,20 +21,13 @@ import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static de.javakaffee.web.msm.integration.TestUtils.createContext;
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyMap;
-import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import javax.annotation.Nonnull;
 
@@ -42,9 +35,11 @@ import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.internal.OperationFuture;
 
 import org.apache.catalina.LifecycleException;
+import org.apache.catalina.connector.Request;
 import org.apache.catalina.core.StandardContext;
 import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -65,12 +60,13 @@ public abstract class MemcachedSessionServiceTest {
 
     private MemcachedSessionService _service;
     private MemcachedClient _memcachedMock;
+    private ExecutorService _executor;
 
     @BeforeMethod
     public void setup() throws Exception {
 
         final SessionManager manager = createSessionManager();
-        
+
         _service = manager.getMemcachedSessionService();
         _service.setMemcachedNodes( "n1:127.0.0.1:11211" );
         _service.setSessionBackupAsync( false );
@@ -89,6 +85,13 @@ public abstract class MemcachedSessionServiceTest {
 
         startInternal( manager, _memcachedMock );
 
+        _executor = Executors.newCachedThreadPool();
+
+    }
+
+    @AfterMethod
+    public void afterMethod() {
+        _executor.shutdown();
     }
 
     protected void startInternal( @Nonnull final SessionManager manager, @Nonnull final MemcachedClient memcachedMock ) throws LifecycleException {
@@ -521,6 +524,87 @@ public abstract class MemcachedSessionServiceTest {
         assertTrue( model.getValue().containsKey( "foo" ) );
         assertTrue( model.getValue().containsKey( "bar" ) );
         assertFalse( model.getValue().containsKey( "baz" ) );
+
+    }
+
+    @Test
+    public void testSessionsRefCountHandlingIssue111() throws Exception {
+        _service.setSticky(false);
+        _service.setLockingMode(LockingMode.ALL.name());
+
+        final TranscoderService transcoderService = new TranscoderService(new JavaSerializationTranscoder());
+        _service.setTranscoderService( transcoderService );
+
+        startInternal(_service.getManager(), _memcachedMock);
+
+        @SuppressWarnings("unchecked")
+        final OperationFuture<Boolean> addResultMock = mock(OperationFuture.class);
+        when(addResultMock.get()).thenReturn(true);
+        when(addResultMock.get(anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(_memcachedMock.add(anyString(), anyInt(), any(TimeUnit.class))).thenReturn(addResultMock);
+
+        final MemcachedBackupSession session = createSession( _service );
+        // the session is now already added to the internal session map
+        assertNotNull(session.getId());
+
+        Future<BackupResult> result = _service.backupSession(session.getId(), false, null);
+        assertFalse(_service.getManager().getSessionsInternal().containsKey(session.getId()));
+
+        // start another request that loads the session from mc
+        _service.getLockingStrategy().onRequestStart(mock(Request.class));
+
+        when(_memcachedMock.get(eq(session.getId()))).thenReturn(transcoderService.serialize(session));
+
+        final MemcachedBackupSession session2 = _service.findSession(session.getId());
+        assertTrue(session2.isLocked());
+        assertEquals(session2.getRefCount(), 1);
+        session2.setAttribute("foo", "bar");
+
+        final CyclicBarrier barrier = new CyclicBarrier(2);
+
+        // the session is now in the internal session map,
+        // now let's run a concurrent request
+        final Future<BackupResult> request2 = _executor.submit(new Callable<BackupResult>() {
+
+            @Override
+            public BackupResult call() throws Exception {
+                final MemcachedBackupSession session3 = _service.findSession(session.getId());
+                assertSame(session3, session2);
+                assertEquals(session3.getRefCount(), 2);
+                // let the other thread proceed (or wait)
+                barrier.await();
+                // and wait again so that the other thread can do some work
+                barrier.await();
+
+                final Future<BackupResult> result = _service.backupSession(session.getId(), false, null);
+                _service.getLockingStrategy().onRequestFinished();
+
+                assertEquals(result.get().getStatus(), BackupResultStatus.SUCCESS);
+                // The session should be released now and no longer stored
+                assertFalse(_service.getManager().getSessionsInternal().containsKey(session.getId()));
+                // just some double checking on expectations...
+                assertEquals(session2.getRefCount(), 0);
+
+                return result.get();
+            }
+
+        });
+
+        barrier.await();
+
+        result = _service.backupSession(session.getId(), false, null);
+        _service.getLockingStrategy().onRequestFinished();
+        assertEquals(result.get().getStatus(), BackupResultStatus.SKIPPED);
+        // This is the important point!
+        assertTrue(_service.getManager().getSessionsInternal().containsKey(session.getId()));
+        // just some double checking on expectations...
+        assertEquals(session2.getRefCount(), 1);
+
+        // now let the other thread proceed
+        barrier.await();
+
+        // and wait for the result, also to get exceptions/assertion errors.
+        request2.get();
 
     }
 

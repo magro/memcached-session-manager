@@ -44,6 +44,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
 	private final MemcachedNodesManager _memcachedNodesManager;
 	private final SessionIdFormat _sessionIdFormat;
     private final Statistics _statistics;
+    private final long _operationTimeout;
 
     /**
      * Creates a new instance.
@@ -53,10 +54,11 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
      *            the {@link SessionIdFormat}
      */
     public SuffixLocatorBinaryConnectionFactory( final MemcachedNodesManager memcachedNodesManager, final SessionIdFormat sessionIdFormat,
-            final Statistics statistics ) {
+            final Statistics statistics, long operationTimeout ) {
         _memcachedNodesManager = memcachedNodesManager;
         _sessionIdFormat = sessionIdFormat;
         _statistics = statistics;
+        _operationTimeout = operationTimeout;
     }
 
     /**
@@ -106,5 +108,9 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     public OperationFactory getOperationFactory() {
         return new BinaryOperationFactory();
     }
-
+    
+    @Override
+    public long getOperationTimeout() {
+    	return _operationTimeout;
+    }
 }
