@@ -219,6 +219,8 @@ public class MemcachedSessionService implements SessionBackupService {
     private final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
 
+    private final LRUCache<String, Object> _removedSessions = new LRUCache<String, Object>( 2000, 5000 );
+
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
     }
@@ -609,6 +611,22 @@ public class MemcachedSessionService implements SessionBackupService {
 
     }
 
+    /**
+     * Is invoked when a session was removed from the manager, e.g. because the
+     * session has been invalidated. Is used to keep track of such sessions in
+     * non-sticky mode, so that lockingStrategy.onBackupWithoutLoadedSession is not
+     * invoked.
+     *
+     * Motivated by issue 116.
+     *
+     * @param id the id of the removed session.
+     */
+    public void sessionRemoved(final String id) {
+        if(!_sticky) {
+            _removedSessions.put(id, "unused");
+        }
+    }
+
     private void checkMaxActiveSessions() {
         if ( _manager.getMaxActiveSessions() >= 0 && _manager.getSessionsInternal().size() >= _manager.getMaxActiveSessions() ) {
             _manager.incrementRejectedSessions();
@@ -847,7 +865,10 @@ public class MemcachedSessionService implements SessionBackupService {
             if(_log.isDebugEnabled())
                 _log.debug( "No session found in session map for " + sessionId );
             if ( !_sticky ) {
-                _lockingStrategy.onBackupWithoutLoadedSession( sessionId, requestId, _backupSessionService );
+                // Issue 116: Only notify the lockingStrategy if the session has not been removed/invalidated
+                if(_removedSessions.remove(sessionId) == null) {
+                    _lockingStrategy.onBackupWithoutLoadedSession( sessionId, requestId, _backupSessionService );
+                }
             }
             return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
         }

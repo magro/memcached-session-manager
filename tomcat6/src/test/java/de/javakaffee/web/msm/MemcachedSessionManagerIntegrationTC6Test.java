@@ -34,5 +34,5 @@ public class MemcachedSessionManagerIntegrationTC6Test extends MemcachedSessionM
     TestUtils getTestUtils() {
         return new TestUtilsTC6();
     }
-    
+
 }

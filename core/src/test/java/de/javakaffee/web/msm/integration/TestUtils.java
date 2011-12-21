@@ -455,14 +455,14 @@ public abstract class TestUtils {
         engine.setName( "engine-" + port );
         engine.setDefaultHost( DEFAULT_HOST );
         engine.setJvmRoute( jvmRoute );
-        
+
         catalina.addEngine( engine );
         engine.setService( catalina );
 
         final UserDatabaseRealm realm = new UserDatabaseRealm();
         realm.setResourceName( USER_DATABASE );
         engine.setRealm( realm );
-        
+
         final Host host = catalina.createHost( DEFAULT_HOST, docBase );
         engine.addChild( host );
         new File( docBase ).mkdirs();
@@ -538,6 +538,10 @@ public abstract class TestUtils {
 
     public static SessionManager getManager( final Embedded tomcat ) {
         return (SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
+    }
+
+    public static Engine getEngine( final Embedded tomcat ) {
+        return (Engine) tomcat.getContainer();
     }
 
     public static void setChangeSessionIdOnAuth( final Embedded tomcat, final boolean changeSessionIdOnAuth ) {
@@ -752,7 +756,7 @@ public abstract class TestUtils {
     public static Key key( @Nonnull final String value ) {
         return new Key( ChannelBuffers.wrappedBuffer( value.getBytes() ) );
     }
-    
+
     @Nonnull
     public static MemcachedBackupSession createSession( @Nonnull final MemcachedSessionService service ) {
         // return (MemcachedBackupSession) service.getManager().createSession( null );

@@ -50,6 +50,7 @@ public class TestServlet extends HttpServlet {
     public static final String KEY_REQUESTED_SESSION_ID = "requestedSessionId";
     public static final String KEY_IS_REQUESTED_SESSION_ID_VALID = "isRequestedSessionIdValid";
     public static final String PATH_NO_SESSION_ACCESS = "/noSessionAccess";
+    public static final String PATH_INVALIDATE = "/invalidate";
 
     private static final long serialVersionUID = 7954803132860358448L;
 
@@ -76,6 +77,12 @@ public class TestServlet extends HttpServlet {
             LOG.info( "skipping session access" );
             response.getWriter().println( "Skipped session access" );
         }
+        else if ( PATH_INVALIDATE.equals( pathInfo ) ) {
+            final HttpSession session = request.getSession(false);
+            LOG.info( "Invalidating session " + session.getId() );
+            session.invalidate();
+            response.getWriter().println( "Invalidated session " + session.getId() );
+        }
         else {
 
             final HttpSession session = request.getSession();
@@ -95,13 +102,11 @@ public class TestServlet extends HttpServlet {
             out.println( ID + "=" + session.getId() );
 
             // final HttpSession session = request.getSession( false );
-            if ( session != null ) {
-                final Enumeration<?> attributeNames = session.getAttributeNames();
-                while ( attributeNames.hasMoreElements() ) {
-                    final String name = attributeNames.nextElement().toString();
-                    final Object value = session.getAttribute( name );
-                    out.println( name + "=" + value );
-                }
+            final Enumeration<?> attributeNames = session.getAttributeNames();
+            while ( attributeNames.hasMoreElements() ) {
+                final String name = attributeNames.nextElement().toString();
+                final Object value = session.getAttribute( name );
+                out.println( name + "=" + value );
             }
         }
 

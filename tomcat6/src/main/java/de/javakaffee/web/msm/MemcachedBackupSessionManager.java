@@ -85,7 +85,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected boolean _started = false;
 
     protected MemcachedSessionService _msm;
-    
+
     public MemcachedBackupSessionManager() {
         _msm = new MemcachedSessionService( this );
     }
@@ -188,6 +188,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _msm.deleteFromMemcached( session.getId() );
         }
         super.remove( session );
+        _msm.sessionRemoved(session.getIdInternal());
     }
 
     /**
@@ -252,7 +253,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
                 Integer.valueOf( oldMaxActiveSessions ),
                 Integer.valueOf( _maxActiveSessions ) );
     }
-    
+
     @Override
     public int getMaxActiveSessions() {
         return _maxActiveSessions;
@@ -538,7 +539,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public boolean isSticky() {
         return _msm.isSticky();
     }
-    
+
 	@Override
 	public void setOperationTimeout(final long operationTimeout ) {
 		_msm.setOperationTimeout(operationTimeout);
@@ -1004,7 +1005,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois, getContainer().getRealm() );
     }
-    
+
     @Override
     public MemcachedSessionService getMemcachedSessionService() {
         return _msm;

@@ -72,7 +72,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected final Log _log = LogFactory.getLog( getClass() );
 
     protected MemcachedSessionService _msm;
-    
+
     public MemcachedBackupSessionManager() {
         _msm = new MemcachedSessionService( this );
     }
@@ -130,7 +130,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public MemcachedBackupSession createSession( final String sessionId ) {
         return _msm.createSession( sessionId );
     }
-    
+
     @Override
     public MemcachedBackupSession createEmptySession() {
         return _msm.createEmptySession();
@@ -183,6 +183,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _msm.deleteFromMemcached( session.getId() );
         }
         super.remove( session, update );
+        _msm.sessionRemoved(session.getIdInternal());
     }
 
     /**
@@ -478,7 +479,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 	public long getOperationTimeout() {
 		return _msm.getOperationTimeout();
 	}
-	
+
     /**
      * Sets the session locking mode. Possible values:
      * <ul>
@@ -851,7 +852,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois );
     }
-    
+
     @Override
     public MemcachedSessionService getMemcachedSessionService() {
         return _msm;
