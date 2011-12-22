@@ -32,6 +32,7 @@ import java.util.concurrent.*;
 import javax.annotation.Nonnull;
 
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.internal.OperationFuture;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.connector.Request;
@@ -42,7 +43,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
@@ -79,7 +79,7 @@ public abstract class MemcachedSessionServiceTest {
         _memcachedMock = mock( MemcachedClient.class );
 
         @SuppressWarnings( "unchecked" )
-        final Future<Boolean> futureMock = mock( Future.class );
+        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
         when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
 
@@ -153,6 +153,32 @@ public abstract class MemcachedSessionServiceTest {
         assertEquals(_service.getMemcachedNodesManager().isEncodeNodeIdInSessionId(), true);
         assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456"), false);
         assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456-n1"), true);
+    }
+
+    /**
+     * Test for issue #105: Make memcached node optional for single-node setup
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=105
+     */
+    @Test
+    public void testBackupSessionFailureWithoutMemcachedNodeIdConfigured105() throws Exception {
+        _service.setMemcachedNodes( "127.0.0.1:11211" );
+        _service.setSessionBackupAsync(false);
+        _service.startInternal(_memcachedMock);
+
+        final MemcachedBackupSession session = createSession( _service );
+
+        session.access();
+        session.endAccess();
+        session.setAttribute( "foo", "bar" );
+
+        @SuppressWarnings( "unchecked" )
+        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
+        when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenThrow(new ExecutionException(new RuntimeException("Simulated exception.")));
+        when( _memcachedMock.set(  eq( session.getId() ), anyInt(), any() ) ).thenReturn( futureMock );
+
+        final BackupResult backupResult = _service.backupSession( session.getIdInternal(), false, null ).get();
+        assertEquals(backupResult.getStatus(), BackupResultStatus.FAILURE);
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
     }
 
     /**
@@ -380,7 +406,7 @@ public abstract class MemcachedSessionServiceTest {
 
         // stub session (backup) ping
         @SuppressWarnings( "unchecked" )
-        final Future<Boolean> futureMock = mock( Future.class );
+        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
         when( futureMock.get() ).thenReturn( Boolean.FALSE );
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.FALSE );
         when( _memcachedMock.add(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
@@ -511,7 +537,11 @@ public abstract class MemcachedSessionServiceTest {
 
         startInternal(_service.getManager(), _memcachedMock);
 
-        when(_memcachedMock.add(anyString(), anyInt(), any(TimeUnit.class))).thenReturn(new SimpleFuture<Boolean>(true));
+        @SuppressWarnings("unchecked")
+        final OperationFuture<Boolean> addResultMock = mock(OperationFuture.class);
+        when(addResultMock.get()).thenReturn(true);
+        when(addResultMock.get(anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(_memcachedMock.add(anyString(), anyInt(), any(TimeUnit.class))).thenReturn(addResultMock);
 
         final MemcachedBackupSession session = createSession( _service );
         // the session is now already added to the internal session map

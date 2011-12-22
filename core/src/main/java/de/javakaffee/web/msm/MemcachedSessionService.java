@@ -34,10 +34,9 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.BinaryConnectionFactory;
-import net.spy.memcached.ConnectionFactory;
-import net.spy.memcached.DefaultConnectionFactory;
-import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.*;
+import net.spy.memcached.auth.AuthDescriptor;
+import net.spy.memcached.auth.PlainCallbackHandler;
 
 import org.apache.catalina.*;
 import org.apache.catalina.authenticator.Constants;
@@ -74,6 +73,34 @@ public class MemcachedSessionService implements SessionBackupService {
         LOCK_NOT_REQUIRED,
         LOCKED,
         COULD_NOT_AQUIRE_LOCK
+    }
+
+    static class ConnectionType {
+
+        private final boolean membaseBucketConfig;
+        private final String username;
+        private final String password;
+        public ConnectionType(final boolean membaseBucketConfig, final String username, final String password) {
+            this.membaseBucketConfig = membaseBucketConfig;
+            this.username = username;
+            this.password = password;
+        }
+        public static ConnectionType valueOf(final boolean membaseBucketConfig, final String username, final String password) {
+            return new ConnectionType(membaseBucketConfig, username, password);
+        }
+        boolean isMembaseBucketConfig() {
+            return membaseBucketConfig;
+        }
+        boolean isSASL() {
+            return !membaseBucketConfig && !isBlank(username) && !isBlank(password);
+        }
+        boolean isDefault() {
+            return !isMembaseBucketConfig() && !isSASL();
+        }
+
+        boolean isBlank(final String value) {
+            return value == null || value.trim().length() == 0;
+        }
     }
 
     private static final String PROTOCOL_TEXT = "text";
@@ -177,6 +204,9 @@ public class MemcachedSessionService implements SessionBackupService {
     private int _backupThreadCount = Runtime.getRuntime().availableProcessors();
 
     private String _memcachedProtocol = PROTOCOL_TEXT;
+
+    private String _username;
+    private String _password;
 
     private final AtomicBoolean _enabled = new AtomicBoolean( true );
 
@@ -326,6 +356,8 @@ public class MemcachedSessionService implements SessionBackupService {
         void setFailoverNodes( String failoverNodes );
         void setLockingMode( @Nullable final String lockingMode );
         void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup );
+        void setUsername(String username);
+        void setPassword(String password);
 
         /**
          * Creates a new instance of {@link MemcachedBackupSession} (needed so that it's possible to
@@ -416,19 +448,43 @@ public class MemcachedSessionService implements SessionBackupService {
             return null;
         }
         try {
-            final ConnectionFactory connectionFactory = createConnectionFactory( memcachedNodesManager, statistics );
-            return new MemcachedClient( connectionFactory, memcachedNodesManager.getAllMemcachedAddresses() );
-        } catch ( final Exception e ) {
-            throw new RuntimeException( "Could not create memcached client", e );
+            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isMembaseBucketConfig(), _username, _password);
+            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
+            if (connectionType.isMembaseBucketConfig()) {
+            	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
+            	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
+                return new MemcachedClient(memcachedNodesManager.getMembaseBucketURIs(), _username, _password);
+            }
+            return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
+        } catch (final Exception e) {
+            throw new RuntimeException("Could not create memcached client", e);
         }
     }
 
-    private ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
-            final Statistics statistics ) {
-        if ( PROTOCOL_BINARY.equals( _memcachedProtocol ) ) {
-            return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-            		memcachedNodesManager.getSessionIdFormat(),
-            		statistics, _operationTimeout ) : new BinaryConnectionFactory();
+    protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
+            final ConnectionType connectionType, final Statistics statistics ) {
+        if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
+            if (connectionType.isSASL()) {
+                // FIXME: CF with AuthDescriptor is only used if nodeIdIsNotEncodedInSessionId.
+                // Shouldn't the AuthDescriptor also be used if !nodeIdIsNotEncodedInSessionId?
+                return memcachedNodesManager.isEncodeNodeIdInSessionId()
+                        ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
+                        : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+                                .setAuthDescriptor(new AuthDescriptor(new String[]{"PLAIN"},
+                                        new PlainCallbackHandler(_username, _password)))
+                                .setOpTimeout(_operationTimeout).build();
+            }
+            else if (connectionType.isMembaseBucketConfig()) {
+                return new ConnectionFactoryBuilder()
+                    .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+                    .setOpTimeout(_operationTimeout).build();
+            }
+            else {
+                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                        memcachedNodesManager.getSessionIdFormat(),
+                        statistics, _operationTimeout ) : new BinaryConnectionFactory();
+            }
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
         		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
@@ -980,9 +1036,6 @@ public class MemcachedSessionService implements SessionBackupService {
                 return null;
             }
 
-        } catch ( final NodeFailureException e ) {
-            _log.warn( "Could not load session with id " + sessionId + " from memcached." );
-            _memcachedNodesManager.onLoadFromMemcachedFailure( sessionId );
         } catch ( final Exception e ) {
             _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
             if ( lockStatus == LockStatus.LOCKED ) {
@@ -1543,6 +1596,30 @@ public class MemcachedSessionService implements SessionBackupService {
     @Nullable
     LockingStrategy getLockingStrategy() {
         return _lockingStrategy;
+    }
+
+    public void setUsername(final String username) {
+        _username = username;
+    }
+
+    /**
+     * username required for SASL Connection types
+     * @return
+     */
+    public String getUsername() {
+        return _username;
+    }
+
+    public void setPassword(final String password) {
+       _password = password;
+    }
+
+    /**
+     * password required for SASL Connection types
+     * @return
+     */
+    public String getPassword() {
+        return _password;
     }
 
 }

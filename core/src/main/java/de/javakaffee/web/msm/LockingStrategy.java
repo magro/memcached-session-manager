@@ -19,13 +19,7 @@ package de.javakaffee.web.msm;
 import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.SessionValidityInfo.decode;
 import static de.javakaffee.web.msm.SessionValidityInfo.encode;
-import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK;
-import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK_FAILURE;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_DELETE_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_LOAD_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_ON_BACKUP_WITHOUT_LOADED_SESSION;
-import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
+import static de.javakaffee.web.msm.Statistics.StatsType.*;
 import static java.lang.Math.min;
 import static java.lang.Thread.sleep;
 
@@ -500,9 +494,6 @@ public abstract class LockingStrategy {
                     }
 
                     saveValidityBackup();
-                } catch( final NodeFailureException e ) {
-                    // handle an unavailable secondary/backup node (fix for issue #83)
-                    _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional backup of session " + _session.getIdInternal() );
                 } catch( final RuntimeException e ) {
                     _log.info( "Could not store secondary backup of session " + _session.getIdInternal(), e );
                 }
@@ -606,9 +597,6 @@ public abstract class LockingStrategy {
                     final int expiration = _maxInactiveInterval <= 0 ? 0 : _maxInactiveInterval;
                     _memcached.set( backupValidityKey, expiration, _validityData );
 
-                } catch( final NodeFailureException e ) {
-                    // handle an unavailable secondary/backup node (fix for issue #83)
-                    _log.info( "Secondary/backup node "+ e.getNodeId() +" not available, skipping additional ping of session " + _sessionId );
                 } catch( final RuntimeException e ) {
                     _log.info( "Could not store secondary backup of session " + _sessionId, e );
                 }

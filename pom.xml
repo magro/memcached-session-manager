@@ -205,6 +205,7 @@
 		<tomcat-version>6.0.28</tomcat-version>
 		<slf4j-version>1.5.8</slf4j-version>
 		<hibernate-core-version>3.3.2.GA</hibernate-core-version>
+		<couchbasemock-version>0.5-69e953bd</couchbasemock-version>
 	</properties>
 
 	<dependencyManagement>
@@ -250,6 +251,12 @@
 				<groupId>org.apache.httpcomponents</groupId>
 				<artifactId>httpclient</artifactId>
 				<version>4.1-alpha1</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>commons-codec</groupId>
+				<artifactId>commons-codec</artifactId>
+				<version>1.5</version><!-- needed for membase runtime compatibility -->
 				<scope>test</scope>
 			</dependency>
 		</dependencies>
@@ -339,9 +346,9 @@
 			<url>http://memcached-session-manager.googlecode.com/svn/maven</url>
 		</repository>
 		<repository>
-			<id>spy</id>
-			<name>Spy Repository</name>
-			<url>http://bleu.west.spy.net/~dustin/m2repo/</url>
+			<id>couchbase</id>
+			<name>Couchbase Repository</name>
+			<url>http://files.couchbase.com/maven2</url>
 		</repository>
 		<repository>
 			<id>jmemcached</id>

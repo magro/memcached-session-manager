@@ -89,15 +89,19 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     }
 
     @Override
+    /**
+     * TODO = Should defaultOperationTimeout be set from the session Timeout.
+     */
     public MemcachedNode createMemcachedNode(final SocketAddress sa,
             final SocketChannel c, final int bufSize) {
         final boolean doAuth = false;
+        final long defaultOpTimeout = getOperationTimeout();
         return new BinaryMemcachedNodeImpl(sa, c, bufSize,
             createReadOperationQueue(),
             createWriteOperationQueue(),
             createOperationQueue(),
             getOpQueueMaxBlockTime(),
-            doAuth);
+            doAuth, defaultOpTimeout);
     }
 
     @Override

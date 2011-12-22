@@ -22,14 +22,7 @@ import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import javax.annotation.Nonnull;
 
@@ -115,7 +108,7 @@ public class BackupSessionService {
      * @see Session#getMaxInactiveInterval()
      * @see MemcachedBackupSession#getThisAccessedTimeInternal()
      */
-    public void updateExpiration( final MemcachedBackupSession session ) {
+    public void updateExpiration( final MemcachedBackupSession session ) throws InterruptedException {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Updating expiration time for session " + session.getId() );
         }
