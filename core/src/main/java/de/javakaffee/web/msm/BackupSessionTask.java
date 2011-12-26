@@ -193,7 +193,6 @@ public class BackupSessionTask implements Callable<BackupResult> {
 
         try {
             storeSessionInMemcached( session, data );
-            _log.info("Have SUCCESS");
             return new BackupResult( BackupResultStatus.SUCCESS, data, attributesData );
         } catch (final ExecutionException e) {
             handleException(session, e);
