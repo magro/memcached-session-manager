@@ -34,11 +34,19 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.*;
+import net.spy.memcached.BinaryConnectionFactory;
+import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.ConnectionFactoryBuilder;
+import net.spy.memcached.DefaultConnectionFactory;
+import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.auth.PlainCallbackHandler;
 
-import org.apache.catalina.*;
+import org.apache.catalina.Container;
+import org.apache.catalina.Context;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Manager;
+import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityConstraint;
@@ -829,27 +837,51 @@ public class MemcachedSessionService implements SessionBackupService {
     @CheckForNull
     private MemcachedBackupSession loadBackupSession( @Nonnull final String requestedSessionId ) {
 
-        final String backupNodeId = getBackupNodeId( requestedSessionId );
-        if ( backupNodeId == null ) {
-            _log.info( "No backup node found for nodeId "+ getSessionIdFormat().extractMemcachedId( requestedSessionId ) );
+        final String nodeId = getSessionIdFormat().extractMemcachedId( requestedSessionId );
+        if ( nodeId == null ) {
+            _log.info( "Cannot load backupSession for sessionId without nodeId: "+ requestedSessionId );
             return null;
         }
 
-        if ( !_memcachedNodesManager.isNodeAvailable( backupNodeId ) ) {
-            _log.info( "Node "+ backupNodeId +" that stores the backup of the session "+ requestedSessionId +" is not available." );
+        final String newNodeId = _memcachedNodesManager.getNextAvailableNodeId(nodeId);
+        if ( newNodeId == null ) {
+            _log.info( "No next available node found for nodeId "+ nodeId );
             return null;
         }
 
+        MemcachedBackupSession result = loadBackupSession(requestedSessionId, newNodeId);
+        String nextNodeId = nodeId;
+        // if we didn't find the backup in the next node, let's go through other nodes
+        // to see if the backup is there. For this we have to fake the session id so that
+        // the SuffixBasedNodeLocator selects another backup node.
+        while(result == null
+                && (nextNodeId = _memcachedNodesManager.getNextAvailableNodeId(nextNodeId)) != null
+                && !nextNodeId.equals(nodeId)) {
+            final String newSessionId = getSessionIdFormat().createNewSessionId(requestedSessionId, nextNodeId);
+            result = loadBackupSession(newSessionId, newNodeId);
+        }
+
+        if ( result == null ) {
+            _log.info( "No backup found for sessionId " + requestedSessionId );
+            return null;
+        }
+
+        return result;
+    }
+
+    private MemcachedBackupSession loadBackupSession(final String requestedSessionId, final String newNodeId) {
         try {
             final SessionValidityInfo validityInfo = _lockingStrategy.loadBackupSessionValidityInfo( requestedSessionId );
             if ( validityInfo == null || !validityInfo.isValid() ) {
-                _log.info( "No validity info (or no valid one) found for sessionId " + requestedSessionId );
+                if(_log.isDebugEnabled())
+                    _log.debug( "No validity info (or no valid one) found for sessionId " + requestedSessionId );
                 return null;
             }
 
             final Object obj = _memcached.get( getSessionIdFormat().createBackupKey( requestedSessionId ) );
             if ( obj == null ) {
-                _log.info( "No backup found for sessionId " + requestedSessionId );
+                if(_log.isDebugEnabled())
+                    _log.debug( "No backup found for sessionId " + requestedSessionId );
                 return null;
             }
 
@@ -857,7 +889,7 @@ public class MemcachedSessionService implements SessionBackupService {
             session.setSticky( _sticky );
             session.setLastAccessedTimeInternal( validityInfo.getLastAccessedTime() );
             session.setThisAccessedTimeInternal( validityInfo.getThisAccessedTime() );
-            final String newSessionId = getSessionIdFormat().createNewSessionId( requestedSessionId, backupNodeId );
+            final String newSessionId = getSessionIdFormat().createNewSessionId( requestedSessionId, newNodeId );
             _log.info( "Session backup loaded from secondary memcached for "+ requestedSessionId +" (will be relocated)," +
             		" setting new id "+ newSessionId +" on session..." );
             session.setIdInternal( newSessionId );
@@ -865,37 +897,8 @@ public class MemcachedSessionService implements SessionBackupService {
 
         } catch( final Exception e ) {
             _log.error( "Could not get backup validityInfo or backup session for sessionId " + requestedSessionId, e );
+            return null;
         }
-        return null;
-    }
-
-    /**
-     * Determines if the (secondary) memcached node used for failover backup of non-sticky sessions is available.
-     * @param sessionId the id of the session that shall be stored in another, secondary memcached node.
-     * @return <code>true</code> if the backup node is available. If there's no secondary memcached node
-     *         (e.g. as there's only a single memcached), <code>false</code> is returned.
-     * @see #getBackupNodeId(String)
-     */
-    boolean isBackupNodeAvailable( @Nonnull final String sessionId ) {
-        final String backupNodeId = getBackupNodeId( sessionId );
-        return backupNodeId == null ? false : _memcachedNodesManager.isNodeAvailable( backupNodeId );
-    }
-
-    /**
-     * Determines the id of the (secondary) memcached node that's used for additional backup
-     * of non-sticky sessions.
-     * @param sessionId the id of the session
-     * @return the nodeId, e.g. "n2", or <code>null</code>.
-     * @see #isBackupNodeAvailable(String)
-     * @see NodeIdService#getNextNodeId(String)
-     */
-    @CheckForNull
-    String getBackupNodeId( @Nonnull final String sessionId ) {
-        final String nodeId = getSessionIdFormat().extractMemcachedId( sessionId );
-        // primary nodes are actually all nodes for non-sticky sessions, so this is ok.
-        // Still, for non-sticky sessions it would make more sense to have just a
-        // getNextNodeId()...
-        return nodeId == null ? null : _memcachedNodesManager.getNextPrimaryNodeId(nodeId);
     }
 
     /**

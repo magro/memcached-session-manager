@@ -108,7 +108,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         if ( !_sessionIdFormat.isBackupKey( key ) ) {
             return nodeId;
         }
-        return _memcachedNodesManager.getNextPrimaryNodeId( nodeId );
+        return _memcachedNodesManager.getNextAvailableNodeId( nodeId );
     }
 
     /**
@@ -390,7 +390,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
             throw new UnsupportedOperationException();
         }
 
-       
+
         @Override
         public void setContinuousTimeout(final boolean b) {
             throw new UnsupportedOperationException();

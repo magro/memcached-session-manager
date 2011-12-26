@@ -37,11 +37,11 @@ import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 
 
 /**
- * 
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class MemcachedNodesManager {
-	
+
 	/**
 	 * Provides queries to memcached.
 	 */
@@ -80,9 +80,9 @@ public class MemcachedNodesManager {
     @Nullable
 	private NodeIdService _nodeIdService;
 	private SessionIdFormat _sessionIdFormat;
-	
+
     /**
-     * 
+     *
      * @param memcachedNodes the original memcachedNodes configuration string
      * @param primaryNodeIds the list of primary node ids (memcachedNodes without failoverNodes).
      * @param failoverNodeIds the configured failover node ids.
@@ -180,7 +180,7 @@ public class MemcachedNodesManager {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
 		}
-		
+
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
         		&& !MEMBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {
             throw new IllegalArgumentException( "Configured memcachedNodes attribute has wrong format, must match " + NODES_REGEX );
@@ -222,7 +222,7 @@ public class MemcachedNodesManager {
         }
 
         final List<String> failoverNodeIds = initFailoverNodes(failoverNodes, address2Ids.values());
-        
+
         // validate that for a single node there's no failover node specified as this does not make sense.
         if(address2Ids.size() == 1 && failoverNodeIds.size() >= 1) {
         	throw new IllegalArgumentException("For a single memcached node there should/must no failoverNodes be specified.");
@@ -235,7 +235,7 @@ public class MemcachedNodesManager {
 	        	primaryNodeIds.add(nodeId);
 	        }
         }
-		
+
 		return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, memcachedClientCallback);
 	}
 
@@ -251,7 +251,7 @@ public class MemcachedNodesManager {
         final String hostname = matcher.group( 2 );
         final int port = Integer.parseInt( matcher.group( 3 ) );
         final InetSocketAddress address = new InetSocketAddress( hostname, port );
-        
+
         return Pair.of(nodeId, address);
     }
 
@@ -270,7 +270,7 @@ public class MemcachedNodesManager {
         }
         return failoverNodeIds;
     }
-    
+
     /**
      * Provides the original memcachedNodes configuration string.
      */
@@ -284,7 +284,7 @@ public class MemcachedNodesManager {
 	public int getCountNodes() {
 		return _address2Ids.size();
 	}
-	
+
 	/**
 	 * Returns the primary node ids, which are the memcachedNodes that are not specified in failoverNodes.
 	 */
@@ -300,7 +300,7 @@ public class MemcachedNodesManager {
 	public List<String> getFailoverNodeIds() {
 		return _failoverNodeIds;
 	}
-	
+
 	/**
 	 * Specifies if the memcached node id shall be encoded in the sessionId. This is only false
 	 * for a single memcachedNode definition without a nodeId (e.g. <code>localhost:11211</code>)
@@ -338,6 +338,26 @@ public class MemcachedNodesManager {
 	@CheckForNull
 	public String getNextPrimaryNodeId(final String nodeId) {
 		return _primaryNodeIds.getNextNodeId(nodeId);
+	}
+
+	/**
+     * Get the next available node id for the given one, based on the primary node ids
+     * (memcachedNodes without failoverNodes). For the last node id the first one is returned.
+     * If this list contains only a single node, conceptionally there's no next node
+     * so that <code>null</code> is returned.
+     * @return the next available node id or <code>null</code> if there's no next available node id.
+     * @see #getNextPrimaryNodeId(String)
+     * @see #isNodeAvailable(String)
+	 */
+	public String getNextAvailableNodeId(final String nodeId) {
+	    String result = nodeId;
+	    do {
+	        result = _primaryNodeIds.getNextNodeId(result);
+	        if(result != null && result.equals(nodeId)) {
+	            result = null;
+	        }
+	    } while(result != null && !isNodeAvailable(result));
+	    return result;
 	}
 
 	/**

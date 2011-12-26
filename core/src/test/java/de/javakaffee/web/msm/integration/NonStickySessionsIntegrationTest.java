@@ -29,8 +29,13 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
@@ -57,8 +62,12 @@ import org.testng.annotations.Test;
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.*;
+import de.javakaffee.web.msm.MemcachedNodesManager;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.NodeIdList;
+import de.javakaffee.web.msm.SessionIdFormat;
+import de.javakaffee.web.msm.Statistics;
+import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
@@ -74,6 +83,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private MemCacheDaemon<?> _daemon1;
     private MemCacheDaemon<?> _daemon2;
+    private MemCacheDaemon<?> _daemon3;
     private MemcachedClient _client;
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
@@ -91,8 +101,10 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private static final String NODE_ID_1 = "n1";
     private static final String NODE_ID_2 = "n2";
+    private static final String NODE_ID_3 = "n3";
     private static final int MEMCACHED_PORT_1 = 21211;
     private static final int MEMCACHED_PORT_2 = 21212;
+    private static final int MEMCACHED_PORT_3 = 21213;
     private static final String MEMCACHED_NODES = NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 + "," +
                                                   NODE_ID_2 + ":localhost:" + MEMCACHED_PORT_2;
 
@@ -145,6 +157,9 @@ public abstract class NonStickySessionsIntegrationTest {
         _client.shutdown();
         _daemon1.stop();
         _daemon2.stop();
+        if(_daemon3 != null && _daemon3.isRunning()) {
+            _daemon3.stop();
+        }
         _tomcat1.stop();
         _tomcat2.stop();
         _httpClient.getConnectionManager().shutdown();
@@ -458,10 +473,6 @@ public abstract class NonStickySessionsIntegrationTest {
 
     }
 
-    /**
-     * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
-     * tomcat when the request is finished.
-     */
     @Test( enabled = true )
     @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
     public void testNonStickySessionIsStoredInSecondaryMemcachedForBackup() throws IOException, InterruptedException, HttpException {
@@ -490,6 +501,148 @@ public abstract class NonStickySessionsIntegrationTest {
 
         assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
         assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+
+    }
+
+    /**
+     * Test for issue #113: Backup of a session should take place on the next available node when the next logical node is unavailable.
+     */
+    @Test( enabled = true )
+    @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
+    public void testNonStickySessionSecondaryBackupFailover() throws IOException, InterruptedException, HttpException {
+
+        final InetSocketAddress address3 = new InetSocketAddress( "localhost", MEMCACHED_PORT_3 );
+        _daemon3 = createDaemon( address3 );
+        _daemon3.start();
+
+        final String memcachedNodes = MEMCACHED_NODES + "," + NODE_ID_3 + ":localhost:" + MEMCACHED_PORT_3;
+
+        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
+        getManager(_tomcat1).setMemcachedNodes(memcachedNodes);
+        getManager(_tomcat1).getMemcachedSessionService().setSessionBackupAsync(false);
+
+        final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
+        final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
+        memcachedsByNodeId.put(NODE_ID_1, _daemon1);
+        memcachedsByNodeId.put(NODE_ID_2, _daemon2);
+        memcachedsByNodeId.put(NODE_ID_3, _daemon3);
+
+        final String sessionId1 = post( _httpClient, TC_PORT_1, null, "key", "v1" ).getSessionId();
+        assertNotNull( sessionId1 );
+
+        // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
+        waitForMemcachedClient( 100 );
+
+        final SessionIdFormat fmt = new SessionIdFormat();
+
+        final String nodeId = fmt.extractMemcachedId( sessionId1 );
+
+        final MemCacheDaemon<?> first = memcachedsByNodeId.get(nodeId);
+
+        assertNotNull( first.getCache().get( key( sessionId1 ) )[0] );
+        assertNotNull( first.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+
+        // The executor needs some time to finish the backup...
+        Thread.sleep( 500 );
+
+        final MemCacheDaemon<?> second = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeId));
+        assertNotNull( second.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
+        assertNotNull( second.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+
+        // Shutdown the secondary memcached, so that the next backup should got to the next node
+        second.stop();
+
+        // Request / Update
+        final String sessionId2 = post( _httpClient, TC_PORT_1, sessionId1, "key", "v2" ).getSessionId();
+        assertEquals( sessionId2, sessionId1 );
+
+        Thread.sleep( 500 );
+
+        final MemCacheDaemon<?> third = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeIdList.getNextNodeId(nodeId)));
+        assertNotNull( third.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
+        assertNotNull( third.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+
+        // Shutdown the first node, so it should be loaded from the 3rd memcached
+        first.stop();
+
+        final Response response3 = get(_httpClient, TC_PORT_1, sessionId1);
+        final String sessionId3 = response3.getResponseSessionId();
+        assertNotNull(sessionId3);
+        assertFalse(sessionId3.equals(sessionId1));
+        assertEquals(sessionId3, fmt.createNewSessionId(sessionId1, fmt.extractMemcachedId(sessionId3)));
+
+        assertEquals(response3.get("key"), "v2");
+
+    }
+
+    /**
+     * Test for issue #113: Backup of a session should take place on the next available node when the next logical node is unavailable.
+     */
+    @Test( enabled = true )
+    @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
+    public void testNonStickySessionSecondaryBackupFailoverForSkippedUpdate() throws IOException, InterruptedException, HttpException {
+
+        final InetSocketAddress address3 = new InetSocketAddress( "localhost", MEMCACHED_PORT_3 );
+        _daemon3 = createDaemon( address3 );
+        _daemon3.start();
+
+        final String memcachedNodes = MEMCACHED_NODES + "," + NODE_ID_3 + ":localhost:" + MEMCACHED_PORT_3;
+
+        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
+        getManager(_tomcat1).setMemcachedNodes(memcachedNodes);
+        getManager(_tomcat1).getMemcachedSessionService().setSessionBackupAsync(false);
+
+        final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
+        final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
+        memcachedsByNodeId.put(NODE_ID_1, _daemon1);
+        memcachedsByNodeId.put(NODE_ID_2, _daemon2);
+        memcachedsByNodeId.put(NODE_ID_3, _daemon3);
+
+        final String sessionId1 = post( _httpClient, TC_PORT_1, null, "key", "v1" ).getSessionId();
+        assertNotNull( sessionId1 );
+
+        // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
+        waitForMemcachedClient( 100 );
+
+        final SessionIdFormat fmt = new SessionIdFormat();
+
+        final String nodeId = fmt.extractMemcachedId( sessionId1 );
+
+        final MemCacheDaemon<?> first = memcachedsByNodeId.get(nodeId);
+
+        assertNotNull( first.getCache().get( key( sessionId1 ) )[0] );
+        assertNotNull( first.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+
+        // The executor needs some time to finish the backup...
+        Thread.sleep( 500 );
+
+        final MemCacheDaemon<?> second = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeId));
+        assertNotNull( second.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
+        assertNotNull( second.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+
+        // Shutdown the secondary memcached, so that the next backup should got to the next node
+        second.stop();
+
+        // Request / Update
+        final String sessionId2 = get( _httpClient, TC_PORT_1, sessionId1 ).getSessionId();
+        assertEquals( sessionId2, sessionId1 );
+
+        Thread.sleep( 500 );
+
+        final MemCacheDaemon<?> third = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeIdList.getNextNodeId(nodeId)));
+        assertNotNull( third.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
+        assertNotNull( third.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+
+        // Shutdown the first node, so it should be loaded from the 3rd memcached
+        first.stop();
+
+        final Response response3 = get(_httpClient, TC_PORT_1, sessionId1);
+        final String sessionId3 = response3.getResponseSessionId();
+        assertNotNull(sessionId3);
+        assertFalse(sessionId3.equals(sessionId1));
+        assertEquals(sessionId3, fmt.createNewSessionId(sessionId1, fmt.extractMemcachedId(sessionId3)));
+
+        assertEquals(response3.get("key"), "v1");
 
     }
 
