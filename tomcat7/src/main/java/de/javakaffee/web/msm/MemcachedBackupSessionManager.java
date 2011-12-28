@@ -17,21 +17,7 @@
 package de.javakaffee.web.msm;
 
 
-import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK;
-import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK_FAILURE;
-import static de.javakaffee.web.msm.Statistics.StatsType.ATTRIBUTES_SERIALIZATION;
-import static de.javakaffee.web.msm.Statistics.StatsType.BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.CACHED_DATA_SIZE;
-import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.EFFECTIVE_BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.MEMCACHED_UPDATE;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_DELETE_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_LOAD_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_ON_BACKUP_WITHOUT_LOADED_SESSION;
-import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
-import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
+import static de.javakaffee.web.msm.Statistics.StatsType.*;
 
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
@@ -128,19 +114,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void unload() throws IOException {
-    }
-
-    /**
-     * Initialize this manager. The memcachedClient parameter is there for testing
-     * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
-     * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
-     *
-     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
-     */
-    protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        super.startInternal();
-        _msm.startInternal( memcachedClient );
-        setState(LifecycleState.STARTING);
     }
 
     @Override
@@ -532,7 +505,9 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void startInternal() throws LifecycleException {
-        startInternal( null );
+        super.startInternal();
+        _msm.startInternal();
+        setState(LifecycleState.STARTING);
     }
 
     /**

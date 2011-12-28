@@ -67,7 +67,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * for a concrete major tomcat version (e.g. for 7.x.x) and configured in the context.xml
  * as manager (see <a href="http://code.google.com/p/memcached-session-manager/wiki/SetupAndConfiguration">SetupAndConfiguration</a>)
  * for more. The {@link SessionManager} then has to pass configuration settings to this
- * {@link MemcachedSessionService}. Relevant lifecycle methods are {@link #startInternal(MemcachedClient)}
+ * {@link MemcachedSessionService}. Relevant lifecycle methods are {@link #startInternal()}
  * and {@link #shutdown()}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
@@ -394,6 +394,14 @@ public class MemcachedSessionService implements SessionBackupService {
      * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
      */
     void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
+        _memcached = memcachedClient;
+        startInternal();
+    }
+
+    /**
+     * Initialize this manager.
+     */
+    void startInternal() throws LifecycleException {
         _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
                 " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
 
@@ -401,7 +409,9 @@ public class MemcachedSessionService implements SessionBackupService {
 
         _memcachedNodesManager = createMemcachedNodesManager( _memcachedNodes, _failoverNodes);
 
-        _memcached = memcachedClient != null ? memcachedClient : createMemcachedClient( _memcachedNodesManager, _statistics );
+        if(_memcached == null) {
+            _memcached = createMemcachedClient( _memcachedNodesManager, _statistics );
+        }
 
         /* create the missing sessions cache
          */
@@ -1591,6 +1601,10 @@ public class MemcachedSessionService implements SessionBackupService {
      */
     MemcachedClient getMemcached() {
         return _memcached;
+    }
+
+    void setMemcachedClient(final MemcachedClient memcachedClient) {
+        _memcached = memcachedClient;
     }
 
     /**

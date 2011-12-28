@@ -36,10 +36,11 @@ public class MemcachedSessionServiceTC7Test extends MemcachedSessionServiceTest 
     protected SessionManager createSessionManager() {
         return new MemcachedBackupSessionManager();
     }
-    
+
     @Override
     protected void startInternal( final SessionManager manager, final MemcachedClient memcachedMock ) throws LifecycleException {
-        ((MemcachedBackupSessionManager)manager).startInternal( memcachedMock );
-    };
+        manager.getMemcachedSessionService().setMemcachedClient(memcachedMock);
+        ((MemcachedBackupSessionManager)manager).start();
+    }
 
 }

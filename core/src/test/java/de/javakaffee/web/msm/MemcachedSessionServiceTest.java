@@ -27,7 +27,14 @@ import static org.testng.Assert.*;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nonnull;
 
@@ -535,7 +542,8 @@ public abstract class MemcachedSessionServiceTest {
         final TranscoderService transcoderService = new TranscoderService(new JavaSerializationTranscoder());
         _service.setTranscoderService( transcoderService );
 
-        startInternal(_service.getManager(), _memcachedMock);
+        _service.setMemcachedClient(_memcachedMock);
+        _service.startInternal();
 
         @SuppressWarnings("unchecked")
         final OperationFuture<Boolean> addResultMock = mock(OperationFuture.class);

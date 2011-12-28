@@ -17,21 +17,7 @@
 package de.javakaffee.web.msm;
 
 
-import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK;
-import static de.javakaffee.web.msm.Statistics.StatsType.ACQUIRE_LOCK_FAILURE;
-import static de.javakaffee.web.msm.Statistics.StatsType.ATTRIBUTES_SERIALIZATION;
-import static de.javakaffee.web.msm.Statistics.StatsType.BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.CACHED_DATA_SIZE;
-import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.EFFECTIVE_BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.MEMCACHED_UPDATE;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_BACKUP;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_DELETE_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_AFTER_LOAD_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.NON_STICKY_ON_BACKUP_WITHOUT_LOADED_SESSION;
-import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
-import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
+import static de.javakaffee.web.msm.Statistics.StatsType.*;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -137,7 +123,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
      */
     protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        _msm.startInternal( memcachedClient );
+        _msm.setMemcachedClient(memcachedClient);
+        _msm.startInternal();
     }
 
     /**
@@ -588,7 +575,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public void setUsername(final String username) {
-        _msm.setUsername(username); 
+        _msm.setUsername(username);
     }
 
     @Override
