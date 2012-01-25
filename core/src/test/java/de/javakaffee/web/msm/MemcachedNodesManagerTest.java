@@ -225,6 +225,14 @@ public class MemcachedNodesManagerTest {
 		assertNotNull(sessionIdFormat);
 	}
 
+    @Test
+    public void testSessionIdFormatForSingleNodeSetupShouldSupportLocking() {
+        final SessionIdFormat sessionIdFormat = createFor( "localhost:11211", null, _mcc ).getSessionIdFormat();
+        assertNotNull(sessionIdFormat);
+        final String sessionId = "12345678";
+        assertEquals(sessionIdFormat.createLockName(sessionId), "lock:" + sessionId);
+    }
+
 	@Test
 	public void testCreateSessionIdShouldOnlyAddNodeIdIfPresent() {
 		assertEquals(createFor( "n1:localhost:11211", null, _mcc ).createSessionId("foo"), "foo-n1" );

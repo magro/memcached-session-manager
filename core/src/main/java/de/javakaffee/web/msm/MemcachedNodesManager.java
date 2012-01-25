@@ -119,10 +119,6 @@ public class MemcachedNodesManager {
 					throw new UnsupportedOperationException("Not supported for single node configuration without node id.");
 				}
 				@Override
-				public String createLockName(final String sessionId) {
-					throw new UnsupportedOperationException("Not supported for single node configuration without node id.");
-				}
-				@Override
 				public String createSessionId(final String sessionId, final String memcachedId) {
 					return sessionId;
 				}

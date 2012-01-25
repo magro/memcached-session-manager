@@ -189,6 +189,34 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that parallel request to the same Tomcat instance don't lead to stale data.
      */
     @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    public void testSessionLockingSupportedWithSingleNodeSetup(@Nonnull final LockingMode lockingMode,
+            @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
+            ExecutionException {
+
+        getManager( _tomcat1 ).setMemcachedNodes("localhost:" + MEMCACHED_PORT_1);
+        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern, false );
+
+        final String sessionId = post(_httpClient, TC_PORT_1, null, "k1", "v1").getSessionId();
+        assertNotNull(sessionId);
+
+        // just want to see that we can access/load the session
+        Response response = get(_httpClient, TC_PORT_1, sessionId);
+        assertEquals(response.getSessionId(), sessionId);
+        assertEquals(response.get("k1"), "v1");
+
+        // and we want to be able to update the session
+        post(_httpClient, TC_PORT_1, sessionId, "k2", "v2");
+
+        response = get(_httpClient, TC_PORT_1, sessionId);
+        assertEquals(response.getSessionId(), sessionId);
+        assertEquals(response.get("k1"), "v1");
+        assertEquals(response.get("k2"), "v2");
+    }
+
+    /**
+     * Tests that parallel request to the same Tomcat instance don't lead to stale data.
+     */
+    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
     public void testParallelRequestsToSameTomcatInstanceIssue111(@Nonnull final LockingMode lockingMode,
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
             ExecutionException {
