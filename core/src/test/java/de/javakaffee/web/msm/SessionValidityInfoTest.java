@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 import org.testng.annotations.Test;
 
@@ -36,4 +37,10 @@ public class SessionValidityInfoTest {
         assertEquals( decoded.getThisAccessedTime(), 4711 );
     }
 
+    @Test
+    public void negativeInactivityAlwaysValid() {
+        long now = System.currentTimeMillis();
+        SessionValidityInfo info = new SessionValidityInfo(-1, 0, 0);
+        assertTrue(info.isValid());
+    }
 }
