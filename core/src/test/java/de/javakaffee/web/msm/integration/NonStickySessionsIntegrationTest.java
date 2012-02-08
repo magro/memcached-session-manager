@@ -186,6 +186,42 @@ public abstract class NonStickySessionsIntegrationTest {
     }
 
     /**
+     * Test for issue http://code.google.com/p/memcached-session-manager/issues/detail?id=120
+     */
+    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
+    public void testLoadBackupSessionShouldWorkWithInfiniteSessionTimeoutIssue120(@Nonnull final LockingMode lockingMode,
+            @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
+            ExecutionException {
+
+        getManager( _tomcat1 ).setMaxInactiveInterval(-1);
+        setLockingMode(lockingMode, uriPattern);
+
+        final String sessionId = post(_httpClient, TC_PORT_1, null, "k1", "v1").getSessionId();
+        assertNotNull(sessionId);
+
+        Thread.sleep(200);
+
+        // we want to get the session from the primary node
+        Response response = get(_httpClient, TC_PORT_1, sessionId);
+        assertEquals(response.getSessionId(), sessionId);
+        assertEquals(response.get("k1"), "v1");
+
+        // now we shut down the primary node so that the session is loaded from the backup node
+        final SessionIdFormat fmt = new SessionIdFormat();
+        final String nodeId = fmt.extractMemcachedId( sessionId );
+        final MemCacheDaemon<?> primary = NODE_ID_1.equals(nodeId) ? _daemon1 : _daemon2;
+        primary.stop();
+
+        Thread.sleep( 200 );
+
+        // the session should be loaded from the backup node
+        response = get(_httpClient, TC_PORT_1, sessionId);
+        assertEquals(fmt.createNewSessionId(response.getSessionId(), nodeId), sessionId);
+        assertEquals(response.get("k1"), "v1");
+    }
+
+    /**
      * Tests that parallel request to the same Tomcat instance don't lead to stale data.
      */
     @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
