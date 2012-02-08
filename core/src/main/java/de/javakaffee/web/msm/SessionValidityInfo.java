@@ -103,7 +103,9 @@ public class SessionValidityInfo {
     public boolean isValid() {
         final long timeNow = System.currentTimeMillis();
         final int timeIdle = (int) ((timeNow - _thisAccessedTime) / 1000L);
-        return timeIdle < _maxInactiveInterval;
+        // if tomcat session inactivity is negative or 0, session
+        // should not expire
+        return _maxInactiveInterval <= 0 || timeIdle < _maxInactiveInterval;
     }
 
 }
