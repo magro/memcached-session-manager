@@ -1,19 +1,4 @@
-/*
  * Copyright 2009 Martin Grotzke
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
 package de.javakaffee.web.msm;
 
 import java.net.SocketAddress;
@@ -26,6 +11,7 @@ import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.OperationFactory;
+import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.protocol.binary.BinaryMemcachedNodeImpl;
 import net.spy.memcached.protocol.binary.BinaryOperationFactory;
 import net.spy.memcached.transcoders.SerializingTranscoder;
@@ -45,7 +31,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     private final SessionIdFormat _sessionIdFormat;
     private final Statistics _statistics;
     private final long _operationTimeout;
-    private final AuthDescriptor _authDescriptor;
+    private AuthDescriptor _authDescriptor = null;
 
     /**
      * Creates a new instance passing an auth descriptor.
@@ -125,7 +111,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     
     @Override
     public long getOperationTimeout() {
-    	return _operationTimeout;
+        return _operationTimeout;
     }
     
     @Override
