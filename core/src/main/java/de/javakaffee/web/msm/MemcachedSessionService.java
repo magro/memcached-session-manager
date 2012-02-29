@@ -483,14 +483,13 @@ public class MemcachedSessionService implements SessionBackupService {
             final ConnectionType connectionType, final Statistics statistics ) {
         if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
             if (connectionType.isSASL()) {
-                // FIXME: CF with AuthDescriptor is only used if nodeIdIsNotEncodedInSessionId.
-                // Shouldn't the AuthDescriptor also be used if !nodeIdIsNotEncodedInSessionId?
+                final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"}, new PlainCallbackHandler(_username, _password));
                 return memcachedNodesManager.isEncodeNodeIdInSessionId()
                         ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
+                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout,
+                                authDescriptor)
                         : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                                .setAuthDescriptor(new AuthDescriptor(new String[]{"PLAIN"},
-                                        new PlainCallbackHandler(_username, _password)))
+                                .setAuthDescriptor(authDescriptor)
                                 .setOpTimeout(_operationTimeout).build();
             }
             else if (connectionType.isMembaseBucketConfig()) {
