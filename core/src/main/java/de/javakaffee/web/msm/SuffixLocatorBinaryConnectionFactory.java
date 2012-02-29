@@ -26,6 +26,7 @@ import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.OperationFactory;
+import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.protocol.binary.BinaryMemcachedNodeImpl;
 import net.spy.memcached.protocol.binary.BinaryOperationFactory;
 import net.spy.memcached.transcoders.SerializingTranscoder;
@@ -41,10 +42,24 @@ import net.spy.memcached.transcoders.Transcoder;
  */
 public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectionFactory {
 
-	private final MemcachedNodesManager _memcachedNodesManager;
-	private final SessionIdFormat _sessionIdFormat;
+    private final MemcachedNodesManager _memcachedNodesManager;
+    private final SessionIdFormat _sessionIdFormat;
     private final Statistics _statistics;
     private final long _operationTimeout;
+    private AuthDescriptor _authDescriptor = null;
+
+    /**
+     * Creates a new instance passing an auth descriptor.
+     * @param memcachedNodesManager
+     *            the memcached nodes manager holding list of nodeIds
+     * @param sessionIdFormat
+     *            the {@link SessionIdFormat}
+     */
+    public SuffixLocatorBinaryConnectionFactory( final MemcachedNodesManager memcachedNodesManager, final SessionIdFormat sessionIdFormat,
+            final Statistics statistics, long operationTimeout, AuthDescriptor authDescriptor) {
+        this(memcachedNodesManager, sessionIdFormat, statistics, operationTimeout);
+        _authDescriptor = authDescriptor;
+    }
 
     /**
      * Creates a new instance.
@@ -60,7 +75,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
         _statistics = statistics;
         _operationTimeout = operationTimeout;
     }
-
+    
     /**
      * We don't want to try another memcached node and we also don't want to wait
      * until the failed node becomes available again.
@@ -94,7 +109,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
      */
     public MemcachedNode createMemcachedNode(final SocketAddress sa,
             final SocketChannel c, final int bufSize) {
-        final boolean doAuth = false;
+        final boolean doAuth = (_authDescriptor == null ? true : false);
         final long defaultOpTimeout = getOperationTimeout();
         return new BinaryMemcachedNodeImpl(sa, c, bufSize,
             createReadOperationQueue(),
@@ -111,6 +126,12 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     
     @Override
     public long getOperationTimeout() {
-    	return _operationTimeout;
+        return _operationTimeout;
     }
+    
+    @Override
+    public AuthDescriptor getAuthDescriptor() {
+        return _authDescriptor;
+    }
+
 }
