@@ -487,7 +487,8 @@ public class MemcachedSessionService implements SessionBackupService {
                 // Shouldn't the AuthDescriptor also be used if !nodeIdIsNotEncodedInSessionId?
                 return memcachedNodesManager.isEncodeNodeIdInSessionId()
                         ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
+                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout,
+                                new AuthDescriptor(new String[]{"PLAIN"}, new PlainCallbackHandler(_username, _password)))
                         : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
                                 .setAuthDescriptor(new AuthDescriptor(new String[]{"PLAIN"},
                                         new PlainCallbackHandler(_username, _password)))
