@@ -648,34 +648,20 @@ public class MemcachedSessionService implements SessionBackupService {
 
         checkMaxActiveSessions();
 
-        MemcachedBackupSession session = null;
+        final MemcachedBackupSession session = createEmptySession();
+        session.setNew( true );
+        session.setValid( true );
+        session.setCreationTime( System.currentTimeMillis() );
+        session.setMaxInactiveInterval( _manager.getMaxInactiveInterval() );
 
-        if ( sessionId != null ) {
-            session = loadFromMemcachedWithCheck( sessionId );
-            // checking valid() would expire() the session if it's not valid!
-            if ( session != null && session.isValid() ) {
-                addValidLoadedSession( session, true );
-            }
+        if ( sessionId == null || !_memcachedNodesManager.canHitMemcached( sessionId ) ) {
+            sessionId = _manager.generateSessionId();
         }
 
-        if ( session == null ) {
+        session.setId( sessionId );
 
-            session = createEmptySession();
-            session.setNew( true );
-            session.setValid( true );
-            session.setCreationTime( System.currentTimeMillis() );
-            session.setMaxInactiveInterval( _manager.getMaxInactiveInterval() );
-
-            if ( sessionId == null || !_memcachedNodesManager.canHitMemcached( sessionId ) ) {
-                sessionId = _manager.generateSessionId();
-            }
-
-            session.setId( sessionId );
-
-            if ( _log.isDebugEnabled() ) {
-                _log.debug( "Created new session with id " + session.getId() );
-            }
-
+        if ( _log.isDebugEnabled() ) {
+            _log.debug( "Created new session with id " + session.getId() );
         }
 
         _manager.incrementSessionCounter();
