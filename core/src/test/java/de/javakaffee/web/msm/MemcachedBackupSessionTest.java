@@ -34,11 +34,13 @@ public class MemcachedBackupSessionTest {
 
     private MemcachedBackupSession cut;
     private ExecutorService executor;
+    private ExecutorService alternateExecutor;
 
     @BeforeMethod
     public void beforeMethod() {
         cut = new MemcachedBackupSession();
         executor = Executors.newCachedThreadPool();
+        alternateExecutor = Executors.newCachedThreadPool();
     }
 
     @AfterMethod
@@ -61,7 +63,7 @@ public class MemcachedBackupSessionTest {
         };
         executor.submit(registerReference).get();
         assertEquals(cut.getRefCount(), 1);
-        executor.submit(registerReference).get();
+        alternateExecutor.submit(registerReference).get();
         assertEquals(cut.getRefCount(), 2);
 
         // we (no ref registered) must not be able to decrement the ref count
