@@ -111,7 +111,7 @@ abstract class SessionTrackerValve extends ValveBase {
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
-        if ( !_enabled.get() || _ignorePattern != null && _ignorePattern.matcher( request.getRequestURI() ).matches() ) {
+        if ( !_enabled.get() || _ignorePattern != null && _ignorePattern.matcher( getURIWithQueryString( request ) ).matches() ) {
             getNext().invoke( request, response );
         } else {
 
