@@ -172,18 +172,17 @@ public abstract class LockingStrategy {
             return;
         }
         else {
-            checkTimeoutAndWait( sessionId, retryInterval, maxRetryInterval, timeout, start );
-            acquireLock( sessionId, retryInterval * 2, maxRetryInterval, timeout, start );
+            checkTimeoutAndWait( sessionId, retryInterval, timeout, start );
+            acquireLock( sessionId, min( retryInterval * 2, maxRetryInterval ), maxRetryInterval, timeout, start );
         }
     }
 
-    protected void checkTimeoutAndWait( @Nonnull final String sessionId, final long retryInterval,
-            final long maxRetryInterval, final long timeout, final long start ) throws TimeoutException,
+    protected void checkTimeoutAndWait( @Nonnull final String sessionId, final long timeToWait,
+            final long timeout, final long start ) throws TimeoutException,
             InterruptedException {
         if ( System.currentTimeMillis() >= start + timeout ) {
             throw new TimeoutException( "Reached timeout when trying to aquire lock for session " + sessionId );
         }
-        final long timeToWait = min( retryInterval, maxRetryInterval );
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Could not aquire lock for session " + sessionId + ", waiting " + timeToWait + " millis now..." );
         }
