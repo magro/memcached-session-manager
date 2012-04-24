@@ -12,10 +12,6 @@
 	<packaging>jar</packaging>
 	<name>memcached-session-manager core</name>
 	<description>The msm core, provides java serialization strategy.</description>
-	
-    <properties>
-        <tomcat-version>6.0.28</tomcat-version>
-    </properties>
 
 	<dependencies>
 		<dependency>
