@@ -313,11 +313,10 @@ public abstract class LockingStrategy {
     }
 
     /**
-     * Is used to determine if this thread / the current request already hit the application or if this method
-     * invocation comes from the container.
+     * Is used to determine if this thread / the current request.
      */
-    protected final boolean isContainerSessionLookup() {
-        return _requestsThreadLocal.get() == null;
+    Request getCurrentRequest() {
+        return _requestsThreadLocal.get();
     }
 
     @CheckForNull

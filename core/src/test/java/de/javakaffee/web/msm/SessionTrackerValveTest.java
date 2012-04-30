@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.integration.TestUtils.createContext;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
@@ -24,16 +23,15 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
-import org.apache.catalina.Context;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
-import org.apache.catalina.core.StandardContext;
 import org.apache.tomcat.util.http.ServerCookie;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -47,7 +45,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public abstract class SessionTrackerValveTest {
+public class SessionTrackerValveTest {
 
     protected SessionBackupService _service;
     private SessionTrackerValve _sessionTrackerValve;
@@ -58,18 +56,20 @@ public abstract class SessionTrackerValveTest {
     @BeforeMethod
     public void setUp() throws Exception {
         _service = mock( SessionBackupService.class );
-        _sessionTrackerValve = createSessionTrackerValve( createContext() );
+        _sessionTrackerValve = createSessionTrackerValve();
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( _nextValve );
         _request = mock( Request.class );
         _response = mock( Response.class );
+
+        when(_request.getNote(eq(SessionTrackerValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(SessionTrackerValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
     }
 
     @Nonnull
-    protected abstract SessionTrackerValve createSessionTrackerValve( @Nonnull final Context context );
-
-    @Nonnull
-    protected abstract String getGlobalSessionCookieName( @Nonnull final Context context );
+    protected SessionTrackerValve createSessionTrackerValve() {
+        return new SessionTrackerValve(null, "somesessionid", _service, Statistics.create(), new AtomicBoolean( true ));
+    }
 
     @AfterMethod
     public void tearDown() throws Exception {
@@ -80,15 +80,17 @@ public abstract class SessionTrackerValveTest {
     }
 
     @Test
-    public final void testSessionCookieName() throws IOException, ServletException {
-        final StandardContext context = createContext();
-        context.setSessionCookieName( "foo" );
-        SessionTrackerValve cut = createSessionTrackerValve( context );
-        assertEquals( "foo", cut.getSessionCookieName() );
+    public final void testGetSessionCookieName() throws IOException, ServletException {
+        final SessionTrackerValve cut = new SessionTrackerValve(null, "foo", _service, Statistics.create(), new AtomicBoolean( true ));
+        assertEquals(cut.getSessionCookieName(), "foo");
+    }
 
-        context.setSessionCookieName( null );
-        cut = createSessionTrackerValve( context );
-        assertEquals( getGlobalSessionCookieName( context ), cut.getSessionCookieName() );
+    @Test
+    public final void testProcessRequestNotePresent() throws IOException, ServletException {
+        _sessionTrackerValve.invoke( _request, _response );
+
+        verify( _service, never() ).backupSession( anyString(), anyBoolean(), anyString() );
+        verify(_request).setNote(eq(SessionTrackerValve.REQUEST_PROCESS), eq(Boolean.TRUE));
     }
 
     @Test
@@ -99,14 +101,6 @@ public abstract class SessionTrackerValveTest {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service, never() ).backupSession( anyString(), anyBoolean(), anyString() );
-    }
-
-    public final void testGetSessionInternalNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
-        when( _request.getRequestedSessionId() ).thenReturn( null );
-        when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( null );
-        _sessionTrackerValve.invoke( _request, _response );
-
-        verify( _request, never() ).getSessionInternal();
     }
 
     @Test
@@ -139,11 +133,8 @@ public abstract class SessionTrackerValveTest {
         final String sessionId = "bar";
         final String newSessionId = "newId";
 
+        when(_request.getNote(eq(SessionTrackerValve.SESSION_ID_CHANGED))).thenReturn(Boolean.TRUE);
         when( _request.getRequestedSessionId() ).thenReturn( sessionId );
-
-        when( _service.changeSessionIdOnMemcachedFailover( eq( sessionId ) ) ).thenReturn( newSessionId );
-
-        //
 
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );
         when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
@@ -154,7 +145,6 @@ public abstract class SessionTrackerValveTest {
 
         _sessionTrackerValve.invoke( _request, _response );
 
-        verify( _request ).changeSessionId( eq( newSessionId ) );
         verify( _service ).backupSession( eq( newSessionId ), eq( true ), anyString() );
 
     }

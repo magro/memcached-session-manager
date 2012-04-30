@@ -18,12 +18,8 @@ package de.javakaffee.web.msm;
 
 import java.io.IOException;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 
-import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
@@ -43,55 +39,32 @@ import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionTrackerValve extends ValveBase {
+public class SessionTrackerValve2 extends ValveBase {
 
-    public static final String REQUEST_PROCESS = "de.javakaffee.msm.request.process";
-
-    public static final String SESSION_ID_CHANGED = "de.javakaffee.msm.sessionIdChanged";
-
-    public static final String REQUEST_PROCESSED = "de.javakaffee.msm.request.processed";
-
+    static final String INVOKED = "de.javakaffee.msm.contextValve.invoked";
     static final String RELOCATE = "session.relocate";
 
     protected static final Log _log = LogFactory.getLog( SessionTrackerValve.class );
 
-    private final Pattern _ignorePattern;
-    private final SessionBackupService _sessionBackupService;
-    private final Statistics _statistics;
-    private final AtomicBoolean _enabled;
+    private final MemcachedSessionService _sessionBackupService;
     protected final String _sessionCookieName;
-    private @CheckForNull LockingStrategy _lockingStrategy;
 
     /**
      * Creates a new instance with the given ignore pattern and
      * {@link SessionBackupService}.
-     *
+     * @param sessionBackupService
+     *            the service that actually backups sessions
      * @param ignorePattern
      *            the regular expression for request uris to ignore
      * @param context
      *            the catalina context of this valve
-     * @param sessionBackupService
-     *            the service that actually backups sessions
      * @param statistics
      *            used to store statistics
-     * @param enabled
-     *            specifies if memcached-session-manager is enabled or not.
-     *            If <code>false</code>, each request is just processed without doing anything further.
      */
-    public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
-            @Nonnull final SessionBackupService sessionBackupService,
-            @Nonnull final Statistics statistics,
-            @Nonnull final AtomicBoolean enabled ) {
-        if ( ignorePattern != null ) {
-            _log.info( "Setting ignorePattern to " + ignorePattern );
-            _ignorePattern = Pattern.compile( ignorePattern );
-        } else {
-            _ignorePattern = null;
-        }
-        _sessionCookieName = sessionCookieName;
+    public SessionTrackerValve2( @Nonnull final String sessionCookieName,
+            @Nonnull final MemcachedSessionService sessionBackupService ) {
         _sessionBackupService = sessionBackupService;
-        _statistics = statistics;
-        _enabled = enabled;
+        _sessionCookieName = sessionCookieName;
     }
 
     /**
@@ -102,33 +75,34 @@ public class SessionTrackerValve extends ValveBase {
         return _sessionCookieName;
     }
 
+    public boolean wasInvokedWith(final Request currentRequest) {
+        return currentRequest != null && currentRequest.getNote(INVOKED) == Boolean.TRUE;
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
-        if ( !_enabled.get() || _ignorePattern != null && _ignorePattern.matcher( getURIWithQueryString( request ) ).matches() ) {
+        final Object processRequest = request.getNote(SessionTrackerValve.REQUEST_PROCESS);
+        if(processRequest != Boolean.TRUE) {
             getNext().invoke( request, response );
-        } else {
-
-            request.setNote(REQUEST_PROCESS, Boolean.TRUE);
+        }
+        else {
 
             if ( _log.isDebugEnabled() ) {
                 _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " ==================" );
             }
 
+            boolean sessionIdChanged = false;
             try {
-                storeRequestThreadLocal( request );
-                // sessionIdChanged = changeRequestedSessionId( request, response );
+                request.setNote(INVOKED, Boolean.TRUE);
+                sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
-
-                if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
-                    final Boolean sessionIdChanged = (Boolean) request.getNote(SESSION_ID_CHANGED);
-                    backupSession( request, response, sessionIdChanged == null ? false : sessionIdChanged.booleanValue() );
-                }
-                resetRequestThreadLocal();
+                request.setNote(SessionTrackerValve.REQUEST_PROCESSED, Boolean.TRUE);
+                request.setNote(SessionTrackerValve.SESSION_ID_CHANGED, Boolean.valueOf(sessionIdChanged));
             }
 
             if ( _log.isDebugEnabled() ) {
@@ -171,53 +145,35 @@ public class SessionTrackerValve extends ValveBase {
 		return method != null ? method.toLowerCase().equals( "post" ) : false;
 	}
 
-    private void resetRequestThreadLocal() {
-        if ( _lockingStrategy != null ) {
-            _lockingStrategy.onRequestFinished();
-        }
-    }
-
-    private void storeRequestThreadLocal( @Nonnull final Request request ) {
-        if ( _lockingStrategy != null ) {
-            _lockingStrategy.onRequestStart( request );
-        }
-    }
-
-    private void backupSession( final Request request, final Response response, final boolean sessionIdChanged ) {
-
+    /**
+     * If there's a session for a requested session id that is taken over (tomcat failover) or
+     * that will be relocated (memcached failover), the new session id will be set (via {@link Request#changeSessionId(String)}).
+     *
+     * @param request the request
+     * @param response the response
+     *
+     * @return <code>true</code> if the id of a valid session was changed.
+     *
+     * @see Request#changeSessionId(String)
+     */
+    private boolean changeRequestedSessionId( final Request request, final Response response ) {
         /*
-         * Do we have a session?
+         * Check for session relocation only if a session id was requested
          */
-        String sessionId = getSessionIdFromResponseSessionCookie( response );
-        if ( sessionId == null ) {
-            sessionId = request.getRequestedSessionId();
-        }
-        if ( sessionId != null ) {
-            _statistics.requestWithSession();
-            _sessionBackupService.backupSession( sessionId, sessionIdChanged, getURIWithQueryString( request ) );
-        }
-        else {
-            _statistics.requestWithoutSession();
-        }
+        if ( request.getRequestedSessionId() != null ) {
 
-    }
+        	String newSessionId = _sessionBackupService.changeSessionIdOnTomcatFailover( request.getRequestedSessionId() );
+        	if ( newSessionId == null ) {
+                newSessionId = _sessionBackupService.changeSessionIdOnMemcachedFailover( request.getRequestedSessionId() );
+            }
 
-    private String getSessionIdFromResponseSessionCookie( final Response response ) {
-        final String header = response.getHeader( "Set-Cookie" );
-        if ( header != null && header.contains( _sessionCookieName ) ) {
-            final String sessionIdPrefix = _sessionCookieName + "=";
-            final int idxNameStart = header.indexOf( sessionIdPrefix );
-            final int idxValueStart = idxNameStart + sessionIdPrefix.length();
-            int idxValueEnd = header.indexOf( ';', idxNameStart );
-            if ( idxValueEnd == -1 ) {
-                idxValueEnd = header.indexOf( ' ', idxValueStart );
+            if ( newSessionId != null ) {
+                request.changeSessionId( newSessionId );
+                return true;
             }
-            if ( idxValueEnd == -1 ) {
-                idxValueEnd = header.length();
-            }
-            return header.substring( idxValueStart, idxValueEnd );
+
         }
-        return null;
+        return false;
     }
 
     private void logDebugResponseCookie( final Response response ) {
@@ -304,10 +260,6 @@ public class SessionTrackerValve extends ValveBase {
                 SKIPPED
         }
 
-    }
-
-    public void setLockingStrategy( @Nullable final LockingStrategy lockingStrategy ) {
-        _lockingStrategy = lockingStrategy;
     }
 
 }

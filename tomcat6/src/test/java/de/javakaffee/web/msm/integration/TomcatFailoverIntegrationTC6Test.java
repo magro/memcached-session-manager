@@ -18,6 +18,8 @@ package de.javakaffee.web.msm.integration;
 
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
+
 
 /**
  * Integration test testing tomcat failover (tomcats failing).
@@ -31,6 +33,12 @@ public class TomcatFailoverIntegrationTC6Test extends TomcatFailoverIntegrationT
     @Override
     TestUtils getTestUtils() {
         return new TestUtilsTC6();
+    }
+
+
+    @Test
+    public void testSerializationOfAuthStuffWithBasicAuthSticky() throws Exception {
+        testSerializationOfAuthStuffWithBasicAuth(SessionAffinityMode.STICKY);
     }
 
 }

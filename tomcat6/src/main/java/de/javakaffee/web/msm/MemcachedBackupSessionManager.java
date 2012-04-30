@@ -23,9 +23,9 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import javax.annotation.CheckForNull;
@@ -36,6 +36,7 @@ import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
+import org.apache.catalina.Globals;
 import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
@@ -975,9 +976,32 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     // ---------------------------------------------------------------------------
 
     @Override
-    public SessionTrackerValveTC6 createSessionTrackerValve( final String requestUriIgnorePattern, final Statistics statistics, final AtomicBoolean enabled ) {
-        return new SessionTrackerValveTC6( requestUriIgnorePattern,
-                (Context) getContainer(), _msm, statistics, enabled );
+    public String getSessionCookieName() {
+        String result = getSessionCookieNameFromContext((Context) getContainer());
+        if ( result == null ) {
+            result = Globals.SESSION_COOKIE_NAME;
+            _log.debug( "Using session cookie name from context: " + result );
+        }
+        return result;
+    }
+
+    @CheckForNull
+    private String getSessionCookieNameFromContext( final Context context ) {
+        // since 6.0.27 the session cookie name, domain and path is configurable per context,
+        // see issue http://issues.apache.org/bugzilla/show_bug.cgi?id=48379
+        try {
+            final Method getSessionCookieName = Context.class.getDeclaredMethod( "getSessionCookieName" );
+            final String result = (String) getSessionCookieName.invoke( context );
+            if ( result != null ) {
+                _log.debug( "Using session cookie name from context: " + result );
+            }
+            return result;
+        } catch( final NoSuchMethodException e ) {
+            // the context does not provide the method getSessionCookieName
+        } catch ( final Exception e ) {
+            throw new RuntimeException( "Could not read session cookie name from context.", e );
+        }
+        return null;
     }
 
     @Override

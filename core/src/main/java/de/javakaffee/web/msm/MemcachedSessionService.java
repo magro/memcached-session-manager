@@ -253,6 +253,7 @@ public class MemcachedSessionService implements SessionBackupService {
     private long _operationTimeout = 1000;
 
     private SessionTrackerValve _sessionTrackerValve;
+    private SessionTrackerValve2 _sessionTrackerValve2;
 
     private final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
@@ -273,10 +274,14 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     public static interface SessionManager extends Manager {
-        SessionTrackerValve createSessionTrackerValve(
-                @Nullable final String requestUriIgnorePattern,
-                @Nonnull final Statistics statistics,
-                @Nonnull final AtomicBoolean enabled );
+
+        /**
+         * Must return the configured session cookie name.
+         * @return the session cookie name.
+         */
+        @Nonnull
+        String getSessionCookieName();
+
         String generateSessionId();
         void expireSession( final String sessionId );
         MemcachedBackupSession getSessionInternal( String sessionId );
@@ -417,8 +422,11 @@ public class MemcachedSessionService implements SessionBackupService {
          */
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
 
-        _sessionTrackerValve = _manager.createSessionTrackerValve( _requestUriIgnorePattern,  _statistics, _enabled );
-        _manager.getContainer().getPipeline().addValve( _sessionTrackerValve );
+        final String sessionCookieName = _manager.getSessionCookieName();
+        _sessionTrackerValve = new SessionTrackerValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled);
+        _manager.getContainer().getParent().getPipeline().addValve(_sessionTrackerValve);
+        _sessionTrackerValve2 = new SessionTrackerValve2(sessionCookieName, this);
+        _manager.getContainer().getPipeline().addValve( _sessionTrackerValve2 );
 
         initNonStickyLockingMode( _memcachedNodesManager );
 
@@ -558,7 +566,7 @@ public class MemcachedSessionService implements SessionBackupService {
     public MemcachedBackupSession findSession( final String id ) throws IOException {
         MemcachedBackupSession result = _manager.getSessionInternal( id );
         if ( result != null ) {
-            if (!_sticky && !_lockingStrategy.isContainerSessionLookup()) {
+            if (!_sticky && !isContainerSessionLookup()) {
                 result.registerReference();
             }
         }
@@ -566,7 +574,7 @@ public class MemcachedSessionService implements SessionBackupService {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
             // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
             // constraint needs the session to get the authenticated principal)
-            if ( !_sticky && _lockingStrategy.isContainerSessionLookup()
+            if ( !_sticky && isContainerSessionLookup()
                     && !contextHasFormBasedSecurityConstraint() ) {
                 // we can return just null as the requestedSessionId will still be set on
                 // the request.
@@ -599,6 +607,14 @@ public class MemcachedSessionService implements SessionBackupService {
             }
         }
         return result;
+    }
+
+    /**
+     * Is used to determine if this thread / the current request already hit the application or if this method
+     * invocation comes from the container.
+     */
+    private boolean isContainerSessionLookup() {
+        return !_sessionTrackerValve2.wasInvokedWith(_lockingStrategy.getCurrentRequest());
     }
 
     private void addValidLoadedSession(final MemcachedBackupSession result) {

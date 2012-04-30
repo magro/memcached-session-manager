@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.security.Principal;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import javax.annotation.CheckForNull;
@@ -39,6 +38,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
@@ -810,9 +810,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     // ---------------------------------------------------------------------------
 
     @Override
-    public SessionTrackerValve createSessionTrackerValve( final String requestUriIgnorePattern, final Statistics statistics, final AtomicBoolean enabled ) {
-        return new SessionTrackerValveTC7( requestUriIgnorePattern,
-                (Context) getContainer(), _msm, statistics, enabled );
+    public String getSessionCookieName() {
+        return ApplicationSessionCookieConfig.getSessionCookieName((Context) getContainer());
     }
 
     @Override

@@ -36,10 +36,16 @@ public class MemcachedSessionServiceTC6Test extends MemcachedSessionServiceTest 
     protected SessionManager createSessionManager() {
         return new MemcachedBackupSessionManager();
     }
-    
+
     @Override
     protected void startInternal( final SessionManager manager, final MemcachedClient memcachedMock ) throws LifecycleException {
         ((MemcachedBackupSessionManager)manager).startInternal( memcachedMock );
     };
+
+    @Override
+    @Test
+    public void testSessionsRefCountHandlingIssue111() throws Exception {
+        super.testSessionsRefCountHandlingIssue111();
+    }
 
 }

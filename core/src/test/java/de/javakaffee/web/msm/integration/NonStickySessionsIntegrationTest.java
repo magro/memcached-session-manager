@@ -801,9 +801,13 @@ public abstract class NonStickySessionsIntegrationTest {
 
     }
 
-    @SuppressWarnings( "deprecation" )
     private Embedded startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded result = getTestUtils().createCatalina( port, MEMCACHED_NODES, null, LoginType.BASIC );
+        return startTomcatWithAuth(port, lockingMode, LoginType.BASIC);
+    }
+
+    private Embedded startTomcatWithAuth(final int port, final LockingMode lockingMode, final LoginType loginType)
+            throws MalformedURLException, UnknownHostException, LifecycleException {
+        final Embedded result = getTestUtils().createCatalina( port, MEMCACHED_NODES, null, loginType );
         getManager( result ).setSticky( false );
         getManager( result ).setLockingMode( lockingMode.name() );
         result.start();
