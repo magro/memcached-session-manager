@@ -786,7 +786,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
-        final Response tc1Response1 = post( _httpClient, TC_PORT_2, "/", null, asMap( "foo", "bar" ),
+        final Response tc1Response1 = post( _httpClient, TC_PORT_1, "/", null, asMap( "foo", "bar" ),
                 new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ) );
         final String sessionId = tc1Response1.getSessionId();
         assertNotNull( sessionId );
