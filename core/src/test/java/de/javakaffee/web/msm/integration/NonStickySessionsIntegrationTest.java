@@ -19,10 +19,7 @@ package de.javakaffee.web.msm.integration;
 import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.integration.TestServlet.*;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -146,8 +143,15 @@ public abstract class NonStickySessionsIntegrationTest {
     abstract TestUtils getTestUtils();
 
     private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = getTestUtils().createCatalina( port, 5, MEMCACHED_NODES );
+        return startTomcat(port, MEMCACHED_NODES, null);
+    }
+
+    private Embedded startTomcat( final int port, final String memcachedNodes, final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
+        final Embedded tomcat = getTestUtils().createCatalina( port, 5, memcachedNodes );
         getManager( tomcat ).setSticky( false );
+        if(lockingMode != null) {
+            getManager( tomcat ).setLockingMode( lockingMode.name() );
+        }
         tomcat.start();
         return tomcat;
     }
@@ -772,6 +776,59 @@ public abstract class NonStickySessionsIntegrationTest {
         }
     }
 
+
+    /**
+     * Ignored resources (requests matching uriIgnorePattern) should neither load the session
+     * from memcached nor should they cause stale session (not released after the request has finished,
+     * which was the original issue).
+     */
+    @Test( enabled = true )
+    public void testIgnoredResourcesWithSessionCookieDontCauseSessionStaleness() throws Exception {
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcat( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO );
+        _tomcat2 = startTomcat( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO );
+
+        /* tomcat1: request secured resource and check that secured resource is accessable
+         */
+        final Response tc1Response1 = post( _httpClient, TC_PORT_1, "/", null, asMap( "foo", "bar" ));
+        final String sessionId = tc1Response1.getSessionId();
+        assertNotNull(sessionId);
+
+        // 0 gets
+        assertEquals( _daemon1.getCache().getGetHits(), 0 );
+        // 2 sets for session and validity
+        assertEquals( _daemon1.getCache().getSetCmds(), 2 );
+
+        // a request on the static (ignored) resource should not pull the session from memcached
+        // and should not update the session in memcached.
+        final Response tc1Response2 = get(_httpClient, TC_PORT_1, "/pixel.gif", sessionId);
+        assertNull(tc1Response2.getResponseSessionId());
+
+        // gets/sets unchanged
+        assertEquals( _daemon1.getCache().getGetHits(), 0 );
+        assertEquals( _daemon1.getCache().getSetCmds(), 2 );
+
+        /* another session change on tomcat1, with a hanging session (wrong refcount due to ignored request)
+         * this change would not be written to memcached
+         */
+        final Response tc1Response3 = post( _httpClient, TC_PORT_1, "/", sessionId, asMap( "bar", "baz" ));
+        assertEquals(tc1Response3.getSessionId(), sessionId);
+        assertNull(tc1Response3.getResponseSessionId());
+
+        /*
+         * on tomcat2, we now should be able to get the session with all session attribues
+         */
+        final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
+        assertEquals(tc2Response1.getSessionId(), sessionId);
+        assertEquals( tc2Response1.get( TestServlet.ID ), sessionId );
+        assertEquals( tc2Response1.get( "foo" ), "bar" );
+        assertEquals( tc2Response1.get( "bar" ), "baz" );
+
+    }
+
     @Test( enabled = true )
     public void testBasicAuth() throws Exception {
 
@@ -787,7 +844,7 @@ public abstract class NonStickySessionsIntegrationTest {
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
         final Response tc1Response1 = post( _httpClient, TC_PORT_1, "/", null, asMap( "foo", "bar" ),
-                new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ) );
+                new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ), true );
         final String sessionId = tc1Response1.getSessionId();
         assertNotNull( sessionId );
 
@@ -798,6 +855,177 @@ public abstract class NonStickySessionsIntegrationTest {
         final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
         assertEquals( sessionId, tc2Response1.get( TestServlet.ID ) );
         assertEquals( tc2Response1.get( "foo" ), "bar" );
+
+    }
+
+    /**
+     * Ignored resources (requests matching uriIgnorePattern) should load the session
+     * from memcached but also clean up / free them after the request has finished.
+     *
+     */
+    @Test( enabled = true )
+    public void testIgnoredResourcesWithFormAuthDontCauseSessionStaleness() throws Exception {
+
+        // TODO: see testSessionCreatedForContainerProtectedResourceIsStoredInMemcached
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO, LoginType.FORM );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO, LoginType.FORM );
+
+        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        getManager( _tomcat2 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
+
+        /* login on tomcat1
+         */
+        final String sessionId = loginWithForm(_httpClient, TC_PORT_1);
+
+        /* tomcat1: request secured resource and check that secured resource is accessable
+         */
+        final Response tc1Response1 = post( _httpClient, TC_PORT_1, "/", sessionId, asMap( "foo", "bar" ));
+        assertEquals(tc1Response1.getSessionId(), sessionId);
+
+        // 2 gets for session and validity
+        assertEquals( _daemon1.getCache().getGetHits(), 2 );
+        // 4 sets for session and validity (2 for the previous login, no backups)
+        assertEquals( _daemon1.getCache().getSetCmds(), 4 );
+
+        // a request on the static (ignored) resource should not pull the session from memcached
+        // and should not update the session in memcached.
+        final Response tc1Response2 = get(_httpClient, TC_PORT_1, "/pixel.gif", sessionId);
+        assertNull(tc1Response2.getResponseSessionId());
+
+        // load session + validity info for pixel.gif
+        assertEquals( _daemon1.getCache().getGetHits(), 4 );
+        assertEquals( _daemon1.getCache().getSetCmds(), 4 );
+
+        /* another session change on tomcat1, with a hanging session (wrong refcount due to ignored request)
+         * this change would not be written to memcached
+         */
+        final Response tc1Response3 = post( _httpClient, TC_PORT_1, "/", sessionId, asMap( "bar", "baz" ));
+        assertEquals(tc1Response3.getSessionId(), sessionId);
+        assertNull(tc1Response3.getResponseSessionId());
+
+        /* tomcat1 failover "simulation":
+         * on tomcat2, we now should be able to access the secured resource directly
+         * with the first request
+         */
+        final Response tc2Response1 = get( _httpClient, TC_PORT_2, sessionId );
+        assertEquals(tc2Response1.getSessionId(), sessionId);
+        assertNull(tc2Response1.getResponseSessionId());
+        assertEquals( tc2Response1.get( TestServlet.ID ), sessionId );
+        assertEquals( tc2Response1.get( "foo" ), "bar" );
+        assertEquals( tc2Response1.get( "bar" ), "baz" );
+
+    }
+
+    /**
+     * When a session is created for a request that tries to access a container protected
+     * resource (container managed auth) this session must also be stored in memcached.
+     */
+    @Test( enabled = false )
+    public void testSessionCreatedForContainerProtectedResourceIsStoredInMemcached() throws Exception {
+
+        /* TODO: FormAuthenticator:339 fails, as savedRequest is null.
+            -> the saved request must be serialized
+            (SavedRequest) session.getNote(Constants.FORM_REQUEST_NOTE);
+            Also the principal must be stored as note FORM_PRINCIPAL_NOTE
+
+
+            Change in MemcachedBackupSession:
+    boolean authenticationChanged() {
+        final Object principal = getNote(Constants.FORM_PRINCIPAL_NOTE);
+        System.out.println("*** authenticationChanged ("+getAuthType() +") - have principal: " + principal +
+                ", username: " + getNote(Constants.SESS_USERNAME_NOTE + ", pwd: " + getNote(Constants.SESS_PASSWORD_NOTE)));
+        return principal != null || _authenticationChanged;
+    }
+
+    @Override
+    public Principal getPrincipal() {
+        final Principal result = super.getPrincipal();
+        return result != null ? result : (Principal)getNote(Constants.FORM_PRINCIPAL_NOTE);
+    }
+
+         */
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO, LoginType.FORM );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO, LoginType.FORM );
+
+        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        getManager( _tomcat2 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
+
+        final Response response1 = get( _httpClient, TC_PORT_1, null );
+        final String sessionId = response1.getSessionId();
+        assertNotNull( sessionId );
+        assertTrue(response1.getContent().contains("j_security_check"));
+
+        // 2 sets for session and validity
+        assertEquals( _daemon1.getCache().getSetCmds(), 2 );
+
+        final Map<String, String> params = new HashMap<String, String>();
+        params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
+        params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
+        final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, false );
+        assertNull(response2.getResponseSessionId());
+        assertEquals(response2.getStatusCode(), 302, response2.getContent());
+
+        // 2 gets for session and validity
+        assertEquals( _daemon1.getCache().getGetHits(), 2 );
+        // 4 sets for session and validity (2 from the previous request)
+        assertEquals( _daemon1.getCache().getSetCmds(), 4 );
+
+    }
+
+    /**
+     * When a session is created with form based auth the session should be stored
+     * appropriately.
+     */
+    @Test( enabled = false )
+    public void testFormAuthDontCauseSessionStaleness() throws Exception {
+
+        // TODO: see testSessionCreatedForContainerProtectedResourceIsStoredInMemcached
+
+        _tomcat1.stop();
+        _tomcat2.stop();
+
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO, LoginType.FORM );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO, LoginType.FORM );
+
+        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        getManager( _tomcat2 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+
+        setChangeSessionIdOnAuth( _tomcat1, false );
+        setChangeSessionIdOnAuth( _tomcat2, false );
+
+        final Response response1 = get( _httpClient, TC_PORT_1, null );
+        final String sessionId = response1.getSessionId();
+        assertNotNull( sessionId );
+        assertTrue(response1.getContent().contains("j_security_check"));
+
+        final Map<String, String> params = new HashMap<String, String>();
+        params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
+        params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
+        final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, false );
+        assertNull(response2.getResponseSessionId());
+        assertEquals(response2.getStatusCode(), 302, response2.getContent());
+
+        final Response response3 = post( _httpClient, TC_PORT_2, "/", sessionId, asMap( "foo", "bar" ));
+        assertEquals(response3.getSessionId(), sessionId);
+
+        final Response response4 = get(_httpClient, TC_PORT_1, sessionId);
+        assertEquals(response4.getSessionId(), sessionId);
+        assertEquals(response4.get( TestServlet.ID ), sessionId);
+        assertEquals(response4.get( "foo" ), "bar");
 
     }
 

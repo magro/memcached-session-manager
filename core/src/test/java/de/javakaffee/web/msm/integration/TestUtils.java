@@ -16,9 +16,14 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
@@ -125,6 +130,27 @@ public abstract class TestUtils {
     public static final String STICKYNESS_PROVIDER = "stickynessProvider";
     public static final String BOOLEAN_PROVIDER = "booleanProvider";
 
+    /**
+     * Login using form based auth and return the session id.
+     */
+    public static String loginWithForm(final DefaultHttpClient client, final int tcPort) throws IOException, HttpException {
+        final Response tc1Response1 = get( client, tcPort, null );
+        final String sessionId = tc1Response1.getSessionId();
+        assertNotNull( sessionId );
+        assertTrue(tc1Response1.getContent().contains("j_security_check"));
+
+        final Map<String, String> params = new HashMap<String, String>();
+        params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
+        params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
+        final Response tc1Response2 = post( client, tcPort, "/j_security_check", sessionId, params );
+        assertEquals(tc1Response2.getSessionId(), sessionId);
+        System.out.println("----------------xxx (status "+ tc1Response2.getStatusCode() +")\n" + tc1Response2.getContent());
+        new RuntimeException("err").printStackTrace();
+        assertTrue( sessionId.equals( tc1Response2.get( TestServlet.ID ) ) );
+
+        return tc1Response2.getSessionId();
+    }
+
     public static String makeRequest( final HttpClient client, final int port, final String rsessionId ) throws IOException,
             HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
@@ -197,7 +223,7 @@ public abstract class TestUtils {
             : executeRequestWithAuth( client, method, credentials );
 
         if ( response.getStatusLine().getStatusCode() != 200 ) {
-            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() );
+            throw new RuntimeException( "GET "+ path +" did not return status 200, but " + response.getStatusLine() );
         }
 
         return readResponse( rsessionId, response );
@@ -250,12 +276,14 @@ public abstract class TestUtils {
         final String responseSessionId = getSessionIdFromResponse( response );
         // System.out.println( "response cookie: " + responseSessionId );
 
+        final StringBuilder sb = new StringBuilder();
         final Map<String, String> keyValues = new LinkedHashMap<String, String>();
         BufferedReader reader = null;
         try {
             reader = new BufferedReader( new InputStreamReader( response.getEntity().getContent() ) );
             String line = null;
             while ( ( line = reader.readLine() ) != null ) {
+                sb.append(line);
                 final String[] keyValue = line.split( "=" );
                 if ( keyValue.length > 0 ) {
                     keyValues.put( keyValue[0], keyValue.length > 1 ? keyValue[1] : null );
@@ -265,7 +293,7 @@ public abstract class TestUtils {
             reader.close();
         }
 
-        return new Response( responseSessionId == null ? rsessionId : responseSessionId, responseSessionId, keyValues );
+        return new Response( response, responseSessionId == null ? rsessionId : responseSessionId, responseSessionId, sb.toString(), keyValues );
     }
 
     public static Response post( final DefaultHttpClient client,
@@ -283,7 +311,7 @@ public abstract class TestUtils {
             final String path,
             final String rsessionId,
             final Map<String, String> params ) throws IOException, HttpException {
-        return post( client, port, path, rsessionId, params, null );
+        return post( client, port, path, rsessionId, params, null, true );
     }
 
     public static Response post( final DefaultHttpClient client,
@@ -291,7 +319,8 @@ public abstract class TestUtils {
             final String path,
             final String rsessionId,
             final Map<String, String> params,
-            @Nullable final Credentials credentials ) throws IOException, HttpException {
+            @Nullable final Credentials credentials,
+            final boolean followRedirects ) throws IOException, HttpException {
         // System.out.println( port + " >>>>>>>>>>>>>>>>>> Client Starting >>>>>>>>>>>>>>>>>>>>");
         final String baseUri = "http://"+ DEFAULT_HOST +":"+ port;
         final String url = getUrl( port, path );
@@ -309,15 +338,34 @@ public abstract class TestUtils {
             : executeRequestWithAuth( client, method, credentials );
 
         final int statusCode = response.getStatusLine().getStatusCode();
-        if ( statusCode == 302 ) {
+        System.out.println("---------- POST status code " + statusCode);
+        if ( followRedirects && statusCode == 302 ) {
             return redirect( response, client, port, rsessionId, baseUri );
         }
 
-        if ( statusCode != 200 ) {
-            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() );
+        if ( statusCode != 200 && !(!followRedirects && statusCode != 302) ) {
+            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() +
+                    "\n" + toString(response.getEntity().getContent()) );
         }
 
         return readResponse( rsessionId, response );
+    }
+
+    public static String toString(final InputStream in) {
+        final StringBuilder sb = new StringBuilder();
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader( new InputStreamReader( in ) );
+            String line = null;
+            while ( ( line = reader.readLine() ) != null ) {
+                sb.append(line);
+            }
+        } catch (final IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            try { reader.close(); } catch (final IOException e) {/* ignore */}
+        }
+        return sb.toString();
     }
 
     private static Response redirect( final HttpResponse response, final DefaultHttpClient client, final int port,
@@ -428,6 +476,9 @@ public abstract class TestUtils {
             final String transcoderFactoryClassName ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
 
+        final URL loggingProperties = getClass().getResource("/logging.properties");
+        System.setProperty("java.util.logging.config.file", loggingProperties.getFile());
+
         final Embedded catalina = new Embedded();
 
         final StandardServer server = new StandardServer();
@@ -495,6 +546,7 @@ public abstract class TestUtils {
         sessionManager.getMemcachedSessionService().setSessionBackupTimeout( 100 );
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName );
+        sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(".*\\.(png|gif|jpg|css|js|ico)$");
 
         final Connector connector = catalina.createConnector( "localhost", port, false );
         connector.setProperty("bindOnInit", "false");
@@ -567,17 +619,31 @@ public abstract class TestUtils {
 
         private final String _sessionId;
         private final String _responseSessionId;
+        private final String _content;
         private final Map<String, String> _keyValues;
-        public Response( final String sessionId, final String responseSessionId, final Map<String, String> keyValues ) {
+        private final HttpResponse _response;
+        public Response( final HttpResponse response, final String sessionId, final String responseSessionId, final String content, final Map<String, String> keyValues ) {
+            _response = response;
             _sessionId = sessionId;
             _responseSessionId = responseSessionId;
+            _content = content;
             _keyValues = keyValues;
+        }
+        public int getStatusCode() {
+            return _response.getStatusLine().getStatusCode();
+        }
+        public String getHeader(final String name) {
+           final Header header = _response.getFirstHeader(name);
+           return header == null ? null : header.getValue();
         }
         public String getSessionId() {
             return _sessionId;
         }
         public String getResponseSessionId() {
             return _responseSessionId;
+        }
+        public String getContent() {
+            return _content;
         }
         public Map<String, String> getKeyValues() {
             return _keyValues;

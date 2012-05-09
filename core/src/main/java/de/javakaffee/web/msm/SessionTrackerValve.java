@@ -45,6 +45,8 @@ import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
  */
 public class SessionTrackerValve extends ValveBase {
 
+    private static final String REQUEST_IGNORED = "de.javakaffee.msm.request.ignored";
+
     public static final String REQUEST_PROCESS = "de.javakaffee.msm.request.process";
 
     public static final String SESSION_ID_CHANGED = "de.javakaffee.msm.sessionIdChanged";
@@ -56,7 +58,7 @@ public class SessionTrackerValve extends ValveBase {
     protected static final Log _log = LogFactory.getLog( SessionTrackerValve.class );
 
     private final Pattern _ignorePattern;
-    private final SessionBackupService _sessionBackupService;
+    private final MemcachedSessionService _sessionBackupService;
     private final Statistics _statistics;
     private final AtomicBoolean _enabled;
     protected final String _sessionCookieName;
@@ -79,7 +81,7 @@ public class SessionTrackerValve extends ValveBase {
      *            If <code>false</code>, each request is just processed without doing anything further.
      */
     public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
-            @Nonnull final SessionBackupService sessionBackupService,
+            @Nonnull final MemcachedSessionService sessionBackupService,
             @Nonnull final Statistics statistics,
             @Nonnull final AtomicBoolean enabled ) {
         if ( ignorePattern != null ) {
@@ -102,20 +104,43 @@ public class SessionTrackerValve extends ValveBase {
         return _sessionCookieName;
     }
 
+    public boolean isIgnoredRequest() {
+        final Request request = _lockingStrategy == null ? null : _lockingStrategy.getCurrentRequest();
+        return request != null && request.getNote(REQUEST_IGNORED) == Boolean.TRUE;
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
-        if ( !_enabled.get() || _ignorePattern != null && _ignorePattern.matcher( getURIWithQueryString( request ) ).matches() ) {
+        if(!_enabled.get()) {
             getNext().invoke( request, response );
+        }
+        else if ( _ignorePattern != null && _ignorePattern.matcher( getURIWithQueryString( request ) ).matches() ) {
+            _log.debug( ">>>>>> Ignoring: " + getURIWithQueryString( request ) + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
+
+            try {
+                storeRequestThreadLocal( request );
+                request.setNote(REQUEST_IGNORED, Boolean.TRUE);
+                getNext().invoke( request, response );
+            } finally {
+                if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
+                    final String sessionId = getSessionId(request, response);
+                    if(sessionId != null) {
+                        _sessionBackupService.requestFinished(sessionId, null);
+                    }
+                }
+                resetRequestThreadLocal();
+            }
+            _log.debug( "<<<<<< Ignored: " + getURIWithQueryString( request ) + " ==================" );
         } else {
 
             request.setNote(REQUEST_PROCESS, Boolean.TRUE);
 
             if ( _log.isDebugEnabled() ) {
-                _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " ==================" );
+                _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
             }
 
             try {
@@ -123,11 +148,10 @@ public class SessionTrackerValve extends ValveBase {
                 // sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
-
-                if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
+                // if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
                     final Boolean sessionIdChanged = (Boolean) request.getNote(SESSION_ID_CHANGED);
                     backupSession( request, response, sessionIdChanged == null ? false : sessionIdChanged.booleanValue() );
-                }
+                // }
                 resetRequestThreadLocal();
             }
 
@@ -188,10 +212,7 @@ public class SessionTrackerValve extends ValveBase {
         /*
          * Do we have a session?
          */
-        String sessionId = getSessionIdFromResponseSessionCookie( response );
-        if ( sessionId == null ) {
-            sessionId = request.getRequestedSessionId();
-        }
+        final String sessionId = getSessionId(request, response);
         if ( sessionId != null ) {
             _statistics.requestWithSession();
             _sessionBackupService.backupSession( sessionId, sessionIdChanged, getURIWithQueryString( request ) );
@@ -200,6 +221,11 @@ public class SessionTrackerValve extends ValveBase {
             _statistics.requestWithoutSession();
         }
 
+    }
+
+    private String getSessionId(final Request request, final Response response) {
+        final String sessionId = getSessionIdFromResponseSessionCookie( response );
+        return sessionId != null ? sessionId : request.getRequestedSessionId();
     }
 
     private String getSessionIdFromResponseSessionCookie( final Response response ) {

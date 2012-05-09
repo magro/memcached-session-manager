@@ -17,7 +17,9 @@
 package de.javakaffee.web.msm.integration;
 
 import static de.javakaffee.web.msm.integration.TestUtils.*;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -25,8 +27,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
@@ -71,7 +71,7 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private MemCacheDaemon<?> _daemon;
     private MemcachedClient _client;
-    
+
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
         @Override
         public Object get(final String key) {
@@ -122,7 +122,7 @@ public abstract class TomcatFailoverIntegrationTest {
 
         _httpClient = new DefaultHttpClient();
     }
-    
+
     abstract TestUtils getTestUtils();
 
     private Embedded startTomcat( final int port, final String jvmRoute ) throws MalformedURLException, UnknownHostException, LifecycleException {
@@ -153,9 +153,9 @@ public abstract class TomcatFailoverIntegrationTest {
      */
     @Test( enabled = true )
     public void testHttpSessionActivationListenersNotifiedOnLoadWithJvmRoute() throws Exception {
-        
-        
-        
+
+
+
         final SessionManager manager1 = getManager( _tomcat1 );
         final SessionManager manager2 = getManager( _tomcat2 );
 
@@ -324,17 +324,7 @@ public abstract class TomcatFailoverIntegrationTest {
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
-        final Response tc1Response1 = get( _httpClient, TC_PORT_1, null );
-        final String sessionId = tc1Response1.getSessionId();
-
-        assertFalse( sessionId.equals( tc1Response1.get( TestServlet.ID ) ) );
-
-        final Map<String, String> params = new HashMap<String, String>();
-        params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
-        params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
-        final Response tc1Response2 = post( _httpClient, TC_PORT_1, "/j_security_check", sessionId, params );
-
-        assertTrue( sessionId.equals( tc1Response2.get( TestServlet.ID ) ) );
+        final String sessionId = loginWithForm(_httpClient, TC_PORT_1);
 
         /* tomcat1 failover "simulation":
          * on tomcat2, we now be able to access the secured resource directly

@@ -37,8 +37,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
-
 /**
  * Test the {@link SessionTrackerValve}.
  *
@@ -47,7 +45,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  */
 public class SessionTrackerValveTest {
 
-    protected SessionBackupService _service;
+    protected MemcachedSessionService _service;
     private SessionTrackerValve _sessionTrackerValve;
     private Valve _nextValve;
     private Request _request;
@@ -55,12 +53,16 @@ public class SessionTrackerValveTest {
 
     @BeforeMethod
     public void setUp() throws Exception {
-        _service = mock( SessionBackupService.class );
+        _service = mock( MemcachedSessionService.class );
         _sessionTrackerValve = createSessionTrackerValve();
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( _nextValve );
         _request = mock( Request.class );
         _response = mock( Response.class );
+
+        when(_request.getRequestURI()).thenReturn( "/someRequest");
+        when(_request.getMethod()).thenReturn("GET");
+        when(_request.getQueryString()).thenReturn(null);
 
         when(_request.getNote(eq(SessionTrackerValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
         when(_request.getNote(eq(SessionTrackerValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
@@ -68,7 +70,7 @@ public class SessionTrackerValveTest {
 
     @Nonnull
     protected SessionTrackerValve createSessionTrackerValve() {
-        return new SessionTrackerValve(null, "somesessionid", _service, Statistics.create(), new AtomicBoolean( true ));
+        return new SessionTrackerValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(), new AtomicBoolean( true ));
     }
 
     @AfterMethod
@@ -108,9 +110,6 @@ public class SessionTrackerValveTest {
         when( _request.getRequestedSessionId() ).thenReturn( null );
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), "foo" );
         when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
-        when( _request.getRequestURI() ).thenReturn( "/someRequest" );
-        when( _request.getMethod() ).thenReturn( "GET" );
-        when( _request.getQueryString() ).thenReturn( null );
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service ).backupSession( eq( "foo" ), eq( false), anyString() );
@@ -139,14 +138,20 @@ public class SessionTrackerValveTest {
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );
         when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
 
-        when( _request.getRequestURI() ).thenReturn( "/foo" );
-        when( _request.getMethod() ).thenReturn( "GET" );
-        when( _request.getQueryString() ).thenReturn( null );
-
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service ).backupSession( eq( newSessionId ), eq( true ), anyString() );
 
+    }
+
+    @Test
+    public final void testRequestFinishedShouldBeInvokedForIgnoredResources() throws IOException, ServletException {
+        when( _request.getRequestedSessionId() ).thenReturn( "foo" );
+        when(_request.getRequestURI()).thenReturn("/pixel.gif");
+
+        _sessionTrackerValve.invoke( _request, _response );
+
+        verify( _service ).requestFinished( eq( "foo" ), anyString() );
     }
 
 }

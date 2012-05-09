@@ -87,7 +87,12 @@ public class SessionTrackerValve2 extends ValveBase {
 
         final Object processRequest = request.getNote(SessionTrackerValve.REQUEST_PROCESS);
         if(processRequest != Boolean.TRUE) {
-            getNext().invoke( request, response );
+            request.setNote(INVOKED, Boolean.TRUE);
+            try {
+                getNext().invoke( request, response );
+            } finally {
+                request.setNote(SessionTrackerValve.REQUEST_PROCESSED, Boolean.TRUE);
+            }
         }
         else {
 

@@ -56,6 +56,11 @@ public class LockingStrategyAuto extends LockingStrategy {
     }
 
     @Override
+    public void registerReadonlyRequest(final String requestId) {
+        _readOnlyRequestCache.readOnlyRequest( requestId );
+    }
+
+    @Override
     protected void onBackupWithoutLoadedSession( @Nonnull final String sessionId, @Nonnull final String requestId,
             @Nonnull final BackupSessionService backupSessionService ) {
 

@@ -21,12 +21,14 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Enumeration;
 
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -55,6 +57,14 @@ public class TestServlet extends HttpServlet {
     private static final long serialVersionUID = 7954803132860358448L;
 
     private static final Log LOG = LogFactory.getLog( TestServlet.class );
+    private DefaultServlet defaultServlet;
+
+    @Override
+    public void init(final ServletConfig config) throws ServletException {
+        super.init(config);
+        defaultServlet = new DefaultServlet();
+        defaultServlet.init(config);
+    }
 
     /* (non-Javadoc)
      * @see javax.servlet.http.HttpServlet#doGet(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)
@@ -66,7 +76,11 @@ public class TestServlet extends HttpServlet {
         final String pathInfo = request.getPathInfo();
         LOG.info( " + starting "+ pathInfo +"..." );
 
-        if ( PATH_GET_REQUESTED_SESSION_INFO.equals( pathInfo ) ) {
+        if ("/pixel.gif".equals(pathInfo)) {
+            defaultServlet.service(request, response);
+            return;
+        }
+        else if ( PATH_GET_REQUESTED_SESSION_INFO.equals( pathInfo ) ) {
             LOG.info( "getRequestedSessionId: " + request.getRequestedSessionId() );
             LOG.info( "isRequestedSessionIdValid: " + request.isRequestedSessionIdValid() );
             final PrintWriter out = response.getWriter();

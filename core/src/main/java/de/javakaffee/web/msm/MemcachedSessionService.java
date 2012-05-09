@@ -566,7 +566,10 @@ public class MemcachedSessionService implements SessionBackupService {
     public MemcachedBackupSession findSession( final String id ) throws IOException {
         MemcachedBackupSession result = _manager.getSessionInternal( id );
         if ( result != null ) {
-            if (!_sticky && !isContainerSessionLookup()) {
+            // TODO: document ignoring requests and container managed authentication
+            // -> with container managed auth protected resources should not be ignored
+            // TODO: check ignored resource also below
+            if (!_sticky && !_sessionTrackerValve.isIgnoredRequest() && !isContainerSessionLookup()) {
                 result.registerReference();
             }
         }
@@ -580,6 +583,18 @@ public class MemcachedSessionService implements SessionBackupService {
                 // the request.
                 return null;
             }
+
+            // If no current request is set (SessionTrackerValve was not passed) we got invoked
+            // by CoyoteAdapter.parseSessionCookiesId - here we can just return null, the requestedSessionId
+            // will be accepted anyway
+            if(!_sticky && _lockingStrategy.getCurrentRequest() == null) {
+                return null;
+            }
+
+//            if(!_sticky && _sessionTrackerValve.isIgnoredRequest()) {
+//                _log.info("findSession invoked for ignoredRequest " + _lockingStrategy.getCurrentRequest().getRequestURI(), new RuntimeException("check2"));
+//                return null;
+//            }
 
             // else load the session from memcached
             result = loadFromMemcached( id );
@@ -599,6 +614,7 @@ public class MemcachedSessionService implements SessionBackupService {
                             addValidLoadedSession(result);
                         }
                         result.registerReference();
+                        // _log.info("Registering reference, isContainerSessionLookup(): " + isContainerSessionLookup(), new RuntimeException("foo"));
                     }
                 }
                 else {
@@ -909,6 +925,48 @@ public class MemcachedSessionService implements SessionBackupService {
         } catch( final Exception e ) {
             _log.error( "Could not get backup validityInfo or backup session for sessionId " + requestedSessionId, e );
             return null;
+        }
+    }
+
+    /**
+     * Is invoked for requests matching {@link #setRequestUriIgnorePattern(String)} at the end
+     * of the request. Any acquired resources should be freed.
+     * @param sessionId the sessionId, must not be null.
+     * @param requestId the uri/id of the request for that the session backup shall be performed, used for readonly tracking.
+     */
+    public void requestFinished(final String sessionId, final String requestId) {
+        if(!_sticky) {
+            final MemcachedBackupSession msmSession = _manager.getSessionInternal( sessionId );
+            if ( msmSession == null ) {
+                if(_log.isDebugEnabled())
+                    _log.debug( "No session found in session map for " + sessionId );
+                return;
+            }
+
+            if ( !msmSession.isValidInternal() ) {
+                if(_log.isDebugEnabled())
+                    _log.debug( "Non valid session found in session map for " + sessionId );
+                return;
+            }
+
+            synchronized (_manager.getSessionsInternal()) {
+                // if another thread in the meantime retrieved the session
+                // we must not remove it as this would case session data loss
+                // for the other request
+                if ( msmSession.releaseReference() > 0 ) {
+                    if(_log.isDebugEnabled())
+                        _log.debug( "Session " + sessionId + " is still used by another request, skipping backup and (optional) lock handling/release." );
+                    return;
+                }
+                msmSession.passivate();
+                _manager.removeInternal( msmSession, false );
+            }
+
+            if(msmSession.isLocked()) {
+                _lockingStrategy.releaseLock(sessionId);
+                _lockingStrategy.registerReadonlyRequest(requestId);
+            }
+
         }
     }
 

@@ -203,6 +203,15 @@ public abstract class LockingStrategy {
     }
 
     /**
+     * Used to register the given requestId as readonly request (for mode auto), so that further
+     * requests like this won't acquire the lock.
+     * @param requestId the uri/id of the request for that the session backup shall be performed, used for readonly tracking.
+     */
+    public void registerReadonlyRequest(final String requestId) {
+        // default empty
+    }
+
+    /**
      * Is invoked for the backup of a non-sticky session that was not accessed for the current request.
      */
     protected void onBackupWithoutLoadedSession( @Nonnull final String sessionId, @Nonnull final String requestId,

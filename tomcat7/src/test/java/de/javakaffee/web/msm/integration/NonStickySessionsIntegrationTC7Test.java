@@ -31,4 +31,31 @@ public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegr
         return new TestUtilsTC7();
     }
 
+    @Override
+    @Test( enabled = true )
+    public void testIgnoredResourcesWithSessionCookieDontCauseSessionStaleness() throws Exception {
+        // TODO Auto-generated method stub
+        super.testIgnoredResourcesWithSessionCookieDontCauseSessionStaleness();
+    }
+
+    @Override
+    @Test( enabled = true )
+    public void testIgnoredResourcesWithFormAuthDontCauseSessionStaleness() throws Exception {
+        super.testIgnoredResourcesWithFormAuthDontCauseSessionStaleness();
+    }
+
+    @Override
+    @Test( enabled = true )
+    public void testFormAuthDontCauseSessionStaleness() throws Exception {
+        // TODO Auto-generated method stub
+        super.testFormAuthDontCauseSessionStaleness();
+    }
+
+    @Override
+    @Test( enabled = true )
+    public void testSessionCreatedForContainerProtectedResourceIsStoredInMemcached() throws Exception {
+        // TODO Auto-generated method stub
+        super.testSessionCreatedForContainerProtectedResourceIsStoredInMemcached();
+    }
+
 }
