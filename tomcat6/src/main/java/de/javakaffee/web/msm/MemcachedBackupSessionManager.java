@@ -625,12 +625,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _started = true;
 
         // Force initialization of the random number generator
-        if (log.isDebugEnabled()) {
-            log.debug("Force random number initialization starting");
+        if (_log.isDebugEnabled()) {
+            _log.debug("Force random number initialization starting");
         }
         super.generateSessionId();
-        if (log.isDebugEnabled()) {
-            log.debug("Force random number initialization completed");
+        if (_log.isDebugEnabled()) {
+            _log.debug("Force random number initialization completed");
         }
 
         startInternal( null );
@@ -642,8 +642,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public void stop() throws LifecycleException {
 
-        if (log.isDebugEnabled()) {
-            log.debug("Stopping");
+        if (_log.isDebugEnabled()) {
+            _log.debug("Stopping");
         }
 
         // Validate and update our current component state
