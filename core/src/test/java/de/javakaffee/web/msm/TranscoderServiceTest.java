@@ -22,17 +22,23 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.security.Principal;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.authenticator.SavedRequest;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.realm.GenericPrincipal;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -51,16 +57,25 @@ public abstract class TranscoderServiceTest {
 
     @BeforeMethod
     public void setup() throws LifecycleException, ClassNotFoundException, IOException {
-        
+
         _manager = mock( SessionManager.class );
-        
+
         when( _manager.getContainer() ).thenReturn( new StandardContext() ); // needed for createSession
-        when( _manager.newMemcachedBackupSession() ).thenReturn( newMemcachedBackupSession( _manager ) );
-        
+        when( _manager.newMemcachedBackupSession() ).thenAnswer(new Answer<MemcachedBackupSession>() {
+            @Override
+            public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {
+                return  newMemcachedBackupSession( _manager );
+            }
+        });
+
         final MemcachedSessionService service = new MemcachedSessionService( _manager );
-        final MemcachedBackupSession session = createSession( service );
-        when( _manager.createSession( anyString() ) ).thenReturn( session );
-        
+        when( _manager.createSession( anyString() ) ).thenAnswer(new Answer<MemcachedBackupSession>() {
+            @Override
+            public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {
+                return createSession(service);
+            }
+        });
+
         when( _manager.readPrincipal( (ObjectInputStream)any() ) ).thenReturn( createPrincipal() );
         when( _manager.getMemcachedSessionService() ).thenReturn( service );
 
@@ -69,6 +84,50 @@ public abstract class TranscoderServiceTest {
     @Nonnull
     protected MemcachedBackupSession newMemcachedBackupSession( @Nullable final SessionManager manager ) {
         return new MemcachedBackupSession( manager );
+    }
+
+    @Test
+    public void testSerializeSessionFieldsIncludesFormPrincipalNote() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        final Principal saved = createPrincipal();
+        session.setNote(Constants.FORM_PRINCIPAL_NOTE, saved);
+
+        final byte[] data = TranscoderService.serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager ).getSession();
+
+        final Principal actual = (Principal) deserialized.getNote(Constants.FORM_PRINCIPAL_NOTE);
+        assertNotNull(actual);
+        assertDeepEquals(actual, saved);
+    }
+
+    @Test
+    public void testSerializeSessionFieldsIncludesFormRequestNote() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        final SavedRequest saved = new SavedRequest();
+        saved.setQueryString("foo=bar");
+        saved.setRequestURI("http://www.foo.org");
+        session.setNote(Constants.FORM_REQUEST_NOTE, saved);
+
+        final byte[] data = TranscoderService.serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager ).getSession();
+
+        final SavedRequest actual = (SavedRequest) deserialized.getNote(Constants.FORM_REQUEST_NOTE);
+        assertNotNull(actual);
+        assertDeepEquals(actual, saved);
+    }
+
+    @Test
+    public void testVersionUpgrade() {
+        final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
+
+        final byte[] data = TranscoderService.serializeSessionFields( session, TranscoderService.VERSION_1 );
+        final byte[] attributesData = TranscoderService.deserializeSessionFields(data, _manager ).getAttributesData();
+
+        // we just check that data is read (w/o) bounds issues and no data
+        // is left (we just passed data in, w/o added attributesData appended)
+        assertEquals(attributesData.length, 0);
     }
 
     @Test

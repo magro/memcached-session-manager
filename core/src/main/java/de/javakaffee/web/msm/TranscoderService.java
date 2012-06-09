@@ -25,17 +25,26 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.catalina.Manager;
 import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.authenticator.SavedRequest;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.buf.ByteChunk;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
@@ -49,7 +58,8 @@ public class TranscoderService {
 
     private static final Log LOG = LogFactory.getLog( TranscoderService.class );
 
-    private static final short CURRENT_VERSION = 1;
+    public static final short VERSION_1 = 1;
+    public static final short VERSION_2 = 2;
 
     static final int NUM_BYTES = 8 // creationTime: long
             + 8 // lastAccessedTime: long
@@ -178,15 +188,24 @@ public class TranscoderService {
 
     // ---------------------  private/protected helper methods  -------------------
 
-
     static byte[] serializeSessionFields( final MemcachedBackupSession session ) {
+        return serializeSessionFields(session, VERSION_2);
+    }
+
+    static byte[] serializeSessionFields( final MemcachedBackupSession session, final int version ) {
 
         final byte[] idData = serializeId( session.getIdInternal() );
 
-        final byte[] principalData = session.getPrincipal() != null ? serializePrincipal( session.getPrincipal() ) : null;
+        final byte[] principalData = serializePrincipal( session.getPrincipal() );
         final int principalDataLength = principalData != null ? principalData.length : 0;
 
-        final int sessionFieldsDataLength = 2 // short value for the version
+        final byte[] savedRequestData = serializeSavedRequest(session.getNote(Constants.FORM_REQUEST_NOTE));
+        final int savedRequestDataLength = savedRequestData != null ? savedRequestData.length : 0;
+
+        final byte[] savedPrincipalData = serializePrincipal((Principal) session.getNote(Constants.FORM_PRINCIPAL_NOTE));
+        final int savedPrincipalDataLength = savedPrincipalData != null ? savedPrincipalData.length : 0;
+
+        int sessionFieldsDataLength = 2 // short value for the version
         // the following might change with other versions, refactoring needed then
                 + 2 // short value that stores the dataLength
                 + NUM_BYTES // bytes that store all session attributes but the id
@@ -195,10 +214,19 @@ public class TranscoderService {
                 + 2 // short value for the authType
                 + 2 // short value that stores the principalData length
                 + principalDataLength; // the number of bytes for the principal
+
+        if(version > VERSION_1) {
+            sessionFieldsDataLength = sessionFieldsDataLength
+                    + 2 // short value that stores the savedRequestData length
+                    + savedRequestDataLength // the number of bytes for the savedRequest
+                    + 2 // short value that stores the savedPrincipalData length
+                    + savedPrincipalDataLength; // the number of bytes for the savedPrincipal
+        }
+
         final byte[] data = new byte[sessionFieldsDataLength];
 
         int idx = 0;
-        idx = encodeNum( CURRENT_VERSION, data, idx, 2 );
+        idx = encodeNum( version, data, idx, 2 );
         idx = encodeNum( sessionFieldsDataLength, data, idx, 2 );
         idx = encodeNum( session.getCreationTimeInternal(), data, idx, 8 );
         idx = encodeNum( session.getLastAccessedTimeInternal(), data, idx, 8 );
@@ -211,7 +239,14 @@ public class TranscoderService {
         idx = copy( idData, data, idx );
         idx = encodeNum( AuthType.valueOfValue( session.getAuthType() ).getId(), data, idx, 2 );
         idx = encodeNum( principalDataLength, data, idx, 2 );
-        copy( principalData, data, idx );
+        idx = copy( principalData, data, idx );
+
+        if(version > VERSION_1) {
+            idx = encodeNum( savedRequestDataLength, data, idx, 2 );
+            idx = copy( savedRequestData, data, idx );
+            idx = encodeNum( savedPrincipalDataLength, data, idx, 2 );
+            idx = copy( savedPrincipalData, data, idx );
+        }
 
         return data;
     }
@@ -221,8 +256,8 @@ public class TranscoderService {
 
         final short version = (short) decodeNum( data, 0, 2 );
 
-        if ( version != CURRENT_VERSION ) {
-            throw new InvalidVersionException( "The version " + version + " does not match the current version " + CURRENT_VERSION, version );
+        if ( version != VERSION_1 && version != VERSION_2 ) {
+            throw new InvalidVersionException( "The version " + version + " does not match the current version " + VERSION_2, version );
         }
 
         final short sessionFieldsDataLength = (short) decodeNum( data, 2, 2 );
@@ -241,12 +276,30 @@ public class TranscoderService {
         final short authTypeId = (short)decodeNum( data, 44 + idLength, 2 );
         result.setAuthTypeInternal( AuthType.valueOfId( authTypeId ).getValue() );
 
-        final int currentIdx = 44 + idLength + 2;
+        int currentIdx = 44 + idLength + 2;
         final short principalDataLength = (short) decodeNum( data, currentIdx, 2 );
         if ( principalDataLength > 0 ) {
             final byte[] principalData = new byte[principalDataLength];
             System.arraycopy( data, currentIdx + 2, principalData, 0, principalDataLength );
             result.setPrincipalInternal( deserializePrincipal( principalData, manager ) );
+        }
+
+        if( version > VERSION_1 ) {
+            currentIdx += 2 + principalDataLength;
+            final short savedRequestDataLength = (short) decodeNum( data, currentIdx, 2 );
+            if ( savedRequestDataLength > 0 ) {
+                final byte[] savedRequestData = new byte[savedRequestDataLength];
+                System.arraycopy( data, currentIdx + 2, savedRequestData, 0, savedRequestDataLength );
+                result.setNote( Constants.FORM_REQUEST_NOTE, deserializeSavedRequest( savedRequestData ) );
+            }
+
+            currentIdx += 2 + savedRequestDataLength;
+            final short savedPrincipalDataLength = (short) decodeNum( data, currentIdx, 2 );
+            if ( savedPrincipalDataLength > 0 ) {
+                final byte[] savedPrincipalData = new byte[savedPrincipalDataLength];
+                System.arraycopy( data, currentIdx + 2, savedPrincipalData, 0, savedPrincipalDataLength );
+                result.setNote( Constants.FORM_PRINCIPAL_NOTE, deserializePrincipal( savedPrincipalData, manager ) );
+            }
         }
 
         final byte[] attributesData = new byte[ data.length - sessionFieldsDataLength ];
@@ -286,6 +339,9 @@ public class TranscoderService {
     }
 
     private static byte[] serializePrincipal( final Principal principal ) {
+        if(principal == null) {
+            return null;
+        }
         ByteArrayOutputStream bos = null;
         ObjectOutputStream oos = null;
         try {
@@ -316,6 +372,115 @@ public class TranscoderService {
         } finally {
             closeSilently( bis );
             closeSilently( ois );
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static byte[] serializeSavedRequest( final Object obj ) {
+        if(obj == null) {
+            return null;
+        }
+
+        final SavedRequest savedRequest = (SavedRequest) obj;
+        ByteArrayOutputStream bos = null;
+        ObjectOutputStream oos = null;
+        try {
+            bos = new ByteArrayOutputStream();
+            oos = new ObjectOutputStream( bos );
+            oos.writeObject(savedRequest.getBody());
+            oos.writeObject(savedRequest.getContentType());
+            // Cookies not cloneable... omit for now - oos.writeObject(newArrayList(savedRequest.getCookies()));
+            oos.writeObject(getHeaders(savedRequest));
+            oos.writeObject(newArrayList(savedRequest.getLocales()));
+            oos.writeObject(savedRequest.getMethod());
+            // obj.getParameters() are not used in tc6 and not existing in tc7
+            // -> we omit them here
+            oos.writeObject(savedRequest.getQueryString());
+            oos.writeObject(savedRequest.getRequestURI());
+            oos.flush();
+            return bos.toByteArray();
+        } catch ( final IOException e ) {
+            throw new IllegalArgumentException( "Non-serializable object", e );
+        } finally {
+            closeSilently( bos );
+            closeSilently( oos );
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static SavedRequest deserializeSavedRequest( final byte[] data ) {
+        ByteArrayInputStream bis = null;
+        ObjectInputStream ois = null;
+        try {
+            bis = new ByteArrayInputStream( data );
+            ois = new ObjectInputStream( bis );
+
+            final SavedRequest savedRequest = new SavedRequest();
+            savedRequest.setBody((ByteChunk) ois.readObject());
+            savedRequest.setContentType((String) ois.readObject());
+            // no cookies support setCookies(savedRequest, ois.readObject());
+            setHeaders(savedRequest, (Map<String, List<String>>) ois.readObject());
+            setLocales(savedRequest, (List<Locale>) ois.readObject());
+            savedRequest.setMethod((String) ois.readObject());
+            savedRequest.setQueryString((String) ois.readObject());
+            savedRequest.setRequestURI((String) ois.readObject());
+
+            return savedRequest;
+        } catch ( final IOException e ) {
+            throw new IllegalArgumentException( "Could not deserialize SavedRequest", e );
+        } catch ( final ClassNotFoundException e ) {
+            throw new IllegalArgumentException( "Could not deserialize SavedRequest", e );
+        } finally {
+            closeSilently( bis );
+            closeSilently( ois );
+        }
+    }
+
+    private static void setLocales(final SavedRequest savedRequest, final List<Locale> locales) {
+        if(locales != null && !locales.isEmpty()) {
+            for (final Locale locale : locales) {
+                savedRequest.addLocale(locale);
+            }
+        }
+    }
+
+    private static <T> List<T> newArrayList(final Iterator<T> iter) {
+        if(!iter.hasNext()) {
+            return Collections.emptyList();
+        }
+
+        final List<T> result = new ArrayList<T>();
+        while (iter.hasNext()) {
+            result.add(iter.next());
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, List<String>> getHeaders(final SavedRequest obj) {
+        final Map<String, List<String>> result = new HashMap<String, List<String>>();
+        final Iterator<String> namesIter = obj.getHeaderNames();
+        while (namesIter.hasNext()) {
+            final String name = namesIter.next();
+            final List<String> values = new ArrayList<String>();
+            result.put(name, values);
+            final Iterator<String> valuesIter = obj.getHeaderValues(name);
+            while (valuesIter.hasNext()) {
+                final String value = valuesIter.next();
+                values.add(value);
+            }
+        }
+        return result;
+    }
+
+    private static void setHeaders(final SavedRequest obj, final Map<String, List<String>> headers) {
+        if(headers != null) {
+            for (final Entry<String, List<String>> entry : headers.entrySet()) {
+                final List<String> values = entry.getValue();
+                for (final String value : values) {
+                    obj.addHeader(entry.getKey(), value);
+                }
+            }
         }
     }
 

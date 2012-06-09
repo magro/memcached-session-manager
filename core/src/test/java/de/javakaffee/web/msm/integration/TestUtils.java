@@ -146,7 +146,7 @@ public abstract class TestUtils {
         assertEquals(tc1Response2.getSessionId(), sessionId);
         System.out.println("----------------xxx (status "+ tc1Response2.getStatusCode() +")\n" + tc1Response2.getContent());
         new RuntimeException("err").printStackTrace();
-        assertTrue( sessionId.equals( tc1Response2.get( TestServlet.ID ) ) );
+        assertEquals( tc1Response2.get( TestServlet.ID ), sessionId );
 
         return tc1Response2.getSessionId();
     }
@@ -338,12 +338,11 @@ public abstract class TestUtils {
             : executeRequestWithAuth( client, method, credentials );
 
         final int statusCode = response.getStatusLine().getStatusCode();
-        System.out.println("---------- POST status code " + statusCode);
         if ( followRedirects && statusCode == 302 ) {
             return redirect( response, client, port, rsessionId, baseUri );
         }
 
-        if ( statusCode != 200 && !(!followRedirects && statusCode != 302) ) {
+        if ( statusCode != 200 && !(!followRedirects && statusCode == 302) ) {
             throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() +
                     "\n" + toString(response.getEntity().getContent()) );
         }

@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 
 import org.apache.catalina.Manager;
 import org.apache.catalina.SessionListener;
+import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.session.StandardSession;
 
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
@@ -543,12 +544,13 @@ public class MemcachedBackupSession extends StandardSession {
     }
 
     /**
-     * Determines, if either the {@link #getAuthType()} or {@link #getPrincipal()}
-     * properties have changed.
+     * Determines, if the {@link #getAuthType()} or {@link #getPrincipal()}
+     * properties have changed or if the session has set the principal as note (which
+     * is the case during form based authentication).
      * @return <code>true</code> if authentication details have changed.
      */
     boolean authenticationChanged() {
-        return _authenticationChanged;
+        return _authenticationChanged || getNote(Constants.FORM_PRINCIPAL_NOTE) != null;
     }
 
     /**

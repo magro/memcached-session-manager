@@ -129,7 +129,7 @@ public class SessionTrackerValve extends ValveBase {
                 if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
                     final String sessionId = getSessionId(request, response);
                     if(sessionId != null) {
-                        _sessionBackupService.requestFinished(sessionId, null);
+                        _sessionBackupService.requestFinished(sessionId, getURIWithQueryString( request ));
                     }
                 }
                 resetRequestThreadLocal();

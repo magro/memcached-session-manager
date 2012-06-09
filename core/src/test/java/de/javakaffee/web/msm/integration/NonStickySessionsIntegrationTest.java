@@ -859,7 +859,7 @@ public abstract class NonStickySessionsIntegrationTest {
     }
 
     /**
-     * Ignored resources (requests matching uriIgnorePattern) should load the session
+     * For form auth ignored resources (requests matching uriIgnorePattern) should load the session
      * from memcached but also clean up / free them after the request has finished.
      *
      */
@@ -871,16 +871,13 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO, LoginType.FORM );
-        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO, LoginType.FORM );
-
-        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        getManager( _tomcat2 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
 
-        /* login on tomcat1
+        /* login on tomcat1 (4 sets)
          */
         final String sessionId = loginWithForm(_httpClient, TC_PORT_1);
 
@@ -889,10 +886,10 @@ public abstract class NonStickySessionsIntegrationTest {
         final Response tc1Response1 = post( _httpClient, TC_PORT_1, "/", sessionId, asMap( "foo", "bar" ));
         assertEquals(tc1Response1.getSessionId(), sessionId);
 
-        // 2 gets for session and validity
-        assertEquals( _daemon1.getCache().getGetHits(), 2 );
-        // 4 sets for session and validity (2 for the previous login, no backups)
-        assertEquals( _daemon1.getCache().getSetCmds(), 4 );
+        // 6 gets for session and validity (4 login + 2 from previous post)
+        assertEquals( _daemon1.getCache().getGetHits(), 6 );
+        // 8 sets for session and validity
+        assertEquals( _daemon1.getCache().getSetCmds(), 8 );
 
         // a request on the static (ignored) resource should not pull the session from memcached
         // and should not update the session in memcached.
@@ -900,8 +897,9 @@ public abstract class NonStickySessionsIntegrationTest {
         assertNull(tc1Response2.getResponseSessionId());
 
         // load session + validity info for pixel.gif
-        assertEquals( _daemon1.getCache().getGetHits(), 4 );
-        assertEquals( _daemon1.getCache().getSetCmds(), 4 );
+        assertEquals( _daemon1.getCache().getGetHits(), 8 );
+        // ignored resource -> no validity update
+        assertEquals( _daemon1.getCache().getSetCmds(), 8 );
 
         /* another session change on tomcat1, with a hanging session (wrong refcount due to ignored request)
          * this change would not be written to memcached
@@ -927,39 +925,14 @@ public abstract class NonStickySessionsIntegrationTest {
      * When a session is created for a request that tries to access a container protected
      * resource (container managed auth) this session must also be stored in memcached.
      */
-    @Test( enabled = false )
+    @Test( enabled = true )
     public void testSessionCreatedForContainerProtectedResourceIsStoredInMemcached() throws Exception {
-
-        /* TODO: FormAuthenticator:339 fails, as savedRequest is null.
-            -> the saved request must be serialized
-            (SavedRequest) session.getNote(Constants.FORM_REQUEST_NOTE);
-            Also the principal must be stored as note FORM_PRINCIPAL_NOTE
-
-
-            Change in MemcachedBackupSession:
-    boolean authenticationChanged() {
-        final Object principal = getNote(Constants.FORM_PRINCIPAL_NOTE);
-        System.out.println("*** authenticationChanged ("+getAuthType() +") - have principal: " + principal +
-                ", username: " + getNote(Constants.SESS_USERNAME_NOTE + ", pwd: " + getNote(Constants.SESS_PASSWORD_NOTE)));
-        return principal != null || _authenticationChanged;
-    }
-
-    @Override
-    public Principal getPrincipal() {
-        final Principal result = super.getPrincipal();
-        return result != null ? result : (Principal)getNote(Constants.FORM_PRINCIPAL_NOTE);
-    }
-
-         */
 
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO, LoginType.FORM );
-        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO, LoginType.FORM );
-
-        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        getManager( _tomcat2 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -969,6 +942,7 @@ public abstract class NonStickySessionsIntegrationTest {
         assertNotNull( sessionId );
         assertTrue(response1.getContent().contains("j_security_check"));
 
+        // failed sometimes, randomly (timing issue?)?!
         // 2 sets for session and validity
         assertEquals( _daemon1.getCache().getSetCmds(), 2 );
 
@@ -981,7 +955,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         // 2 gets for session and validity
         assertEquals( _daemon1.getCache().getGetHits(), 2 );
-        // 4 sets for session and validity (2 from the previous request)
+        // 2 new sets for session and validity
         assertEquals( _daemon1.getCache().getSetCmds(), 4 );
 
     }
@@ -990,19 +964,14 @@ public abstract class NonStickySessionsIntegrationTest {
      * When a session is created with form based auth the session should be stored
      * appropriately.
      */
-    @Test( enabled = false )
+    @Test( enabled = true )
     public void testFormAuthDontCauseSessionStaleness() throws Exception {
-
-        // TODO: see testSessionCreatedForContainerProtectedResourceIsStoredInMemcached
 
         _tomcat1.stop();
         _tomcat2.stop();
 
-        _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO, LoginType.FORM );
-        _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO, LoginType.FORM );
-
-        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        getManager( _tomcat2 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        _tomcat1 = startTomcatWithAuth( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
+        _tomcat2 = startTomcatWithAuth( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
 
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
@@ -1015,9 +984,11 @@ public abstract class NonStickySessionsIntegrationTest {
         final Map<String, String> params = new HashMap<String, String>();
         params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
-        final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, false );
+
+        final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, true );
         assertNull(response2.getResponseSessionId());
-        assertEquals(response2.getStatusCode(), 302, response2.getContent());
+        assertEquals(response2.getStatusCode(), 200, response2.getContent());
+        assertEquals(response2.get( TestServlet.ID ), sessionId);
 
         final Response response3 = post( _httpClient, TC_PORT_2, "/", sessionId, asMap( "foo", "bar" ));
         assertEquals(response3.getSessionId(), sessionId);
@@ -1035,7 +1006,12 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private Embedded startTomcatWithAuth(final int port, final LockingMode lockingMode, final LoginType loginType)
             throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded result = getTestUtils().createCatalina( port, MEMCACHED_NODES, null, loginType );
+        return startTomcatWithAuth(port, MEMCACHED_NODES, lockingMode, loginType);
+    }
+
+    private Embedded startTomcatWithAuth(final int port, final String memcachedNodes, final LockingMode lockingMode, final LoginType loginType)
+            throws MalformedURLException, UnknownHostException, LifecycleException {
+        final Embedded result = getTestUtils().createCatalina( port, memcachedNodes, null, loginType );
         getManager( result ).setSticky( false );
         getManager( result ).setLockingMode( lockingMode.name() );
         result.start();
