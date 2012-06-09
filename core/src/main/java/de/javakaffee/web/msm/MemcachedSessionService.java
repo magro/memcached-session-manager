@@ -255,6 +255,8 @@ public class MemcachedSessionService {
     private RequestTrackingHostValve _trackingHostValve;
     private RequestTrackingContextValve _trackingContextValve;
 
+    private Boolean _contextHasFormBasedSecurityConstraint;
+
     private final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
 
@@ -584,17 +586,12 @@ public class MemcachedSessionService {
                 return null;
             }
 
-            // If no current request is set (SessionTrackerValve was not passed) we got invoked
+            // If no current request is set (RequestTrackerHostValve was not passed) we got invoked
             // by CoyoteAdapter.parseSessionCookiesId - here we can just return null, the requestedSessionId
             // will be accepted anyway
             if(!_sticky && _lockingStrategy.getCurrentRequest() == null) {
                 return null;
             }
-
-//            if(!_sticky && _sessionTrackerValve.isIgnoredRequest()) {
-//                _log.info("findSession invoked for ignoredRequest " + _lockingStrategy.getCurrentRequest().getRequestURI(), new RuntimeException("check2"));
-//                return null;
-//            }
 
             // else load the session from memcached
             result = loadFromMemcached( id );
@@ -647,11 +644,15 @@ public class MemcachedSessionService {
     }
 
     private boolean contextHasFormBasedSecurityConstraint() {
+        if(_contextHasFormBasedSecurityConstraint != null) {
+            return _contextHasFormBasedSecurityConstraint.booleanValue();
+        }
         final Context context = (Context)_manager.getContainer();
         final SecurityConstraint[] constraints = context.findConstraints();
         final LoginConfig loginConfig = context.getLoginConfig();
-        return constraints != null && constraints.length > 0
+        _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
                 && loginConfig != null && Constants.FORM_METHOD.equals( loginConfig.getAuthMethod() );
+        return _contextHasFormBasedSecurityConstraint;
     }
 
     private void addValidLoadedSession( final StandardSession session, final boolean activate ) {
