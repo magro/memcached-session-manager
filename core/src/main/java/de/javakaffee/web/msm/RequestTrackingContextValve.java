@@ -28,18 +28,19 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 /**
- * This valve is used for tracking requests for that the session must be sent to
- * memcached.
+ * This valve is used for tracking that a request was actually processed
+ * (after e.g. authentication was passed) and detects if sessionId must
+ * be changed (due to tomcat/memcached failover).
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionTrackerValve2 extends ValveBase {
+public class RequestTrackingContextValve extends ValveBase {
 
     static final String INVOKED = "de.javakaffee.msm.contextValve.invoked";
     static final String RELOCATE = "session.relocate";
 
-    protected static final Log _log = LogFactory.getLog( SessionTrackerValve.class );
+    protected static final Log _log = LogFactory.getLog( RequestTrackingHostValve.class );
 
     private final MemcachedSessionService _sessionBackupService;
     protected final String _sessionCookieName;
@@ -56,7 +57,7 @@ public class SessionTrackerValve2 extends ValveBase {
      * @param statistics
      *            used to store statistics
      */
-    public SessionTrackerValve2( @Nonnull final String sessionCookieName,
+    public RequestTrackingContextValve( @Nonnull final String sessionCookieName,
             @Nonnull final MemcachedSessionService sessionBackupService ) {
         _sessionBackupService = sessionBackupService;
         _sessionCookieName = sessionCookieName;
@@ -80,13 +81,13 @@ public class SessionTrackerValve2 extends ValveBase {
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
-        final Object processRequest = request.getNote(SessionTrackerValve.REQUEST_PROCESS);
+        final Object processRequest = request.getNote(RequestTrackingHostValve.REQUEST_PROCESS);
         if(processRequest != Boolean.TRUE) {
             request.setNote(INVOKED, Boolean.TRUE);
             try {
                 getNext().invoke( request, response );
             } finally {
-                request.setNote(SessionTrackerValve.REQUEST_PROCESSED, Boolean.TRUE);
+                request.setNote(RequestTrackingHostValve.REQUEST_PROCESSED, Boolean.TRUE);
             }
         }
         else {
@@ -97,8 +98,8 @@ public class SessionTrackerValve2 extends ValveBase {
                 sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
-                request.setNote(SessionTrackerValve.REQUEST_PROCESSED, Boolean.TRUE);
-                request.setNote(SessionTrackerValve.SESSION_ID_CHANGED, Boolean.valueOf(sessionIdChanged));
+                request.setNote(RequestTrackingHostValve.REQUEST_PROCESSED, Boolean.TRUE);
+                request.setNote(RequestTrackingHostValve.SESSION_ID_CHANGED, Boolean.valueOf(sessionIdChanged));
             }
 
         }

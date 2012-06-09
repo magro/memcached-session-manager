@@ -36,15 +36,15 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 /**
- * Test the {@link SessionTrackerValve}.
+ * Test the {@link RequestTrackingContextValve}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionTrackerValve2Test {
+public class RequestTrackingContextValveTest {
 
     protected MemcachedSessionService _service;
-    private SessionTrackerValve2 _sessionTrackerValve;
+    private RequestTrackingContextValve _sessionTrackerValve;
     private Valve _nextValve;
     private Request _request;
     private Response _response;
@@ -58,12 +58,12 @@ public class SessionTrackerValve2Test {
         _request = mock( Request.class );
         _response = mock( Response.class );
 
-        when(_request.getNote(eq(SessionTrackerValve.REQUEST_PROCESS))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(RequestTrackingHostValve.REQUEST_PROCESS))).thenReturn(Boolean.TRUE);
     }
 
     @Nonnull
-    protected SessionTrackerValve2 createSessionTrackerValve() {
-        return new SessionTrackerValve2("foo", _service);
+    protected RequestTrackingContextValve createSessionTrackerValve() {
+        return new RequestTrackingContextValve("foo", _service);
     }
 
     @AfterMethod
@@ -76,14 +76,14 @@ public class SessionTrackerValve2Test {
 
     @Test
     public final void testGetSessionCookieName() throws IOException, ServletException {
-        final SessionTrackerValve2 cut = new SessionTrackerValve2("foo", _service);
+        final RequestTrackingContextValve cut = new RequestTrackingContextValve("foo", _service);
         assertEquals(cut.getSessionCookieName(), "foo");
     }
 
     @Test
     public final void testRequestIsMarkedAsProcessed() throws IOException, ServletException {
         _sessionTrackerValve.invoke( _request, _response );
-        verify(_request).setNote(eq(SessionTrackerValve.REQUEST_PROCESSED), eq(Boolean.TRUE));
+        verify(_request).setNote(eq(RequestTrackingHostValve.REQUEST_PROCESSED), eq(Boolean.TRUE));
     }
 
     @Test
@@ -98,7 +98,7 @@ public class SessionTrackerValve2Test {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _request ).changeSessionId( eq( newSessionId ) );
-        verify(_request).setNote(eq(SessionTrackerValve.SESSION_ID_CHANGED), eq(Boolean.TRUE));
+        verify(_request).setNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED), eq(Boolean.TRUE));
 
     }
 

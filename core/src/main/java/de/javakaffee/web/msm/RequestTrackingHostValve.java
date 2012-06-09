@@ -34,12 +34,13 @@ import org.apache.juli.logging.LogFactory;
 
 /**
  * This valve is used for tracking requests for that the session must be sent to
- * memcached.
+ * memcached, on host level. This encapsulates/surrounds als container request
+ * processing like e.g. authentication and ServletRequestListener notification.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionTrackerValve extends ValveBase {
+public class RequestTrackingHostValve extends ValveBase {
 
     private static final String REQUEST_IGNORED = "de.javakaffee.msm.request.ignored";
 
@@ -51,7 +52,7 @@ public class SessionTrackerValve extends ValveBase {
 
     static final String RELOCATE = "session.relocate";
 
-    protected static final Log _log = LogFactory.getLog( SessionTrackerValve.class );
+    protected static final Log _log = LogFactory.getLog( RequestTrackingHostValve.class );
 
     private final Pattern _ignorePattern;
     private final MemcachedSessionService _sessionBackupService;
@@ -78,7 +79,7 @@ public class SessionTrackerValve extends ValveBase {
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
      */
-    public SessionTrackerValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
+    public RequestTrackingHostValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
             @Nonnull final MemcachedSessionService sessionBackupService,
             @Nonnull final Statistics statistics,
             @Nonnull final AtomicBoolean enabled ) {

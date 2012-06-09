@@ -38,15 +38,15 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 /**
- * Test the {@link SessionTrackerValve}.
+ * Test the {@link RequestTrackingHostValve}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class SessionTrackerValveTest {
+public class RequestTrackingHostValveTest {
 
     protected MemcachedSessionService _service;
-    private SessionTrackerValve _sessionTrackerValve;
+    private RequestTrackingHostValve _sessionTrackerValve;
     private Valve _nextValve;
     private Request _request;
     private Response _response;
@@ -64,13 +64,13 @@ public class SessionTrackerValveTest {
         when(_request.getMethod()).thenReturn("GET");
         when(_request.getQueryString()).thenReturn(null);
 
-        when(_request.getNote(eq(SessionTrackerValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
-        when(_request.getNote(eq(SessionTrackerValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
+        when(_request.getNote(eq(RequestTrackingHostValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
     }
 
     @Nonnull
-    protected SessionTrackerValve createSessionTrackerValve() {
-        return new SessionTrackerValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(), new AtomicBoolean( true ));
+    protected RequestTrackingHostValve createSessionTrackerValve() {
+        return new RequestTrackingHostValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(), new AtomicBoolean( true ));
     }
 
     @AfterMethod
@@ -83,7 +83,7 @@ public class SessionTrackerValveTest {
 
     @Test
     public final void testGetSessionCookieName() throws IOException, ServletException {
-        final SessionTrackerValve cut = new SessionTrackerValve(null, "foo", _service, Statistics.create(), new AtomicBoolean( true ));
+        final RequestTrackingHostValve cut = new RequestTrackingHostValve(null, "foo", _service, Statistics.create(), new AtomicBoolean( true ));
         assertEquals(cut.getSessionCookieName(), "foo");
     }
 
@@ -92,7 +92,7 @@ public class SessionTrackerValveTest {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service, never() ).backupSession( anyString(), anyBoolean(), anyString() );
-        verify(_request).setNote(eq(SessionTrackerValve.REQUEST_PROCESS), eq(Boolean.TRUE));
+        verify(_request).setNote(eq(RequestTrackingHostValve.REQUEST_PROCESS), eq(Boolean.TRUE));
     }
 
     @Test
@@ -132,7 +132,7 @@ public class SessionTrackerValveTest {
         final String sessionId = "bar";
         final String newSessionId = "newId";
 
-        when(_request.getNote(eq(SessionTrackerValve.SESSION_ID_CHANGED))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.TRUE);
         when( _request.getRequestedSessionId() ).thenReturn( sessionId );
 
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );

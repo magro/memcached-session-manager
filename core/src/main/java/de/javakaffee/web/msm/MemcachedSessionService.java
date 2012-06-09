@@ -252,8 +252,8 @@ public class MemcachedSessionService {
     private LockingStrategy _lockingStrategy;
     private long _operationTimeout = 1000;
 
-    private SessionTrackerValve _sessionTrackerValve;
-    private SessionTrackerValve2 _sessionTrackerValve2;
+    private RequestTrackingHostValve _trackingHostValve;
+    private RequestTrackingContextValve _trackingContextValve;
 
     private final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
@@ -423,10 +423,10 @@ public class MemcachedSessionService {
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
 
         final String sessionCookieName = _manager.getSessionCookieName();
-        _sessionTrackerValve = new SessionTrackerValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled);
-        _manager.getContainer().getParent().getPipeline().addValve(_sessionTrackerValve);
-        _sessionTrackerValve2 = new SessionTrackerValve2(sessionCookieName, this);
-        _manager.getContainer().getPipeline().addValve( _sessionTrackerValve2 );
+        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled);
+        _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
+        _trackingContextValve = new RequestTrackingContextValve(sessionCookieName, this);
+        _manager.getContainer().getPipeline().addValve( _trackingContextValve );
 
         initNonStickyLockingMode( _memcachedNodesManager );
 
@@ -569,7 +569,7 @@ public class MemcachedSessionService {
             // TODO: document ignoring requests and container managed authentication
             // -> with container managed auth protected resources should not be ignored
             // TODO: check ignored resource also below
-            if (!_sticky && !_sessionTrackerValve.isIgnoredRequest() && !isContainerSessionLookup()) {
+            if (!_sticky && !_trackingHostValve.isIgnoredRequest() && !isContainerSessionLookup()) {
                 result.registerReference();
             }
         }
@@ -630,7 +630,7 @@ public class MemcachedSessionService {
      * invocation comes from the container.
      */
     private boolean isContainerSessionLookup() {
-        return !_sessionTrackerValve2.wasInvokedWith(_lockingStrategy.getCurrentRequest());
+        return !_trackingContextValve.wasInvokedWith(_lockingStrategy.getCurrentRequest());
     }
 
     private void addValidLoadedSession(final MemcachedBackupSession result) {
@@ -1537,8 +1537,8 @@ public class MemcachedSessionService {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
         _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _memcachedNodesManager,
                 _missingSessionsCache, storeSecondaryBackup, _statistics );
-        if ( _sessionTrackerValve != null ) {
-            _sessionTrackerValve.setLockingStrategy( _lockingStrategy );
+        if ( _trackingHostValve != null ) {
+            _trackingHostValve.setLockingStrategy( _lockingStrategy );
         }
     }
 

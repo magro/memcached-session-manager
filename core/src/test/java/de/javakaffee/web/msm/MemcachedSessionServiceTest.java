@@ -559,7 +559,7 @@ public abstract class MemcachedSessionServiceTest {
 
         // start another request that loads the session from mc
         final Request requestMock = mock(Request.class);
-        when(requestMock.getNote(eq(SessionTrackerValve2.INVOKED))).thenReturn(Boolean.TRUE);
+        when(requestMock.getNote(eq(RequestTrackingContextValve.INVOKED))).thenReturn(Boolean.TRUE);
         _service.getLockingStrategy().onRequestStart(requestMock);
 
         when(_memcachedMock.get(eq(session.getId()))).thenReturn(transcoderService.serialize(session));
