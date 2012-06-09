@@ -64,6 +64,8 @@ public class SessionTrackerValve extends ValveBase {
     protected final String _sessionCookieName;
     private @CheckForNull LockingStrategy _lockingStrategy;
 
+    private static final String MSM_REQUEST_ID = "msm.requestId";
+
     /**
      * Creates a new instance with the given ignore pattern and
      * {@link SessionBackupService}.
@@ -115,11 +117,13 @@ public class SessionTrackerValve extends ValveBase {
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
+        final String requestId = getURIWithQueryString( request );
         if(!_enabled.get()) {
             getNext().invoke( request, response );
-        }
-        else if ( _ignorePattern != null && _ignorePattern.matcher( getURIWithQueryString( request ) ).matches() ) {
-            _log.debug( ">>>>>> Ignoring: " + getURIWithQueryString( request ) + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
+        } else if ( _ignorePattern != null && _ignorePattern.matcher( requestId ).matches() ) {
+            if(_log.isDebugEnabled()) {
+                _log.debug( ">>>>>> Ignoring: " + requestId + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
+            }
 
             try {
                 storeRequestThreadLocal( request );
@@ -129,40 +133,38 @@ public class SessionTrackerValve extends ValveBase {
                 if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
                     final String sessionId = getSessionId(request, response);
                     if(sessionId != null) {
-                        _sessionBackupService.requestFinished(sessionId, getURIWithQueryString( request ));
+                        _sessionBackupService.requestFinished(sessionId, requestId);
                     }
                 }
                 resetRequestThreadLocal();
             }
-            _log.debug( "<<<<<< Ignored: " + getURIWithQueryString( request ) + " ==================" );
+            if(_log.isDebugEnabled()) {
+                _log.debug( "<<<<<< Ignored: " + requestId + " ==================" );
+            }
         } else {
 
             request.setNote(REQUEST_PROCESS, Boolean.TRUE);
 
             if ( _log.isDebugEnabled() ) {
-                _log.debug( ">>>>>> Request starting: " + getURIWithQueryString( request ) + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
+                _log.debug( ">>>>>> Request starting: " + requestId + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
             }
 
             try {
                 storeRequestThreadLocal( request );
-                // sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
-                // if(request.getNote(REQUEST_PROCESSED) == Boolean.TRUE) {
-                    final Boolean sessionIdChanged = (Boolean) request.getNote(SESSION_ID_CHANGED);
-                    backupSession( request, response, sessionIdChanged == null ? false : sessionIdChanged.booleanValue() );
-                // }
+                final Boolean sessionIdChanged = (Boolean) request.getNote(SESSION_ID_CHANGED);
+                backupSession( request, response, sessionIdChanged == null ? false : sessionIdChanged.booleanValue() );
                 resetRequestThreadLocal();
             }
 
             if ( _log.isDebugEnabled() ) {
                 logDebugRequestSessionCookie( request );
                 logDebugResponseCookie( response );
-                _log.debug( "<<<<<< Request finished: " + getURIWithQueryString( request ) + " ==================" );
+                _log.debug( "<<<<<< Request finished: " + requestId + " ==================" );
             }
 
         }
-
     }
 
     protected void logDebugRequestSessionCookie( final Request request ) {
@@ -181,9 +183,21 @@ public class SessionTrackerValve extends ValveBase {
 
     @Nonnull
     protected static String getURIWithQueryString( @Nonnull final Request request ) {
-        final String uri = request.getRequestURI();
-        final String qs = isPostMethod(request) ? null : request.getQueryString();
-        return qs != null ? uri + "?" + qs : uri;
+        final Object note = request.getNote(MSM_REQUEST_ID);
+        if(note != null) {
+            // we have a string and want to save cast
+            return note.toString();
+        }
+        final StringBuilder sb = new StringBuilder(30);
+        sb.append(request.getMethod())
+        .append(' ')
+        .append(request.getRequestURI());
+        if(!isPostMethod(request) && request.getQueryString() != null) {
+            sb.append('?').append(request.getQueryString());
+        }
+        final String result = sb.toString();
+        request.setNote(MSM_REQUEST_ID, result);
+        return result;
     }
 
 	protected static boolean isPostMethod(final Request request) {
