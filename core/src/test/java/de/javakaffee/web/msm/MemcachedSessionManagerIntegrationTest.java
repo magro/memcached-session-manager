@@ -326,6 +326,9 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         final SessionManager manager = getManager( _tomcat1 );
         manager.setSticky( stickyness.isSticky() );
 
+        // Wait some time for reconfiguration
+        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 1, 500);
+
         // set to 1 sec above (in setup), default is 10 seconds
         final int delay = manager.getContainer().getBackgroundProcessorDelay();
         manager.setMaxInactiveInterval( delay * 4 );
@@ -353,6 +356,18 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         assertNotSame( makeRequest( _httpClient, _portTomcat1, sessionId1 ), sessionId1,
                 "The sessionId should have changed due to expired sessin" );
 
+    }
+
+    public static void waitForReconnect( final MemcachedClient client, final int expectedNumServers, final long timeToWait )
+            throws InterruptedException, RuntimeException {
+        final long start = System.currentTimeMillis();
+        while( System.currentTimeMillis() < start + timeToWait ) {
+            if ( client.getAvailableServers().size() >= expectedNumServers ) {
+                return;
+            }
+            Thread.sleep( 20 );
+        }
+        throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
     }
 
     /**
