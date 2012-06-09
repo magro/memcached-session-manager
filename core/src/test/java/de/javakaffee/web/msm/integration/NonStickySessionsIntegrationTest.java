@@ -937,12 +937,15 @@ public abstract class NonStickySessionsIntegrationTest {
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
 
+        LOG.info("START foo1234");
         final Response response1 = get( _httpClient, TC_PORT_1, null );
+        LOG.info("END foo1234");
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
         assertTrue(response1.getContent().contains("j_security_check"));
 
         // failed sometimes, randomly (timing issue?)?!
+        Thread.sleep(200);
         // 2 sets for session and validity
         assertEquals( _daemon1.getCache().getSetCmds(), 2 );
 
