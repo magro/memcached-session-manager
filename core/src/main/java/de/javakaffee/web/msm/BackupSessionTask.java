@@ -40,7 +40,6 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * Stores the provided session in memcached if the session was modified
@@ -184,7 +183,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
      * @param data the serialized session data (session fields and session attributes).
      * @param attributesData just the serialized session attributes.
      *
-     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
+     * @return the {@link BackupResultStatus}
      */
     BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) throws InterruptedException {
         if ( _log.isDebugEnabled() ) {

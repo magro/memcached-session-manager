@@ -23,7 +23,11 @@ import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -90,7 +94,7 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
      *            the session to save
      * @param sessionRelocationRequired
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
-     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
+     * @return the {@link BackupResultStatus}
      */
     public Future<BackupResult> backupSession( final Session session, final boolean sessionIdChanged, final String requestURI ) {
         _log.info( "Serializing session data for session " + session.getIdInternal() );

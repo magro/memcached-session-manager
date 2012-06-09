@@ -48,6 +48,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.connector.Request;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
@@ -58,7 +59,6 @@ import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
 
 /**
  * This is the core of memcached session manager, managing sessions in memcached.
@@ -72,7 +72,7 @@ import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class MemcachedSessionService implements SessionBackupService {
+public class MemcachedSessionService {
 
     static enum LockStatus {
         /**
@@ -736,9 +736,24 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     /**
-     * {@inheritDoc}
+     * Check if the given session id does not belong to this tomcat (according to the
+     * local jvmRoute and the jvmRoute in the session id). If the session contains a
+     * different jvmRoute load if from memcached. If the session was found in memcached and
+     * if it's valid it must be associated with this tomcat and therefore the session id has to
+     * be changed. The new session id must be returned if it was changed.
+     * <p>
+     * This is only useful for sticky sessions, in non-sticky operation mode <code>null</code> should
+     * always be returned.
+     * </p>
+     *
+     * @param requestedSessionId
+     *            the sessionId that was requested.
+     *
+     * @return the new session id if the session is taken over and the id was changed.
+     *          Otherwise <code>null</code>.
+     *
+     * @see Request#getRequestedSessionId()
      */
-    @Override
     public String changeSessionIdOnTomcatFailover( final String requestedSessionId ) {
         if ( !_sticky ) {
             return null;
@@ -810,9 +825,19 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     /**
-     * {@inheritDoc}
+     * Check if the valid session associated with the provided
+     * requested session Id will be relocated with the next {@link #backupSession(Session, boolean)}
+     * and change the session id to the new one (containing the new memcached node). The
+     * new session id must be returned if the session will be relocated and the id was changed.
+     *
+     * @param requestedSessionId
+     *            the sessionId that was requested.
+     *
+     * @return the new session id if the session will be relocated and the id was changed.
+     *          Otherwise <code>null</code>.
+     *
+     * @see Request#getRequestedSessionId()
      */
-    @Override
     public String changeSessionIdOnMemcachedFailover( final String requestedSessionId ) {
 
     	if ( !_memcachedNodesManager.isEncodeNodeIdInSessionId() ) {
@@ -971,18 +996,19 @@ public class MemcachedSessionService implements SessionBackupService {
     }
 
     /**
-     * Store the provided session in memcached if the session was modified
-     * or if the session needs to be relocated.
+     * Backup the session for the provided session id in memcached if the session was modified or
+     * if the session needs to be relocated. In non-sticky session-mode the session should not be
+     * loaded from memcached for just storing it again but only metadata should be updated.
      *
      * @param sessionId
-     *            the id of the session to save
-     * @param sessionRelocationRequired
+     *            the if of the session to backup
+     * @param sessionIdChanged
      *            specifies, if the session id was changed due to a memcached failover or tomcat failover.
      * @param requestId
-     *            the uri/id of the request for that the session backup shall be performed, used for readonly tracking.
-     * @return the {@link SessionTrackerValve.SessionBackupService.BackupResultStatus}
+     *            the uri of the request for that the session backup shall be performed.
+     *
+     * @return a {@link Future} providing the {@link BackupResultStatus}.
      */
-    @Override
     public Future<BackupResult> backupSession( final String sessionId, final boolean sessionIdChanged, final String requestId ) {
         if ( !_enabled.get() ) {
             return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );

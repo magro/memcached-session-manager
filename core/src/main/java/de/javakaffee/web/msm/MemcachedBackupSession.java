@@ -31,7 +31,6 @@ import org.apache.catalina.session.StandardSession;
 
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.SessionTrackerValve.SessionBackupService.BackupResultStatus;
 
 /**
  * The session class used by the {@link MemcachedSessionService}.
