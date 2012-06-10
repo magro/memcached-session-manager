@@ -250,7 +250,15 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         if(!sessionAffinity.isSticky()) {
             getEngine(_tomcat1).setJvmRoute(null);
         }
-        getManager( _tomcat1 ).setSticky( sessionAffinity.isSticky() );
+        final SessionManager manager = getManager( _tomcat1 );
+        manager.setSticky( sessionAffinity.isSticky() );
+
+        try {
+            waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 1, 500);
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
     }
 
     @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
@@ -324,10 +332,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple( final SessionAffinityMode stickyness ) throws Exception {
 
         final SessionManager manager = getManager( _tomcat1 );
-        manager.setSticky( stickyness.isSticky() );
-
-        // Wait some time for reconfiguration
-        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 1, 500);
+        setStickyness(stickyness);
 
         // set to 1 sec above (in setup), default is 10 seconds
         final int delay = manager.getContainer().getBackgroundProcessorDelay();
