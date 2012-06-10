@@ -328,6 +328,7 @@ public abstract class MemcachedSessionServiceTest {
         verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
 
         if ( !stickyness.isSticky() ) {
+            Thread.sleep(200l);
             // check validity info
             verify( _memcachedMock, times( 1 ) ).delete( eq( createValidityInfoKeyName( oldSessionId ) ) );
             verify( _memcachedMock, times( 1 ) ).set( eq( createValidityInfoKeyName( session.getId() ) ), anyInt(), any() );

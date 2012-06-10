@@ -28,7 +28,10 @@ import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -50,6 +53,8 @@ import javax.annotation.Nullable;
 import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
 import javax.servlet.http.HttpSessionEvent;
+
+import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -343,7 +348,7 @@ public abstract class TestUtils {
         }
 
         if ( statusCode != 200 && !(!followRedirects && statusCode == 302) ) {
-            throw new RuntimeException( "GET did not return status 200, but " + response.getStatusLine() +
+            throw new RuntimeException( "POST"+(path != null ? " " + path : "")+" did not return status 200, but " + response.getStatusLine() +
                     "\n" + toString(response.getEntity().getContent()) );
         }
 
@@ -544,7 +549,7 @@ public abstract class TestUtils {
         sessionManager.getMemcachedSessionService().setSessionBackupAsync( false );
         sessionManager.getMemcachedSessionService().setSessionBackupTimeout( 100 );
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
-        sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName );
+        sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName != null ? transcoderFactoryClassName : DEFAULT_TRANSCODER_FACTORY );
         sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(".*\\.(png|gif|jpg|css|js|ico)$");
 
         final Connector connector = catalina.createConnector( "localhost", port, false );
@@ -845,6 +850,82 @@ public abstract class TestUtils {
         session.setMaxInactiveInterval( 23 );
         session.setId( "foo-n1" );
         return session;
+    }
+
+
+    public static void waitForReconnect( final MemcachedClient client, final int expectedNumServers, final long timeToWait )
+            throws InterruptedException, RuntimeException {
+        final long start = System.currentTimeMillis();
+        while( System.currentTimeMillis() < start + timeToWait ) {
+            if ( client.getAvailableServers().size() >= expectedNumServers ) {
+                return;
+            }
+            Thread.sleep( 20 );
+        }
+        throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
+    }
+
+    public static Object assertNotNullElementWaiting(final int elementIndex, final long maxTimeToWait, final Object obj, final Method method, final Object[] args) throws Exception {
+        final long start = System.currentTimeMillis();
+        while( System.currentTimeMillis() < start + maxTimeToWait ) {
+            final Object items = method.invoke(obj, args);
+            if ( items != null ) {
+                if (items instanceof List && ((List<?>)items).get(elementIndex) != null
+                        || items instanceof Object[] && ((Object[])items)[elementIndex] != null) {
+                    return items;
+                }
+            }
+            try {
+                Thread.sleep( 20 );
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        }
+        throw new AssertionError("Expected not null within "+ maxTimeToWait +" millis, got null.");
+    }
+
+    @java.lang.SuppressWarnings("unchecked")
+    public static <T,V> T assertNotNullElementWaitingWithProxy(final int elementIndex, final long maxTimeToWait, final T objectToProxy) {
+        final Class<?>[] interfaces = objectToProxy.getClass().getInterfaces();
+        return (T) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
+                interfaces,
+                new InvocationHandler() {
+                    @Override
+                    public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
+                        return assertNotNullElementWaiting(elementIndex, maxTimeToWait, objectToProxy, method, args);
+                    }
+                } );
+    }
+
+    @java.lang.SuppressWarnings("unchecked")
+    public static <T,V> T assertNotNullWaitingWithProxy(final long maxTimeToWait, final T objectToProxy) {
+        final Class<?>[] interfaces = objectToProxy.getClass().getInterfaces();
+        return (T) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
+                interfaces,
+                new InvocationHandler() {
+                    @Override
+                    public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
+                        return assertNotNullWaiting(maxTimeToWait, objectToProxy, method, args);
+                    }
+                } );
+    }
+
+    public static Object assertNotNullWaiting(final long maxTimeToWait, final Object obj, final Method method, final Object[] args) throws Exception {
+        final long start = System.currentTimeMillis();
+        while( System.currentTimeMillis() < start + maxTimeToWait ) {
+            final Object result = method.invoke(obj, args);
+            if ( result != null ) {
+                return result;
+            }
+            try {
+                Thread.sleep( 10 );
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        }
+        throw new AssertionError("Expected not null, actual null.");
     }
 
 }

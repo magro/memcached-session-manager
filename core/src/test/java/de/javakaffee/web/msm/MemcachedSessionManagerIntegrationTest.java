@@ -36,6 +36,7 @@ import javax.annotation.Nonnull;
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.MemcachedClientIF;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.LifecycleException;
@@ -70,7 +71,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     private static final String GROUP_WITHOUT_NODE_ID = "withoutNodeId";
 
     private MemCacheDaemon<?> _daemon;
-    private MemcachedClient _memcached;
+    private MemcachedClientIF _memcached;
 
     private Embedded _tomcat1;
 
@@ -363,18 +364,6 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
     }
 
-    public static void waitForReconnect( final MemcachedClient client, final int expectedNumServers, final long timeToWait )
-            throws InterruptedException, RuntimeException {
-        final long start = System.currentTimeMillis();
-        while( System.currentTimeMillis() < start + timeToWait ) {
-            if ( client.getAvailableServers().size() >= expectedNumServers ) {
-                return;
-            }
-            Thread.sleep( 20 );
-        }
-        throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
-    }
-
     /**
      * Tests update of session expiration in memcached (like {@link #testExpirationOfSessionsInMemcachedIfBackupWasSkippedSimple()})
      * but for the scenario where many readonly requests occur: in this case, we cannot just use
@@ -387,7 +376,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     public void testExpirationOfSessionsInMemcachedIfBackupWasSkippedManyReadonlyRequests( final SessionAffinityMode stickyness ) throws Exception {
 
         final SessionManager manager = getManager( _tomcat1 );
-        manager.setSticky( stickyness.isSticky() );
+        setStickyness(stickyness);
 
         // set to 1 sec above (in setup), default is 10 seconds
         final int delay = manager.getContainer().getBackgroundProcessorDelay();
@@ -395,7 +384,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
-        assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
+        assertNotNullWaitingWithProxy(200l, _memcached).get( sessionId1 );
 
         /* after 3 seconds make another request without changing the session, so that
          * it's not sent to memcached

@@ -61,6 +61,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.NodeIdList;
 import de.javakaffee.web.msm.SessionIdFormat;
 import de.javakaffee.web.msm.Statistics;
@@ -585,9 +586,12 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final String memcachedNodes = MEMCACHED_NODES + "," + NODE_ID_3 + ":localhost:" + MEMCACHED_PORT_3;
 
-        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager(_tomcat1).setMemcachedNodes(memcachedNodes);
-        getManager(_tomcat1).getMemcachedSessionService().setSessionBackupAsync(false);
+        final SessionManager manager = getManager(_tomcat1);
+        manager.setMaxInactiveInterval( 5 );
+        manager.setMemcachedNodes(memcachedNodes);
+        manager.getMemcachedSessionService().setSessionBackupAsync(false);
+
+        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 3, 1000);
 
         final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
         final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
@@ -598,40 +602,38 @@ public abstract class NonStickySessionsIntegrationTest {
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, "key", "v1" ).getSessionId();
         assertNotNull( sessionId1 );
 
-        // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
-        waitForMemcachedClient( 100 );
-
         final SessionIdFormat fmt = new SessionIdFormat();
-
         final String nodeId = fmt.extractMemcachedId( sessionId1 );
-
         final MemCacheDaemon<?> first = memcachedsByNodeId.get(nodeId);
 
-        assertNotNull( first.getCache().get( key( sessionId1 ) )[0] );
-        assertNotNull( first.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+        // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
+        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( sessionId1 ) );
+        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( createValidityInfoKeyName( sessionId1 ) ) );
 
         // The executor needs some time to finish the backup...
-        Thread.sleep( 500 );
-
         final MemCacheDaemon<?> second = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeId));
-        assertNotNull( second.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
-        assertNotNull( second.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+        assertNotNullElementWaitingWithProxy(0, 4000, second.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, second.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the secondary memcached, so that the next backup should got to the next node
         second.stop();
+
+        // Wait for update of nodeAvailabilityNodeCache
+        Thread.sleep(100l);
 
         // Request / Update
         final String sessionId2 = post( _httpClient, TC_PORT_1, sessionId1, "key", "v2" ).getSessionId();
         assertEquals( sessionId2, sessionId1 );
 
-        Thread.sleep( 500 );
-
         final MemCacheDaemon<?> third = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeIdList.getNextNodeId(nodeId)));
-        assertNotNull( third.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
-        assertNotNull( third.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+        assertNotNullElementWaitingWithProxy(0, 4000, third.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, third.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the first node, so it should be loaded from the 3rd memcached
         first.stop();
+
+        // Wait for update of nodeAvailabilityNodeCache
+        Thread.sleep(100l);
 
         final Response response3 = get(_httpClient, TC_PORT_1, sessionId1);
         final String sessionId3 = response3.getResponseSessionId();
@@ -656,9 +658,12 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final String memcachedNodes = MEMCACHED_NODES + "," + NODE_ID_3 + ":localhost:" + MEMCACHED_PORT_3;
 
-        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager(_tomcat1).setMemcachedNodes(memcachedNodes);
-        getManager(_tomcat1).getMemcachedSessionService().setSessionBackupAsync(false);
+        final SessionManager manager = getManager(_tomcat1);
+        manager.setMaxInactiveInterval( 5 );
+        manager.setMemcachedNodes(memcachedNodes);
+        manager.getMemcachedSessionService().setSessionBackupAsync(false);
+
+        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 3, 1000);
 
         final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
         final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
@@ -670,39 +675,34 @@ public abstract class NonStickySessionsIntegrationTest {
         assertNotNull( sessionId1 );
 
         // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
-        waitForMemcachedClient( 100 );
-
         final SessionIdFormat fmt = new SessionIdFormat();
-
         final String nodeId = fmt.extractMemcachedId( sessionId1 );
-
         final MemCacheDaemon<?> first = memcachedsByNodeId.get(nodeId);
 
-        assertNotNull( first.getCache().get( key( sessionId1 ) )[0] );
-        assertNotNull( first.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( sessionId1 ) );
+        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( createValidityInfoKeyName( sessionId1 ) ) );
 
         // The executor needs some time to finish the backup...
-        Thread.sleep( 500 );
-
         final MemCacheDaemon<?> second = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeId));
-        assertNotNull( second.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
-        assertNotNull( second.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+        assertNotNullElementWaitingWithProxy(0, 4000, second.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, second.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the secondary memcached, so that the next backup should got to the next node
         second.stop();
+
+        Thread.sleep(100);
 
         // Request / Update
         final String sessionId2 = get( _httpClient, TC_PORT_1, sessionId1 ).getSessionId();
         assertEquals( sessionId2, sessionId1 );
 
-        Thread.sleep( 500 );
-
         final MemCacheDaemon<?> third = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeIdList.getNextNodeId(nodeId)));
-        assertNotNull( third.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
-        assertNotNull( third.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+        assertNotNullElementWaitingWithProxy(0, 4000, third.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, third.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the first node, so it should be loaded from the 3rd memcached
         first.stop();
+        Thread.sleep(100);
 
         final Response response3 = get(_httpClient, TC_PORT_1, sessionId1);
         final String sessionId3 = response3.getResponseSessionId();
@@ -1017,17 +1017,12 @@ public abstract class NonStickySessionsIntegrationTest {
     }
 
     private Embedded startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        return startTomcatWithAuth(port, lockingMode, LoginType.BASIC);
-    }
-
-    private Embedded startTomcatWithAuth(final int port, final LockingMode lockingMode, final LoginType loginType)
-            throws MalformedURLException, UnknownHostException, LifecycleException {
-        return startTomcatWithAuth(port, MEMCACHED_NODES, lockingMode, loginType);
+        return startTomcatWithAuth(port, MEMCACHED_NODES, lockingMode, LoginType.BASIC);
     }
 
     private Embedded startTomcatWithAuth(final int port, final String memcachedNodes, final LockingMode lockingMode, final LoginType loginType)
             throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded result = getTestUtils().createCatalina( port, memcachedNodes, null, loginType );
+        final Embedded result = getTestUtils().createCatalina( port, 5, memcachedNodes, null, loginType, null );
         getManager( result ).setSticky( false );
         getManager( result ).setLockingMode( lockingMode.name() );
         result.start();

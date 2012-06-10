@@ -1691,7 +1691,7 @@ public class MemcachedSessionService {
     /**
      * The memcached client.
      */
-    MemcachedClient getMemcached() {
+    public MemcachedClient getMemcached() {
         return _memcached;
     }
 
