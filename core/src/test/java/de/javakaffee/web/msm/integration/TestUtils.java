@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.LogManager;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -97,6 +98,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
+import org.apache.juli.logging.LogFactory;
 import org.apache.naming.NamingContext;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
@@ -134,6 +136,25 @@ public abstract class TestUtils {
 
     public static final String STICKYNESS_PROVIDER = "stickynessProvider";
     public static final String BOOLEAN_PROVIDER = "booleanProvider";
+
+    static {
+        initLogConfig(TestUtils.class);
+    }
+
+    private static void initLogConfig(final Class<? extends TestUtils> clazz) {
+        final URL loggingProperties = clazz.getResource("/logging.properties");
+        try {
+            System.setProperty("java.util.logging.config.file", new File(loggingProperties.toURI()).getAbsolutePath());
+        } catch (final Exception e) {
+            // we don't have a plain file (e.g. the case for msm-kryo-serializer etc), so we can skip reading the config
+            return;
+        }
+        try {
+            LogManager.getLogManager().readConfiguration();
+        } catch (final Exception e) {
+            LogFactory.getLog( TestUtils.class ).error("Could not init logging configuration.", e);
+        }
+    }
 
     /**
      * Login using form based auth and return the session id.
@@ -479,9 +500,6 @@ public abstract class TestUtils {
             final LoginType loginType,
             final String transcoderFactoryClassName ) throws MalformedURLException,
             UnknownHostException, LifecycleException {
-
-        final URL loggingProperties = getClass().getResource("/logging.properties");
-        System.setProperty("java.util.logging.config.file", loggingProperties.getFile());
 
         final Embedded catalina = new Embedded();
 

@@ -979,6 +979,8 @@ public abstract class NonStickySessionsIntegrationTest {
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
 
+        System.out.println("********* START testFormAuthDontCauseSessionStaleness");
+
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
@@ -1000,6 +1002,8 @@ public abstract class NonStickySessionsIntegrationTest {
         assertEquals(response4.getSessionId(), sessionId);
         assertEquals(response4.get( TestServlet.ID ), sessionId);
         assertEquals(response4.get( "foo" ), "bar");
+
+        System.out.println("********* END testFormAuthDontCauseSessionStaleness");
 
     }
 
