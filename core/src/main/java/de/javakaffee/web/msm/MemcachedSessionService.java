@@ -819,7 +819,7 @@ public class MemcachedSessionService {
             }
             try {
                 final long start = System.currentTimeMillis();
-                _memcached.delete( sessionId );
+                _memcached.delete( sessionId ).get();
                 _statistics.registerSince( DELETE_FROM_MEMCACHED, start );
                 if ( !_sticky ) {
                     _lockingStrategy.onAfterDeleteFromMemcached( sessionId );

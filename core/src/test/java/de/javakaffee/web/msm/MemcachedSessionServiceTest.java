@@ -68,6 +68,7 @@ public abstract class MemcachedSessionServiceTest {
     private MemcachedClient _memcachedMock;
     private ExecutorService _executor;
 
+    @SuppressWarnings("unchecked")
     @BeforeMethod
     public void setup() throws Exception {
 
@@ -84,10 +85,14 @@ public abstract class MemcachedSessionServiceTest {
 
         _memcachedMock = mock( MemcachedClient.class );
 
-        @SuppressWarnings( "unchecked" )
-        final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
-        when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
-        when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
+        final OperationFuture<Boolean> setResultMock = mock( OperationFuture.class );
+        when( setResultMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
+        when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( setResultMock );
+
+        final OperationFuture<Boolean> deleteResultMock = mock( OperationFuture.class );
+        when( deleteResultMock.get() ).thenReturn( Boolean.TRUE );
+        when( _memcachedMock.delete( anyString() ) ).thenReturn( deleteResultMock );
+
 
         startInternal( manager, _memcachedMock );
 
