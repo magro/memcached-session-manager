@@ -193,7 +193,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             _msm.deleteFromMemcached( session.getId() );
         }
         super.remove( session );
-        _msm.sessionRemoved(session.getIdInternal());
+        _msm.sessionRemoved((MemcachedBackupSession) session);
     }
 
     /**

@@ -705,17 +705,21 @@ public class MemcachedSessionService {
 
     /**
      * Is invoked when a session was removed from the manager, e.g. because the
-     * session has been invalidated. Is used to keep track of such sessions in
-     * non-sticky mode, so that lockingStrategy.onBackupWithoutLoadedSession is not
-     * invoked.
+     * session has been invalidated.
      *
-     * Motivated by issue 116.
+     * Is used to release a lock if the non-stick session was locked
      *
-     * @param id the id of the removed session.
+     * It's also used to keep track of such sessions in non-sticky mode, so that
+     * lockingStrategy.onBackupWithoutLoadedSession is not invoked (see issue 116).
+     *
+     * @param session the removed session.
      */
-    public void sessionRemoved(final String id) {
+    public void sessionRemoved(final MemcachedBackupSession session) {
         if(!_sticky) {
-            _removedSessions.put(id, "unused");
+            if(session.isLocked()) {
+                _lockingStrategy.releaseLock(session.getIdInternal());
+            }
+            _removedSessions.put(session.getIdInternal(), "unused");
         }
     }
 

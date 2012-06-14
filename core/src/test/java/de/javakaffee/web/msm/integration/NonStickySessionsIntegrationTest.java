@@ -1003,6 +1003,19 @@ public abstract class NonStickySessionsIntegrationTest {
 
     }
 
+    @Test( enabled = true )
+    public void testInvalidateSessionShouldReleaseLockIssue144() throws IOException, InterruptedException, HttpException {
+        getManager(_tomcat1).setLockingMode(LockingMode.AUTO.name());
+
+        final String sessionId1 = get( _httpClient, TC_PORT_1, null ).getSessionId();
+        assertNotNull( sessionId1, "No session created." );
+
+        final Response response = get( _httpClient, TC_PORT_1, PATH_INVALIDATE, sessionId1 );
+        assertNull( response.getResponseSessionId() );
+        assertNull(_client.get( sessionId1 ), "Invalidated session should be removed from memcached");
+        assertNull(_client.get(new SessionIdFormat().createLockName(sessionId1)), "Lock should be released.");
+    }
+
     private Embedded startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
         return startTomcatWithAuth(port, lockingMode, LoginType.BASIC);
     }
