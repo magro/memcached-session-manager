@@ -718,6 +718,7 @@ public class MemcachedSessionService {
         if(!_sticky) {
             if(session.isLocked()) {
                 _lockingStrategy.releaseLock(session.getIdInternal());
+                session.releaseLock();
             }
             _removedSessions.put(session.getIdInternal(), "unused");
         }
@@ -994,6 +995,7 @@ public class MemcachedSessionService {
 
             if(msmSession.isLocked()) {
                 _lockingStrategy.releaseLock(sessionId);
+                msmSession.releaseLock();
                 _lockingStrategy.registerReadonlyRequest(requestId);
             }
 
