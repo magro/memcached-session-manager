@@ -16,6 +16,8 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import static de.javakaffee.web.msm.integration.TestUtils.Predicates.elementAt;
+import static de.javakaffee.web.msm.integration.TestUtils.Predicates.notNull;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -883,57 +885,29 @@ public abstract class TestUtils {
         throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
     }
 
-    public static Object assertNotNullElementWaiting(final int elementIndex, final long maxTimeToWait, final Object obj, final Method method, final Object[] args) throws Exception {
-        final long start = System.currentTimeMillis();
-        while( System.currentTimeMillis() < start + maxTimeToWait ) {
-            final Object items = method.invoke(obj, args);
-            if ( items != null ) {
-                if (items instanceof List && ((List<?>)items).get(elementIndex) != null
-                        || items instanceof Object[] && ((Object[])items)[elementIndex] != null) {
-                    return items;
-                }
-            }
-            try {
-                Thread.sleep( 20 );
-            } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
-        }
-        throw new AssertionError("Expected not null within "+ maxTimeToWait +" millis, got null.");
-    }
-
-    @java.lang.SuppressWarnings("unchecked")
     public static <T,V> T assertNotNullElementWaitingWithProxy(final int elementIndex, final long maxTimeToWait, final T objectToProxy) {
-        final Class<?>[] interfaces = objectToProxy.getClass().getInterfaces();
-        return (T) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
-                interfaces,
-                new InvocationHandler() {
-                    @Override
-                    public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
-                        return assertNotNullElementWaiting(elementIndex, maxTimeToWait, objectToProxy, method, args);
-                    }
-                } );
+        return assertWaitingWithProxy(elementAt(elementIndex, notNull()), maxTimeToWait, objectToProxy);
     }
 
     @java.lang.SuppressWarnings("unchecked")
-    public static <T,V> T assertNotNullWaitingWithProxy(final long maxTimeToWait, final T objectToProxy) {
+    public static <T,V> T assertWaitingWithProxy(final Predicate<V> predicate, final long maxTimeToWait, final T objectToProxy) {
         final Class<?>[] interfaces = objectToProxy.getClass().getInterfaces();
         return (T) Proxy.newProxyInstance( Thread.currentThread().getContextClassLoader(),
                 interfaces,
                 new InvocationHandler() {
                     @Override
                     public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
-                        return assertNotNullWaiting(maxTimeToWait, objectToProxy, method, args);
+                        return assertPredicateWaiting(predicate, maxTimeToWait, objectToProxy, method, args);
                     }
                 } );
     }
 
-    public static Object assertNotNullWaiting(final long maxTimeToWait, final Object obj, final Method method, final Object[] args) throws Exception {
+    private static <V> V assertPredicateWaiting(final Predicate<V> predicate, final long maxTimeToWait, final Object obj, final Method method, final Object[] args) throws Exception {
         final long start = System.currentTimeMillis();
         while( System.currentTimeMillis() < start + maxTimeToWait ) {
-            final Object result = method.invoke(obj, args);
-            if ( result != null ) {
+            @java.lang.SuppressWarnings("unchecked")
+            final V result = (V) method.invoke(obj, args);
+            if ( predicate.apply(result) ) {
                 return result;
             }
             try {
@@ -944,6 +918,73 @@ public abstract class TestUtils {
             }
         }
         throw new AssertionError("Expected not null, actual null.");
+    }
+
+    public static interface Predicate<T> {
+        /**
+         * Applies this predicate to the given object.
+         *
+         * @param input the input that the predicate should act on
+         * @return the value of this predicate when applied to the input {@code t}
+         */
+        boolean apply(@Nullable T input);
+    }
+
+    public static class Predicates {
+
+        private static final Predicate<Object> NOT_NULL = new Predicate<Object>() {
+            @Override
+            public boolean apply(final Object input) {
+                return input != null;
+            }
+        };
+        private static final Predicate<Object> IS_NULL = new Predicate<Object>() {
+            @Override
+            public boolean apply(final Object input) {
+                return input == null;
+            }
+        };
+
+        /**
+         * Returns a predicate that evaluates to {@code true} if the object reference
+         * being tested is not null.
+         */
+        @java.lang.SuppressWarnings("unchecked")
+        public static <T> Predicate<T> notNull() {
+            return (Predicate<T>) NOT_NULL;
+        }
+
+        /**
+         * Returns a predicate that evaluates to {@code true} if the object reference
+         * being tested is null.
+         */
+        @java.lang.SuppressWarnings("unchecked")
+        public static <T> Predicate<T> isNull() {
+            return (Predicate<T>) IS_NULL;
+        }
+
+        /**
+         * Returns a predicate that evaluates to {@code true} if the object being
+         * tested {@code equals()} the given target or both are null.
+         */
+        public static <T> Predicate<T> equalTo(@Nullable final T target) {
+            return (target == null) ? Predicates.<T> isNull()
+                    : new Predicate<T>() {
+                @Override
+                public boolean apply(final T input) {
+                    return target.equals(input);
+                }
+            };
+        }
+
+        public static <T> Predicate<T[]> elementAt(final int index, @Nonnull final Predicate<T> elementPredicate) {
+            return new Predicate<T[]>() {
+                @Override
+                public boolean apply(final T[] input) {
+                    return input != null && input.length > index && elementPredicate.apply(input[index]);
+                }
+            };
+        }
     }
 
 }

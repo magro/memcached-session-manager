@@ -55,6 +55,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtils.Predicates;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 
@@ -384,7 +385,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
         assertNotNull( sessionId1, "No session created." );
-        assertNotNullWaitingWithProxy(200l, _memcached).get( sessionId1 );
+        assertWaitingWithProxy(Predicates.<MemcachedClientIF> notNull(), 200l, _memcached).get( sessionId1 );
 
         /* after 3 seconds make another request without changing the session, so that
          * it's not sent to memcached

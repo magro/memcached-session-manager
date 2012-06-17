@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.integration;
 import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.integration.TestServlet.*;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
+import static de.javakaffee.web.msm.integration.TestUtils.Predicates.equalTo;
 import static org.testng.Assert.*;
 
 import java.io.IOException;
@@ -752,28 +753,22 @@ public abstract class NonStickySessionsIntegrationTest {
     @Test( enabled = true )
     public void testSessionNotLoadedForReadonlyRequest() throws IOException, HttpException, InterruptedException {
         getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        try {
+        waitForReconnect(getService(_tomcat1).getMemcached(), 1, 1000);
 
-            final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
-            assertNotNull( sessionId1 );
-            Thread.sleep( 500 );
+        final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
+        assertNotNull( sessionId1 );
 
-            // 2 for session and validity, if backup would be stored this would be 4 instead
-            assertEquals( _daemon1.getCache().getSetCmds(), 2 );
-            // no gets at all
-            assertEquals( _daemon1.getCache().getGetHits(), 0 );
+        // 2 for session and validity, if backup would be stored this would be 4 instead
+        assertWaitingWithProxy(equalTo(2), 1000, _daemon1.getCache()).getSetCmds();
+        // no gets at all
+        assertEquals( _daemon1.getCache().getGetHits(), 0 );
 
-            // a request without session access should not pull the session from memcached
-            // but update the validity info (get + set)
-            get( _httpClient, TC_PORT_1, PATH_NO_SESSION_ACCESS, sessionId1 );
-            Thread.sleep( 500 );
+        // a request without session access should not pull the session from memcached
+        // but update the validity info (get + set)
+        get( _httpClient, TC_PORT_1, PATH_NO_SESSION_ACCESS, sessionId1 );
 
-            assertEquals( _daemon1.getCache().getGetHits(), 1 );
-            assertEquals( _daemon1.getCache().getSetCmds(), 3 );
-
-        } finally {
-            getManager( _tomcat1 ).setMemcachedNodes( MEMCACHED_NODES );
-        }
+        assertWaitingWithProxy(equalTo(3), 1000, _daemon1.getCache()).getSetCmds();
+        assertEquals( _daemon1.getCache().getGetHits(), 1 );
     }
 
 
@@ -979,12 +974,20 @@ public abstract class NonStickySessionsIntegrationTest {
         setChangeSessionIdOnAuth( _tomcat1, false );
         setChangeSessionIdOnAuth( _tomcat2, false );
 
+        waitForReconnect(getService(_tomcat1).getMemcached(), 1, 1000);
+        waitForReconnect(getService(_tomcat2).getMemcached(), 1, 1000);
+
         System.out.println("********* START testFormAuthDontCauseSessionStaleness");
 
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
         assertTrue(response1.getContent().contains("j_security_check"));
+
+        System.out.println("********* AFTER GET: testFormAuthDontCauseSessionStaleness");
+
+        // Wait some time so that the GET is finished
+        Thread.sleep(200);
 
         final Map<String, String> params = new HashMap<String, String>();
         params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );

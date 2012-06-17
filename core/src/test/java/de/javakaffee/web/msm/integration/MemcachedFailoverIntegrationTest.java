@@ -117,7 +117,7 @@ public abstract class MemcachedFailoverIntegrationTest {
 
         _httpClient = new DefaultHttpClient();
     }
-    
+
     abstract TestUtils getTestUtils();
 
     private String toString( final String nodeId, final InetSocketAddress address ) {
@@ -428,6 +428,8 @@ public abstract class MemcachedFailoverIntegrationTest {
         /* shutdown regular memcached node
          */
         _daemon2.stop();
+
+        TestUtils.waitForReconnect(getService(_tomcat1).getMemcached(), 1, 1000l);
 
         final Response response1 = get( _httpClient, _portTomcat1, null );
         final String sessionId = response1.getSessionId();
