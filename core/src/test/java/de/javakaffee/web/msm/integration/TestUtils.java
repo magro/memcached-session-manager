@@ -318,7 +318,9 @@ public abstract class TestUtils {
                 }
             }
         } finally {
-            reader.close();
+            if(reader != null) {
+                reader.close();
+            }
         }
 
         return new Response( response, responseSessionId == null ? rsessionId : responseSessionId, responseSessionId, sb.toString(), keyValues );
@@ -390,7 +392,9 @@ public abstract class TestUtils {
         } catch (final IOException e) {
             throw new RuntimeException(e);
         } finally {
-            try { reader.close(); } catch (final IOException e) {/* ignore */}
+            if(reader != null) {
+                try { reader.close(); } catch (final IOException e) {/* ignore */}
+            }
         }
         return sb.toString();
     }

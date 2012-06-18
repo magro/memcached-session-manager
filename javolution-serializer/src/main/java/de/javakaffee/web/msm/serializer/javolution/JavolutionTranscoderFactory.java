@@ -88,6 +88,7 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings("EI_EXPOSE_REP2")
     public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
         _customConverterClassNames = customConverterClassNames;
     }

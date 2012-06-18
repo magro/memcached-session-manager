@@ -49,6 +49,7 @@ import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoder;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
+@edu.umd.cs.findbugs.annotations.SuppressWarnings({"EI_EXPOSE_REP", "EI_EXPOSE_REP2"})
 public class TestClasses {
 
     static Person createPerson( final String name, final Gender gender, final String... emailAddresses ) {

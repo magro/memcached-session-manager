@@ -202,13 +202,15 @@ public abstract class AbstractHibernateCollectionsTest {
             transaction.commit();
             return result;
         } catch ( final HibernateException e ) {
-            transaction.rollback();
+            if(transaction != null) {
+                transaction.rollback();
+            }
             throw new RuntimeException( e );
         } finally {
             session.close();
         }
     }
-    
+
     @Nonnull
     protected SessionManager createSessionManager() {
         final SessionManager manager = mock( SessionManager.class );
