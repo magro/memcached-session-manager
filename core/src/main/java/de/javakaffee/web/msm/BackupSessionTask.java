@@ -161,11 +161,11 @@ public class BackupSessionTask implements Callable<BackupResult> {
                     _log.debug( "Releasing lock for session " + _session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) );
+                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) ).get();
                 _statistics.registerSince( RELEASE_LOCK, start );
                 _session.releaseLock();
             } catch( final Exception e ) {
-                _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal() );
+                _log.warn( "Caught exception when trying to release lock for session " + _session.getIdInternal(), e );
             }
         }
     }

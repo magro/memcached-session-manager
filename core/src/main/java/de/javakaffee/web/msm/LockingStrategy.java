@@ -194,10 +194,10 @@ public abstract class LockingStrategy {
                 _log.debug( "Releasing lock for session " + sessionId );
             }
             final long start = System.currentTimeMillis();
-            _memcached.delete( _sessionIdFormat.createLockName( sessionId ) );
+            _memcached.delete( _sessionIdFormat.createLockName( sessionId ) ).get();
             _stats.registerSince( RELEASE_LOCK, start );
         } catch ( final Exception e ) {
-            _log.warn( "Caught exception when trying to release lock for session " + sessionId );
+            _log.warn( "Caught exception when trying to release lock for session " + sessionId, e );
         }
     }
 

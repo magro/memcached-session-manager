@@ -240,11 +240,11 @@ public class BackupSessionService {
                     _log.debug( "Releasing lock for session " + session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( session.getIdInternal() ) );
+                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( session.getIdInternal() ) ).get();
                 _statistics.registerSince( RELEASE_LOCK, start );
                 session.releaseLock();
             } catch( final Exception e ) {
-                _log.warn( "Caught exception when trying to release lock for session " + session.getIdInternal() );
+                _log.warn( "Caught exception when trying to release lock for session " + session.getIdInternal(), e );
             }
         }
     }
