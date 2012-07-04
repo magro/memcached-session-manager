@@ -18,8 +18,6 @@ package de.javakaffee.web.msm.serializer.javolution;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.Map;
 
 import javolution.xml.XMLObjectReader;
@@ -131,13 +129,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
 
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Returning serialized data:\n" + new String( bos.toByteArray() ) );
-                final File tmpFile = File.createTempFile( "session-" + System.identityHashCode( object ) + "-", ".tmp", new File( "/tmp" ) );
-                final FileOutputStream out = new FileOutputStream( tmpFile );
-                out.write( bos.toByteArray() );
-                out.close();
-                LOG.debug( "Wrote content to file " + tmpFile.getAbsolutePath() );
             }
-            // getLogger().info( "Returning deserialized:\n" + new String( bos.toByteArray() ) );
 
             return bos.toByteArray();
         } catch ( final Exception e ) {
