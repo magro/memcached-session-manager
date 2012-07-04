@@ -977,14 +977,10 @@ public abstract class NonStickySessionsIntegrationTest {
         waitForReconnect(getService(_tomcat1).getMemcached(), 1, 1000);
         waitForReconnect(getService(_tomcat2).getMemcached(), 1, 1000);
 
-        System.out.println("********* START testFormAuthDontCauseSessionStaleness");
-
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
         assertTrue(response1.getContent().contains("j_security_check"));
-
-        System.out.println("********* AFTER GET: testFormAuthDontCauseSessionStaleness");
 
         // Wait some time so that the GET is finished
         Thread.sleep(200);
@@ -1005,8 +1001,6 @@ public abstract class NonStickySessionsIntegrationTest {
         assertEquals(response4.getSessionId(), sessionId);
         assertEquals(response4.get( TestServlet.ID ), sessionId);
         assertEquals(response4.get( "foo" ), "bar");
-
-        System.out.println("********* END testFormAuthDontCauseSessionStaleness");
 
     }
 

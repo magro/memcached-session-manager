@@ -172,7 +172,6 @@ public abstract class TestUtils {
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
         final Response tc1Response2 = post( client, tcPort, "/j_security_check", sessionId, params );
         assertEquals(tc1Response2.getSessionId(), sessionId);
-        System.out.println("----------------xxx (status "+ tc1Response2.getStatusCode() +")\n" + tc1Response2.getContent());
         new RuntimeException("err").printStackTrace();
         assertEquals( tc1Response2.get( TestServlet.ID ), sessionId );
 
