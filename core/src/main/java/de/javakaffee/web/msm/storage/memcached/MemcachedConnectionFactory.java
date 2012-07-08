@@ -32,8 +32,6 @@ public class MemcachedConnectionFactory implements IStorageFactory {
 	private long _operationTimeout = 1000;
 
 	private ConnectionType connectionType = null;
-	private MemcachedNodesManager memcachedNodesManager;
-	private Statistics statistics;
 
 	@Override
 	public IStorageClient getStorageClient(MemcachedNodesManager memcachedNodesManager, Statistics statistics,
@@ -41,8 +39,6 @@ public class MemcachedConnectionFactory implements IStorageFactory {
 
 		connectionType = ConnectionType.valueOf(memcachedNodesManager.isMembaseBucketConfig(), username, password);
 
-		this.memcachedNodesManager = memcachedNodesManager;
-		this.statistics = statistics;
 		this._operationTimeout = operationTimeout;
 
 		ConnectionFactory connectionFactory = null;
@@ -82,8 +78,8 @@ public class MemcachedConnectionFactory implements IStorageFactory {
 			// And:
 			// http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
 			client = new MemcachedClient(memcachedNodesManager.getMembaseBucketURIs(), username, password);
-		}
-		client = new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
+		} else
+			client = new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
 
 		return new MemcachedStorage(client);
 	}
@@ -97,8 +93,7 @@ public class MemcachedConnectionFactory implements IStorageFactory {
 	 */
 	public void setMemcachedProtocol(final String memcachedProtocol) {
 		if (!PROTOCOL_TEXT.equals(memcachedProtocol) && !PROTOCOL_BINARY.equals(memcachedProtocol)) {
-			_log.warn("Illegal memcachedProtocol " + memcachedProtocol + ", using default (" + memcachedProtocol
-					+ ").");
+			_log.warn("Illegal memcachedProtocol " + memcachedProtocol + ", using default (" + memcachedProtocol + ").");
 			return;
 		}
 		this.memcachedProtocol = memcachedProtocol;

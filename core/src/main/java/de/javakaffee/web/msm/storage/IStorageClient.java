@@ -10,7 +10,7 @@ public interface IStorageClient {
 
 	public Future<Boolean> add(String key, int expirationTime, String value);
 
-	public Object get(String key);
+	public byte[] get(String key);
 
 	public void shutdown();
 

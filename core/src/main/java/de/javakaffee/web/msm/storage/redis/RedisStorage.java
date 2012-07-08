@@ -40,9 +40,9 @@ public class RedisStorage implements IStorageClient {
 		try {
 			resource = redisPool.getResource();
 			String setex = resource.setex(key.getBytes(), expirationTime, value);
-			if ("OK".equals(setex) )
+			if ("OK".equals(setex))
 				return TRUE;
-			
+
 		} finally {
 			if (resource != null)
 				redisPool.returnResource(resource);
@@ -51,15 +51,13 @@ public class RedisStorage implements IStorageClient {
 		return FALSE;
 	}
 
-	
-
 	@Override
 	public Future<Boolean> add(String key, int expirationTime, String value) {
 		Jedis resource = null;
 
 		try {
 			resource = redisPool.getResource();
-			Long setnx = resource.setnx(key, value);
+			Long setnx = resource.setnx(key.getBytes(), value.getBytes());
 			if (setnx.intValue() == 1) {
 				resource.expire(key, expirationTime);
 				return TRUE;
@@ -71,17 +69,17 @@ public class RedisStorage implements IStorageClient {
 
 		return FALSE;
 	}
-	
+
 	@Override
 	public Future<Boolean> checkExist(String key, int expirationTime) {
 		Jedis resource = null;
 
-		// TODO : what to do for expiration  
+		// TODO : what to do for expiration
 		try {
 			resource = redisPool.getResource();
-			Boolean result= resource.exists(key);
+			Boolean result = resource.exists(key);
 			if (result) {
-				
+
 				return TRUE;
 			}
 		} finally {
@@ -92,18 +90,15 @@ public class RedisStorage implements IStorageClient {
 		return FALSE;
 	}
 
-	
-	
-
 	@Override
-	public Object get(String name) {
+	public byte[] get(String name) {
 		Jedis resource = null;
 
-		Object value = null;
+		byte[] value = null;
 
 		try {
 			resource = redisPool.getResource();
-			value = resource.get(name);
+			value = resource.get(name.getBytes());
 		} finally {
 			if (resource != null)
 				redisPool.returnResource(resource);
@@ -118,6 +113,5 @@ public class RedisStorage implements IStorageClient {
 		redisPool.destroy();
 
 	}
-
 
 }

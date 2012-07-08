@@ -21,7 +21,7 @@ public class ConnectionType {
 	}
 
 	boolean isSASL() {
-		return !membaseBucketConfig && !isBlank(username) && !isBlank(password);
+		return  !isBlank(username) && !isBlank(password);
 	}
 
 	boolean isDefault() {

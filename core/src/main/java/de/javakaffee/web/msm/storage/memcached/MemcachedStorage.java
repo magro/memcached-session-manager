@@ -33,8 +33,8 @@ public class MemcachedStorage implements IStorageClient {
 	}
 
 	@Override
-	public Object get(String key) {
-		return client.get(key);
+	public byte[] get(String key) {
+		return (byte[]) client.get(key);
 	}
 
 	@Override
