@@ -14,7 +14,7 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm;
+package de.javakaffee.web.msm.storage.memcached;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -28,6 +28,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
+import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.SessionIdFormat;
 
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;

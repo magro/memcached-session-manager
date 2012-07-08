@@ -63,7 +63,7 @@ public abstract class CommitInterceptingActionHook implements ActionHook {
      * {@inheritDoc}
      */
     public void action( final ActionCode actionCode, final Object param ) {
-        if ( actionCode == ActionCode.ACTION_COMMIT && !_response.isCommitted() ) {
+        if ( actionCode == ActionCode.COMMIT && !_response.isCommitted() ) {
             beforeCommit();
         }
         _delegate.action( actionCode, param );
