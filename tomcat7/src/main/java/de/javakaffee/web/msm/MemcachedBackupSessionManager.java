@@ -92,6 +92,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
 	protected MemcachedSessionService _msm;
 	private Map<String, String> storageProperties = new HashMap<String, String>();
+	private String storageFactoryClassname = null;
 
 	public MemcachedBackupSessionManager() {
 		_msm = new MemcachedSessionService(this);
@@ -544,6 +545,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 	@Override
 	public void startInternal() throws LifecycleException {
 		super.startInternal();
+
+		try {
+			initStorageFactory();
+		} catch (Exception e) {
+			throw new LifecycleException(e);
+		}
+
 		_msm.startInternal();
 		setState(LifecycleState.STARTING);
 	}
@@ -913,26 +921,25 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 		return _msm;
 	}
 
-	public void setStorageFactoryClass(final String connectionFactoryClassName) throws ClassNotFoundException,
-			InstantiationException, IllegalAccessException {
+	public void setStorageFactoryClass(final String storageFactoryClassname) {
+		this.storageFactoryClassname = storageFactoryClassname;
+
+	}
+
+	public void initStorageFactory() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
 
 		Class<? extends IStorageFactory> storageFactoryClass;
-		ClassLoader classLoader = null;
 
-		if (getContainer() != null)
-			classLoader = getContainer().getLoader().getClassLoader();
-		else
-			classLoader = this.getClass().getClassLoader();
+		ClassLoader classLoader = getContainer().getLoader().getClassLoader();
 
 		try {
-			_log.debug("Loading storage factory class " + connectionFactoryClassName + " using classloader "
-					+ classLoader);
-			storageFactoryClass = Class.forName(connectionFactoryClassName, false, classLoader).asSubclass(
+			_log.debug("Loading storage factory class " + storageFactoryClassname + " using classloader " + classLoader);
+			storageFactoryClass = Class.forName(storageFactoryClassname, false, classLoader).asSubclass(
 					IStorageFactory.class);
 		} catch (final ClassNotFoundException e) {
 			_log.info("Could not load transcoderfactory class with classloader " + classLoader + ", trying "
 					+ getClass().getClassLoader());
-			storageFactoryClass = Class.forName(connectionFactoryClassName, false, getClass().getClassLoader())
+			storageFactoryClass = Class.forName(storageFactoryClassname, false, getClass().getClassLoader())
 					.asSubclass(IStorageFactory.class);
 		}
 

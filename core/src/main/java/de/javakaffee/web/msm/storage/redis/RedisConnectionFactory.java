@@ -21,16 +21,20 @@ public class RedisConnectionFactory implements IStorageFactory {
 	private int database = Protocol.DEFAULT_DATABASE;
 
 	public RedisConnectionFactory() {
-		poolConfig = new Config();
-		redisPool = new JedisPool(poolConfig, host, port, timeout, password, database);
+
 	}
 
 	@Override
 	public IStorageClient getStorageClient(MemcachedNodesManager memcachedNodesManager, Statistics statistics,
 			long _operationTimeout) throws IOException {
 
+		poolConfig = new Config();
+
+		redisPool = new JedisPool(poolConfig, host, port, timeout, password, database);
+
 		return new RedisStorage(redisPool);
 	}
+	
 
 	public String getHost() {
 		return host;
