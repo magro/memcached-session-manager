@@ -338,7 +338,11 @@
 	</dependencies>
 
 	<repositories>
-
+		<repository>
+			<id>sonatype-releases</id>
+			<name>sonatype releases repo</name>
+			<url>https://oss.sonatype.org/content/repositories/releases</url>
+		</repository>
 		<!-- msm maven repo with custom javolution jar and kryo jars -->
 		<repository>
 			<id>msm</id>
