@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Currency;
+import java.util.Date;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.GregorianCalendar;
@@ -56,6 +57,7 @@ import de.javakaffee.kryoserializers.CollectionsSingletonSetSerializer;
 import de.javakaffee.kryoserializers.CopyForIterateCollectionSerializer;
 import de.javakaffee.kryoserializers.CopyForIterateMapSerializer;
 import de.javakaffee.kryoserializers.CurrencySerializer;
+import de.javakaffee.kryoserializers.DateSerializer;
 import de.javakaffee.kryoserializers.EnumMapSerializer;
 import de.javakaffee.kryoserializers.EnumSetSerializer;
 import de.javakaffee.kryoserializers.GregorianCalendarSerializer;
@@ -126,7 +128,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         final Kryo kryo = new KryoReflectionFactorySupport() {
             
             @Override
-            @SuppressWarnings( { "rawtypes" } )
+            @SuppressWarnings( { "rawtypes", "unchecked" } )
             public Serializer newSerializer(final Class clazz) {
                 final Serializer customSerializer = loadCustomSerializer( clazz );
                 if ( customSerializer != null ) {
@@ -139,13 +141,16 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
                     return new EnumMapSerializer( this );
                 }
                 if ( SubListSerializer.canSerialize( clazz ) ) {
-                    return new SubListSerializer( this );
+                    return new SubListSerializer( this, clazz );
                 }
                 if ( copyCollectionsForSerialization ) {
                     final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
+                }
+                if ( Date.class.isAssignableFrom( clazz ) ) {
+                    return new DateSerializer( clazz );
                 }
                 return super.newSerializer( clazz );
             }
