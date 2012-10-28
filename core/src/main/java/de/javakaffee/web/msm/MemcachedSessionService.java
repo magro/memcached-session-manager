@@ -38,6 +38,7 @@ import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.DefaultConnectionFactory;
+import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.auth.PlainCallbackHandler;
@@ -62,7 +63,6 @@ import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
-import net.spy.memcached.FailureMode;
 
 /**
  * This is the core of memcached session manager, managing sessions in memcached.
@@ -444,9 +444,9 @@ public class MemcachedSessionService {
 
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
-        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, _currentRequest);
+        _trackingHostValve = createRequestTrackingHostValve(sessionCookieName, _currentRequest);
         _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
-        _trackingContextValve = new RequestTrackingContextValve(sessionCookieName, this);
+        _trackingContextValve = createRequestTrackingContextValve(sessionCookieName);
         _manager.getContainer().getPipeline().addValve( _trackingContextValve );
 
         initNonStickyLockingMode( _memcachedNodesManager );
@@ -459,6 +459,14 @@ public class MemcachedSessionService {
         _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky + ", operation timeout " + _operationTimeout +", with node ids " +
         		_memcachedNodesManager.getPrimaryNodeIds() + " and failover node ids " + _memcachedNodesManager.getFailoverNodeIds() );
 
+    }
+
+    protected RequestTrackingContextValve createRequestTrackingContextValve(final String sessionCookieName) {
+        return new RequestTrackingContextValve(sessionCookieName, this);
+    }
+
+    protected RequestTrackingHostValve createRequestTrackingHostValve(final String sessionCookieName, final CurrentRequest currentRequest) {
+        return new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, currentRequest);
     }
 
 	protected MemcachedClientCallback createMemcachedClientCallback() {
