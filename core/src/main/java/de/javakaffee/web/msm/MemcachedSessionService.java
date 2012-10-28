@@ -406,9 +406,9 @@ public class MemcachedSessionService {
 
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
-        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, _currentRequest);
+        _trackingHostValve = createRequestTrackingHostValve(sessionCookieName, _currentRequest);
         _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
-        _trackingContextValve = new RequestTrackingContextValve(sessionCookieName, this);
+        _trackingContextValve = createRequestTrackingContextValve(sessionCookieName);
         _manager.getContainer().getPipeline().addValve( _trackingContextValve );
 
         initNonStickyLockingMode( _memcachedNodesManager );
@@ -421,6 +421,14 @@ public class MemcachedSessionService {
         _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky + ", operation timeout " + _operationTimeout +", with node ids " +
         		_memcachedNodesManager.getPrimaryNodeIds() + " and failover node ids " + _memcachedNodesManager.getFailoverNodeIds() );
 
+    }
+
+    protected RequestTrackingContextValve createRequestTrackingContextValve(final String sessionCookieName) {
+        return new RequestTrackingContextValve(sessionCookieName, this);
+    }
+
+    protected RequestTrackingHostValve createRequestTrackingHostValve(final String sessionCookieName, final CurrentRequest currentRequest) {
+        return new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, currentRequest);
     }
 
 	protected MemcachedClientCallback createMemcachedClientCallback() {
