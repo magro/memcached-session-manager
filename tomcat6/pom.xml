@@ -14,21 +14,45 @@
 	<description>The msm tomcat6 specific implementation.</description>
 
 	<dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>memcached-session-manager</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>servlet-api</artifactId>
+			<version>2.5</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>catalina</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>catalina-ha</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>coyote</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
 
-        <!-- use msm core test classes in tests -->
-        <!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
-        <dependency>
-            <groupId>de.javakaffee.msm</groupId>
-            <artifactId>memcached-session-manager</artifactId>
-            <version>${project.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
+		<!-- use msm core test classes in tests -->
+		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
+		<dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.couchbase.mock</groupId>
 			<artifactId>CouchbaseMock</artifactId>
