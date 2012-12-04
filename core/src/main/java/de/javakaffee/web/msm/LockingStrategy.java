@@ -407,8 +407,7 @@ public abstract class LockingStrategy {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
                 _log.warn( "The session " + sessionId
-                        + " should be touched in memcached, but it seemed to be"
-                        + " not existing anymore." );
+                        + " should be touched in memcached, but it does not exist therein." );
                 return false;
             }
             return true;
@@ -426,8 +425,8 @@ public abstract class LockingStrategy {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
                 _log.warn( "The session " + session.getIdInternal()
-                        + " should be touched in memcached, but it seemed to be"
-                        + " not existing anymore. Will store in memcached again." );
+                        + " should be touched in memcached, but it does not exist"
+                        + " therein. Will store in memcached again." );
                 updateSession( session, backupSessionService );
             }
         } catch ( final ExecutionException e ) {
