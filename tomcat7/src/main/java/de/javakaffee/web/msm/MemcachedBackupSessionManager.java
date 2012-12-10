@@ -77,6 +77,17 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
+    private String memcachedNodes;
+    private String failoverNodes;
+    private String username;
+    private String password;
+    private String memcachedProtocol;
+    private Boolean sessionBackupAsync;
+    private Integer backupThreadCount;
+    private Integer sessionBackupTimeout;
+    private Long operationTimeout;
+    private Boolean enableStatistics;
+    private Boolean enabled;
     private String jndiConfiguration;
 
     protected MemcachedSessionService _msm;
@@ -224,7 +235,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void setMemcachedNodes( final String memcachedNodes ) {
-        _msm.setMemcachedNodes( memcachedNodes );
+        this.memcachedNodes = memcachedNodes;
     }
 
     /**
@@ -235,7 +246,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the configuration string for the memcached nodes.
      */
     public String getMemcachedNodes() {
-        return _msm.getMemcachedNodes();
+        return this.memcachedNodes;
     }
 
     /**
@@ -255,7 +266,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void setFailoverNodes( final String failoverNodes ) {
-        _msm.setFailoverNodes( failoverNodes );
+        this.failoverNodes = failoverNodes;
     }
 
     /**
@@ -266,7 +277,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the configuration string for the failover nodes.
      */
     public String getFailoverNodes() {
-        return _msm.getFailoverNodes();
+        return this.failoverNodes;
     }
 
     /**
@@ -405,7 +416,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param enableStatistics <code>true</code> if statistics shall be gathered.
      */
     public void setEnableStatistics( final boolean enableStatistics ) {
-        _msm.setEnableStatistics( enableStatistics );
+        this.enableStatistics = enableStatistics;
     }
 
     /**
@@ -415,7 +426,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param backupThreadCount the number of threads to use for session backup.
      */
     public void setBackupThreadCount( final int backupThreadCount ) {
-        _msm.setBackupThreadCount( backupThreadCount );
+        this.backupThreadCount = backupThreadCount;
     }
 
     /**
@@ -424,7 +435,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return the number of threads for session backup.
      */
     public int getBackupThreadCount() {
-        return _msm.getBackupThreadCount();
+        return this.backupThreadCount;
     }
 
     /**
@@ -433,7 +444,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param memcachedProtocol one of "text" or "binary".
      */
     public void setMemcachedProtocol( final String memcachedProtocol ) {
-        _msm.setMemcachedProtocol( memcachedProtocol );
+        this.memcachedProtocol = memcachedProtocol;
     }
 
     /**
@@ -445,7 +456,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     @Override
     public void setEnabled( final boolean enabled ) throws IllegalStateException {
-        _msm.setEnabled( enabled );
+        this.enabled = enabled;
     }
 
     /**
@@ -454,7 +465,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @return <code>true</code> if enabled, otherwise <code>false</code>.
      */
     public boolean isEnabled() {
-        return _msm.isEnabled();
+        return this.enabled;
     }
 
     @Override
@@ -467,13 +478,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     @Override
-	public void setOperationTimeout(final long operationTimeout ) {
-		_msm.setOperationTimeout(operationTimeout);
-	}
+    public void setOperationTimeout(final long operationTimeout ) {
+        this.operationTimeout = operationTimeout;
+    }
 
-	public long getOperationTimeout() {
-		return _msm.getOperationTimeout();
-	}
+    public long getOperationTimeout() {
+        return this.operationTimeout;
+    }
 
     /**
      * Sets the session locking mode. Possible values:
@@ -497,63 +508,125 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public void setUsername(final String username) {
-        _msm.setUsername(username);
+        this.username = username;
     }
 
     @Override
     public void setPassword(final String password) {
-        _msm.setPassword(password);
+        this.password = password;
     }
 
     /**
      * {@inheritDoc}
      */
-	@Override
-	public void initInternal() throws LifecycleException {
-		super.initInternal();
-		if (jndiConfiguration != null) {
+    @Override
+    public void initInternal() throws LifecycleException {
+        super.initInternal();
+
+        String memcachedNodes = null;
+        String failoverNodes = null;
+        String username = null;
+        String password = null;
+        String memcachedProtocol = null;
+        Boolean sessionBackupAsync = null;
+        Integer backupThreadCount = null;
+        Integer sessionBackupTimeout = null;
+        Long operationTimeout = null;
+        Boolean enableStatistics = null;
+        Boolean enabled = null;
+
+        if (jndiConfiguration != null) {
             try {
                 InitialContext initialContext = new InitialContext();
                 ConfigurationObject config = (ConfigurationObject) initialContext.lookup("java:/comp/env/" + jndiConfiguration);
 
-                if (config.memcachedNodes != null) {
-                    setMemcachedNodes(config.memcachedNodes);
-                }
-                if (config.failoverNodes != null) {
-                    setFailoverNodes(config.failoverNodes);
-                }
-                if (config.username != null) {
-                    setUsername(config.username);
-                }
-                if (config.password != null) {
-                    setPassword(config.password);
-                }
-                if (config.memcachedProtocol != null) {
-                    setMemcachedProtocol(config.memcachedProtocol);
-                }
-                if (config.sessionBackupAsync != null) {
-                    setSessionBackupAsync(config.sessionBackupAsync);
-                }
-                if (config.backupThreadCount != null) {
-                    setBackupThreadCount(config.backupThreadCount);
-                }
-                if (config.sessionBackupTimeout != null) {
-                    setSessionBackupTimeout(config.sessionBackupTimeout);
-                }
-                if (config.operationTimeout != null) {
-                    setOperationTimeout(config.operationTimeout);
-                }
-                if (config.enableStatistics != null) {
-                    setEnableStatistics(config.enableStatistics);
-                }
-                if (config.enabled != null) {
-                    setEnabled(config.enabled);
-                }
+                // set global defaults through jndi
+                memcachedNodes = config.memcachedNodes;
+                failoverNodes = config.failoverNodes;
+                username = config.username;
+                password = config.password;
+                memcachedProtocol = config.memcachedProtocol;
+                sessionBackupAsync = config.sessionBackupAsync;
+                backupThreadCount = config.backupThreadCount;
+                sessionBackupTimeout = config.sessionBackupTimeout;
+                operationTimeout = config.operationTimeout;
+                enableStatistics = config.enableStatistics;
+                enabled = config.enabled;
             } catch(NamingException e) {
                 _log.warn("unable to get configuration via jndi");
             }
         }
-	}
+
+        // set local configs
+        if (this.memcachedNodes != null) {
+            memcachedNodes = this.memcachedNodes;
+        }
+        if (this.failoverNodes != null) {
+            failoverNodes = this.failoverNodes;
+        }
+        if (this.username != null) {
+            username = this.username;
+        }
+        if (this.password != null) {
+            password = this.password;
+        }
+        if (this.memcachedProtocol != null) {
+            memcachedProtocol = this.memcachedProtocol;
+        }
+        if (this.sessionBackupAsync != null) {
+            sessionBackupAsync = this.sessionBackupAsync;
+        }
+        if (this.backupThreadCount != null) {
+            backupThreadCount = this.backupThreadCount;
+        }
+        if (this.sessionBackupTimeout != null) {
+            sessionBackupTimeout = this.sessionBackupTimeout;
+        }
+        if (this.operationTimeout != null) {
+            operationTimeout = this.operationTimeout;
+        }
+        if (this.enableStatistics != null) {
+            enableStatistics = this.enableStatistics;
+        }
+        if (this.enabled != null) {
+            enabled = this.enabled;
+        }
+
+        // set value if informed
+        if (memcachedNodes != null) {
+            _msm.setMemcachedNodes(memcachedNodes);
+        }
+        if (failoverNodes != null) {
+            _msm.setFailoverNodes(failoverNodes);
+        }
+        if (username != null) {
+            _msm.setUsername(username);
+        }
+        if (password != null) {
+            _msm.setPassword(password);
+        }
+        if (memcachedProtocol != null) {
+            _msm.setMemcachedProtocol(memcachedProtocol);
+        }
+        if (sessionBackupAsync != null) {
+            _msm.setSessionBackupAsync(sessionBackupAsync);
+        }
+        if (backupThreadCount != null) {
+            _msm.setBackupThreadCount(backupThreadCount);
+        }
+        if (sessionBackupTimeout != null) {
+            _msm.setSessionBackupTimeout(sessionBackupTimeout);
+        }
+        if (operationTimeout != null) {
+            _msm.setOperationTimeout(operationTimeout);
+        }
+        if (enableStatistics != null) {
+            _msm.setEnableStatistics(enableStatistics);
+        }
+        if (enabled != null) {
+            _msm.setEnabled(enabled);
+        }
+    }
 
     /**
      * {@inheritDoc}
@@ -618,7 +691,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the sessionBackupAsync to set
      */
     public void setSessionBackupAsync( final boolean sessionBackupAsync ) {
-        _msm.setSessionBackupAsync( sessionBackupAsync );
+        this.sessionBackupAsync = sessionBackupAsync;
     }
 
     /**
@@ -628,7 +701,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * evaluated.
      */
     public boolean isSessionBackupAsync() {
-        return _msm.isSessionBackupAsync();
+        return this.sessionBackupAsync;
     }
 
     /**
@@ -645,7 +718,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      *            the sessionBackupTimeout to set (milliseconds)
      */
     public void setSessionBackupTimeout( final int sessionBackupTimeout ) {
-        _msm.setSessionBackupTimeout( sessionBackupTimeout );
+        this.sessionBackupTimeout = sessionBackupTimeout;
     }
 
     /**
@@ -653,7 +726,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * beeing failed when {@link #getSessionBackupAsync()}) is <code>false</code>.
      */
     public long getSessionBackupTimeout() {
-        return _msm.getSessionBackupTimeout();
+        return this.sessionBackupTimeout;
     }
 
     /**
