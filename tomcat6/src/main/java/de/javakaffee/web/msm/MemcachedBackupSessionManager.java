@@ -50,6 +50,9 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
+import de.javakaffee.web.msm.jndi.ConfigurationObject;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 
 /**
  * This {@link Manager} stores session in configured memcached nodes after the
@@ -82,6 +85,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     private int _maxActiveSessions = -1;
     private int _rejectedSessions;
+    private String jndiConfiguration;
 
     /**
      * Has this component been _started yet?
@@ -124,6 +128,49 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
      */
     protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
+        if (jndiConfiguration != null) {
+            try {
+                InitialContext initialContext = new InitialContext();
+                ConfigurationObject config = (ConfigurationObject) initialContext.lookup("java:/comp/env/" + jndiConfiguration);
+
+                if (config.memcachedNodes != null) {
+                    setMemcachedNodes(config.memcachedNodes);
+                }
+                if (config.failoverNodes != null) {
+                    setFailoverNodes(config.failoverNodes);
+                }
+                if (config.username != null) {
+                    setUsername(config.username);
+                }
+                if (config.password != null) {
+                    setPassword(config.password);
+                }
+                if (config.memcachedProtocol != null) {
+                    setMemcachedProtocol(config.memcachedProtocol);
+                }
+                if (config.sessionBackupAsync != null) {
+                    setSessionBackupAsync(config.sessionBackupAsync);
+                }
+                if (config.backupThreadCount != null) {
+                    setBackupThreadCount(config.backupThreadCount);
+                }
+                if (config.sessionBackupTimeout != null) {
+                    setSessionBackupTimeout(config.sessionBackupTimeout);
+                }
+                if (config.operationTimeout != null) {
+                    setOperationTimeout(config.operationTimeout);
+                }
+                if (config.enableStatistics != null) {
+                    setEnableStatistics(config.enableStatistics);
+                }
+                if (config.enabled != null) {
+                    setEnabled(config.enabled);
+                }
+            } catch(NamingException e) {
+                _log.warn("unable to get configuration via jndi");
+            }
+        }
+
         _msm.setMemcachedClient(memcachedClient);
         _msm.startInternal();
     }
@@ -765,6 +812,26 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      */
     public long getSessionBackupTimeout() {
         return _msm.getSessionBackupTimeout();
+    }
+
+    /**
+     * The configuration that gives administrators the ability to have a common
+     * global configuration that is available through jndi.
+     *
+     * @param jndiConfiguration
+     *            the jndi name where the configuration is found
+     */
+    @Override
+    public void setJndiConfiguration( final String jndiConfiguration ) {
+        this.jndiConfiguration = jndiConfiguration;
+    }
+
+    /**
+     * The configuration that gives administrators the ability to have a common
+     * global configuration that is available through jndi.
+     */
+    public String getJndiConfiguration() {
+        return jndiConfiguration;
     }
 
     // -------------------------  statistics via jmx ----------------

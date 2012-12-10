@@ -373,6 +373,7 @@ public class MemcachedSessionService {
         void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup );
         void setUsername(String username);
         void setPassword(String password);
+        void setJndiConfiguration(String jndiConfiguration );
 
         /**
          * Creates a new instance of {@link MemcachedBackupSession} (needed so that it's possible to
