@@ -79,7 +79,7 @@ public final class ConfigurationObjectFactory implements ObjectFactory {
         }
     }
 
-	private Object getValue(Class<?> type, String propName, String propValue) throws Exception {
+    private Object getValue(Class<?> type, String propName, String propValue) throws Exception {
         if (type.isAssignableFrom(Long.class)) {
             try {
                 return Long.valueOf(propValue);
@@ -104,6 +104,6 @@ public final class ConfigurationObjectFactory implements ObjectFactory {
             return propValue;
         }
 
-		return null;
-	}
+        return null;
+    }
 }
