@@ -24,7 +24,10 @@ import java.util.Map;
 import javax.naming.*;
 import javax.naming.spi.ObjectFactory;
 
-public class ConfigurationObjectFactory implements ObjectFactory {
+/**
+ * Factory that is used to create the JNDI resource.
+ */
+public final class ConfigurationObjectFactory implements ObjectFactory {
     private static Map<Class, Class> mapper = new HashMap<Class, Class>();
     static {
         mapper.put(boolean.class, Boolean.class);
@@ -32,6 +35,9 @@ public class ConfigurationObjectFactory implements ObjectFactory {
         mapper.put(long.class, Long.class);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Object getObjectInstance(Object obj, Name name, Context nameCtx, Hashtable<?, ?> environment) throws Exception {
         if (obj == null) {
@@ -50,44 +56,54 @@ public class ConfigurationObjectFactory implements ObjectFactory {
 
             Field[] fields = ConfigurationObject.class.getFields();
             for (Field field : fields) {
-                if (propName.equals(field.getName())) {
-                    Class<?> type = field.getType();
-                    if (mapper.containsKey(type)) {
-                        type = mapper.get(type);
-                    }
-
-                    Object value = null;
-                    if (type.isAssignableFrom(Long.class)) {
-                        try {
-                            value = Long.valueOf(propValue);
-                        } catch (NumberFormatException e) {
-                            throw new NamingException(field.getName() + " is not an long value");
-                        }
-                    } else if (type.isAssignableFrom(Integer.class)) {
-                        try {
-                            value = Integer.parseInt(propValue);
-                        } catch (NumberFormatException e) {
-                            throw new NamingException(field.getName() + " is not an integer value");
-                        }
-                    } else if (type.isAssignableFrom(Boolean.class)) {
-                        if ("true".equalsIgnoreCase(propValue)) {
-                            value = true;
-                        } else if ("false".equalsIgnoreCase(propValue)) {
-                            value = false;
-                        } else {
-                            throw new NamingException(field.getName() + " is not a boolean value");
-                        }
-                    } else if (type.isAssignableFrom(String.class)) {
-                        value = propValue;
-                    }
-
-                    if (value != null) {
-                        field.set(config, value);
-                    }
-                }
+                checkForValue(config, propName, propValue, field);
             }
         }
 
         return config;
     }
+
+    private void checkForValue(ConfigurationObject config, String propName, String propValue, Field field) throws Exception {
+        if (!propName.equals(field.getName())) {
+            return;
+        }
+
+        Class<?> type = field.getType();
+        if (mapper.containsKey(type)) {
+            type = mapper.get(type);
+        }
+
+        Object value = getValue(type, propName, propValue);
+        if (value != null) {
+            field.set(config, value);
+        }
+    }
+
+	private Object getValue(Class<?> type, String propName, String propValue) throws Exception {
+        if (type.isAssignableFrom(Long.class)) {
+            try {
+                return Long.valueOf(propValue);
+            } catch (NumberFormatException e) {
+                throw new NamingException(propName + " is not an long value");
+            }
+        } else if (type.isAssignableFrom(Integer.class)) {
+            try {
+                return Integer.parseInt(propValue);
+            } catch (NumberFormatException e) {
+                throw new NamingException(propName + " is not an integer value");
+            }
+        } else if (type.isAssignableFrom(Boolean.class)) {
+            if ("true".equalsIgnoreCase(propValue)) {
+                return true;
+            } else if ("false".equalsIgnoreCase(propValue)) {
+                return false;
+            } else {
+                throw new NamingException(propName + " is not a boolean value");
+            }
+        } else if (type.isAssignableFrom(String.class)) {
+            return propValue;
+        }
+
+		return null;
+	}
 }
