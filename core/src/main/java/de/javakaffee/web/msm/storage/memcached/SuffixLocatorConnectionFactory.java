@@ -14,7 +14,7 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm;
+package de.javakaffee.web.msm.storage.memcached;
 
 import java.util.List;
 
@@ -24,10 +24,13 @@ import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.transcoders.SerializingTranscoder;
 import net.spy.memcached.transcoders.Transcoder;
+import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.SessionIdFormat;
+import de.javakaffee.web.msm.Statistics;
 
 
 /**
- * This {@link net.spy.memcached.ConnectionFactory} uses the
+ * This {@link de.javakaffee.web.msm.storage.IStorageFactory} uses the
  * {@link SuffixBasedNodeLocator} as {@link NodeLocator}.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>

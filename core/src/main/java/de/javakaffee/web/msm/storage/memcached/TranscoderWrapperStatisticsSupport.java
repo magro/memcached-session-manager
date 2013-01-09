@@ -14,10 +14,11 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm;
+package de.javakaffee.web.msm.storage.memcached;
 
 import net.spy.memcached.CachedData;
 import net.spy.memcached.transcoders.Transcoder;
+import de.javakaffee.web.msm.Statistics;
 import de.javakaffee.web.msm.Statistics.MinMaxAvgProbe;
 import de.javakaffee.web.msm.Statistics.StatsType;
 

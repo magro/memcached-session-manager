@@ -20,8 +20,8 @@ import java.util.concurrent.ExecutionException;
 
 import javax.annotation.Nonnull;
 
-import net.spy.memcached.MemcachedClient;
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.storage.IStorageClient;
 
 /**
  * Ths locking strategy does not lock the session at all.
@@ -32,7 +32,7 @@ public class LockingStrategyNone extends LockingStrategy {
 
     public LockingStrategyNone( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
-            @Nonnull final MemcachedClient memcached,
+            @Nonnull final IStorageClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats ) {
