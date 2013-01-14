@@ -98,7 +98,7 @@ public class RequestTrackingHostValveTest {
     @Test
     public final void testBackupSessionNotInvokedWhenNoSessionIdPresent() throws IOException, ServletException {
         when( _request.getRequestedSessionId() ).thenReturn( null );
-        when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( null );
+        when( _response.getHeaderValues( eq( "Set-Cookie" ) ) ).thenReturn( null );
 
         _sessionTrackerValve.invoke( _request, _response );
 
@@ -109,7 +109,7 @@ public class RequestTrackingHostValveTest {
     public final void testBackupSessionInvokedWhenResponseCookiePresent() throws IOException, ServletException {
         when( _request.getRequestedSessionId() ).thenReturn( null );
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), "foo" );
-        when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
+        when( _response.getHeaderValues( eq( "Set-Cookie" ) ) ).thenReturn( new String[] { generateCookieString( cookie ) } );
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service ).backupSession( eq( "foo" ), eq( false), anyString() );
@@ -136,7 +136,7 @@ public class RequestTrackingHostValveTest {
         when( _request.getRequestedSessionId() ).thenReturn( sessionId );
 
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );
-        when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
+        when( _response.getHeaderValues( eq( "Set-Cookie" ) ) ).thenReturn( new String[] { generateCookieString( cookie ) } );
 
         _sessionTrackerValve.invoke( _request, _response );
 
