@@ -240,19 +240,23 @@ public class RequestTrackingHostValve extends ValveBase {
     }
 
     private String getSessionIdFromResponseSessionCookie( final Response response ) {
-        final String header = response.getHeader( "Set-Cookie" );
-        if ( header != null && header.contains( _sessionCookieName ) ) {
-            final String sessionIdPrefix = _sessionCookieName + "=";
-            final int idxNameStart = header.indexOf( sessionIdPrefix );
-            final int idxValueStart = idxNameStart + sessionIdPrefix.length();
-            int idxValueEnd = header.indexOf( ';', idxNameStart );
-            if ( idxValueEnd == -1 ) {
-                idxValueEnd = header.indexOf( ' ', idxValueStart );
+        final String[] headers = response.getHeaderValues( "Set-Cookie" );
+        if( headers != null ) {
+            for( final String header : headers ) {
+                if ( header != null && header.contains( _sessionCookieName ) ) {
+                    final String sessionIdPrefix = _sessionCookieName + "=";
+                    final int idxNameStart = header.indexOf( sessionIdPrefix );
+                    final int idxValueStart = idxNameStart + sessionIdPrefix.length();
+                    int idxValueEnd = header.indexOf( ';', idxNameStart );
+                    if ( idxValueEnd == -1 ) {
+                        idxValueEnd = header.indexOf( ' ', idxValueStart );
+                    }
+                    if ( idxValueEnd == -1 ) {
+                        idxValueEnd = header.length();
+                    }
+                    return header.substring( idxValueStart, idxValueEnd );
+                }
             }
-            if ( idxValueEnd == -1 ) {
-                idxValueEnd = header.length();
-            }
-            return header.substring( idxValueStart, idxValueEnd );
         }
         return null;
     }
