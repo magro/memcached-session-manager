@@ -17,6 +17,8 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -62,6 +64,18 @@ public class RequestTrackingHostValve extends ValveBase {
     private @CheckForNull LockingStrategy _lockingStrategy;
 
     private static final String MSM_REQUEST_ID = "msm.requestId";
+
+	private static final boolean IS_TOMCAT_6;
+	static {
+		Method getHeaderValues = null;
+		try {
+			getHeaderValues = Response.class.getMethod("getHeaderValues", String.class);
+		}catch(NoSuchMethodException e) {
+			//Do nothing
+		}
+
+		IS_TOMCAT_6 = (getHeaderValues != null);
+	}
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -239,22 +253,43 @@ public class RequestTrackingHostValve extends ValveBase {
         return sessionId != null ? sessionId : request.getRequestedSessionId();
     }
 
-    private String getSessionIdFromResponseSessionCookie( final Response response ) {
-        final String header = response.getHeader( "Set-Cookie" );
-        if ( header != null && header.contains( _sessionCookieName ) ) {
-            final String sessionIdPrefix = _sessionCookieName + "=";
-            final int idxNameStart = header.indexOf( sessionIdPrefix );
-            final int idxValueStart = idxNameStart + sessionIdPrefix.length();
-            int idxValueEnd = header.indexOf( ';', idxNameStart );
-            if ( idxValueEnd == -1 ) {
-                idxValueEnd = header.indexOf( ' ', idxValueStart );
+    private String getSessionIdFromResponseSessionCookie(final Response response) {
+        String[] headers = getResponseSetCookieHeaders(response);
+        if (headers == null) {
+            return null;
+        }
+        for (String header : headers) {
+            if (header != null && header.contains(_sessionCookieName)) {
+                final String sessionIdPrefix = _sessionCookieName + "=";
+                final int idxNameStart = header.indexOf(sessionIdPrefix);
+                final int idxValueStart = idxNameStart + sessionIdPrefix.length();
+                int idxValueEnd = header.indexOf(';', idxNameStart);
+                if (idxValueEnd == -1) {
+                    idxValueEnd = header.indexOf(' ', idxValueStart);
+                }
+                if (idxValueEnd == -1) {
+                    idxValueEnd = header.length();
+                }
+                return header.substring(idxValueStart, idxValueEnd);
             }
-            if ( idxValueEnd == -1 ) {
-                idxValueEnd = header.length();
-            }
-            return header.substring( idxValueStart, idxValueEnd );
         }
         return null;
+    }
+
+    private String[] getResponseSetCookieHeaders(final Response response) {
+        try {
+            if (IS_TOMCAT_6) {
+                Method getHeaderValues = response.getClass().getMethod("getHeaderValues", String.class);
+                String[] result = (String[]) getHeaderValues.invoke(response, "Set-Cookie");
+                return result;
+            } else {
+                Method getHeaders = response.getClass().getMethod("getHeaders", String.class);
+                Collection<String> result = (Collection<String>) getHeaders.invoke(response, "Set-Cookie");
+                return result.toArray(new String[0]);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void logDebugResponseCookie( final Response response ) {

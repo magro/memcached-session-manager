@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class RequestTrackingHostValveTest {
+public abstract class RequestTrackingHostValveTest {
 
     protected MemcachedSessionService _service;
     private RequestTrackingHostValve _sessionTrackerValve;
@@ -109,21 +109,11 @@ public class RequestTrackingHostValveTest {
     public final void testBackupSessionInvokedWhenResponseCookiePresent() throws IOException, ServletException {
         when( _request.getRequestedSessionId() ).thenReturn( null );
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), "foo" );
-        when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
+        setupGetResponseSetCookieHeadersExpectations(_response, new String[]{generateCookieString( cookie )});
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service ).backupSession( eq( "foo" ), eq( false), anyString() );
 
-    }
-
-    private String generateCookieString(final Cookie cookie) {
-        final StringBuffer sb = new StringBuffer();
-        ServerCookie.appendCookieValue
-        (sb, cookie.getVersion(), cookie.getName(), cookie.getValue(),
-             cookie.getPath(), cookie.getDomain(), cookie.getComment(),
-             cookie.getMaxAge(), cookie.getSecure(), true );
-        final String setSessionCookieHeader = sb.toString();
-        return setSessionCookieHeader;
     }
 
     @Test
@@ -136,7 +126,7 @@ public class RequestTrackingHostValveTest {
         when( _request.getRequestedSessionId() ).thenReturn( sessionId );
 
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );
-        when( _response.getHeader( eq( "Set-Cookie" ) ) ).thenReturn( generateCookieString( cookie ) );
+        setupGetResponseSetCookieHeadersExpectations(_response, new String[]{generateCookieString( cookie )});
 
         _sessionTrackerValve.invoke( _request, _response );
 
@@ -152,6 +142,18 @@ public class RequestTrackingHostValveTest {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service ).requestFinished( eq( "foo" ), anyString() );
+    }
+
+    protected abstract void setupGetResponseSetCookieHeadersExpectations(Response response, String[] result);
+
+    private String generateCookieString(final Cookie cookie) {
+        final StringBuffer sb = new StringBuffer();
+        ServerCookie.appendCookieValue
+                (sb, cookie.getVersion(), cookie.getName(), cookie.getValue(),
+                        cookie.getPath(), cookie.getDomain(), cookie.getComment(),
+                        cookie.getMaxAge(), cookie.getSecure(), true);
+        final String setSessionCookieHeader = sb.toString();
+        return setSessionCookieHeader;
     }
 
 }
