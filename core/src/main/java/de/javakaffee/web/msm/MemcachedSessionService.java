@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 
+import com.couchbase.client.CouchbaseClient;
 import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
@@ -481,7 +482,7 @@ public class MemcachedSessionService {
             if (connectionType.isMembaseBucketConfig()) {
             	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
-                return new MemcachedClient(memcachedNodesManager.getMembaseBucketURIs(), _username, _password);
+                return new CouchbaseClient(memcachedNodesManager.getMembaseBucketURIs(), _username, _password);
             }
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
         } catch (final Exception e) {

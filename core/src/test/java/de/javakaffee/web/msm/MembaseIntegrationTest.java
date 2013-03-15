@@ -15,6 +15,7 @@
  */
 package de.javakaffee.web.msm;
 
+import com.couchbase.client.CouchbaseClient;
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
 import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.getService;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.vbucket.ConfigurationException;
 
 import org.apache.catalina.startup.Embedded;
 import org.apache.juli.logging.Log;
@@ -156,14 +156,14 @@ public abstract class MembaseIntegrationTest {
         throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
     }
 
-    private void setupMembaseClient() throws URISyntaxException, IOException, ConfigurationException {
+    private void setupMembaseClient() throws URISyntaxException, IOException {
         if(mc != null) {
             LOG.info("Closing existing membase client.");
             mc.shutdown();
         }
         final List<URI> uris = getURIs();
         LOG.info("Creating new membase client with uris " + uris);
-        mc = new MemcachedClient(uris, "default", "");
+        mc = new CouchbaseClient(uris, "default", "");
     }
 
     private List<URI> getURIs() throws URISyntaxException {
