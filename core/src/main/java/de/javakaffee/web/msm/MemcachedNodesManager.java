@@ -64,11 +64,11 @@ public class MemcachedNodesManager {
     private static final String SINGLE_NODE_REGEX = "([^:]+):([\\d]+)";
     private static final Pattern SINGLE_NODE_PATTERN = Pattern.compile( SINGLE_NODE_REGEX );
 
-    private static final String MEMBASE_BUCKET_NODE_REGEX = "http://([^:]+):([\\d]+)/[\\w]+";
-    private static final Pattern MEMBASE_BUCKET_NODE_PATTERN = Pattern.compile( MEMBASE_BUCKET_NODE_REGEX );
+    private static final String COUCHBASE_BUCKET_NODE_REGEX = "http://([^:]+):([\\d]+)/[\\w]+";
+    private static final Pattern COUCHBASE_BUCKET_NODE_PATTERN = Pattern.compile( COUCHBASE_BUCKET_NODE_REGEX );
 
-    private static final String MEMBASE_BUCKET_NODES_REGEX = MEMBASE_BUCKET_NODE_REGEX + "(?:(?:\\s+|,)" + MEMBASE_BUCKET_NODE_REGEX + ")*";
-    private static final Pattern MEMBASE_BUCKET_NODES_PATTERN = Pattern.compile( MEMBASE_BUCKET_NODES_REGEX );
+    private static final String COUCHBASE_BUCKET_NODES_REGEX = COUCHBASE_BUCKET_NODE_REGEX + "(?:(?:\\s+|,)" + COUCHBASE_BUCKET_NODE_REGEX + ")*";
+    private static final Pattern COUCHBASE_BUCKET_NODES_PATTERN = Pattern.compile( COUCHBASE_BUCKET_NODES_REGEX );
 
     private static final int NODE_AVAILABILITY_CACHE_TTL = 50;
 
@@ -98,7 +98,7 @@ public class MemcachedNodesManager {
 		_failoverNodeIds = failoverNodeIds;
 		_address2Ids = address2Ids;
 
-        _encodeNodeIdInSessionId = !((getCountNodes() <= 1 || isMembaseConfig(memcachedNodes)) && _primaryNodeIds.isEmpty());
+        _encodeNodeIdInSessionId = !((getCountNodes() <= 1 || isCouchbaseConfig(memcachedNodes)) && _primaryNodeIds.isEmpty());
 
 		if (_encodeNodeIdInSessionId) {
 			if (memcachedClientCallback == null) {
@@ -131,7 +131,7 @@ public class MemcachedNodesManager {
 		}
 	}
 
-    private boolean isMembaseConfig(final String memcachedNodes) {
+    private boolean isCouchbaseConfig(final String memcachedNodes) {
         return memcachedNodes.startsWith("http://");
     }
 
@@ -178,7 +178,7 @@ public class MemcachedNodesManager {
 		}
 
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
-        		&& !MEMBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {
+        		&& !COUCHBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {
             throw new IllegalArgumentException( "Configured memcachedNodes attribute has wrong format, must match " + NODES_REGEX );
         }
 
@@ -193,8 +193,8 @@ public class MemcachedNodesManager {
         if (singleNodeMatcher.matches()) {    // for single
             address2Ids.put(getSingleShortNodeDefinition(singleNodeMatcher), null);
         }
-        else if (MEMBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {    // for membase
-            final Matcher matcher = MEMBASE_BUCKET_NODE_PATTERN.matcher(memcachedNodes);
+        else if (COUCHBASE_BUCKET_NODES_PATTERN.matcher(memcachedNodes).matches()) {    // for couchbase
+            final Matcher matcher = COUCHBASE_BUCKET_NODE_PATTERN.matcher(memcachedNodes);
             while (matcher.find()) {
                 final String hostname = matcher.group( 1 );
                 final int port = Integer.parseInt( matcher.group( 2 ) );
@@ -300,7 +300,7 @@ public class MemcachedNodesManager {
 	/**
 	 * Specifies if the memcached node id shall be encoded in the sessionId. This is only false
 	 * for a single memcachedNode definition without a nodeId (e.g. <code>localhost:11211</code>)
-	 * or for membase REST URIs (one or more of e.g. http://10.10.0.1:8091/pools).
+	 * or for couchbase REST URIs (one or more of e.g. http://10.10.0.1:8091/pools).
 	 */
 	public boolean isEncodeNodeIdInSessionId() {
 		return _encodeNodeIdInSessionId;
@@ -488,23 +488,23 @@ public class MemcachedNodesManager {
 	}
 
 	/**
-	 * Determines, if the current memcachedNodes configuration is a membase bucket configuration
+	 * Determines, if the current memcachedNodes configuration is a couchbase bucket configuration
 	 * (like e.g. http://10.10.0.1:8091/pools).
 	 */
-    public boolean isMembaseBucketConfig() {
-        return MEMBASE_BUCKET_NODES_PATTERN.matcher(_memcachedNodes).matches();
+    public boolean isCouchbaseBucketConfig() {
+        return COUCHBASE_BUCKET_NODES_PATTERN.matcher(_memcachedNodes).matches();
     }
 
     /**
-     * Returns a list of membase REST interface uris if the current configuration is
-     * a membase bucket configuration.
-     * @see #isMembaseBucketConfig()
+     * Returns a list of couchbase REST interface uris if the current configuration is
+     * a couchbase bucket configuration.
+     * @see #isCouchbaseBucketConfig()
      */
-    public List<URI> getMembaseBucketURIs() {
-        if(!isMembaseBucketConfig())
-            throw new IllegalStateException("This is not a membase bucket configuration.");
+    public List<URI> getCouchbaseBucketURIs() {
+        if(!isCouchbaseBucketConfig())
+            throw new IllegalStateException("This is not a couchbase bucket configuration.");
         final List<URI> result = new ArrayList<URI>(_address2Ids.size());
-        final Matcher matcher = MEMBASE_BUCKET_NODE_PATTERN.matcher(_memcachedNodes);
+        final Matcher matcher = COUCHBASE_BUCKET_NODE_PATTERN.matcher(_memcachedNodes);
         while (matcher.find()) {
             try {
                 result.add(new URI(matcher.group()));

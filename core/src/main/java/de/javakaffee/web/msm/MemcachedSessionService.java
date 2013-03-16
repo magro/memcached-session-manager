@@ -88,25 +88,25 @@ public class MemcachedSessionService {
 
     static class ConnectionType {
 
-        private final boolean membaseBucketConfig;
+        private final boolean couchbaseBucketConfig;
         private final String username;
         private final String password;
-        public ConnectionType(final boolean membaseBucketConfig, final String username, final String password) {
-            this.membaseBucketConfig = membaseBucketConfig;
+        public ConnectionType(final boolean couchbaseBucketConfig, final String username, final String password) {
+            this.couchbaseBucketConfig = couchbaseBucketConfig;
             this.username = username;
             this.password = password;
         }
-        public static ConnectionType valueOf(final boolean membaseBucketConfig, final String username, final String password) {
-            return new ConnectionType(membaseBucketConfig, username, password);
+        public static ConnectionType valueOf(final boolean couchbaseBucketConfig, final String username, final String password) {
+            return new ConnectionType(couchbaseBucketConfig, username, password);
         }
-        boolean isMembaseBucketConfig() {
-            return membaseBucketConfig;
+        boolean isCouchbaseBucketConfig() {
+            return couchbaseBucketConfig;
         }
         boolean isSASL() {
-            return !membaseBucketConfig && !isBlank(username) && !isBlank(password);
+            return !couchbaseBucketConfig && !isBlank(username) && !isBlank(password);
         }
         boolean isDefault() {
-            return !isMembaseBucketConfig() && !isSASL();
+            return !isCouchbaseBucketConfig() && !isSASL();
         }
 
         boolean isBlank(final String value) {
@@ -479,14 +479,14 @@ public class MemcachedSessionService {
             return null;
         }
         try {
-            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isMembaseBucketConfig(), _username, _password);
+            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), _username, _password);
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
-            if (connectionType.isMembaseBucketConfig()) {
+            if (connectionType.isCouchbaseBucketConfig()) {
             	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
                 CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
                 factory.setOpTimeout(_operationTimeout);
-                return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getMembaseBucketURIs(), _username, _password));
+                return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, _password));
             }
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
         } catch (final Exception e) {
@@ -507,7 +507,7 @@ public class MemcachedSessionService {
                                 .setAuthDescriptor(authDescriptor)
                                 .setOpTimeout(_operationTimeout).build();
             }
-            else if (connectionType.isMembaseBucketConfig()) {
+            else if (connectionType.isCouchbaseBucketConfig()) {
                 return new ConnectionFactoryBuilder()
                     .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
                     .setOpTimeout(_operationTimeout).build();
