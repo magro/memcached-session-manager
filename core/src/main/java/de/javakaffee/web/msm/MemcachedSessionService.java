@@ -480,7 +480,6 @@ public class MemcachedSessionService {
         }
         try {
             final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), _username, _password);
-            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
             if (connectionType.isCouchbaseBucketConfig()) {
             	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
@@ -488,6 +487,7 @@ public class MemcachedSessionService {
                 factory.setOpTimeout(_operationTimeout);
                 return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, _password));
             }
+            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
         } catch (final Exception e) {
             throw new RuntimeException("Could not create memcached client", e);
@@ -506,11 +506,6 @@ public class MemcachedSessionService {
                         : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
                                 .setAuthDescriptor(authDescriptor)
                                 .setOpTimeout(_operationTimeout).build();
-            }
-            else if (connectionType.isCouchbaseBucketConfig()) {
-                return new ConnectionFactoryBuilder()
-                    .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                    .setOpTimeout(_operationTimeout).build();
             }
             else {
                 return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
