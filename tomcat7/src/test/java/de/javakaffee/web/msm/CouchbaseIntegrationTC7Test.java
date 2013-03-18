@@ -27,7 +27,7 @@ import de.javakaffee.web.msm.integration.TestUtilsTC7;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 @Test
-public class MembaseIntegrationTC7Test extends MembaseIntegrationTest {
+public class CouchbaseIntegrationTC7Test extends CouchbaseIntegrationTest {
 
     @Override
     TestUtils getTestUtils() {
