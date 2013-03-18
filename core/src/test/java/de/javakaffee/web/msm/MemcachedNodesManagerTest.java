@@ -74,7 +74,7 @@ public class MemcachedNodesManagerTest {
 	}
 
     @Test(expectedExceptions = IllegalArgumentException.class)
-    public void testMembaseNodesAndFailoverNodeShouldThrowException() {
+    public void testCouchbaseNodesAndFailoverNodeShouldThrowException() {
         createFor("http://localhost:8091/pools", "n1", _mcc);
     }
 
@@ -252,16 +252,16 @@ public class MemcachedNodesManagerTest {
 	}
 
     @Test
-    public void testIsMembaseBucketConfig() {
-        assertTrue(createFor("http://10.10.0.1:8091/pools", null, _mcc ).isMembaseBucketConfig());
-        assertTrue(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).isMembaseBucketConfig());
+    public void testIsCouchbaseBucketConfig() {
+        assertTrue(createFor("http://10.10.0.1:8091/pools", null, _mcc ).isCouchbaseBucketConfig());
+        assertTrue(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).isCouchbaseBucketConfig());
     }
 
     @Test
-    public void testGetMembaseBucketURIs() throws URISyntaxException {
-        assertEquals(createFor("http://10.10.0.1:8091/pools", null, _mcc ).getMembaseBucketURIs(),
+    public void testGetCouchbaseBucketURIs() throws URISyntaxException {
+        assertEquals(createFor("http://10.10.0.1:8091/pools", null, _mcc ).getCouchbaseBucketURIs(),
                 Arrays.asList(new URI("http://10.10.0.1:8091/pools")));
-        assertEquals(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).getMembaseBucketURIs(),
+        assertEquals(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).getCouchbaseBucketURIs(),
                 Arrays.asList(new URI("http://10.10.0.1:8091/pools"), new URI("http://10.10.0.2:8091/pools")));
     }
 

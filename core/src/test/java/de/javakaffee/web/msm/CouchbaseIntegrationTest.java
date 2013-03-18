@@ -15,6 +15,7 @@
  */
 package de.javakaffee.web.msm;
 
+import com.couchbase.client.CouchbaseClient;
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
 import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.getService;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.vbucket.ConfigurationException;
 
 import org.apache.catalina.startup.Embedded;
 import org.apache.juli.logging.Log;
@@ -46,9 +46,9 @@ import de.javakaffee.web.msm.integration.TestUtils;
 /**
  * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public abstract class MembaseIntegrationTest {
+public abstract class CouchbaseIntegrationTest {
 
-    private static final Log LOG = LogFactory.getLog(MembaseIntegrationTest.class);
+    private static final Log LOG = LogFactory.getLog(CouchbaseIntegrationTest.class);
 
     private final List<Pair<CouchbaseMock, Thread>> cluster = new ArrayList<Pair<CouchbaseMock,Thread>>(2);
     private MemcachedClient mc;
@@ -56,7 +56,7 @@ public abstract class MembaseIntegrationTest {
     private Embedded _tomcat1;
     private final int _portTomcat1 = 18888;
 
-    private boolean membaseProvided;
+    private boolean couchbaseProvided;
     private TranscoderService transcoderService;
 
     abstract TestUtils getTestUtils();
@@ -64,16 +64,16 @@ public abstract class MembaseIntegrationTest {
     @BeforeMethod
     public void setUp(final Method testMethod) throws Throwable {
     	
-        membaseProvided = Boolean.parseBoolean(System.getProperty("membase.provided", "false"));
-        final int membasePort = Integer.parseInt(System.getProperty("membase.port", "18091"));
+        couchbaseProvided = Boolean.parseBoolean(System.getProperty("couchbase.provided", "false"));
+        final int couchbasePort = Integer.parseInt(System.getProperty("couchbase.port", "18091"));
 
-        if(!membaseProvided) {
-            cluster.add(setupMembase(membasePort));
+        if(!couchbaseProvided) {
+            cluster.add(setupCouchbase(couchbasePort));
         }
 
         try {
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
-            _tomcat1 = getTestUtils().createCatalina(_portTomcat1, "http://localhost:"+ membasePort +"/pools");
+            _tomcat1 = getTestUtils().createCatalina(_portTomcat1, "http://localhost:"+ couchbasePort +"/pools");
             getManager( _tomcat1 ).setSticky( true );
             getService(_tomcat1).setMemcachedProtocol("binary");
             getManager(_tomcat1).setUsername("default");
@@ -83,7 +83,7 @@ public abstract class MembaseIntegrationTest {
             throw e;
         }
 
-        setupMembaseClient();
+        setupCouchbaseClient();
 
         transcoderService = new TranscoderService(new JavaSerializationTranscoder(getManager(_tomcat1)));
     }
@@ -93,15 +93,15 @@ public abstract class MembaseIntegrationTest {
         mc.shutdown();
         mc = null;
         
-        if(!membaseProvided) {
-            tearDownMembase();
+        if(!couchbaseProvided) {
+            tearDownCouchbase();
         }
 
         _tomcat1.stop();
     }
     
     @Test
-    public void testBackupSessionInMembase() throws InterruptedException, ExecutionException {
+    public void testBackupSessionInCouchbase() throws InterruptedException, ExecutionException {
         final MemcachedSessionService service = getService(_tomcat1);
         final MemcachedBackupSession session = createSession( service );
         final String sessionId = "12345";
@@ -116,12 +116,12 @@ public abstract class MembaseIntegrationTest {
     }
     
     @Test(enabled = false) // spurious failures
-    public void testBackupSessionInMembaseCluster() throws Exception {
+    public void testBackupSessionInCouchbaseCluster() throws Exception {
         final MemcachedSessionService service = getService(_tomcat1);
         
-        cluster.add(setupMembase(getMaxMembasePort() + 1));
+        cluster.add(setupCouchbase(getMaxCouchbasePort() + 1));
         service.setMemcachedNodes(getMemcachedNodesConfig(getURIs()));
-        setupMembaseClient();
+        setupCouchbaseClient();
         
         waitForReconnect(service.getMemcached(), cluster.size(), 1000);
         waitForReconnect(mc, cluster.size(), 1000);
@@ -156,14 +156,14 @@ public abstract class MembaseIntegrationTest {
         throw new RuntimeException( "MemcachedClient did not reconnect after " + timeToWait + " millis." );
     }
 
-    private void setupMembaseClient() throws URISyntaxException, IOException, ConfigurationException {
+    private void setupCouchbaseClient() throws URISyntaxException, IOException {
         if(mc != null) {
-            LOG.info("Closing existing membase client.");
+            LOG.info("Closing existing couchbase client.");
             mc.shutdown();
         }
         final List<URI> uris = getURIs();
-        LOG.info("Creating new membase client with uris " + uris);
-        mc = new MemcachedClient(uris, "default", "");
+        LOG.info("Creating new couchbase client with uris " + uris);
+        mc = new CouchbaseClient(uris, "default", "");
     }
 
     private List<URI> getURIs() throws URISyntaxException {
@@ -174,15 +174,15 @@ public abstract class MembaseIntegrationTest {
         return uris;
     }
 
-    private Pair<CouchbaseMock, Thread> setupMembase(final int membasePort) throws IOException {
-        final CouchbaseMock membase = new CouchbaseMock("localhost", membasePort, 1, 1);
-        membase.setRequiredHttpAuthorization(null);
-        final Thread thread = new Thread(membase);
+    private Pair<CouchbaseMock, Thread> setupCouchbase(final int couchbasePort) throws IOException {
+        final CouchbaseMock couchbase = new CouchbaseMock("localhost", couchbasePort, 1, 1);
+        couchbase.setRequiredHttpAuthorization(null);
+        final Thread thread = new Thread(couchbase);
         thread.start();
-        return Pair.of(membase, thread);
+        return Pair.of(couchbase, thread);
     }
 
-    private void tearDownMembase() throws InterruptedException {
+    private void tearDownCouchbase() throws InterruptedException {
         for (final Pair<CouchbaseMock, Thread> server : cluster) {
             server.getSecond().interrupt();
             server.getSecond().join(1000);
@@ -197,11 +197,11 @@ public abstract class MembaseIntegrationTest {
             if(sb.length() > 1) sb.append(",");
             sb.append(uri.toString());
         }
-        final String membaseNodes = sb.toString();
-        return membaseNodes;
+        final String couchbaseNodes = sb.toString();
+        return couchbaseNodes;
     }
 
-    private int getMaxMembasePort() {
+    private int getMaxCouchbasePort() {
         return cluster.get(cluster.size() - 1).getFirst().getHttpPort();
     }
     

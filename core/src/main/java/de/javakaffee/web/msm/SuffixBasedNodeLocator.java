@@ -32,7 +32,6 @@ import java.util.Map;
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
 import net.spy.memcached.ops.Operation;
-import net.spy.memcached.vbucket.config.Config;
 
 /**
  * Locates nodes based on their id which is a part of the sessionId (key).
@@ -74,7 +73,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
     }
 
 	@Override
-	public void updateLocator(final List<MemcachedNode> nodes, final Config conf) {
+	public void updateLocator(final List<MemcachedNode> nodes) {
 		// TODO: how to handle this? When does this happen?
 		// The nodes could be updated like in the constructor, but
 		// then the memcachedNodesManager would have to be able to provide a nodeId to a new
