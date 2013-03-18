@@ -70,7 +70,7 @@ public class RequestTrackingHostValve extends ValveBase {
 		Method getHeaderValues = null;
 		try {
 			getHeaderValues = Response.class.getMethod("getHeaderValues", String.class);
-		}catch(NoSuchMethodException e) {
+		} catch(final NoSuchMethodException e) {
 			//Do nothing
 		}
 
@@ -254,11 +254,11 @@ public class RequestTrackingHostValve extends ValveBase {
     }
 
     private String getSessionIdFromResponseSessionCookie(final Response response) {
-        String[] headers = getResponseSetCookieHeaders(response);
+        final String[] headers = getResponseSetCookieHeaders(response);
         if (headers == null) {
             return null;
         }
-        for (String header : headers) {
+        for (final String header : headers) {
             if (header != null && header.contains(_sessionCookieName)) {
                 final String sessionIdPrefix = _sessionCookieName + "=";
                 final int idxNameStart = header.indexOf(sessionIdPrefix);
@@ -279,15 +279,17 @@ public class RequestTrackingHostValve extends ValveBase {
     private String[] getResponseSetCookieHeaders(final Response response) {
         try {
             if (IS_TOMCAT_6) {
-                Method getHeaderValues = response.getClass().getMethod("getHeaderValues", String.class);
-                String[] result = (String[]) getHeaderValues.invoke(response, "Set-Cookie");
+                final Method getHeaderValues = response.getClass().getMethod("getHeaderValues", String.class);
+                final String[] result = (String[]) getHeaderValues.invoke(response, "Set-Cookie");
                 return result;
             } else {
-                Method getHeaders = response.getClass().getMethod("getHeaders", String.class);
+                final Method getHeaders = response.getClass().getMethod("getHeaders", String.class);
+                @SuppressWarnings("unchecked")
+                final
                 Collection<String> result = (Collection<String>) getHeaders.invoke(response, "Set-Cookie");
-                return result.toArray(new String[0]);
+                return result.toArray(new String[result.size()]);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new RuntimeException(e);
         }
     }
