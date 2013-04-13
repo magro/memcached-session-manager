@@ -27,6 +27,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
+import org.apache.catalina.Context;
+import org.apache.catalina.Host;
 
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -129,7 +131,9 @@ public class RequestTrackingHostValve extends ValveBase {
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
         final String requestId = getURIWithQueryString( request );
-        if(!_enabled.get()) {
+        Context context = (Context) _sessionBackupService.getManager().getContainer();
+        Host host = (Host) _sessionBackupService.getManager().getContainer().getParent();
+        if(!_enabled.get() || !container.equals(host) || !request.getRequestURI().startsWith(context.getPath())) {
             getNext().invoke( request, response );
         } else if ( _ignorePattern != null && _ignorePattern.matcher( requestId ).matches() ) {
             if(_log.isDebugEnabled()) {
