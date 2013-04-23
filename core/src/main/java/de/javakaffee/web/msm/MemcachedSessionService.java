@@ -1536,7 +1536,7 @@ public class MemcachedSessionService {
         if ( lockingMode == null ) {
             lockingMode = LockingMode.NONE;
         }
-        final boolean storeSecondaryBackup = config.getCountNodes() > 1;
+        final boolean storeSecondaryBackup = config.getCountNodes() > 1 && !config.isCouchbaseBucketConfig();
         setLockingMode( lockingMode, uriPattern, storeSecondaryBackup );
     }
 
