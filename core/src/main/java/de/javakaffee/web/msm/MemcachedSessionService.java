@@ -387,6 +387,7 @@ public class MemcachedSessionService {
 
     public void shutdown() {
         _log.info( "Stopping services." );
+        _manager.getContainer().getParent().getPipeline().removeValve(_trackingHostValve);
         _backupSessionService.shutdown();
         if ( _lockingStrategy != null ) {
             _lockingStrategy.shutdown();

@@ -29,6 +29,8 @@ import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
+import org.apache.catalina.Context;
+import org.apache.catalina.Host;
 import org.apache.catalina.Valve;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -36,6 +38,8 @@ import org.apache.tomcat.util.http.ServerCookie;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
  * Test the {@link RequestTrackingHostValve}.
@@ -59,6 +63,16 @@ public abstract class RequestTrackingHostValveTest {
         _sessionTrackerValve.setNext( _nextValve );
         _request = mock( Request.class );
         _response = mock( Response.class );
+
+        Context _contextContainer = mock(Context.class);
+        Host _hostContainer = mock(Host.class);
+        SessionManager _manager = mock(SessionManager.class);
+
+        when(_service.getManager()).thenReturn(_manager);
+        when(_manager.getContainer()).thenReturn(_contextContainer);
+        when(_contextContainer.getParent()).thenReturn(_hostContainer);
+        when(_contextContainer.getPath()).thenReturn("/");
+        _sessionTrackerValve.setContainer(_hostContainer);
 
         when(_request.getRequestURI()).thenReturn( "/someRequest");
         when(_request.getMethod()).thenReturn("GET");
