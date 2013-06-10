@@ -397,6 +397,7 @@ public class TranscoderService {
             // -> we omit them here
             oos.writeObject(savedRequest.getQueryString());
             oos.writeObject(savedRequest.getRequestURI());
+            oos.writeObject(savedRequest.getDecodedRequestURI());
             oos.flush();
             return bos.toByteArray();
         } catch ( final IOException e ) {
@@ -424,6 +425,7 @@ public class TranscoderService {
             savedRequest.setMethod((String) ois.readObject());
             savedRequest.setQueryString((String) ois.readObject());
             savedRequest.setRequestURI((String) ois.readObject());
+            savedRequest.setDecodedRequestURI((String) ois.readObject());
 
             return savedRequest;
         } catch ( final IOException e ) {
