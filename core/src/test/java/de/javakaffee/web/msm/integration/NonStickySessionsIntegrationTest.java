@@ -149,11 +149,8 @@ public abstract class NonStickySessionsIntegrationTest {
     }
 
     private Embedded startTomcat( final int port, final String memcachedNodes, final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = getTestUtils().createCatalina( port, 5, memcachedNodes );
-        getManager( tomcat ).setSticky( false );
-        if(lockingMode != null) {
-            getManager( tomcat ).setLockingMode( lockingMode.name() );
-        }
+        final Embedded tomcat = getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).memcachedNodes(memcachedNodes)
+                .sticky(false).lockingMode(lockingMode).build();
         tomcat.start();
         return tomcat;
     }
@@ -1023,9 +1020,8 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private Embedded startTomcatWithAuth(final int port, final String memcachedNodes, final LockingMode lockingMode, final LoginType loginType)
             throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded result = getTestUtils().createCatalina( port, 5, memcachedNodes, null, loginType, null );
-        getManager( result ).setSticky( false );
-        getManager( result ).setLockingMode( lockingMode.name() );
+        final Embedded result = getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).loginType(loginType)
+                .memcachedNodes(memcachedNodes).sticky(false).lockingMode(lockingMode).build();
         result.start();
         return result;
     }

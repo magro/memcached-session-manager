@@ -107,8 +107,7 @@ public abstract class MemcachedFailoverIntegrationTest {
             final String memcachedNodes = toString( _nodeId1, _address1 ) +
                 " " + toString( _nodeId2, _address2 ) +
                 " " + toString( _nodeId3, _address3 );
-            _tomcat1 = getTestUtils().createCatalina( _portTomcat1, 10, memcachedNodes );
-            getManager( _tomcat1 ).setSticky( true );
+            _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).sessionTimeout(10).memcachedNodes(memcachedNodes).sticky(true).build();
             _tomcat1.start();
         } catch( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
@@ -527,8 +526,7 @@ public abstract class MemcachedFailoverIntegrationTest {
     private void restartTomcat( final String memcachedNodes, final String failoverNodes ) throws Exception {
         _tomcat1.stop();
         Thread.sleep( 500 );
-        _tomcat1 = getTestUtils().createCatalina( _portTomcat1, 10, memcachedNodes );
-        getManager( _tomcat1 ).setFailoverNodes( failoverNodes );
+        _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).sessionTimeout(10).memcachedNodes(memcachedNodes).failoverNodes(failoverNodes).build();
         _tomcat1.start();
     }
 

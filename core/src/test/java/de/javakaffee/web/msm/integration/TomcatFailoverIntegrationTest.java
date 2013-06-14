@@ -131,9 +131,9 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private Embedded startTomcat( final int port, final SessionAffinityMode sessionAffinityMode,
             final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = getTestUtils().createCatalina( port, _memcachedNodes, jvmRoute, loginType );
+        final Embedded tomcat = getTestUtils().tomcatBuilder().port(port).memcachedNodes(_memcachedNodes)
+                .sticky(sessionAffinityMode.isSticky()).jvmRoute(jvmRoute).loginType(loginType).build();
         tomcat.start();
-        getManager( tomcat ).setSticky( sessionAffinityMode.isSticky() );
         return tomcat;
     }
 

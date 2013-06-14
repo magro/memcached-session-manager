@@ -42,9 +42,6 @@ import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.auth.PlainCallbackHandler;
 
-import com.couchbase.client.CouchbaseClient;
-import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
-
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
@@ -57,6 +54,9 @@ import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+
+import com.couchbase.client.CouchbaseClient;
+import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
@@ -114,8 +114,8 @@ public class MemcachedSessionService {
         }
     }
 
-    private static final String PROTOCOL_TEXT = "text";
-    private static final String PROTOCOL_BINARY = "binary";
+    public static final String PROTOCOL_TEXT = "text";
+    public static final String PROTOCOL_BINARY = "binary";
 
     protected static final String NODE_FAILURE = "node.failure";
 
@@ -484,7 +484,7 @@ public class MemcachedSessionService {
             if (connectionType.isCouchbaseBucketConfig()) {
             	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
-                CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
+                final CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
                 factory.setOpTimeout(_operationTimeout);
                 return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, _password));
             }

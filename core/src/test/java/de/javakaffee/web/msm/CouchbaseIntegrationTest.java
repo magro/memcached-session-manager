@@ -15,7 +15,6 @@
  */
 package de.javakaffee.web.msm;
 
-import com.couchbase.client.CouchbaseClient;
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
 import static de.javakaffee.web.msm.integration.TestUtils.getManager;
 import static de.javakaffee.web.msm.integration.TestUtils.getService;
@@ -40,6 +39,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import com.couchbase.client.CouchbaseClient;
+
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.integration.TestUtils;
 
@@ -63,7 +64,7 @@ public abstract class CouchbaseIntegrationTest {
 
     @BeforeMethod
     public void setUp(final Method testMethod) throws Throwable {
-    	
+
         couchbaseProvided = Boolean.parseBoolean(System.getProperty("couchbase.provided", "false"));
         final int couchbasePort = Integer.parseInt(System.getProperty("couchbase.port", "18091"));
 
@@ -73,10 +74,8 @@ public abstract class CouchbaseIntegrationTest {
 
         try {
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
-            _tomcat1 = getTestUtils().createCatalina(_portTomcat1, "http://localhost:"+ couchbasePort +"/pools");
-            getManager( _tomcat1 ).setSticky( true );
-            getService(_tomcat1).setMemcachedProtocol("binary");
-            getManager(_tomcat1).setUsername("default");
+            _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).memcachedNodes("http://localhost:"+ couchbasePort +"/pools")
+                    .sticky(true).memcachedProtocol("binary").username("default").build();
             _tomcat1.start();
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
@@ -92,14 +91,14 @@ public abstract class CouchbaseIntegrationTest {
     public void tearDown() throws Exception {
         mc.shutdown();
         mc = null;
-        
+
         if(!couchbaseProvided) {
             tearDownCouchbase();
         }
 
         _tomcat1.stop();
     }
-    
+
     @Test
     public void testBackupSessionInCouchbase() throws InterruptedException, ExecutionException {
         final MemcachedSessionService service = getService(_tomcat1);
@@ -110,22 +109,22 @@ public abstract class CouchbaseIntegrationTest {
 
         final BackupResult backupResult = service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.SUCCESS);
-        
+
         final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), getManager(_tomcat1));
         checkSession(loadedSession, session);
     }
-    
+
     @Test(enabled = false) // spurious failures
     public void testBackupSessionInCouchbaseCluster() throws Exception {
         final MemcachedSessionService service = getService(_tomcat1);
-        
+
         cluster.add(setupCouchbase(getMaxCouchbasePort() + 1));
         service.setMemcachedNodes(getMemcachedNodesConfig(getURIs()));
         setupCouchbaseClient();
-        
+
         waitForReconnect(service.getMemcached(), cluster.size(), 1000);
         waitForReconnect(mc, cluster.size(), 1000);
-        
+
         final MemcachedBackupSession session = createSession( service );
         final String sessionId = "12345";
         session.setId(sessionId);
@@ -133,7 +132,7 @@ public abstract class CouchbaseIntegrationTest {
 
         final BackupResult backupResult = service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.SUCCESS);
-        
+
         final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), getManager(_tomcat1));
         checkSession(loadedSession, session);
     }
@@ -204,5 +203,5 @@ public abstract class CouchbaseIntegrationTest {
     private int getMaxCouchbasePort() {
         return cluster.get(cluster.size() - 1).getFirst().getHttpPort();
     }
-    
+
 }

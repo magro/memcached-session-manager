@@ -109,8 +109,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
         try {
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
-            _tomcat1 = getTestUtils().createCatalina( _portTomcat1, memcachedNodes, "app1" );
-            getManager( _tomcat1 ).setSticky( true );
+            _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).memcachedNodes(memcachedNodes).sticky(true).jvmRoute("app1").build();
             _tomcat1.start();
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
@@ -477,10 +476,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         _tomcat1.stop();
         Thread.sleep( 500 );
         final String memcachedNodes = _memcachedNodeId + ":localhost:" + _memcachedPort;
-        _tomcat1 = getTestUtils().createCatalina( _portTomcat1, memcachedNodes, "app1" );
-        final SessionManager manager = getManager( _tomcat1 );
-        manager.setSticky( true );
-        manager.setEnabled( false );
+        _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).memcachedNodes(memcachedNodes).sticky(true).enabled(false).jvmRoute("app1").build();
         _tomcat1.start();
 
         LOG.info( "Waiting, check logs to see if the client causes any 'Connection refused' logging..." );
@@ -492,7 +488,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         // start memcached, client and reenable msm
         _daemon.start();
         _memcached = createMemcachedClient( memcachedNodes, new InetSocketAddress( "localhost", _memcachedPort ) );
-        manager.setEnabled( true );
+        getManager( _tomcat1 ).setEnabled( true );
         // Wait a little bit, so that msm's memcached client can connect and is ready when test starts
         Thread.sleep( 100 );
 

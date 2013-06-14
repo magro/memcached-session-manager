@@ -35,13 +35,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -53,7 +50,6 @@ import java.util.logging.LogManager;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.naming.NamingException;
 import javax.servlet.http.HttpSessionActivationListener;
 import javax.servlet.http.HttpSessionEvent;
 
@@ -63,25 +59,14 @@ import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Role;
-import org.apache.catalina.User;
-import org.apache.catalina.UserDatabase;
 import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
-import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
-import org.apache.catalina.core.StandardServer;
 import org.apache.catalina.core.StandardService;
-import org.apache.catalina.deploy.LoginConfig;
-import org.apache.catalina.deploy.SecurityCollection;
-import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.loader.WebappLoader;
-import org.apache.catalina.realm.UserDatabaseRealm;
 import org.apache.catalina.startup.Embedded;
-import org.apache.catalina.users.MemoryUserDatabase;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpException;
@@ -101,7 +86,6 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
 import org.apache.juli.logging.LogFactory;
-import org.apache.naming.NamingContext;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -114,11 +98,9 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap;
 import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap.EvictionPolicy;
 
-import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedSessionService;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 
 /**
  * Integration test utils.
@@ -129,9 +111,7 @@ public abstract class TestUtils {
 
     private static final String CONTEXT_PATH = "/";
     private static final String DEFAULT_HOST = "localhost";
-    private static final String DEFAULT_TRANSCODER_FACTORY = JavaSerializationTranscoderFactory.class.getName();
 
-    private static final String USER_DATABASE = "UserDatabase";
     protected static final String PASSWORD = "secret";
     protected static final String USER_NAME = "testuser";
     protected static final String ROLE_NAME = "test";
@@ -469,122 +449,14 @@ public abstract class TestUtils {
         return daemon;
     }
 
-    public Embedded createCatalina( final int port, final String memcachedNodes ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final LoginType loginType ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, null, loginType, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, null, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute,
-            final String transcoderFactoryClassName ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, null, transcoderFactoryClassName );
-    }
-
-    public Embedded createCatalina( final int port, final String memcachedNodes, final String jvmRoute, final LoginType loginType ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, 1, memcachedNodes, jvmRoute, loginType, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    public Embedded createCatalina( final int port, final int sessionTimeout, final String memcachedNodes ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-        return createCatalina( port, sessionTimeout, memcachedNodes, null, null, DEFAULT_TRANSCODER_FACTORY );
-    }
-
-    @SuppressWarnings( "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" )
-    public Embedded createCatalina( final int port, final int sessionTimeout, final String memcachedNodes, final String jvmRoute,
-            final LoginType loginType,
-            final String transcoderFactoryClassName ) throws MalformedURLException,
-            UnknownHostException, LifecycleException {
-
-        final Embedded catalina = new Embedded();
-
-        final StandardServer server = new StandardServer();
-        server.addService( catalina );
-
-        try {
-            final NamingContext globalNamingContext = new NamingContext( new Hashtable<String, Object>(), "ctxt" );
-            server.setGlobalNamingContext( globalNamingContext );
-            globalNamingContext.bind( USER_DATABASE, createUserDatabase() );
-        } catch ( final NamingException e ) {
-            throw new RuntimeException( e );
-        }
-
-
-        final URL root = new URL( TestUtils.class.getResource( "/" ), "../test-classes" );
-        // use file to get correct separator char, replace %20 introduced by URL for spaces
-        final String cleanedRoot = new File( root.getFile().replaceAll("%20", " ") ).toString();
-
-        final String fileSeparator = File.separator.equals( "\\" ) ? "\\\\" : File.separator;
-        final String docBase = cleanedRoot + File.separator + TestUtils.class.getPackage().getName().replaceAll( "\\.", fileSeparator );
-
-        final Engine engine = catalina.createEngine();
-
-        /* we must have a unique name for mbeans
-         */
-        engine.setName( "engine-" + port );
-        engine.setDefaultHost( DEFAULT_HOST );
-        engine.setJvmRoute( jvmRoute );
-
-        catalina.addEngine( engine );
-        engine.setService( catalina );
-
-        final UserDatabaseRealm realm = new UserDatabaseRealm();
-        realm.setResourceName( USER_DATABASE );
-        engine.setRealm( realm );
-
-        final Host host = catalina.createHost( DEFAULT_HOST, docBase );
-        engine.addChild( host );
-        new File( docBase ).mkdirs();
-
-        final Context context = createContext( catalina, CONTEXT_PATH, "webapp" );
-        host.addChild( context );
-
-        final SessionManager sessionManager = createSessionManager();
-        context.setManager( sessionManager );
-        context.setBackgroundProcessorDelay( 1 );
-        new File( "webapp" + File.separator + "webapp" ).mkdirs();
-
-        if ( loginType != null ) {
-            context.addConstraint( createSecurityConstraint( "/*", ROLE_NAME ) );
-            // context.addConstraint( createSecurityConstraint( "/j_security_check", null ) );
-            context.addSecurityRole( ROLE_NAME );
-            final LoginConfig loginConfig = loginType == LoginType.FORM
-                ? new LoginConfig( "FORM", null, "/login", "/error" )
-                : new LoginConfig( "BASIC", null, null, null );
-                context.setLoginConfig( loginConfig );
-        }
-
-        /* we must set the maxInactiveInterval after the context,
-         * as setContainer(context) uses the session timeout set on the context
-         */
-        sessionManager.getMemcachedSessionService().setMemcachedNodes( memcachedNodes );
-        sessionManager.setMaxInactiveInterval( sessionTimeout ); // 1 second
-        sessionManager.getMemcachedSessionService().setSessionBackupAsync( false );
-        sessionManager.getMemcachedSessionService().setSessionBackupTimeout( 100 );
-        sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
-        sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName != null ? transcoderFactoryClassName : DEFAULT_TRANSCODER_FACTORY );
-        sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(".*\\.(png|gif|jpg|css|js|ico)$");
-
-        final Connector connector = catalina.createConnector( "localhost", port, false );
-        connector.setProperty("bindOnInit", "false");
-        catalina.addConnector( connector );
-
-        return catalina;
-    }
-
-    @Nonnull
-    protected Context createContext( @Nonnull final Embedded catalina, @Nonnull final String contextPath, @Nonnull final String docBase ) {
-        return catalina.createContext( contextPath, docBase );
+    public TomcatBuilder tomcatBuilder() {
+        return new TomcatBuilder() {
+            @Override
+            @Nonnull
+            protected SessionManager createSessionManager() {
+                return TestUtils.this.createSessionManager();
+            }
+        };
     }
 
     /**
@@ -593,35 +465,20 @@ public abstract class TestUtils {
     @Nonnull
     protected abstract SessionManager createSessionManager();
 
-    private static SecurityConstraint createSecurityConstraint( final String pattern, final String role ) {
-        final SecurityConstraint constraint = new SecurityConstraint();
-        final SecurityCollection securityCollection = new SecurityCollection();
-        securityCollection.addPattern( pattern );
-        constraint.addCollection( securityCollection );
-        if ( role != null ) {
-            constraint.addAuthRole( role );
-        }
-        return constraint;
-    }
-
     public static enum LoginType {
         BASIC, FORM
     }
 
-    protected UserDatabase createUserDatabase() {
-        final MemoryUserDatabase userDatabase = new MemoryUserDatabase();
-        final Role role = userDatabase.createRole( ROLE_NAME, "the role for unit tests" );
-        final User user = userDatabase.createUser( USER_NAME, PASSWORD, "the user for unit tests" );
-        user.addRole( role );
-        return userDatabase;
+    public static Context getContext( final Embedded tomcat ) {
+        return (Context) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH );
     }
 
     public static SessionManager getManager( final Embedded tomcat ) {
-        return (SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager();
+        return (SessionManager) getContext(tomcat).getManager();
     }
 
     public static MemcachedSessionService getService( final Embedded tomcat ) {
-        return ((SessionManager) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH ).getManager()).getMemcachedSessionService();
+        return ((SessionManager) getContext(tomcat).getManager()).getMemcachedSessionService();
     }
 
     public static Engine getEngine( final Embedded tomcat ) {
