@@ -38,7 +38,6 @@ import javax.annotation.Nullable;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.connector.Request;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -75,23 +74,24 @@ public abstract class LockingStrategy {
     protected final MemcachedClient _memcached;
     protected LRUCache<String, Boolean> _missingSessionsCache;
     protected final SessionIdFormat _sessionIdFormat;
-    protected final InheritableThreadLocal<Request> _requestsThreadLocal;
     private final ExecutorService _executor;
     private final boolean _storeSecondaryBackup;
     protected final Statistics _stats;
+    protected final CurrentRequest _currentRequest;
 
     protected LockingStrategy( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
-            @Nonnull final Statistics stats ) {
+            @Nonnull final Statistics stats,
+            @Nonnull final CurrentRequest currentRequest ) {
         _manager = manager;
         _memcached = memcached;
         _missingSessionsCache = missingSessionsCache;
         _sessionIdFormat = memcachedNodesManager.getSessionIdFormat();
-        _requestsThreadLocal = new InheritableThreadLocal<Request>();
         _storeSecondaryBackup = storeSecondaryBackup;
         _stats = stats;
+        _currentRequest = currentRequest;
         _executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
     }
 
@@ -103,20 +103,21 @@ public abstract class LockingStrategy {
             @Nonnull final MemcachedClient memcached, @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
-            @Nonnull final Statistics stats ) {
+            @Nonnull final Statistics stats,
+            @Nonnull final CurrentRequest currentRequest ) {
         if ( lockingMode == null ) {
             return null;
         }
         switch ( lockingMode ) {
         case ALL:
-            return new LockingStrategyAll( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            return new LockingStrategyAll( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         case AUTO:
-            return new LockingStrategyAuto( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            return new LockingStrategyAuto( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         case URI_PATTERN:
             return new LockingStrategyUriPattern( manager, memcachedNodesManager, uriPattern, memcached, missingSessionsCache, storeSecondaryBackup,
-                    stats );
+                    stats, currentRequest );
         case NONE:
-            return new LockingStrategyNone( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            return new LockingStrategyNone( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         default:
             throw new IllegalArgumentException( "LockingMode not yet supported: " + lockingMode );
         }
@@ -320,13 +321,6 @@ public abstract class LockingStrategy {
 
     }
 
-    /**
-     * Is used to determine if this thread / the current request.
-     */
-    Request getCurrentRequest() {
-        return _requestsThreadLocal.get();
-    }
-
     @CheckForNull
     protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String sessionId ) {
         return loadSessionValidityInfoForValidityKey( createValidityInfoKeyName( sessionId ) );
@@ -390,14 +384,6 @@ public abstract class LockingStrategy {
         }
 
         _stats.registerSince( NON_STICKY_AFTER_DELETE_FROM_MEMCACHED, start );
-    }
-
-    protected final void onRequestStart( final Request request ) {
-        _requestsThreadLocal.set( request );
-    }
-
-    protected final void onRequestFinished() {
-        _requestsThreadLocal.set( null );
     }
 
     private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {

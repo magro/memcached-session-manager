@@ -42,8 +42,9 @@ public class LockingStrategyUriPattern extends LockingStrategy {
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
-            @Nonnull final Statistics stats ) {
-        super( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            @Nonnull final Statistics stats,
+            @Nonnull final CurrentRequest currentRequest ) {
+        super( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         if ( uriPattern == null ) {
             throw new IllegalArgumentException( "The uriPattern is null" );
         }
@@ -54,7 +55,7 @@ public class LockingStrategyUriPattern extends LockingStrategy {
     protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) throws InterruptedException,
             ExecutionException {
 
-        final Request request = _requestsThreadLocal.get();
+        final Request request = _currentRequest.get();
 
         if ( request == null ) {
             throw new RuntimeException( "There's no request set, this indicates that this findSession" +

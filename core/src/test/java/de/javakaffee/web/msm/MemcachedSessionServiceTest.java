@@ -566,7 +566,7 @@ public abstract class MemcachedSessionServiceTest {
         // start another request that loads the session from mc
         final Request requestMock = mock(Request.class);
         when(requestMock.getNote(eq(RequestTrackingContextValve.INVOKED))).thenReturn(Boolean.TRUE);
-        _service.getLockingStrategy().onRequestStart(requestMock);
+        _service.getTrackingHostValve().storeRequestThreadLocal(requestMock);
 
         when(_memcachedMock.get(eq(session.getId()))).thenReturn(transcoderService.serialize(session));
 
@@ -592,7 +592,7 @@ public abstract class MemcachedSessionServiceTest {
                 barrier.await();
 
                 final Future<BackupResult> result = _service.backupSession(session.getId(), false, null);
-                _service.getLockingStrategy().onRequestFinished();
+                _service.getTrackingHostValve().resetRequestThreadLocal();
 
                 assertEquals(result.get().getStatus(), BackupResultStatus.SUCCESS);
                 // The session should be released now and no longer stored
@@ -608,7 +608,7 @@ public abstract class MemcachedSessionServiceTest {
         barrier.await();
 
         result = _service.backupSession(session.getId(), false, null);
-        _service.getLockingStrategy().onRequestFinished();
+        _service.getTrackingHostValve().resetRequestThreadLocal();
         assertEquals(result.get().getStatus(), BackupResultStatus.SKIPPED);
         // This is the important point!
         assertTrue(_service.getManager().getSessionsInternal().containsKey(session.getId()));

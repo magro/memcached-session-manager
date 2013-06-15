@@ -54,10 +54,12 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.integration.TestServlet;
 import de.javakaffee.web.msm.integration.TestUtils;
 import de.javakaffee.web.msm.integration.TestUtils.Predicates;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
+import de.javakaffee.web.msm.integration.TomcatBuilder;
 
 /**
  * Integration test testing basic session manager functionality.
@@ -79,6 +81,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     private int _portTomcat1;
 
     private final String _memcachedNodeId = "n1";
+    private String _memcachedNodes;
 
     private DefaultHttpClient _httpClient;
 
@@ -105,20 +108,24 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         final String[] testGroups = testMethod.getAnnotation(Test.class).groups();
         final String nodePrefix = testGroups.length == 0 || !GROUP_WITHOUT_NODE_ID.equals(testGroups[0]) ? _memcachedNodeId + ":" : "";
 
-        final String memcachedNodes = nodePrefix + "localhost:" + _memcachedPort;
+        _memcachedNodes = nodePrefix + "localhost:" + _memcachedPort;
 
         try {
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
-            _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).memcachedNodes(memcachedNodes).sticky(true).jvmRoute("app1").build();
+            _tomcat1 = tcBuilder().build();
             _tomcat1.start();
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
         }
 
-        _memcached = createMemcachedClient( memcachedNodes, address );
+        _memcached = createMemcachedClient( _memcachedNodes, address );
 
         _httpClient = new DefaultHttpClient();
+    }
+
+    private TomcatBuilder tcBuilder() {
+        return getTestUtils().tomcatBuilder().port(_portTomcat1).memcachedNodes(_memcachedNodes).sticky(true).jvmRoute("app1");
     }
 
     private MemcachedClient createMemcachedClient( final String memcachedNodes, final InetSocketAddress address ) throws IOException, InterruptedException {
@@ -271,6 +278,19 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         assertNotNull( sessionId1, "No session created." );
         Thread.sleep( 50 );
         assertNotNull( _memcached.get( sessionId1 ), "Session not available in memcached." );
+    }
+
+    @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
+    public void testSessionAvailableInMemcachedWithCookiesDisabled( final SessionAffinityMode sessionAffinity ) throws Exception {
+        _tomcat1.stop();
+        _tomcat1 = tcBuilder().sticky(sessionAffinity.isSticky()).cookies(false).jvmRoute("app1").build();
+        _tomcat1.start();
+
+        final Response response = get(_httpClient, _portTomcat1, null);
+        final String sessionId = response.get( TestServlet.ID );
+        assertNotNull( sessionId, "No session created." );
+        Thread.sleep( 50 );
+        assertNotNull( _memcached.get( sessionId ), "Session not available in memcached." );
     }
 
     @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )

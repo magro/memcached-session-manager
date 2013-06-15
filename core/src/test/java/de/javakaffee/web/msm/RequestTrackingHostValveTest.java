@@ -64,9 +64,9 @@ public abstract class RequestTrackingHostValveTest {
         _request = mock( Request.class );
         _response = mock( Response.class );
 
-        Context _contextContainer = mock(Context.class);
-        Host _hostContainer = mock(Host.class);
-        SessionManager _manager = mock(SessionManager.class);
+        final Context _contextContainer = mock(Context.class);
+        final Host _hostContainer = mock(Host.class);
+        final SessionManager _manager = mock(SessionManager.class);
 
         when(_service.getManager()).thenReturn(_manager);
         when(_manager.getContainer()).thenReturn(_contextContainer);
@@ -84,7 +84,8 @@ public abstract class RequestTrackingHostValveTest {
 
     @Nonnull
     protected RequestTrackingHostValve createSessionTrackerValve() {
-        return new RequestTrackingHostValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(), new AtomicBoolean( true ));
+        return new RequestTrackingHostValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(),
+                new AtomicBoolean( true ), new CurrentRequest());
     }
 
     @AfterMethod
@@ -97,7 +98,8 @@ public abstract class RequestTrackingHostValveTest {
 
     @Test
     public final void testGetSessionCookieName() throws IOException, ServletException {
-        final RequestTrackingHostValve cut = new RequestTrackingHostValve(null, "foo", _service, Statistics.create(), new AtomicBoolean( true ));
+        final RequestTrackingHostValve cut = new RequestTrackingHostValve(null, "foo", _service, Statistics.create(),
+                new AtomicBoolean( true ), new CurrentRequest());
         assertEquals(cut.getSessionCookieName(), "foo");
     }
 

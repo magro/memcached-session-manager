@@ -35,8 +35,9 @@ public class LockingStrategyNone extends LockingStrategy {
             @Nonnull final MemcachedClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
-            @Nonnull final Statistics stats ) {
-        super( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats );
+            @Nonnull final Statistics stats,
+            @Nonnull final CurrentRequest currentRequest ) {
+        super( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
     }
 
     @Override

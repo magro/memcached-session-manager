@@ -22,14 +22,13 @@ import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
+
 import org.apache.catalina.Context;
 import org.apache.catalina.Host;
-
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
@@ -63,7 +62,7 @@ public class RequestTrackingHostValve extends ValveBase {
     private final Statistics _statistics;
     private final AtomicBoolean _enabled;
     protected final String _sessionCookieName;
-    private @CheckForNull LockingStrategy _lockingStrategy;
+    private final CurrentRequest _currentRequest;
 
     private static final String MSM_REQUEST_ID = "msm.requestId";
 
@@ -98,7 +97,8 @@ public class RequestTrackingHostValve extends ValveBase {
     public RequestTrackingHostValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
             @Nonnull final MemcachedSessionService sessionBackupService,
             @Nonnull final Statistics statistics,
-            @Nonnull final AtomicBoolean enabled ) {
+            @Nonnull final AtomicBoolean enabled,
+            @Nonnull final CurrentRequest currentRequest) {
         if ( ignorePattern != null ) {
             _log.info( "Setting ignorePattern to " + ignorePattern );
             _ignorePattern = Pattern.compile( ignorePattern );
@@ -109,6 +109,7 @@ public class RequestTrackingHostValve extends ValveBase {
         _sessionBackupService = sessionBackupService;
         _statistics = statistics;
         _enabled = enabled;
+        _currentRequest = currentRequest;
     }
 
     /**
@@ -120,7 +121,7 @@ public class RequestTrackingHostValve extends ValveBase {
     }
 
     public boolean isIgnoredRequest() {
-        final Request request = _lockingStrategy == null ? null : _lockingStrategy.getCurrentRequest();
+        final Request request = _currentRequest.get();
         return request != null && request.getNote(REQUEST_IGNORED) == Boolean.TRUE;
     }
 
@@ -131,8 +132,8 @@ public class RequestTrackingHostValve extends ValveBase {
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
         final String requestId = getURIWithQueryString( request );
-        Context context = (Context) _sessionBackupService.getManager().getContainer();
-        Host host = (Host) _sessionBackupService.getManager().getContainer().getParent();
+        final Context context = (Context) _sessionBackupService.getManager().getContainer();
+        final Host host = (Host) _sessionBackupService.getManager().getContainer().getParent();
         if(!_enabled.get() || !container.equals(host) || !request.getRequestURI().startsWith(context.getPath())) {
             getNext().invoke( request, response );
         } else if ( _ignorePattern != null && _ignorePattern.matcher( requestId ).matches() ) {
@@ -224,16 +225,12 @@ public class RequestTrackingHostValve extends ValveBase {
 		return method != null ? method.toLowerCase().equals( "post" ) : false;
 	}
 
-    private void resetRequestThreadLocal() {
-        if ( _lockingStrategy != null ) {
-            _lockingStrategy.onRequestFinished();
-        }
+	void resetRequestThreadLocal() {
+        _currentRequest.reset();
     }
 
-    private void storeRequestThreadLocal( @Nonnull final Request request ) {
-        if ( _lockingStrategy != null ) {
-            _lockingStrategy.onRequestStart( request );
-        }
+    void storeRequestThreadLocal( @Nonnull final Request request ) {
+        _currentRequest.set( request );
     }
 
     private void backupSession( final Request request, final Response response, final boolean sessionIdChanged ) {
@@ -253,7 +250,12 @@ public class RequestTrackingHostValve extends ValveBase {
     }
 
     private String getSessionId(final Request request, final Response response) {
-        final String sessionId = getSessionIdFromResponseSessionCookie( response );
+        // If the context is configured with cookie="false" there's no session cookie
+        // sent so we must rely on data from MemcachedSessionService
+        String sessionId = (String) request.getNote(MemcachedSessionService.NEW_SESSION_ID);
+        if(sessionId == null) {
+            sessionId = getSessionIdFromResponseSessionCookie( response );
+        }
         return sessionId != null ? sessionId : request.getRequestedSessionId();
     }
 
@@ -303,10 +305,6 @@ public class RequestTrackingHostValve extends ValveBase {
         if ( header != null && header.contains( _sessionCookieName ) ) {
             _log.debug( "Request finished, with Set-Cookie header: " + header );
         }
-    }
-
-    public void setLockingStrategy( @Nullable final LockingStrategy lockingStrategy ) {
-        _lockingStrategy = lockingStrategy;
     }
 
 }

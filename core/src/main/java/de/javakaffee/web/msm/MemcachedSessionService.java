@@ -118,6 +118,15 @@ public class MemcachedSessionService {
     public static final String PROTOCOL_BINARY = "binary";
 
     protected static final String NODE_FAILURE = "node.failure";
+    /**
+     * Used to store the id for a new session in a request note. This is needed
+     * for a context configured with cookie="false" as in this case there's no
+     * set-cookie header with the session id. When the request came in with a
+     * requestedSessionId this will be changed in the case of a tomcat/memcached
+     * failover (via request.changeSessionId, called by the contextValve) so in
+     * this case we don't need to note the new/changed session id.
+     */
+    protected static final String NEW_SESSION_ID = "msm.session.id";
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
@@ -255,6 +264,7 @@ public class MemcachedSessionService {
     private LockingStrategy _lockingStrategy;
     private long _operationTimeout = 1000;
 
+    private CurrentRequest _currentRequest;
     private RequestTrackingHostValve _trackingHostValve;
     private RequestTrackingContextValve _trackingContextValve;
 
@@ -429,7 +439,8 @@ public class MemcachedSessionService {
         _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
 
         final String sessionCookieName = _manager.getSessionCookieName();
-        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled);
+        _currentRequest = new CurrentRequest();
+        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, _currentRequest);
         _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
         _trackingContextValve = new RequestTrackingContextValve(sessionCookieName, this);
         _manager.getContainer().getPipeline().addValve( _trackingContextValve );
@@ -590,7 +601,7 @@ public class MemcachedSessionService {
             // If no current request is set (RequestTrackerHostValve was not passed) we got invoked
             // by CoyoteAdapter.parseSessionCookiesId - here we can just return null, the requestedSessionId
             // will be accepted anyway
-            if(!_sticky && _lockingStrategy.getCurrentRequest() == null) {
+            if(!_sticky && _currentRequest.get() == null) {
                 return null;
             }
 
@@ -628,7 +639,7 @@ public class MemcachedSessionService {
      * invocation comes from the container.
      */
     private boolean isContainerSessionLookup() {
-        return !_trackingContextValve.wasInvokedWith(_lockingStrategy.getCurrentRequest());
+        return !_trackingContextValve.wasInvokedWith(_currentRequest.get());
     }
 
     private void addValidLoadedSession(final MemcachedBackupSession result) {
@@ -693,6 +704,11 @@ public class MemcachedSessionService {
         }
 
         session.setId( sessionId );
+
+        final Request request = _currentRequest.get();
+        if(request != null) {
+            request.setNote(NEW_SESSION_ID, sessionId);
+        }
 
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Created new session with id " + session.getId() );
@@ -1544,10 +1560,7 @@ public class MemcachedSessionService {
     public void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
         _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _memcachedNodesManager,
-                _missingSessionsCache, storeSecondaryBackup, _statistics );
-        if ( _trackingHostValve != null ) {
-            _trackingHostValve.setLockingStrategy( _lockingStrategy );
-        }
+                _missingSessionsCache, storeSecondaryBackup, _statistics, _currentRequest );
     }
 
     protected void updateExpirationInMemcached() {
@@ -1698,6 +1711,10 @@ public class MemcachedSessionService {
 
     void setMemcachedClient(final MemcachedClient memcachedClient) {
         _memcached = memcachedClient;
+    }
+
+    RequestTrackingHostValve getTrackingHostValve() {
+        return _trackingHostValve;
     }
 
     /**
