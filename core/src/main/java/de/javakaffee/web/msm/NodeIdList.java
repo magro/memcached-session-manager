@@ -57,7 +57,7 @@ public class NodeIdList extends ArrayList<String> {
     public String getNextNodeId( @Nonnull final String nodeId ) throws IllegalArgumentException {
         final int idx = indexOf( nodeId );
         if ( idx < 0 ) {
-            throw new IllegalArgumentException( "The given node id is not part of this list" );
+            throw new IllegalArgumentException( "The given node id "+ nodeId +" is not part of this list " + toString() );
         }
         if ( size() == 1 ) {
             return null;
