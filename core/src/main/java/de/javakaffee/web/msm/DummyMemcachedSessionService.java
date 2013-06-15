@@ -59,7 +59,7 @@ import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
 public class DummyMemcachedSessionService<T extends MemcachedSessionService.SessionManager> extends MemcachedSessionService {
 
     private final Map<String,byte[]> _sessionData = new ConcurrentHashMap<String, byte[]>();
-    private final ExecutorService _executorService = Executors.newSingleThreadExecutor();
+    private final ExecutorService _executorService = Executors.newSingleThreadExecutor(new NamedThreadFactory("dummy-msm"));
 
     public DummyMemcachedSessionService( final T manager ) {
         super( manager );

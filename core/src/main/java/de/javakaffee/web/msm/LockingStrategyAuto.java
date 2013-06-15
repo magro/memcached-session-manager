@@ -51,7 +51,7 @@ public class LockingStrategyAuto extends LockingStrategy {
             @Nonnull final Statistics stats,
             @Nonnull final CurrentRequest currentRequest ) {
         super( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
-        _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor();
+        _requestPatternDetectionExecutor = Executors.newSingleThreadExecutor(new NamedThreadFactory("msm-req-pattern-detector"));
         _readOnlyRequestCache = new ReadOnlyRequestsCache();
     }
 

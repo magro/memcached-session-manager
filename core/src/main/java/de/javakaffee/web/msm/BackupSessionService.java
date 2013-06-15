@@ -85,7 +85,7 @@ public class BackupSessionService {
         _statistics = statistics;
 
         _executorService = sessionBackupAsync
-            ? Executors.newFixedThreadPool( backupThreadCount )
+            ? Executors.newFixedThreadPool( backupThreadCount, new NamedThreadFactory("msm-storage") )
             : new SynchronousExecutorService();
 
     }

@@ -92,7 +92,7 @@ public abstract class LockingStrategy {
         _storeSecondaryBackup = storeSecondaryBackup;
         _stats = stats;
         _currentRequest = currentRequest;
-        _executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
+        _executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors(), new NamedThreadFactory("msm-2ndary-backup") );
     }
 
     /**
