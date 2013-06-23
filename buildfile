@@ -5,6 +5,7 @@ require 'etc/checkstyle'
 repositories.remote << 'http://repo2.maven.org/maven2'
 repositories.remote << 'http://www.ibiblio.org/maven2'
 repositories.remote << 'http://thimbleware.com/maven'
+repositories.remote << 'https://repository.jboss.org/nexus/content/repositories/releases'
 repositories.remote << 'http://repository.jboss.com/maven2'
 #repositories.remote << 'http://powermock.googlecode.com/svn/repo'
 
@@ -37,7 +38,8 @@ JAVASSIST = transitive( 'javassist:javassist:jar:3.11.0.GA' )
 SPRING = group( 'spring-core', 'spring-beans', 'spring-aop', :under => 'org.springframework', :version => '2.5.6' )
 
 # Testing
-JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:0.9.1' ).reject { |a| a.group == 'org.slf4j' }
+NETTY = artifact('org.jboss.netty:netty:jar:3.2.4.Final')
+JMEMCACHED = transitive( 'com.thimbleware.jmemcached:jmemcached-core:jar:1.0.0' ).reject { |a| ((a.group == 'org.slf4j') || (a.group == 'org.jboss.netty')) }
 HTTP_CLIENT = transitive( 'org.apache.httpcomponents:httpclient:jar:4.1-alpha1' )
 SLF4J = transitive( 'org.slf4j:slf4j-simple:jar:1.5.6' )
 JMOCK_CGLIB = transitive( 'jmock:jmock-cglib:jar:1.2.0' )
@@ -47,7 +49,7 @@ MOCKITO = transitive( 'org.mockito:mockito-core:jar:1.8.1' )
 # Dependencies
 require 'etc/tools'
 
-LIBS = [ CATALINA, CATALINA_HA, MEMCACHED, JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, XSTREAM ]
+LIBS = [ CATALINA, CATALINA_HA, MEMCACHED, NETTY, JMEMCACHED, TC_COYOTE, HTTP_CLIENT, SLF4J, XSTREAM ]
 task("check-deps") do |task|
   checkdeps LIBS      
 end                         
@@ -71,7 +73,7 @@ define 'msm' do
   desc 'The core module of memcached-session-manager'
   define 'core' do |project|
     compile.with( SERVLET_API, CATALINA, CATALINA_HA, TC_COYOTE, MEMCACHED, JSR305 )
-    test.with( JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO, HIBERNATE, HIBERNATE_ANNOTATIONS, JAVASSIST, HSQLDB )
+    test.with( NETTY, JMEMCACHED, HTTP_CLIENT, SLF4J, JMOCK_CGLIB, MOCKITO, HIBERNATE, HIBERNATE_ANNOTATIONS, JAVASSIST, HSQLDB )
     package :jar, :id => 'memcached-session-manager-tc7'
     package(:jar, :classifier => 'sources', :id => 'memcached-session-manager-tc7').include :from => compile.sources 
   end
