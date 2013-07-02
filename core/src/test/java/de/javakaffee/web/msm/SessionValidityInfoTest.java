@@ -39,8 +39,7 @@ public class SessionValidityInfoTest {
 
     @Test
     public void negativeInactivityAlwaysValid() {
-        long now = System.currentTimeMillis();
-        SessionValidityInfo info = new SessionValidityInfo(-1, 0, 0);
+        final SessionValidityInfo info = new SessionValidityInfo(-1, 0, 0);
         assertTrue(info.isValid());
     }
 }

@@ -24,8 +24,6 @@ import static org.testng.Assert.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,8 +39,6 @@ import javax.annotation.Nullable;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.startup.Embedded;
 import org.apache.http.HttpException;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.conn.scheme.PlainSocketFactory;
@@ -92,8 +88,8 @@ public abstract class NonStickySessionsIntegrationTest {
         }
     };
 
-    private Embedded _tomcat1;
-    private Embedded _tomcat2;
+    private TomcatBuilder<?> _tomcat1;
+    private TomcatBuilder<?> _tomcat2;
 
     private static final int TC_PORT_1 = 18888;
     private static final int TC_PORT_2 = 18889;
@@ -136,23 +132,21 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final SchemeRegistry schemeRegistry = new SchemeRegistry();
         schemeRegistry.register(
-                new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
+                new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
         _httpClient = new DefaultHttpClient(new ThreadSafeClientConnManager(schemeRegistry));
 
         _executor = Executors.newCachedThreadPool();
     }
 
-    abstract TestUtils getTestUtils();
+    abstract TestUtils<?> getTestUtils();
 
-    private Embedded startTomcat( final int port ) throws MalformedURLException, UnknownHostException, LifecycleException {
+    private TomcatBuilder<?> startTomcat( final int port ) throws Exception {
         return startTomcat(port, MEMCACHED_NODES, null);
     }
 
-    private Embedded startTomcat( final int port, final String memcachedNodes, final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).memcachedNodes(memcachedNodes)
-                .sticky(false).lockingMode(lockingMode).build();
-        tomcat.start();
-        return tomcat;
+    private TomcatBuilder<?> startTomcat( final int port, final String memcachedNodes, final LockingMode lockingMode ) throws Exception {
+        return getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).memcachedNodes(memcachedNodes)
+                .sticky(false).lockingMode(lockingMode).buildAndStart();
     }
 
     @AfterMethod
@@ -197,7 +191,7 @@ public abstract class NonStickySessionsIntegrationTest {
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
             ExecutionException {
 
-        getManager( _tomcat1 ).setMaxInactiveInterval(-1);
+        _tomcat1.getManager().setMaxInactiveInterval(-1);
         setLockingMode(lockingMode, uriPattern);
 
         final String sessionId = post(_httpClient, TC_PORT_1, null, "k1", "v1").getSessionId();
@@ -239,7 +233,7 @@ public abstract class NonStickySessionsIntegrationTest {
          *  may not exceed 60*60*24*30 (number of seconds in 30 days); if the number sent by a client is larger than
          *  that, the server will consider it to be real Unix time value rather than an offset from current time.
          */
-        getManager( _tomcat1 ).setMaxInactiveInterval(60*60*24*30 / 2 + 1);
+        _tomcat1.getManager().setMaxInactiveInterval(60*60*24*30 / 2 + 1);
         setLockingMode(lockingMode, uriPattern);
 
         final String sessionId = post(_httpClient, TC_PORT_1, null, "k1", "v1").getSessionId();
@@ -274,8 +268,8 @@ public abstract class NonStickySessionsIntegrationTest {
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
             ExecutionException {
 
-        getManager( _tomcat1 ).setMemcachedNodes("localhost:" + MEMCACHED_PORT_1);
-        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern, false );
+        _tomcat1.getManager().setMemcachedNodes("localhost:" + MEMCACHED_PORT_1);
+        _tomcat1.getManager().setLockingMode( lockingMode, uriPattern, false );
 
         final String sessionId = post(_httpClient, TC_PORT_1, null, "k1", "v1").getSessionId();
         assertNotNull(sessionId);
@@ -341,8 +335,8 @@ public abstract class NonStickySessionsIntegrationTest {
     @Test( enabled = true )
     public void testNoStaleSessionsWithNonStickySessions() throws IOException, InterruptedException, HttpException {
 
-        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat2 ).setMaxInactiveInterval( 1 );
+        _tomcat1.getManager().setMaxInactiveInterval( 1 );
+        _tomcat2.getManager().setMaxInactiveInterval( 1 );
 
         final String key = "foo";
         final String value1 = "bar";
@@ -367,8 +361,8 @@ public abstract class NonStickySessionsIntegrationTest {
     }
 
     private void setLockingMode( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) {
-        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern, true );
-        getManager( _tomcat2 ).setLockingMode( lockingMode, uriPattern, true );
+        _tomcat1.getManager().setLockingMode( lockingMode, uriPattern, true );
+        _tomcat2.getManager().setLockingMode( lockingMode, uriPattern, true );
     }
 
     /**
@@ -542,8 +536,8 @@ public abstract class NonStickySessionsIntegrationTest {
     @Test( enabled = true, dataProvider = "lockingModes" )
     public void testNonStickySessionIsValidEvenWhenAccessedReadonly( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat1 ).setLockingMode( lockingMode, uriPattern, true );
+        _tomcat1.getManager().setMaxInactiveInterval( 1 );
+        _tomcat1.getManager().setLockingMode( lockingMode, uriPattern, true );
 
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
@@ -563,8 +557,8 @@ public abstract class NonStickySessionsIntegrationTest {
     @Test( enabled = true, dataProvider = "sessionTrackingModesProvider" )
     public void testNonStickySessionIsValidForDifferentSessionTrackingModes( @Nonnull final SessionTrackingMode sessionTrackingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
-        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat1 ).setLockingMode( LockingMode.ALL, null, true );
+        _tomcat1.getManager().setMaxInactiveInterval( 1 );
+        _tomcat1.getManager().setLockingMode( LockingMode.ALL, null, true );
 
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
@@ -586,8 +580,8 @@ public abstract class NonStickySessionsIntegrationTest {
     @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
     public void testNonStickySessionIsStoredInSecondaryMemcachedForBackup() throws IOException, InterruptedException, HttpException {
 
-        getManager( _tomcat1 ).setMaxInactiveInterval( 1 );
-        getManager( _tomcat2 ).setMaxInactiveInterval( 1 );
+        _tomcat1.getManager().setMaxInactiveInterval( 1 );
+        _tomcat2.getManager().setMaxInactiveInterval( 1 );
 
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
         assertNotNull( sessionId1 );
@@ -626,7 +620,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final String memcachedNodes = MEMCACHED_NODES + "," + NODE_ID_3 + ":localhost:" + MEMCACHED_PORT_3;
 
-        final SessionManager manager = getManager(_tomcat1);
+        final SessionManager manager = _tomcat1.getManager();
         manager.setMaxInactiveInterval( 5 );
         manager.setMemcachedNodes(memcachedNodes);
         manager.getMemcachedSessionService().setSessionBackupAsync(false);
@@ -698,7 +692,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final String memcachedNodes = MEMCACHED_NODES + "," + NODE_ID_3 + ":localhost:" + MEMCACHED_PORT_3;
 
-        final SessionManager manager = getManager(_tomcat1);
+        final SessionManager manager = _tomcat1.getManager();
         manager.setMaxInactiveInterval( 5 );
         manager.setMemcachedNodes(memcachedNodes);
         manager.getMemcachedSessionService().setSessionBackupAsync(false);
@@ -759,7 +753,7 @@ public abstract class NonStickySessionsIntegrationTest {
      */
     @Test( enabled = true )
     public void testNoBackupWhenRunningASingleMemcachedOnly() throws IOException, HttpException, InterruptedException {
-        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        _tomcat1.getManager().setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
 
         // let's take some break so that everything's up again
         Thread.sleep( 500 );
@@ -777,7 +771,7 @@ public abstract class NonStickySessionsIntegrationTest {
             // just to be sure that node2 was not hit at all
             assertEquals( _daemon2.getCache().getSetCmds(), 0 );
         } finally {
-            getManager( _tomcat1 ).setMemcachedNodes( MEMCACHED_NODES );
+            _tomcat1.getManager().setMemcachedNodes( MEMCACHED_NODES );
         }
     }
 
@@ -791,8 +785,8 @@ public abstract class NonStickySessionsIntegrationTest {
 
     @Test( enabled = true )
     public void testSessionNotLoadedForReadonlyRequest() throws IOException, HttpException, InterruptedException {
-        getManager( _tomcat1 ).setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        waitForReconnect(getService(_tomcat1).getMemcached(), 1, 1000);
+        _tomcat1.getManager().setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
+        waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
 
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
         assertNotNull( sessionId1 );
@@ -872,8 +866,8 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1 = startTomcatWithAuth( TC_PORT_1, LockingMode.AUTO );
         _tomcat2 = startTomcatWithAuth( TC_PORT_2, LockingMode.AUTO );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
@@ -908,8 +902,8 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1 = startTomcatWithAuth( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
         _tomcat2 = startTomcatWithAuth( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         /* login on tomcat1 (4 sets)
          */
@@ -968,15 +962,15 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1 = startTomcatWithAuth( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
         _tomcat2 = startTomcatWithAuth( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         LOG.info("START foo1234");
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         LOG.info("END foo1234");
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(response1.getContent().contains("j_security_check"));
+        assertTrue(response1.getContent().contains("j_security_check"), "IllegalState: /j_security_check not found, app is not properly initialized");
 
         // failed sometimes, randomly (timing issue?)?!
         Thread.sleep(200);
@@ -988,7 +982,8 @@ public abstract class NonStickySessionsIntegrationTest {
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
         final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, false );
         assertNull(response2.getResponseSessionId());
-        assertEquals(response2.getStatusCode(), 302, response2.getContent());
+        assertTrue(isRedirect(response2.getStatusCode()), "IllegalState: 'POST /j_security_check' did not issue a redirect,"
+                + " but status " + response2.getStatusCode() +". Page content: " + response2.getContent());
 
         // 2 gets for session and validity
         assertEquals( _daemon1.getCache().getGetHits(), 2 );
@@ -1010,16 +1005,16 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1 = startTomcatWithAuth( TC_PORT_1, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
         _tomcat2 = startTomcatWithAuth( TC_PORT_2, NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1, LockingMode.AUTO, LoginType.FORM );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
-        waitForReconnect(getService(_tomcat1).getMemcached(), 1, 1000);
-        waitForReconnect(getService(_tomcat2).getMemcached(), 1, 1000);
+        waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
+        waitForReconnect(_tomcat2.getService().getMemcached(), 1, 1000);
 
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(response1.getContent().contains("j_security_check"));
+        assertTrue(response1.getContent().contains("j_security_check"), "IllegalState: /j_security_check not found, app is not properly initialized");
 
         // Wait some time so that the GET is finished
         Thread.sleep(200);
@@ -1045,7 +1040,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     @Test( enabled = true )
     public void testInvalidateSessionShouldReleaseLockIssue144() throws IOException, InterruptedException, HttpException {
-        getManager(_tomcat1).setLockingMode(LockingMode.AUTO.name());
+        _tomcat1.getManager().setLockingMode(LockingMode.AUTO.name());
 
         final String sessionId1 = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId1, "No session created." );
@@ -1056,16 +1051,14 @@ public abstract class NonStickySessionsIntegrationTest {
         assertNull(_client.get(new SessionIdFormat().createLockName(sessionId1)), "Lock should be released.");
     }
 
-    private Embedded startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws MalformedURLException, UnknownHostException, LifecycleException {
+    private TomcatBuilder<?> startTomcatWithAuth( final int port, @Nonnull final LockingMode lockingMode ) throws Exception {
         return startTomcatWithAuth(port, MEMCACHED_NODES, lockingMode, LoginType.BASIC);
     }
 
-    private Embedded startTomcatWithAuth(final int port, final String memcachedNodes, final LockingMode lockingMode, final LoginType loginType)
-            throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded result = getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).loginType(loginType)
-                .memcachedNodes(memcachedNodes).sticky(false).lockingMode(lockingMode).build();
-        result.start();
-        return result;
+    private TomcatBuilder<?> startTomcatWithAuth(final int port, final String memcachedNodes, final LockingMode lockingMode, final LoginType loginType)
+            throws Exception {
+        return getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).loginType(loginType)
+                .memcachedNodes(memcachedNodes).sticky(false).lockingMode(lockingMode).buildAndStart();
     }
 
     @DataProvider

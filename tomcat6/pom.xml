@@ -12,7 +12,11 @@
 	<packaging>jar</packaging>
 	<name>memcached-session-manager tomcat6</name>
 	<description>The msm tomcat6 specific implementation.</description>
-
+	
+	<properties>
+		<tomcat-version>6.0.37</tomcat-version>
+	</properties>
+	
 	<dependencies>
 		<dependency>
 			<groupId>${project.groupId}</groupId>

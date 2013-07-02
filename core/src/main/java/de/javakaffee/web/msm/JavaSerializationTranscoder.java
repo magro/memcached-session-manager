@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.catalina.Loader;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
 import org.apache.juli.logging.Log;
@@ -195,13 +194,9 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
 
     private ObjectInputStream createObjectInputStream( final ByteArrayInputStream bis ) throws IOException {
         final ObjectInputStream ois;
-        Loader loader = null;
         ClassLoader classLoader = null;
         if ( _manager != null && _manager.getContainer() != null ) {
-            loader = _manager.getContainer().getLoader();
-        }
-        if ( loader != null ) {
-            classLoader = loader.getClassLoader();
+            classLoader = _manager.getContainerClassLoader();
         }
         if ( classLoader != null ) {
             ois = new CustomObjectInputStream( bis, classLoader );

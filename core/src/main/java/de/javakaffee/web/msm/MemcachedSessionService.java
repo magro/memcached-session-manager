@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-
 import static de.javakaffee.web.msm.Configurations.MAX_RECONNECT_DELAY_KEY;
 import static de.javakaffee.web.msm.Configurations.getSystemProperty;
 import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
@@ -40,15 +39,11 @@ import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
-import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
-import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
-import org.apache.catalina.deploy.LoginConfig;
-import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -235,9 +230,7 @@ public class MemcachedSessionService {
     private RequestTrackingHostValve _trackingHostValve;
     private RequestTrackingContextValve _trackingContextValve;
 
-    private Boolean _contextHasFormBasedSecurityConstraint;
-
-    private final SessionManager _manager;
+    protected final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
 
     private final LRUCache<String, Object> _removedSessions = new LRUCache<String, Object>( 2000, 5000 );
@@ -329,6 +322,12 @@ public class MemcachedSessionService {
         Container getContainer();
 
         /**
+         * Return the Context with which this Manager is associated.
+         */
+        @Nonnull
+        ClassLoader getContainerClassLoader();
+
+        /**
          * Reads the Principal from the given OIS.
          * @param ois the object input stream to read from. Will be closed by the caller.
          * @return the deserialized principal
@@ -337,6 +336,11 @@ public class MemcachedSessionService {
          */
         @Nonnull
         Principal readPrincipal( @Nonnull ObjectInputStream ois ) throws ClassNotFoundException, IOException;
+
+        /**
+         * Determines if the context has a security contraint with form based login.
+         */
+        boolean contextHasFormBasedSecurityConstraint();
 
         // --------------------- setters for testing
         /**
@@ -498,7 +502,7 @@ public class MemcachedSessionService {
 
     private Class<? extends TranscoderFactory> loadTranscoderFactoryClass() throws ClassNotFoundException {
         Class<? extends TranscoderFactory> transcoderFactoryClass;
-        final ClassLoader classLoader = _manager.getContainer().getLoader().getClassLoader();
+        final ClassLoader classLoader = _manager.getContainerClassLoader();
         try {
             _log.debug( "Loading transcoder factory class " + _transcoderFactoryClassName + " using classloader " + classLoader );
             transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, classLoader ).asSubclass( TranscoderFactory.class );
@@ -546,7 +550,7 @@ public class MemcachedSessionService {
             // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
             // constraint needs the session to get the authenticated principal)
             if ( !_sticky && isContainerSessionLookup()
-                    && !contextHasFormBasedSecurityConstraint() ) {
+                    && !_manager.contextHasFormBasedSecurityConstraint() ) {
                 // we can return just null as the requestedSessionId will still be set on
                 // the request.
                 return null;
@@ -607,18 +611,6 @@ public class MemcachedSessionService {
 
         final boolean activate = !sessionIdWillBeChanged;
         addValidLoadedSession( result, activate );
-    }
-
-    private boolean contextHasFormBasedSecurityConstraint() {
-        if(_contextHasFormBasedSecurityConstraint != null) {
-            return _contextHasFormBasedSecurityConstraint.booleanValue();
-        }
-        final Context context = (Context)_manager.getContainer();
-        final SecurityConstraint[] constraints = context.findConstraints();
-        final LoginConfig loginConfig = context.getLoginConfig();
-        _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
-                && loginConfig != null && Constants.FORM_METHOD.equals( loginConfig.getAuthMethod() );
-        return _contextHasFormBasedSecurityConstraint;
     }
 
     private void addValidLoadedSession( final StandardSession session, final boolean activate ) {

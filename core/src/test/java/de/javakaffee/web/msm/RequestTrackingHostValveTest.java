@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.Nonnull;
@@ -111,7 +112,8 @@ public abstract class RequestTrackingHostValveTest {
                 new AtomicBoolean( true ), new CurrentRequest()) {
             @Override
             protected String[] getSetCookieHeaders(final Response response) {
-                return response.getHeaderValues("Set-Cookie");
+                final Collection<String> result = response.getHeaders("Set-Cookie");
+                return result.toArray(new String[result.size()]);
             }
         };
         assertEquals(cut.getSessionCookieName(), "foo");

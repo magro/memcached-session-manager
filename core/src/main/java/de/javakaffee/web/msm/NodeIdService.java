@@ -36,7 +36,6 @@ import org.apache.juli.logging.LogFactory;
  */
 public class NodeIdService {
 
-    @SuppressWarnings( "unused" )
     private static final Log LOG = LogFactory.getLog( NodeIdService.class );
 
     private final Random _random = new Random();

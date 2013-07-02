@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Martin Grotzke
+ * Copyright 2011 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,20 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.serializer.hibernate;
+package de.javakaffee.web.msm.integration;
 
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.JavaSerializationTranscoder;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.SessionAttributesTranscoder;
-
 /**
- * Test for serialization/deserialization of hibernate collection mappings with
- * {@link JavaSerializationTranscoder}.
+ * Integration test testing non-sticky sessions.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 @Test
-public class JavaSerializationHibernateCollectionsTest extends AbstractHibernateCollectionsTest {
+public class NonStickySessionsIntegrationTC8Test extends NonStickySessionsIntegrationTest {
 
     @Override
-    protected SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
-        return new JavaSerializationTranscoder( manager );
+    TestUtils<?> getTestUtils() {
+        return new TestUtilsTC8();
     }
-
 }

@@ -215,9 +215,13 @@ public abstract class AbstractHibernateCollectionsTest {
     protected SessionManager createSessionManager() {
         final SessionManager manager = mock( SessionManager.class );
         when( manager.getContainer() ).thenReturn( new StandardContext() ); // needed for createSession
-        when( manager.getMemcachedSessionService() ).thenReturn( new MemcachedSessionService( manager ) );
+        when( manager.getMemcachedSessionService() ).thenReturn(newMemcachedSessionService(manager));
         when( manager.newMemcachedBackupSession() ).thenReturn( new MemcachedBackupSession( manager ) );
         return manager;
+    }
+
+    protected MemcachedSessionService newMemcachedSessionService(final SessionManager manager) {
+        return new MemcachedSessionService(manager);
     }
 
     private static MemcachedBackupSession createSession( final SessionManager manager, final String id ) {

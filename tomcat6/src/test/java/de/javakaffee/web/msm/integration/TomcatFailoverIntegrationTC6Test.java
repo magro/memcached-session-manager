@@ -31,7 +31,7 @@ import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 public class TomcatFailoverIntegrationTC6Test extends TomcatFailoverIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC6();
     }
 

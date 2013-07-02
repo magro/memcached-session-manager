@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 public class NonStickySessionsIntegrationTC6Test extends NonStickySessionsIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC6();
     }
 

@@ -56,18 +56,11 @@ import javax.servlet.http.HttpSessionEvent;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Container;
-import org.apache.catalina.Context;
-import org.apache.catalina.Engine;
-import org.apache.catalina.Host;
-import org.apache.catalina.Valve;
-import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.core.StandardService;
 import org.apache.catalina.loader.WebappLoader;
-import org.apache.catalina.startup.Embedded;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpException;
@@ -81,11 +74,13 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.params.HttpClientParams;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EntityUtils;
 import org.apache.juli.logging.LogFactory;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
@@ -101,14 +96,15 @@ import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap.EvictionP
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedSessionService;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
  * Integration test utils.
  *
+ * @param <T> The type of {@link TomcatBuilder}, returned by {@link #tomcatBuilder()}.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public abstract class TestUtils {
+public abstract class TestUtils<T extends TomcatBuilder<?>> {
 
     private static final String CONTEXT_PATH = "/";
     private static final String DEFAULT_HOST = "localhost";
@@ -125,7 +121,7 @@ public abstract class TestUtils {
         System.setProperty(NODE_AVAILABILITY_CACHE_TTL_KEY, "50");
     }
 
-    private static void initLogConfig(final Class<? extends TestUtils> clazz) {
+    public static void initLogConfig(@SuppressWarnings("rawtypes") final Class<? extends TestUtils> clazz) {
         final URL loggingProperties = clazz.getResource("/logging.properties");
         try {
             System.setProperty("java.util.logging.config.file", new File(loggingProperties.toURI()).getAbsolutePath());
@@ -147,7 +143,7 @@ public abstract class TestUtils {
         final Response tc1Response1 = get( client, tcPort, null );
         final String sessionId = tc1Response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(tc1Response1.getContent().contains("j_security_check"));
+        assertTrue(tc1Response1.getContent().contains("j_security_check"), "/j_security_check not found, app is not properly initialized");
 
         final Map<String, String> params = new HashMap<String, String>();
         params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );
@@ -182,7 +178,7 @@ public abstract class TestUtils {
         // System.out.println( "response cookie: " + responseSessionId );
 
         // We must consume the content so that the connection will be released
-        response.getEntity().consumeContent();
+        EntityUtils.consume(response.getEntity());
 
         return responseSessionId == null ? rsessionId : responseSessionId;
     }
@@ -342,6 +338,11 @@ public abstract class TestUtils {
 
         method.setEntity( createFormEntity( params ) );
 
+        // For 303 httpclient automatically redirects, so let's prevent this if requested.
+        if (!followRedirects) {
+            HttpClientParams.setRedirecting(method.getParams(), false);
+        }
+
         // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
         //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
         final HttpResponse response = credentials == null
@@ -349,16 +350,20 @@ public abstract class TestUtils {
             : executeRequestWithAuth( client, method, credentials );
 
         final int statusCode = response.getStatusLine().getStatusCode();
-        if ( followRedirects && statusCode == 302 ) {
+        if ( followRedirects && isRedirect(statusCode) ) {
             return redirect( response, client, port, rsessionId, baseUri );
         }
 
-        if ( statusCode != 200 && !(!followRedirects && statusCode == 302) ) {
+        if ( statusCode != 200 && !(!followRedirects && isRedirect(statusCode)) ) {
             throw new RuntimeException( "POST"+(path != null ? " " + path : "")+" did not return status 200, but " + response.getStatusLine() +
                     "\n" + toString(response.getEntity().getContent()) );
         }
 
         return readResponse( rsessionId, response );
+    }
+
+    public static boolean isRedirect(final int statusCode) {
+        return statusCode == 302 || statusCode == 303;
     }
 
     public static String toString(final InputStream in) {
@@ -389,7 +394,7 @@ public abstract class TestUtils {
         }
         /* consume content so that the connection can be released
          */
-        response.getEntity().consumeContent();
+        EntityUtils.consume(response.getEntity());
 
         /* redirect
          */
@@ -451,50 +456,13 @@ public abstract class TestUtils {
         return daemon;
     }
 
-    public TomcatBuilder tomcatBuilder() {
-        return new TomcatBuilder() {
-            @Override
-            @Nonnull
-            protected SessionManager createSessionManager() {
-                return TestUtils.this.createSessionManager();
-            }
-        };
-    }
-
     /**
-     * Must create a {@link SessionManager} for the current tomcat version.
+     * Must create a {@link TomcatBuilder} for the current tomcat version.
      */
-    @Nonnull
-    protected abstract SessionManager createSessionManager();
+    public abstract T tomcatBuilder();
 
     public static enum LoginType {
         BASIC, FORM
-    }
-
-    public static Context getContext( final Embedded tomcat ) {
-        return (Context) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH );
-    }
-
-    public static SessionManager getManager( final Embedded tomcat ) {
-        return (SessionManager) getContext(tomcat).getManager();
-    }
-
-    public static MemcachedSessionService getService( final Embedded tomcat ) {
-        return ((SessionManager) getContext(tomcat).getManager()).getMemcachedSessionService();
-    }
-
-    public static Engine getEngine( final Embedded tomcat ) {
-        return (Engine) tomcat.getContainer();
-    }
-
-    public static void setChangeSessionIdOnAuth( final Embedded tomcat, final boolean changeSessionIdOnAuth ) {
-        final Engine engine = (StandardEngine)tomcat.getContainer();
-        final Host host = (Host)engine.findChild( DEFAULT_HOST );
-        final Container context = host.findChild( CONTEXT_PATH );
-        final Valve first = context.getPipeline().getFirst();
-        if ( first instanceof AuthenticatorBase ) {
-            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( changeSessionIdOnAuth );
-        }
     }
 
     /**

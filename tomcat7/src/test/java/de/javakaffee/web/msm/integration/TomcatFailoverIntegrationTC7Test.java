@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 public class TomcatFailoverIntegrationTC7Test extends TomcatFailoverIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC7();
     }
 

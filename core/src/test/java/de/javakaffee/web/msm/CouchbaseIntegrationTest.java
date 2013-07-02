@@ -16,8 +16,6 @@
 package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
-import static de.javakaffee.web.msm.integration.TestUtils.getManager;
-import static de.javakaffee.web.msm.integration.TestUtils.getService;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
@@ -31,7 +29,6 @@ import java.util.concurrent.ExecutionException;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.startup.Embedded;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.couchbase.mock.CouchbaseMock;
@@ -43,6 +40,7 @@ import com.couchbase.client.CouchbaseClient;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TomcatBuilder;
 
 /**
  * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
@@ -54,13 +52,13 @@ public abstract class CouchbaseIntegrationTest {
     private final List<Pair<CouchbaseMock, Thread>> cluster = new ArrayList<Pair<CouchbaseMock,Thread>>(2);
     private MemcachedClient mc;
 
-    private Embedded _tomcat1;
+    private TomcatBuilder<?> _tomcat1;
     private final int _portTomcat1 = 18888;
 
     private boolean couchbaseProvided;
     private TranscoderService transcoderService;
 
-    abstract TestUtils getTestUtils();
+    abstract TestUtils<?> getTestUtils();
 
     @BeforeMethod
     public void setUp(final Method testMethod) throws Throwable {
@@ -75,8 +73,7 @@ public abstract class CouchbaseIntegrationTest {
         try {
             System.setProperty( "org.apache.catalina.startup.EXIT_ON_INIT_FAILURE", "true" );
             _tomcat1 = getTestUtils().tomcatBuilder().port(_portTomcat1).memcachedNodes("http://localhost:"+ couchbasePort +"/pools")
-                    .sticky(true).memcachedProtocol("binary").username("default").build();
-            _tomcat1.start();
+                    .sticky(true).memcachedProtocol("binary").username("default").buildAndStart();
         } catch ( final Throwable e ) {
             LOG.error( "could not start tomcat.", e );
             throw e;
@@ -84,7 +81,7 @@ public abstract class CouchbaseIntegrationTest {
 
         setupCouchbaseClient();
 
-        transcoderService = new TranscoderService(new JavaSerializationTranscoder(getManager(_tomcat1)));
+        transcoderService = new TranscoderService(new JavaSerializationTranscoder(_tomcat1.getManager()));
     }
 
     @AfterMethod
@@ -101,7 +98,7 @@ public abstract class CouchbaseIntegrationTest {
 
     @Test
     public void testBackupSessionInCouchbase() throws InterruptedException, ExecutionException {
-        final MemcachedSessionService service = getService(_tomcat1);
+        final MemcachedSessionService service = _tomcat1.getService();
         final MemcachedBackupSession session = createSession( service );
         final String sessionId = "12345";
         session.setId(sessionId);
@@ -110,13 +107,13 @@ public abstract class CouchbaseIntegrationTest {
         final BackupResult backupResult = service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.SUCCESS);
 
-        final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), getManager(_tomcat1));
+        final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), _tomcat1.getManager());
         checkSession(loadedSession, session);
     }
 
     @Test(enabled = false) // spurious failures
     public void testBackupSessionInCouchbaseCluster() throws Exception {
-        final MemcachedSessionService service = getService(_tomcat1);
+        final MemcachedSessionService service = _tomcat1.getService();
 
         cluster.add(setupCouchbase(getMaxCouchbasePort() + 1));
         service.setMemcachedNodes(getMemcachedNodesConfig(getURIs()));
@@ -133,7 +130,7 @@ public abstract class CouchbaseIntegrationTest {
         final BackupResult backupResult = service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.SUCCESS);
 
-        final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), getManager(_tomcat1));
+        final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), _tomcat1.getManager());
         checkSession(loadedSession, session);
     }
 

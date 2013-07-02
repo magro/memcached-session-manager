@@ -12,3 +12,5 @@ core/src/test/java/de/javakaffee/web/msm/integration/MemcachedFailover2Integrati
 jbossweb3/
 *.iml
 .idea
+*.log
+

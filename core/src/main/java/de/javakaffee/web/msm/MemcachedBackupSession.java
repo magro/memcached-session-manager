@@ -444,6 +444,7 @@ public class MemcachedBackupSession extends StandardSession {
         _dataHashCode = attributesDataHashCode;
     }
 
+    @Override
     public long getCreationTimeInternal() {
         return this.creationTime;
     }
@@ -475,6 +476,7 @@ public class MemcachedBackupSession extends StandardSession {
      *
      * @return the timestamp of the last {@link #access()} invocation.
      */
+    @Override
     public long getThisAccessedTimeInternal() {
         return this.thisAccessedTime;
     }
@@ -505,7 +507,6 @@ public class MemcachedBackupSession extends StandardSession {
      *
      * @return the filtered attribute map that only includes attributes that shall be stored in memcached.
      */
-    @SuppressWarnings( "unchecked" )
     public Map<String, Object> getAttributesFiltered() {
         if ( this.manager == null ) {
             throw new IllegalStateException( "There's no manager set." );
@@ -515,7 +516,7 @@ public class MemcachedBackupSession extends StandardSession {
             return this.attributes;
         }
         final Map<String, Object> result = new ConcurrentHashMap<String, Object>( this.attributes.size() );
-        for ( final Map.Entry<String, Object> entry: (Set<Map.Entry<String, Object>>)this.attributes.entrySet() ) {
+        for ( final Map.Entry<String, Object> entry: this.attributes.entrySet() ) {
             if ( pattern.matcher(entry.getKey()).matches() ) {
                 result.put( entry.getKey(), entry.getValue() );
             }

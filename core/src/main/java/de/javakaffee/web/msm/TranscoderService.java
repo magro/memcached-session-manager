@@ -35,6 +35,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.catalina.Manager;
 import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
@@ -375,7 +377,6 @@ public class TranscoderService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static byte[] serializeSavedRequest( final Object obj ) {
         if(obj == null) {
             return null;
@@ -458,7 +459,6 @@ public class TranscoderService {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, List<String>> getHeaders(final SavedRequest obj) {
         final Map<String, List<String>> result = new HashMap<String, List<String>>();
         final Iterator<String> namesIter = obj.getHeaderNames();
@@ -584,10 +584,10 @@ public class TranscoderService {
     private static enum AuthType {
 
         NONE( (short)0, null ),
-        BASIC( (short)1, Constants.BASIC_METHOD ),
-        CLIENT_CERT( (short)2, Constants.CERT_METHOD ),
-        DIGEST( (short)3, Constants.DIGEST_METHOD ),
-        FORM( (short)4, Constants.FORM_METHOD );
+        BASIC( (short)1, HttpServletRequest.BASIC_AUTH ),
+        CLIENT_CERT( (short)2, HttpServletRequest.CLIENT_CERT_AUTH ),
+        DIGEST( (short)3, HttpServletRequest.DIGEST_AUTH ),
+        FORM( (short)4, HttpServletRequest.FORM_AUTH );
 
         private final short _id;
         private final String _value;

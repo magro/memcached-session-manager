@@ -56,6 +56,7 @@
 		<module>core</module>
 		<module>tomcat6</module>
 		<module>tomcat7</module>
+		<module>tomcat8</module>
 		<module>kryo-serializer</module>
 		<module>javolution-serializer</module>
 		<module>xstream-serializer</module>
@@ -250,7 +251,7 @@
 			<dependency>
 				<groupId>org.apache.httpcomponents</groupId>
 				<artifactId>httpclient</artifactId>
-				<version>4.1-alpha1</version>
+				<version>4.1.1</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>

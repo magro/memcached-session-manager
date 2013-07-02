@@ -31,6 +31,7 @@ import java.security.Principal;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.authenticator.Constants;
@@ -53,7 +54,7 @@ import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
  */
 public abstract class TranscoderServiceTest {
 
-    private static SessionManager _manager;
+    protected static SessionManager _manager;
 
     @BeforeMethod
     public void setup() throws LifecycleException, ClassNotFoundException, IOException {
@@ -68,7 +69,7 @@ public abstract class TranscoderServiceTest {
             }
         });
 
-        final MemcachedSessionService service = new MemcachedSessionService( _manager );
+        final MemcachedSessionService service = new DummyMemcachedSessionService<SessionManager>( _manager );
         when( _manager.createSession( anyString() ) ).thenAnswer(new Answer<MemcachedBackupSession>() {
             @Override
             public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {
@@ -144,7 +145,7 @@ public abstract class TranscoderServiceTest {
     public void testSerializeSessionFieldsWithAuthenticatedPrincipal() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
-        session.setAuthType( Constants.FORM_METHOD );
+        session.setAuthType( HttpServletRequest.FORM_AUTH );
         session.setPrincipal( createPrincipal() );
 
         session.setLastBackupTime( System.currentTimeMillis() );
