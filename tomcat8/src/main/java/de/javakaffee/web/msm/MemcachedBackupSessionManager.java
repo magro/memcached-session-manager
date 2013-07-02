@@ -70,26 +70,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
-    private static final String INFO = NAME + "/1.0";
-
     protected final Log _log = LogFactory.getLog( getClass() );
 
     protected MemcachedSessionService _msm;
 
     public MemcachedBackupSessionManager() {
         _msm = new MemcachedSessionService( this );
-    }
-
-    /**
-     * Return descriptive information about this Manager implementation and the
-     * corresponding version number, in the format
-     * <code>&lt;description&gt;/&lt;version&gt;</code>.
-     *
-     * @return the info string
-     */
-    @Override
-    public String getInfo() {
-        return INFO;
     }
 
     /**
@@ -811,7 +797,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public String getSessionCookieName() {
-        return ApplicationSessionCookieConfig.getSessionCookieName((Context) getContainer());
+        return getContext().getSessionCookieName();
     }
 
     @Override
@@ -851,7 +837,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public ClassLoader getContainerClassLoader() {
-        return getContainer().getLoader().getClassLoader();
+        return getContext().getLoader().getClassLoader();
     }
 
     @Override
