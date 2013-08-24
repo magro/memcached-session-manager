@@ -399,13 +399,16 @@ public class MemcachedSessionService {
     public void shutdown() {
         _log.info( "Stopping services." );
         _manager.getContainer().getParent().getPipeline().removeValve(_trackingHostValve);
+        _manager.getContainer().getPipeline().removeValve(_trackingContextValve);
         _backupSessionService.shutdown();
         if ( _lockingStrategy != null ) {
             _lockingStrategy.shutdown();
         }
         if ( _memcached != null ) {
             _memcached.shutdown();
+            _memcached = null;
         }
+        _transcoderFactory = null;
     }
 
     /**

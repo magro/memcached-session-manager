@@ -150,6 +150,22 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     }
 
     /**
+     * Test for issue 174: sessions lost on Tomcat 7 reload
+     * http://code.google.com/p/memcached-session-manager/issues/detail?id=174
+     */
+    @Test( enabled = true )
+    public void testContextReload() throws IOException, InterruptedException, HttpException {
+        final String sessionId1 = post( _httpClient, _portTomcat1, null, "foo", "bar" ).getSessionId();
+        assertNotNull( sessionId1, "No session created." );
+
+        getContext(_tomcat1).reload();
+
+        final Response response = get( _httpClient, _portTomcat1, sessionId1 );
+        final String actualValue = response.get( "foo" );
+        assertEquals( "bar", actualValue );
+    }
+
+    /**
      * Test for issue 106: Session not updated in memcached when only a session attribute was removed
      * http://code.google.com/p/memcached-session-manager/issues/detail?id=106
      */
