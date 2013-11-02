@@ -62,6 +62,7 @@ import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import net.spy.memcached.FailureMode;
 
 /**
  * This is the core of memcached session manager, managing sessions in memcached.
@@ -404,13 +405,16 @@ public class MemcachedSessionService {
     public void shutdown() {
         _log.info( "Stopping services." );
         _manager.getContainer().getParent().getPipeline().removeValve(_trackingHostValve);
+        _manager.getContainer().getPipeline().removeValve(_trackingContextValve);
         _backupSessionService.shutdown();
         if ( _lockingStrategy != null ) {
             _lockingStrategy.shutdown();
         }
         if ( _memcached != null ) {
             _memcached.shutdown();
+            _memcached = null;
         }
+        _transcoderFactory = null;
     }
 
     /**
@@ -503,6 +507,7 @@ public class MemcachedSessionService {
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
                 final CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
                 factory.setOpTimeout(_operationTimeout);
+                factory.setFailureMode(FailureMode.Redistribute);
                 return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, _password));
             }
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);

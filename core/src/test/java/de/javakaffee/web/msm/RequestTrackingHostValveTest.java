@@ -58,9 +58,6 @@ public abstract class RequestTrackingHostValveTest {
     @BeforeMethod
     public void setUp() throws Exception {
         _service = mock( MemcachedSessionService.class );
-        _sessionTrackerValve = createSessionTrackerValve();
-        _nextValve = mock( Valve.class );
-        _sessionTrackerValve.setNext( _nextValve );
         _request = mock( Request.class );
         _response = mock( Response.class );
 
@@ -72,11 +69,16 @@ public abstract class RequestTrackingHostValveTest {
         when(_manager.getContainer()).thenReturn(_contextContainer);
         when(_contextContainer.getParent()).thenReturn(_hostContainer);
         when(_contextContainer.getPath()).thenReturn("/");
+
+        _sessionTrackerValve = createSessionTrackerValve();
+        _nextValve = mock( Valve.class );
+        _sessionTrackerValve.setNext( _nextValve );
         _sessionTrackerValve.setContainer(_hostContainer);
 
         when(_request.getRequestURI()).thenReturn( "/someRequest");
         when(_request.getMethod()).thenReturn("GET");
         when(_request.getQueryString()).thenReturn(null);
+        when(_request.getContext()).thenReturn(_contextContainer);
 
         when(_request.getNote(eq(RequestTrackingHostValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
         when(_request.getNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);

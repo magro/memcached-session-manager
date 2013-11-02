@@ -28,7 +28,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 
 import org.apache.catalina.Context;
-import org.apache.catalina.Host;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
@@ -63,10 +62,12 @@ public class RequestTrackingHostValve extends ValveBase {
     private final AtomicBoolean _enabled;
     protected final String _sessionCookieName;
     private final CurrentRequest _currentRequest;
+    private final Context _msmContext;
 
     private static final String MSM_REQUEST_ID = "msm.requestId";
 
 	private static final boolean IS_TOMCAT_6;
+
 	static {
 		Method getHeaderValues = null;
 		try {
@@ -110,6 +111,8 @@ public class RequestTrackingHostValve extends ValveBase {
         _statistics = statistics;
         _enabled = enabled;
         _currentRequest = currentRequest;
+
+        _msmContext = (Context) _sessionBackupService.getManager().getContainer();
     }
 
     /**
@@ -132,9 +135,7 @@ public class RequestTrackingHostValve extends ValveBase {
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
         final String requestId = getURIWithQueryString( request );
-        final Context context = (Context) _sessionBackupService.getManager().getContainer();
-        final Host host = (Host) _sessionBackupService.getManager().getContainer().getParent();
-        if(!_enabled.get() || !container.equals(host) || !request.getRequestURI().startsWith(context.getPath())) {
+        if(!_enabled.get() || !_msmContext.equals(request.getContext())) {
             getNext().invoke( request, response );
         } else if ( _ignorePattern != null && _ignorePattern.matcher( requestId ).matches() ) {
             if(_log.isDebugEnabled()) {
