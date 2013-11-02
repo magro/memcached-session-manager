@@ -10,3 +10,5 @@ reports
 test-output
 core/src/test/java/de/javakaffee/web/msm/integration/MemcachedFailover2IntegrationTest.java
 jbossweb3/
+*.iml
+.idea
