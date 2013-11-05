@@ -55,7 +55,7 @@ import edu.umd.cs.findbugs.annotations.SuppressWarnings;
  */
 public abstract class TomcatBuilder {
 
-    private static final String CONTEXT_PATH = "/";
+    public static final String CONTEXT_PATH = "/";
     private static final String DEFAULT_HOST = "localhost";
     private static final String DEFAULT_TRANSCODER_FACTORY = JavaSerializationTranscoderFactory.class.getName();
 
