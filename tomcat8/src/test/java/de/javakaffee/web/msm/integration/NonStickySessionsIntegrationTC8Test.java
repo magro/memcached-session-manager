@@ -30,5 +30,8 @@ public class NonStickySessionsIntegrationTC8Test extends NonStickySessionsIntegr
     TestUtils getTestUtils() {
         return new TestUtilsTC8();
     }
-
+    @Test( enabled = true )
+    public void testSessionCreatedForContainerProtectedResourceIsStoredInMemcached() throws Exception {
+    	super.testSessionCreatedForContainerProtectedResourceIsStoredInMemcached();
+    }
 }

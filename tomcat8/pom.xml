@@ -6,15 +6,13 @@
 		<version>1.6.6-SNAPSHOT</version>
 	</parent>
 
-	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>memcached-session-manager-tc8</artifactId>
-	<version>1.6.6-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager tomcat8</name>
 	<description>The msm tomcat8 specific implementation.</description>
 
 	<properties>
-		<tomcat-version>8.0.0</tomcat-version>
+		<tomcat-version>8.0.0-RC5</tomcat-version>
 	</properties>
 
 	<dependencies>
@@ -49,6 +47,13 @@
 			<version>${tomcat-version}</version>
 			<scope>provided</scope>
 		</dependency>
+        <dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>tomcat-jasper</artifactId>
+            <version>${tomcat-version}</version>
+            <scope>provided</scope>
+        </dependency>
+
 
 		<!-- use msm core test classes in tests -->
 		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
@@ -76,4 +81,18 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+	
+		<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+          			<source>1.7</source>
+          			<target>1.7</target>
+        		</configuration>
+			</plugin>
+		</plugins>
+	</build>
 </project>
