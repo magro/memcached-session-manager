@@ -34,14 +34,7 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.BinaryConnectionFactory;
-import net.spy.memcached.ConnectionFactory;
-import net.spy.memcached.ConnectionFactoryBuilder;
-import net.spy.memcached.DefaultConnectionFactory;
-import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.auth.AuthDescriptor;
-import net.spy.memcached.auth.PlainCallbackHandler;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -55,9 +48,6 @@ import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-
-import com.couchbase.client.CouchbaseClient;
-import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
@@ -85,34 +75,6 @@ public class MemcachedSessionService {
         LOCK_NOT_REQUIRED,
         LOCKED,
         COULD_NOT_AQUIRE_LOCK
-    }
-
-    static class ConnectionType {
-
-        private final boolean couchbaseBucketConfig;
-        private final String username;
-        private final String password;
-        public ConnectionType(final boolean couchbaseBucketConfig, final String username, final String password) {
-            this.couchbaseBucketConfig = couchbaseBucketConfig;
-            this.username = username;
-            this.password = password;
-        }
-        public static ConnectionType valueOf(final boolean couchbaseBucketConfig, final String username, final String password) {
-            return new ConnectionType(couchbaseBucketConfig, username, password);
-        }
-        boolean isCouchbaseBucketConfig() {
-            return couchbaseBucketConfig;
-        }
-        boolean isSASL() {
-            return !couchbaseBucketConfig && !isBlank(username) && !isBlank(password);
-        }
-        boolean isDefault() {
-            return !isCouchbaseBucketConfig() && !isSASL();
-        }
-
-        boolean isBlank(final String value) {
-            return value == null || value.trim().length() == 0;
-        }
     }
 
     public static final String PROTOCOL_TEXT = "text";
@@ -494,47 +456,7 @@ public class MemcachedSessionService {
         if ( ! _enabled.get() ) {
             return null;
         }
-        try {
-            final String password = _password == null ? "" : _password;
-            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), _username, password);
-            if (connectionType.isCouchbaseBucketConfig()) {
-            	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
-            	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
-                final CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
-                factory.setOpTimeout(_operationTimeout);
-                factory.setFailureMode(FailureMode.Redistribute);
-                return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, password));
-            }
-            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
-            return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
-        } catch (final Exception e) {
-            throw new RuntimeException("Could not create memcached client", e);
-        }
-    }
-
-    protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
-            final ConnectionType connectionType, final Statistics statistics ) {
-        if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
-            if (connectionType.isSASL()) {
-                final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
-                        new PlainCallbackHandler(_username, _password == null ? "" : _password));
-                return memcachedNodesManager.isEncodeNodeIdInSessionId()
-                        ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout,
-                                authDescriptor)
-                        : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                                .setAuthDescriptor(authDescriptor)
-                                .setOpTimeout(_operationTimeout).build();
-            }
-            else {
-                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                        memcachedNodesManager.getSessionIdFormat(),
-                        statistics, _operationTimeout ) : new BinaryConnectionFactory();
-            }
-        }
-        return memcachedNodesManager.isEncodeNodeIdInSessionId()
-        		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
-        		: new DefaultConnectionFactory();
+        return new MemcachedClientFactory().createMemcachedClient(memcachedNodesManager, _memcachedProtocol, _username, _password, _operationTimeout, statistics);
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
