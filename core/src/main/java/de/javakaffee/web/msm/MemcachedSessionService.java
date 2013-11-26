@@ -38,6 +38,7 @@ import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.DefaultConnectionFactory;
+import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.auth.PlainCallbackHandler;
@@ -62,7 +63,6 @@ import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
-import net.spy.memcached.FailureMode;
 
 /**
  * This is the core of memcached session manager, managing sessions in memcached.
@@ -495,14 +495,15 @@ public class MemcachedSessionService {
             return null;
         }
         try {
-            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), _username, _password);
+            final String password = _password == null ? "" : _password;
+            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), _username, password);
             if (connectionType.isCouchbaseBucketConfig()) {
             	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
             	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
                 final CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
                 factory.setOpTimeout(_operationTimeout);
                 factory.setFailureMode(FailureMode.Redistribute);
-                return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, _password));
+                return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, password));
             }
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
@@ -515,7 +516,8 @@ public class MemcachedSessionService {
             final ConnectionType connectionType, final Statistics statistics ) {
         if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
             if (connectionType.isSASL()) {
-                final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"}, new PlainCallbackHandler(_username, _password));
+                final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"},
+                        new PlainCallbackHandler(_username, _password == null ? "" : _password));
                 return memcachedNodesManager.isEncodeNodeIdInSessionId()
                         ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
                                 memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout,

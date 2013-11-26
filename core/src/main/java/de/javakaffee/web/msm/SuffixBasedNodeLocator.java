@@ -132,14 +132,14 @@ class SuffixBasedNodeLocator implements NodeLocator {
 
     /**
      * The class that is used for readonly copies.
-     *
+     * Basically a copy of net.spy.memcached.MemcachedNodeROImpl (which is not visible).
      */
     static class MyMemcachedNodeROImpl implements MemcachedNode {
 
-        private final MemcachedNode _root;
+        private final MemcachedNode root;
 
         public MyMemcachedNodeROImpl( final MemcachedNode node ) {
-            _root = node;
+            this.root = node;
         }
 
         /**
@@ -147,257 +147,187 @@ class SuffixBasedNodeLocator implements NodeLocator {
          */
         @Override
 		public String toString() {
-            return _root.toString();
+            return root.toString();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void addOp( final Operation op ) {
-            throw new UnsupportedOperationException();
+        public void addOp(final Operation op) {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void connected() {
-            throw new UnsupportedOperationException();
+        public void insertOp(final Operation op) {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void copyInputQueue() {
-            throw new UnsupportedOperationException();
+        public void connected() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void fillWriteBuffer( final boolean optimizeGets ) {
-            throw new UnsupportedOperationException();
+        public void copyInputQueue() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void fixupOps() {
-            throw new UnsupportedOperationException();
+        public void fillWriteBuffer(final boolean optimizeGets) {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public int getBytesRemainingToWrite() {
-            throw new UnsupportedOperationException();
+        public void fixupOps() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public SocketChannel getChannel() {
-            throw new UnsupportedOperationException();
+        public int getBytesRemainingToWrite() {
+          return root.getBytesRemainingToWrite();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public Operation getCurrentReadOp() {
-            throw new UnsupportedOperationException();
+        public SocketChannel getChannel() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public Operation getCurrentWriteOp() {
-            throw new UnsupportedOperationException();
+        public Operation getCurrentReadOp() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public ByteBuffer getRbuf() {
-            throw new UnsupportedOperationException();
+        public Operation getCurrentWriteOp() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public int getReconnectCount() {
-            throw new UnsupportedOperationException();
+        public ByteBuffer getRbuf() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public int getSelectionOps() {
-            throw new UnsupportedOperationException();
+        public int getReconnectCount() {
+          return root.getReconnectCount();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public SelectionKey getSk() {
-            throw new UnsupportedOperationException();
+        public int getSelectionOps() {
+          return root.getSelectionOps();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public SocketAddress getSocketAddress() {
-            return _root.getSocketAddress();
+        public SelectionKey getSk() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public ByteBuffer getWbuf() {
-            throw new UnsupportedOperationException();
+        public SocketAddress getSocketAddress() {
+          return root.getSocketAddress();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public boolean hasReadOp() {
-            throw new UnsupportedOperationException();
+        public ByteBuffer getWbuf() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public boolean hasWriteOp() {
-            throw new UnsupportedOperationException();
+        public boolean hasReadOp() {
+          return root.hasReadOp();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public boolean isActive() {
-            throw new UnsupportedOperationException();
+        public boolean hasWriteOp() {
+          return root.hasReadOp();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void reconnecting() {
-            throw new UnsupportedOperationException();
+        public boolean isActive() {
+          return root.isActive();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void registerChannel( final SocketChannel ch, final SelectionKey selectionKey ) {
-            throw new UnsupportedOperationException();
+        public void reconnecting() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public Operation removeCurrentReadOp() {
-            throw new UnsupportedOperationException();
+        public void registerChannel(final SocketChannel ch, final SelectionKey selectionKey) {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public Operation removeCurrentWriteOp() {
-            throw new UnsupportedOperationException();
+        public Operation removeCurrentReadOp() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void setChannel( final SocketChannel to ) {
-            throw new UnsupportedOperationException();
+        public Operation removeCurrentWriteOp() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void setSk( final SelectionKey to ) {
-            throw new UnsupportedOperationException();
+        public void setChannel(final SocketChannel to) {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void setupResend() {
-            throw new UnsupportedOperationException();
+        public void setSk(final SelectionKey to) {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public void transitionWriteItem() {
-            throw new UnsupportedOperationException();
+        public void setupResend() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public int writeSome() throws IOException {
-            throw new UnsupportedOperationException();
+        public void transitionWriteItem() {
+          throw new UnsupportedOperationException();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-		public Collection<Operation> destroyInputQueue() {
-            throw new UnsupportedOperationException();
+        public int writeSome() throws IOException {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Collection<Operation> destroyInputQueue() {
+          throw new UnsupportedOperationException();
         }
 
         @Override
         public void authComplete() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void insertOp( final Operation arg0 ) {
-            throw new UnsupportedOperationException();
+          throw new UnsupportedOperationException();
         }
 
         @Override
         public void setupForAuth() {
-            throw new UnsupportedOperationException();
-        }
-
-
-        @Override
-        public void setContinuousTimeout(final boolean b) {
-            throw new UnsupportedOperationException();
+          throw new UnsupportedOperationException();
         }
 
         @Override
         public int getContinuousTimeout() {
-            throw new UnsupportedOperationException();
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void setContinuousTimeout(final boolean isIncrease) {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean isAuthenticated() {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long lastReadDelta() {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void completedRead() {
+          throw new UnsupportedOperationException();
         }
     }
 
