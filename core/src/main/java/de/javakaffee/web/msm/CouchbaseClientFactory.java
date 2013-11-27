@@ -25,9 +25,10 @@ import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class CouchbaseClientFactory {
+public class CouchbaseClientFactory implements MemcachedClientFactory.CouchbaseClientFactory {
 
-    protected CouchbaseClient createCouchbaseClient(final MemcachedNodesManager memcachedNodesManager,
+    @Override
+    public CouchbaseClient createCouchbaseClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, String password, final long operationTimeout,
             final Statistics statistics ) {
         try {

@@ -33,6 +33,12 @@ public class MemcachedClientFactory {
 
     public static final String PROTOCOL_BINARY = "binary";
 
+    static interface CouchbaseClientFactory {
+        MemcachedClient createCouchbaseClient(MemcachedNodesManager memcachedNodesManager,
+                String memcachedProtocol, String username, String password, long operationTimeout,
+                Statistics statistics );
+    }
+
     protected MemcachedClient createMemcachedClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
             final Statistics statistics ) {
@@ -53,7 +59,12 @@ public class MemcachedClientFactory {
     protected MemcachedClient createCouchbaseClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
             final Statistics statistics) {
-        return new CouchbaseClientFactory().createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, statistics);
+        try {
+            final CouchbaseClientFactory factory = Class.forName("de.javakaffee.web.msm.CouchbaseClientFactory").asSubclass(CouchbaseClientFactory.class).newInstance();
+            return factory.createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, statistics);
+        } catch (final Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
