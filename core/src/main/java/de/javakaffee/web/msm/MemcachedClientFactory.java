@@ -23,6 +23,8 @@ import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.auth.PlainCallbackHandler;
 
+import java.lang.reflect.Constructor;
+
 /**
  * Factory to create the {@link MemcachedClient}, either directly the spymemcached {@link MemcachedClient}
  * or the {@link com.couchbase.client.CouchbaseClient}.
@@ -53,7 +55,30 @@ public class MemcachedClientFactory {
     protected MemcachedClient createCouchbaseClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
             final Statistics statistics) {
-        return new CouchbaseClientFactory().createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, statistics);
+        // return new CouchbaseClientFactory().createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, statistics);
+        // Call CouchBaseClientFactory with reflect api, then net.spy client have no lib dependency!
+
+        try {
+            Class fooClass = Class.forName("de.javakaffee.web.msm.CouchbaseClientFactory");
+            Constructor fooCtrs = fooClass.getConstructor(null);
+            Object factory = fooCtrs.newInstance(null);
+            java.lang.reflect.Method method = fooClass.getDeclaredMethod("createCouchbaseClient",
+                MemcachedNodesManager.class,
+                String.class,
+                String.class,
+                String.class,
+                long.class,
+                Statistics.class);
+            method.setAccessible(true);
+            return (MemcachedClient) method.invoke( factory,
+                    memcachedNodesManager,
+                    memcachedProtocol,
+                    username,
+                    password,
+                    operationTimeout,
+                    statistics);
+        } catch (Exception ex) { ex.printStackTrace(); throw new RuntimeException("Could not create couchbase memcached client", ex); }
+
     }
 
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
