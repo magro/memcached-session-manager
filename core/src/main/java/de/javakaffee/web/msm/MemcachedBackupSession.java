@@ -166,6 +166,7 @@ public class MemcachedBackupSession extends StandardSession {
     @Override
     public void recycle() {
         super.recycle();
+        _attributesAccessed = false;
         _dataHashCode = 0;
         _expirationUpdateRunning = false;
         _backupRunning = false;
