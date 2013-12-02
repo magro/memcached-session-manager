@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import static de.javakaffee.web.msm.Configurations.NODE_AVAILABILITY_CACHE_TTL_KEY;
 import static de.javakaffee.web.msm.integration.TestUtils.Predicates.elementAt;
 import static de.javakaffee.web.msm.integration.TestUtils.Predicates.notNull;
 import static org.testng.Assert.assertEquals;
@@ -121,6 +122,7 @@ public abstract class TestUtils {
 
     static {
         initLogConfig(TestUtils.class);
+        System.setProperty(NODE_AVAILABILITY_CACHE_TTL_KEY, "50");
     }
 
     private static void initLogConfig(final Class<? extends TestUtils> clazz) {
