@@ -50,7 +50,7 @@ import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 public abstract class RequestTrackingHostValveTest {
 
     protected MemcachedSessionService _service;
-    private RequestTrackingHostValve _sessionTrackerValve;
+    private AbstractRequestTrackingHostValve _sessionTrackerValve;
     private Valve _nextValve;
     private Request _request;
     private Response _response;
@@ -80,15 +80,11 @@ public abstract class RequestTrackingHostValveTest {
         when(_request.getQueryString()).thenReturn(null);
         when(_request.getContext()).thenReturn(_contextContainer);
 
-        when(_request.getNote(eq(RequestTrackingHostValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
-        when(_request.getNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
+        when(_request.getNote(eq(AbstractRequestTrackingHostValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(AbstractRequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
     }
 
-    @Nonnull
-    protected RequestTrackingHostValve createSessionTrackerValve() {
-        return new RequestTrackingHostValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(),
-                new AtomicBoolean( true ), new CurrentRequest());
-    }
+    protected abstract AbstractRequestTrackingHostValve createSessionTrackerValve();
 
     @AfterMethod
     public void tearDown() throws Exception {
@@ -100,9 +96,7 @@ public abstract class RequestTrackingHostValveTest {
 
     @Test
     public final void testGetSessionCookieName() throws IOException, ServletException {
-        final RequestTrackingHostValve cut = new RequestTrackingHostValve(null, "foo", _service, Statistics.create(),
-                new AtomicBoolean( true ), new CurrentRequest());
-        assertEquals(cut.getSessionCookieName(), "foo");
+        assertEquals(_sessionTrackerValve.getSessionCookieName(), "somesessionid");
     }
 
     @Test
@@ -110,7 +104,7 @@ public abstract class RequestTrackingHostValveTest {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service, never() ).backupSession( anyString(), anyBoolean(), anyString() );
-        verify(_request).setNote(eq(RequestTrackingHostValve.REQUEST_PROCESS), eq(Boolean.TRUE));
+        verify(_request).setNote(eq(AbstractRequestTrackingHostValve.REQUEST_PROCESS), eq(Boolean.TRUE));
     }
 
     @Test
@@ -140,7 +134,7 @@ public abstract class RequestTrackingHostValveTest {
         final String sessionId = "bar";
         final String newSessionId = "newId";
 
-        when(_request.getNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(AbstractRequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.TRUE);
         when( _request.getRequestedSessionId() ).thenReturn( sessionId );
 
         final Cookie cookie = new Cookie( _sessionTrackerValve.getSessionCookieName(), newSessionId );

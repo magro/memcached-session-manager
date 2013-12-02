@@ -266,7 +266,7 @@ public class MemcachedSessionService {
     private long _operationTimeout = 1000;
 
     private CurrentRequest _currentRequest;
-    private RequestTrackingHostValve _trackingHostValve;
+    private AbstractRequestTrackingHostValve _trackingHostValve;
     private RequestTrackingContextValve _trackingContextValve;
 
     private Boolean _contextHasFormBasedSecurityConstraint;
@@ -394,6 +394,10 @@ public class MemcachedSessionService {
          */
         @Nonnull
         MemcachedBackupSession newMemcachedBackupSession();
+
+        @Nonnull
+        AbstractRequestTrackingHostValve createRequestTrackingHostValve(@Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
+                @Nonnull final MemcachedSessionService sessionBackupService, @Nonnull final Statistics statistics, @Nonnull final AtomicBoolean enabled, @Nonnull final CurrentRequest currentRequest);
     }
 
     public void shutdown() {
@@ -444,7 +448,7 @@ public class MemcachedSessionService {
 
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
-        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, _currentRequest);
+        _trackingHostValve = _manager.createRequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, _currentRequest);
         _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
         _trackingContextValve = new RequestTrackingContextValve(sessionCookieName, this);
         _manager.getContainer().getPipeline().addValve( _trackingContextValve );
@@ -1718,7 +1722,7 @@ public class MemcachedSessionService {
         _memcached = memcachedClient;
     }
 
-    RequestTrackingHostValve getTrackingHostValve() {
+    AbstractRequestTrackingHostValve getTrackingHostValve() {
         return _trackingHostValve;
     }
 

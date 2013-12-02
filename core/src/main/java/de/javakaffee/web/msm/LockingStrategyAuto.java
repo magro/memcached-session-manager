@@ -127,9 +127,9 @@ public class LockingStrategyAuto extends LockingStrategy {
 
         /* lets see if we can skip the locking as we consider this beeing a readonly request
          */
-        if ( _readOnlyRequestCache.isReadOnlyRequest( RequestTrackingHostValve.getURIWithQueryString( request ) ) ) {
+        if ( _readOnlyRequestCache.isReadOnlyRequest( AbstractRequestTrackingHostValve.getURIWithQueryString( request ) ) ) {
             if ( _log.isDebugEnabled() ) {
-                _log.debug( "Not getting lock for readonly request " + RequestTrackingHostValve.getURIWithQueryString( request ) );
+                _log.debug( "Not getting lock for readonly request " + AbstractRequestTrackingHostValve.getURIWithQueryString( request ) );
             }
             _stats.nonStickySessionsReadOnlyRequest();
             return LockStatus.LOCK_NOT_REQUIRED;

@@ -64,15 +64,15 @@ public class LockingStrategyUriPattern extends LockingStrategy {
 
         /* let's see if we should lock the session for this request
          */
-        if ( _uriPattern.matcher( RequestTrackingHostValve.getURIWithQueryString( request ) ).matches() ) {
+        if ( _uriPattern.matcher( AbstractRequestTrackingHostValve.getURIWithQueryString( request ) ).matches() ) {
             if ( _log.isDebugEnabled() ) {
-                _log.debug( "Lock request for request " + RequestTrackingHostValve.getURIWithQueryString( request ) );
+                _log.debug( "Lock request for request " + AbstractRequestTrackingHostValve.getURIWithQueryString( request ) );
             }
             return lock( sessionId );
         }
 
         if ( _log.isDebugEnabled() ) {
-        	_log.debug( "Not lock request for request " + RequestTrackingHostValve.getURIWithQueryString( request ) );
+        	_log.debug( "Not lock request for request " + AbstractRequestTrackingHostValve.getURIWithQueryString( request ) );
         }
 
         _stats.nonStickySessionsReadOnlyRequest();

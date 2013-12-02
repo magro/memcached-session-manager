@@ -40,7 +40,7 @@ public class RequestTrackingContextValve extends ValveBase {
     static final String INVOKED = "de.javakaffee.msm.contextValve.invoked";
     static final String RELOCATE = "session.relocate";
 
-    protected static final Log _log = LogFactory.getLog( RequestTrackingHostValve.class );
+    protected static final Log _log = LogFactory.getLog( AbstractRequestTrackingHostValve.class );
 
     private final MemcachedSessionService _sessionBackupService;
     protected final String _sessionCookieName;
@@ -81,13 +81,13 @@ public class RequestTrackingContextValve extends ValveBase {
     @Override
     public void invoke( final Request request, final Response response ) throws IOException, ServletException {
 
-        final Object processRequest = request.getNote(RequestTrackingHostValve.REQUEST_PROCESS);
+        final Object processRequest = request.getNote(AbstractRequestTrackingHostValve.REQUEST_PROCESS);
         if(processRequest != Boolean.TRUE) {
             request.setNote(INVOKED, Boolean.TRUE);
             try {
                 getNext().invoke( request, response );
             } finally {
-                request.setNote(RequestTrackingHostValve.REQUEST_PROCESSED, Boolean.TRUE);
+                request.setNote(AbstractRequestTrackingHostValve.REQUEST_PROCESSED, Boolean.TRUE);
             }
         }
         else {
@@ -98,8 +98,8 @@ public class RequestTrackingContextValve extends ValveBase {
                 sessionIdChanged = changeRequestedSessionId( request, response );
                 getNext().invoke( request, response );
             } finally {
-                request.setNote(RequestTrackingHostValve.REQUEST_PROCESSED, Boolean.TRUE);
-                request.setNote(RequestTrackingHostValve.SESSION_ID_CHANGED, Boolean.valueOf(sessionIdChanged));
+                request.setNote(AbstractRequestTrackingHostValve.REQUEST_PROCESSED, Boolean.TRUE);
+                request.setNote(AbstractRequestTrackingHostValve.SESSION_ID_CHANGED, Boolean.valueOf(sessionIdChanged));
             }
 
         }

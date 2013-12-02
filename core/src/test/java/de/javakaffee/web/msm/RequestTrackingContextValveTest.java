@@ -58,7 +58,7 @@ public class RequestTrackingContextValveTest {
         _request = mock( Request.class );
         _response = mock( Response.class );
 
-        when(_request.getNote(eq(RequestTrackingHostValve.REQUEST_PROCESS))).thenReturn(Boolean.TRUE);
+        when(_request.getNote(eq(AbstractRequestTrackingHostValve.REQUEST_PROCESS))).thenReturn(Boolean.TRUE);
     }
 
     @Nonnull
@@ -83,7 +83,7 @@ public class RequestTrackingContextValveTest {
     @Test
     public final void testRequestIsMarkedAsProcessed() throws IOException, ServletException {
         _sessionTrackerValve.invoke( _request, _response );
-        verify(_request).setNote(eq(RequestTrackingHostValve.REQUEST_PROCESSED), eq(Boolean.TRUE));
+        verify(_request).setNote(eq(AbstractRequestTrackingHostValve.REQUEST_PROCESSED), eq(Boolean.TRUE));
     }
 
     @Test
@@ -98,7 +98,7 @@ public class RequestTrackingContextValveTest {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _request ).changeSessionId( eq( newSessionId ) );
-        verify(_request).setNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED), eq(Boolean.TRUE));
+        verify(_request).setNote(eq(AbstractRequestTrackingHostValve.SESSION_ID_CHANGED), eq(Boolean.TRUE));
 
     }
 

@@ -50,6 +50,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * This {@link Manager} stores session in configured memcached nodes after the
@@ -1049,4 +1050,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _msm;
     }
 
+    @Override
+    public AbstractRequestTrackingHostValve createRequestTrackingHostValve(String ignorePattern, String sessionCookieName, MemcachedSessionService sessionBackupService, Statistics statistics, AtomicBoolean enabled, CurrentRequest currentRequest) {
+        return new RequestTrackingHostValve(ignorePattern, sessionCookieName, sessionBackupService, statistics, enabled, currentRequest);
+    }
 }

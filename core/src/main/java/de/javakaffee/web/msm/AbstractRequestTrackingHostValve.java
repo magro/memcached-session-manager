@@ -42,7 +42,7 @@ import org.apache.juli.logging.LogFactory;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class RequestTrackingHostValve extends ValveBase {
+public abstract class AbstractRequestTrackingHostValve extends ValveBase {
 
     private static final String REQUEST_IGNORED = "de.javakaffee.msm.request.ignored";
 
@@ -54,7 +54,7 @@ public class RequestTrackingHostValve extends ValveBase {
 
     static final String RELOCATE = "session.relocate";
 
-    protected static final Log _log = LogFactory.getLog( RequestTrackingHostValve.class );
+    protected static final Log _log = LogFactory.getLog( AbstractRequestTrackingHostValve.class );
 
     private final Pattern _ignorePattern;
     private final MemcachedSessionService _sessionBackupService;
@@ -66,18 +66,6 @@ public class RequestTrackingHostValve extends ValveBase {
 
     private static final String MSM_REQUEST_ID = "msm.requestId";
 
-	private static final boolean IS_TOMCAT_6;
-
-	static {
-		Method getHeaderValues = null;
-		try {
-			getHeaderValues = Response.class.getMethod("getHeaderValues", String.class);
-		} catch(final NoSuchMethodException e) {
-			//Do nothing
-		}
-
-		IS_TOMCAT_6 = (getHeaderValues != null);
-	}
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -95,7 +83,7 @@ public class RequestTrackingHostValve extends ValveBase {
      *            specifies if memcached-session-manager is enabled or not.
      *            If <code>false</code>, each request is just processed without doing anything further.
      */
-    public RequestTrackingHostValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
+    public AbstractRequestTrackingHostValve( @Nullable final String ignorePattern, @Nonnull final String sessionCookieName,
             @Nonnull final MemcachedSessionService sessionBackupService,
             @Nonnull final Statistics statistics,
             @Nonnull final AtomicBoolean enabled,
@@ -283,23 +271,7 @@ public class RequestTrackingHostValve extends ValveBase {
         return null;
     }
 
-    private String[] getResponseSetCookieHeaders(final Response response) {
-        try {
-            if (IS_TOMCAT_6) {
-                final Method getHeaderValues = response.getClass().getMethod("getHeaderValues", String.class);
-                final String[] result = (String[]) getHeaderValues.invoke(response, "Set-Cookie");
-                return result;
-            } else {
-                final Method getHeaders = response.getClass().getMethod("getHeaders", String.class);
-                @SuppressWarnings("unchecked")
-                final
-                Collection<String> result = (Collection<String>) getHeaders.invoke(response, "Set-Cookie");
-                return result.toArray(new String[result.size()]);
-            }
-        } catch (final Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
+    protected abstract String[] getResponseSetCookieHeaders(final Response response);
 
     private void logDebugResponseCookie( final Response response ) {
         final String header = response.getHeader("Set-Cookie");
