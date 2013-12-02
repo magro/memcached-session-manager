@@ -46,6 +46,7 @@ import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.connector.Request;
+import org.apache.catalina.connector.Response;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
@@ -263,6 +264,11 @@ public class MemcachedSessionService {
         @Nonnull
         String getSessionCookieName();
 
+        /**
+         * Reads the Set-Cookie header(s) from the given response.
+         */
+        String[] getSetCookieHeaders(Response response);
+
         String generateSessionId();
         void expireSession( final String sessionId );
         MemcachedBackupSession getSessionInternal( String sessionId );
@@ -431,7 +437,12 @@ public class MemcachedSessionService {
     }
 
     protected RequestTrackingHostValve createRequestTrackingHostValve(final String sessionCookieName, final CurrentRequest currentRequest) {
-        return new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, currentRequest);
+        return new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, currentRequest) {
+            @Override
+            protected String[] getSetCookieHeaders(final Response response) {
+                return _manager.getSetCookieHeaders(response);
+            }
+        };
     }
 
 	protected MemcachedClientCallback createMemcachedClientCallback() {

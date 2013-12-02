@@ -87,8 +87,15 @@ public abstract class RequestTrackingHostValveTest {
     @Nonnull
     protected RequestTrackingHostValve createSessionTrackerValve() {
         return new RequestTrackingHostValve(".*\\.(png|gif|jpg|css|js|ico)$", "somesessionid", _service, Statistics.create(),
-                new AtomicBoolean( true ), new CurrentRequest());
+                new AtomicBoolean( true ), new CurrentRequest()) {
+            @Override
+            protected String[] getSetCookieHeaders(final Response response) {
+                return RequestTrackingHostValveTest.this.getSetCookieHeaders(response);
+            }
+        };
     }
+
+    protected abstract String[] getSetCookieHeaders(final Response response);
 
     @AfterMethod
     public void tearDown() throws Exception {
@@ -101,7 +108,12 @@ public abstract class RequestTrackingHostValveTest {
     @Test
     public final void testGetSessionCookieName() throws IOException, ServletException {
         final RequestTrackingHostValve cut = new RequestTrackingHostValve(null, "foo", _service, Statistics.create(),
-                new AtomicBoolean( true ), new CurrentRequest());
+                new AtomicBoolean( true ), new CurrentRequest()) {
+            @Override
+            protected String[] getSetCookieHeaders(final Response response) {
+                return response.getHeaderValues("Set-Cookie");
+            }
+        };
         assertEquals(cut.getSessionCookieName(), "foo");
     }
 

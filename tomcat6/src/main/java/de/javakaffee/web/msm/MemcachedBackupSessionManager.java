@@ -42,6 +42,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.connector.Response;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
@@ -1047,6 +1048,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public MemcachedSessionService getMemcachedSessionService() {
         return _msm;
+    }
+
+    @Override
+    public String[] getSetCookieHeaders(final Response response) {
+        return response.getHeaderValues("Set-Cookie");
     }
 
 }

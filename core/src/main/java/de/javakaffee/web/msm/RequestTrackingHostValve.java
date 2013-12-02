@@ -17,8 +17,6 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -42,7 +40,7 @@ import org.apache.juli.logging.LogFactory;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class RequestTrackingHostValve extends ValveBase {
+public abstract class RequestTrackingHostValve extends ValveBase {
 
     private static final String REQUEST_IGNORED = "de.javakaffee.msm.request.ignored";
 
@@ -65,19 +63,6 @@ public class RequestTrackingHostValve extends ValveBase {
     private final Context _msmContext;
 
     private static final String MSM_REQUEST_ID = "msm.requestId";
-
-	private static final boolean IS_TOMCAT_6;
-
-	static {
-		Method getHeaderValues = null;
-		try {
-			getHeaderValues = Response.class.getMethod("getHeaderValues", String.class);
-		} catch(final NoSuchMethodException e) {
-			//Do nothing
-		}
-
-		IS_TOMCAT_6 = (getHeaderValues != null);
-	}
 
     /**
      * Creates a new instance with the given ignore pattern and
@@ -261,7 +246,7 @@ public class RequestTrackingHostValve extends ValveBase {
     }
 
     private String getSessionIdFromResponseSessionCookie(final Response response) {
-        final String[] headers = getResponseSetCookieHeaders(response);
+        final String[] headers = getSetCookieHeaders(response);
         if (headers == null) {
             return null;
         }
@@ -283,23 +268,10 @@ public class RequestTrackingHostValve extends ValveBase {
         return null;
     }
 
-    private String[] getResponseSetCookieHeaders(final Response response) {
-        try {
-            if (IS_TOMCAT_6) {
-                final Method getHeaderValues = response.getClass().getMethod("getHeaderValues", String.class);
-                final String[] result = (String[]) getHeaderValues.invoke(response, "Set-Cookie");
-                return result;
-            } else {
-                final Method getHeaders = response.getClass().getMethod("getHeaders", String.class);
-                @SuppressWarnings("unchecked")
-                final
-                Collection<String> result = (Collection<String>) getHeaders.invoke(response, "Set-Cookie");
-                return result.toArray(new String[result.size()]);
-            }
-        } catch (final Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
+    /**
+     * Read the Set-Cookie header from the given response.
+     */
+    protected abstract String[] getSetCookieHeaders(final Response response);
 
     private void logDebugResponseCookie( final Response response ) {
         final String header = response.getHeader("Set-Cookie");
