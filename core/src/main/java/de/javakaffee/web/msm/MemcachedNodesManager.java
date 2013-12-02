@@ -16,7 +16,7 @@
 package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.Configurations.NODE_AVAILABILITY_CACHE_TTL_KEY;
-import static de.javakaffee.web.msm.Configurations.getSystemPropertyInt;
+import static de.javakaffee.web.msm.Configurations.getSystemProperty;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -73,7 +73,7 @@ public class MemcachedNodesManager {
     private static final String COUCHBASE_BUCKET_NODES_REGEX = COUCHBASE_BUCKET_NODE_REGEX + "(?:(?:\\s+|,)" + COUCHBASE_BUCKET_NODE_REGEX + ")*";
     private static final Pattern COUCHBASE_BUCKET_NODES_PATTERN = Pattern.compile( COUCHBASE_BUCKET_NODES_REGEX );
 
-    private static final int NODE_AVAILABILITY_CACHE_TTL = getSystemPropertyInt(NODE_AVAILABILITY_CACHE_TTL_KEY, 1000);
+    private static final int NODE_AVAILABILITY_CACHE_TTL = getSystemProperty(NODE_AVAILABILITY_CACHE_TTL_KEY, 1000);
 
 	private final String _memcachedNodes;
     private final NodeIdList _primaryNodeIds;

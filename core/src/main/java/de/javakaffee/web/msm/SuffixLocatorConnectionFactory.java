@@ -39,6 +39,7 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
     private final SessionIdFormat _sessionIdFormat;
     private final Statistics _statistics;
     private final long _operationTimeout;
+    private final long _maxReconnectDelay;
 
     /**
      * Creates a new instance.
@@ -48,11 +49,12 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
      *            the {@link SessionIdFormat}
      */
     public SuffixLocatorConnectionFactory( final MemcachedNodesManager memcachedNodesManager, final SessionIdFormat sessionIdFormat,
-            final Statistics statistics, long operationTimeout ) {
+            final Statistics statistics, final long operationTimeout, final long maxReconnectDelay ) {
         _memcachedNodesManager = memcachedNodesManager;
         _sessionIdFormat = sessionIdFormat;
         _statistics = statistics;
         _operationTimeout = operationTimeout;
+        _maxReconnectDelay = maxReconnectDelay;
     }
 
     /**
@@ -81,9 +83,14 @@ public final class SuffixLocatorConnectionFactory extends DefaultConnectionFacto
         transcoder.setCompressionThreshold( SerializingTranscoder.DEFAULT_COMPRESSION_THRESHOLD );
         return new TranscoderWrapperStatisticsSupport( _statistics, transcoder );
     }
-    
+
     @Override
     public long getOperationTimeout() {
     	return _operationTimeout;
+    }
+
+    @Override
+    public long getMaxReconnectDelay() {
+        return _maxReconnectDelay;
     }
 }

@@ -36,20 +36,20 @@ public class MemcachedClientFactory {
     static interface CouchbaseClientFactory {
         MemcachedClient createCouchbaseClient(MemcachedNodesManager memcachedNodesManager,
                 String memcachedProtocol, String username, String password, long operationTimeout,
-                Statistics statistics );
+                long maxReconnectDelay, Statistics statistics );
     }
 
     protected MemcachedClient createMemcachedClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
-            final Statistics statistics ) {
+            final long maxReconnectDelay, final Statistics statistics ) {
         try {
             final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), username, password);
             if (connectionType.isCouchbaseBucketConfig()) {
-                return createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout,
+                return createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, maxReconnectDelay,
                         statistics);
             }
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, memcachedProtocol,
-                    username, password, operationTimeout, statistics);
+                    username, password, operationTimeout, maxReconnectDelay, statistics);
             return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
         } catch (final Exception e) {
             throw new RuntimeException("Could not create memcached client", e);
@@ -58,37 +58,58 @@ public class MemcachedClientFactory {
 
     protected MemcachedClient createCouchbaseClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
-            final Statistics statistics) {
+            final long maxReconnectDelay, final Statistics statistics) {
         try {
             final CouchbaseClientFactory factory = Class.forName("de.javakaffee.web.msm.CouchbaseClientFactory").asSubclass(CouchbaseClientFactory.class).newInstance();
-            return factory.createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, statistics);
+            return factory.createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, maxReconnectDelay, statistics);
         } catch (final Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
-            final ConnectionType connectionType, final String memcachedProtocol, final String username, final String password, final long operationTimeout, final Statistics statistics ) {
+            final ConnectionType connectionType, final String memcachedProtocol, final String username, final String password, final long operationTimeout,
+            final long maxReconnectDelay, final Statistics statistics ) {
         if (PROTOCOL_BINARY.equals( memcachedProtocol )) {
             if (connectionType.isSASL()) {
                 final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"}, new PlainCallbackHandler(username, password));
                 return memcachedNodesManager.isEncodeNodeIdInSessionId()
                         ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
-                                memcachedNodesManager.getSessionIdFormat(), statistics, operationTimeout,
+                                memcachedNodesManager.getSessionIdFormat(), statistics, operationTimeout, maxReconnectDelay,
                                 authDescriptor)
                         : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
                                 .setAuthDescriptor(authDescriptor)
-                                .setOpTimeout(operationTimeout).build();
+                                .setOpTimeout(operationTimeout)
+                                .setMaxReconnectDelay(maxReconnectDelay)
+                                .build();
             }
             else {
                 return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
                         memcachedNodesManager.getSessionIdFormat(),
-                        statistics, operationTimeout ) : new BinaryConnectionFactory();
+                        statistics, operationTimeout, maxReconnectDelay ) : new BinaryConnectionFactory() {
+                    @Override
+                    public long getOperationTimeout() {
+                        return operationTimeout;
+                    }
+                    @Override
+                    public long getMaxReconnectDelay() {
+                        return maxReconnectDelay;
+                    }
+                };
             }
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
-                ? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, operationTimeout )
-                : new DefaultConnectionFactory();
+                ? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, operationTimeout, maxReconnectDelay )
+                : new DefaultConnectionFactory() {
+                    @Override
+                    public long getOperationTimeout() {
+                        return operationTimeout;
+                    }
+                    @Override
+                    public long getMaxReconnectDelay() {
+                        return maxReconnectDelay;
+                    }
+                };
     }
 
     static class ConnectionType {

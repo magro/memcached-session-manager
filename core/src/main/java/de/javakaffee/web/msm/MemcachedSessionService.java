@@ -17,6 +17,8 @@
 package de.javakaffee.web.msm;
 
 
+import static de.javakaffee.web.msm.Configurations.MAX_RECONNECT_DELAY_KEY;
+import static de.javakaffee.web.msm.Configurations.getSystemProperty;
 import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
@@ -34,6 +36,7 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
@@ -464,7 +467,10 @@ public class MemcachedSessionService {
         if ( ! _enabled.get() ) {
             return null;
         }
-        return new MemcachedClientFactory().createMemcachedClient(memcachedNodesManager, _memcachedProtocol, _username, _password, _operationTimeout, statistics);
+
+        final long maxReconnectDelay = getSystemProperty(MAX_RECONNECT_DELAY_KEY, DefaultConnectionFactory.DEFAULT_MAX_RECONNECT_DELAY);
+        return new MemcachedClientFactory().createMemcachedClient(memcachedNodesManager, _memcachedProtocol, _username, _password, _operationTimeout,
+                maxReconnectDelay, statistics);
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {

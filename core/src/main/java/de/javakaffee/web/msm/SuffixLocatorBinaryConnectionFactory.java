@@ -46,6 +46,7 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     private final SessionIdFormat _sessionIdFormat;
     private final Statistics _statistics;
     private final long _operationTimeout;
+    private final long _maxReconnectDelay;
     private final AuthDescriptor _authDescriptor;
 
     /**
@@ -56,11 +57,12 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
      *            the {@link SessionIdFormat}
      */
     public SuffixLocatorBinaryConnectionFactory( final MemcachedNodesManager memcachedNodesManager, final SessionIdFormat sessionIdFormat,
-            final Statistics statistics, final long operationTimeout, final AuthDescriptor authDescriptor) {
+            final Statistics statistics, final long operationTimeout, final long maxReconnectDelay, final AuthDescriptor authDescriptor) {
         _memcachedNodesManager = memcachedNodesManager;
         _sessionIdFormat = sessionIdFormat;
         _statistics = statistics;
         _operationTimeout = operationTimeout;
+        _maxReconnectDelay = maxReconnectDelay;
         _authDescriptor = authDescriptor;
     }
 
@@ -72,8 +74,8 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
      *            the {@link SessionIdFormat}
      */
     public SuffixLocatorBinaryConnectionFactory( final MemcachedNodesManager memcachedNodesManager, final SessionIdFormat sessionIdFormat,
-            final Statistics statistics, final long operationTimeout ) {
-        this(memcachedNodesManager, sessionIdFormat, statistics, operationTimeout, null);
+            final Statistics statistics, final long operationTimeout, final long maxReconnectDelay ) {
+        this(memcachedNodesManager, sessionIdFormat, statistics, operationTimeout, maxReconnectDelay, null);
     }
 
     /**
@@ -127,6 +129,11 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
     @Override
     public long getOperationTimeout() {
         return _operationTimeout;
+    }
+
+    @Override
+    public long getMaxReconnectDelay() {
+        return _maxReconnectDelay;
     }
 
     @Override

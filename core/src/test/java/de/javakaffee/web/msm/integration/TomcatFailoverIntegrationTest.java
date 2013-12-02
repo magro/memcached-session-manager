@@ -116,7 +116,7 @@ public abstract class TomcatFailoverIntegrationTest {
 
         final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(_memcachedNodes, null, _memcachedClientCallback);
         final ConnectionFactory cf = nodesManager.isEncodeNodeIdInSessionId()
-            ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000 )
+            ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 )
             : new DefaultConnectionFactory();
         _client = new MemcachedClient( cf, Arrays.asList( address ) );
 
