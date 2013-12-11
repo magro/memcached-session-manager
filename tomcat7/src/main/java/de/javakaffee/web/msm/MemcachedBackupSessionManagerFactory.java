@@ -21,7 +21,7 @@ public class MemcachedBackupSessionManagerFactory {
         
         // Default: One-Hour timeout
         int sessionTimeout = Integer.parseInt(System.getProperty("msm.sessionTimeout", "3600"));
-        String transcoderFactoryClassName = System.getProperty("msm.failoverNodes", DEFAULT_TRANSCODER_FACTORY);
+        String transcoderFactoryClassName = System.getProperty("msm.transcoderFactoryClassName", DEFAULT_TRANSCODER_FACTORY);
         
         // Example: ".*\\.(png|gif|jpg|css|js|ico)$"
         String requestUriIgnorePattern = System.getProperty("msm.requestUriIgnorePattern", "");
