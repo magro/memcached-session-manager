@@ -1,11 +1,14 @@
 package de.javakaffee.web.msm;
 
 import org.apache.catalina.Manager;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 public class MemcachedBackupSessionManagerFactory {
-
+    private static final Log LOG = LogFactory.getLog( MemcachedBackupSessionManagerFactory.class );
+    
     private static final String DEFAULT_TRANSCODER_FACTORY = JavaSerializationTranscoderFactory.class.getName();
     
     public Manager createSessionManager() {
@@ -45,7 +48,7 @@ public class MemcachedBackupSessionManagerFactory {
         sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName);
         sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(requestUriIgnorePattern);
 
-        System.out.println("MemcachedBackupSessionManager constructed");
+        LOG.info("MemcachedBackupSessionManager constructed");
         return sessionManager;
     }
 }
