@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import static de.javakaffee.web.msm.MemcachedUtil.toMemcachedExpiration;
 import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.SessionValidityInfo.decode;
 import static de.javakaffee.web.msm.SessionValidityInfo.encode;
@@ -237,7 +238,7 @@ public abstract class LockingStrategy {
                     System.currentTimeMillis() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            final Future<Boolean> validityResult = _memcached.set( validityKey, expiration, validityData );
+            final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
             if ( !_manager.isSessionBackupAsync() ) {
                 validityResult.get( _manager.getSessionBackupTimeout(), TimeUnit.MILLISECONDS );
             }
@@ -285,7 +286,7 @@ public abstract class LockingStrategy {
             final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            final Future<Boolean> validityResult = _memcached.set( validityKey, expiration, validityData );
+            final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
             if ( !_manager.isSessionBackupAsync() ) {
                 // TODO: together with session backup wait not longer than sessionBackupTimeout.
                 // Details: Now/here we're waiting the whole session backup timeout, even if (perhaps) some time
@@ -498,7 +499,7 @@ public abstract class LockingStrategy {
             final byte[] data = backupResult.getData();
             if ( data != null ) {
                 final String key = _sessionIdFormat.createBackupKey( _session.getId() );
-                _memcached.set( key, _session.getMemcachedExpirationTimeToSet(), data );
+                _memcached.set( key, toMemcachedExpiration(_session.getMemcachedExpirationTimeToSet()), data );
             }
             else {
                 _log.warn( "No data set for backupResultStatus " + backupResult.getStatus() + " for sessionId "
@@ -512,7 +513,7 @@ public abstract class LockingStrategy {
             final int maxInactiveInterval = _session.getMaxInactiveInterval();
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            _memcached.set( backupValidityKey, expiration, _validityData );
+            _memcached.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
         }
 
         private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
@@ -539,7 +540,7 @@ public abstract class LockingStrategy {
                 throws InterruptedException {
             try {
                 final byte[] data = _manager.serialize( session );
-                final Future<Boolean> backupResult = _memcached.set( key, session.getMemcachedExpirationTimeToSet(), data );
+                final Future<Boolean> backupResult = _memcached.set( key, toMemcachedExpiration(session.getMemcachedExpirationTimeToSet()), data );
                 if ( !backupResult.get().booleanValue() ) {
                     _log.warn( "Update for secondary backup of session "+ session.getIdInternal() +" (after unsuccessful ping) did not return sucess." );
                 }
@@ -586,7 +587,7 @@ public abstract class LockingStrategy {
                     final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
                     // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
                     final int expiration = _maxInactiveInterval <= 0 ? 0 : _maxInactiveInterval;
-                    _memcached.set( backupValidityKey, expiration, _validityData );
+                    _memcached.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
 
                 } catch( final RuntimeException e ) {
                     _log.info( "Could not store secondary backup of session " + _sessionId, e );

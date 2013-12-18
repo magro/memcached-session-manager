@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 
+import static de.javakaffee.web.msm.MemcachedUtil.toMemcachedExpiration;
 import static de.javakaffee.web.msm.Statistics.StatsType.ATTRIBUTES_SERIALIZATION;
 import static de.javakaffee.web.msm.Statistics.StatsType.BACKUP;
 import static de.javakaffee.web.msm.Statistics.StatsType.MEMCACHED_UPDATE;
@@ -224,7 +225,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
         final int expirationTime = session.getMemcachedExpirationTimeToSet();
         final long start = System.currentTimeMillis();
         try {
-            final Future<Boolean> future = _memcached.set( session.getId(), expirationTime, data );
+            final Future<Boolean> future = _memcached.set( session.getId(), toMemcachedExpiration(expirationTime), data );
             if ( !_sessionBackupAsync ) {
                 future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
                 session.setLastMemcachedExpirationTime( expirationTime );
