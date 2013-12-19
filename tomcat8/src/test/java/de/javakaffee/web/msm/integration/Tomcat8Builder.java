@@ -15,123 +15,40 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import de.javakaffee.web.msm.JavaSerializationTranscoderFactory;
-import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.MemcachedSessionService;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.integration.TestUtils.LoginType;
-import edu.umd.cs.findbugs.annotations.SuppressWarnings;
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.UnknownHostException;
+
+import javax.annotation.Nonnull;
+import javax.servlet.ServletException;
+
+import org.apache.catalina.Container;
 import org.apache.catalina.Context;
+import org.apache.catalina.Engine;
+import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Valve;
+import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
-import org.apache.catalina.core.StandardServer;
+import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
 import org.apache.tomcat.util.descriptor.web.SecurityCollection;
 import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
 
-import javax.annotation.Nonnull;
-import javax.servlet.ServletException;
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.UnknownHostException;
+import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.integration.TestUtils.LoginType;
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 
 /**
  * Builder for {@link Tomcat} tomcat.
  *
  * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public abstract class TomcatBuilder {
-
-    public static final String CONTEXT_PATH = "";
-    private static final String DEFAULT_TRANSCODER_FACTORY = JavaSerializationTranscoderFactory.class.getName();
-
-    protected static final String PASSWORD = "secret";
-    protected static final String USER_NAME = "testuser";
-    protected static final String ROLE_NAME = "test";
-
-    public static final String STICKYNESS_PROVIDER = "stickynessProvider";
-    public static final String BOOLEAN_PROVIDER = "booleanProvider";
-
-    private int port;
-    private int sessionTimeout = 1;
-    private boolean cookies = true;
-    private String jvmRoute = null;
-    private LoginType loginType = null;
-    private String memcachedNodes;
-    private String failoverNodes;
-    private boolean enabled = true;
-    private boolean sticky = true;
-    private LockingMode lockingMode;
-    private String memcachedProtocol = MemcachedSessionService.PROTOCOL_TEXT;
-    private String username = null;
-    private String transcoderFactoryClassName = JavaSerializationTranscoderFactory.class.getName();
-
-    public TomcatBuilder port(final int port) {
-        this.port = port;
-        return this;
-    }
-
-    public TomcatBuilder sessionTimeout(final int sessionTimeout) {
-        this.sessionTimeout = sessionTimeout;
-        return this;
-    }
-
-    public TomcatBuilder cookies(final boolean cookies) {
-        this.cookies = cookies;
-        return this;
-    }
-
-    public TomcatBuilder memcachedNodes(final String memcachedNodes) {
-        this.memcachedNodes = memcachedNodes;
-        return this;
-    }
-
-    public TomcatBuilder failoverNodes(final String failoverNodes) {
-        this.failoverNodes = failoverNodes;
-        return this;
-    }
-
-    public TomcatBuilder enabled(final boolean enabled) {
-        this.enabled = enabled;
-        return this;
-    }
-
-    public TomcatBuilder sticky(final boolean sticky) {
-        this.sticky = sticky;
-        return this;
-    }
-
-    public TomcatBuilder lockingMode(final LockingMode lockingMode) {
-        this.lockingMode = lockingMode;
-        return this;
-    }
-
-    public TomcatBuilder memcachedProtocol(final String memcachedProtocol) {
-        this.memcachedProtocol = memcachedProtocol;
-        return this;
-    }
-
-    public TomcatBuilder username(final String memcachedUsername) {
-        this.username = memcachedUsername;
-        return this;
-    }
-
-    public TomcatBuilder jvmRoute(final String jvmRoute) {
-        this.jvmRoute = jvmRoute;
-        return this;
-    }
-
-    public TomcatBuilder loginType(final LoginType loginType) {
-        this.loginType = loginType;
-        return this;
-    }
-
-    public TomcatBuilder transcoderFactoryClassName(final String transcoderFactoryClassName) {
-        this.transcoderFactoryClassName = transcoderFactoryClassName;
-        return this;
-    }
+public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
 
     @SuppressWarnings( "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" )
     public Tomcat build() throws MalformedURLException,
@@ -210,7 +127,9 @@ public abstract class TomcatBuilder {
      * Must create a {@link SessionManager} for the current tomcat version.
      */
     @Nonnull
-    protected abstract SessionManager createSessionManager();
+    protected SessionManager createSessionManager() {
+        return new MemcachedBackupSessionManager();
+    }
 
     private static SecurityConstraint createSecurityConstraint( final String pattern, final String role ) {
         final SecurityConstraint constraint = new SecurityConstraint();
@@ -221,6 +140,51 @@ public abstract class TomcatBuilder {
             constraint.addAuthRole( role );
         }
         return constraint;
+    }
+
+    private Tomcat tomcat;
+
+    @Override
+    public Tomcat8Builder buildAndStart() throws Exception {
+        tomcat = build();
+        tomcat.start();
+        return this;
+    }
+
+    @Override
+    public void stop() throws Exception {
+        tomcat.stop();
+    }
+
+    @Override
+    public Context getContext() {
+        return (Context) tomcat.getHost().findChild( CONTEXT_PATH );
+    }
+
+    @Override
+    public SessionManager getManager() {
+        return (SessionManager) getContext().getManager();
+    }
+
+    @Override
+    public MemcachedSessionService getService() {
+        return ((SessionManager) getContext().getManager()).getMemcachedSessionService();
+    }
+
+    @Override
+    public Engine getEngine() {
+        return tomcat.getEngine();
+    }
+
+    @Override
+    public void setChangeSessionIdOnAuth(final boolean changeSessionIdOnAuth) {
+        final Engine engine = (StandardEngine)tomcat.getEngine();
+        final Host host = (Host)engine.findChild( DEFAULT_HOST );
+        final Container context = host.findChild( CONTEXT_PATH );
+        final Valve first = context.getPipeline().getFirst();
+        if ( first instanceof AuthenticatorBase ) {
+            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( changeSessionIdOnAuth );
+        }
     }
 
 }

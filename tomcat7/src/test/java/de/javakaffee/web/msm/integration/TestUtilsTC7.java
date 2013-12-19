@@ -24,7 +24,7 @@ import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC7 extends TestUtils {
+public class TestUtilsTC7 extends EmbeddedTestUtils {
 
     @Override
     protected SessionManager createSessionManager() {

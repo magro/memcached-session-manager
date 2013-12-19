@@ -24,16 +24,12 @@ import static org.testng.Assert.assertNull;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.startup.Embedded;
 import org.apache.http.HttpException;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -79,8 +75,8 @@ public abstract class TomcatFailoverIntegrationTest {
         }
     };
 
-    private Embedded _tomcat1;
-    private Embedded _tomcat2;
+    private TomcatBuilder<?> _tomcat1;
+    private TomcatBuilder<?> _tomcat2;
 
     private static final int TC_PORT_1 = 18888;
     private static final int TC_PORT_2 = 18889;
@@ -123,18 +119,16 @@ public abstract class TomcatFailoverIntegrationTest {
         _httpClient = new DefaultHttpClient();
     }
 
-    abstract TestUtils getTestUtils();
+    abstract TestUtils<?> getTestUtils();
 
-    private Embedded startTomcat( final int port, final String jvmRoute ) throws MalformedURLException, UnknownHostException, LifecycleException {
+    private TomcatBuilder<?> startTomcat( final int port, final String jvmRoute ) throws Exception {
         return startTomcat( port, SessionAffinityMode.STICKY, jvmRoute, null );
     }
 
-    private Embedded startTomcat( final int port, final SessionAffinityMode sessionAffinityMode,
-            final String jvmRoute, final LoginType loginType ) throws MalformedURLException, UnknownHostException, LifecycleException {
-        final Embedded tomcat = getTestUtils().tomcatBuilder().port(port).memcachedNodes(_memcachedNodes)
-                .sticky(sessionAffinityMode.isSticky()).jvmRoute(jvmRoute).loginType(loginType).build();
-        tomcat.start();
-        return tomcat;
+    private TomcatBuilder<?> startTomcat( final int port, final SessionAffinityMode sessionAffinityMode,
+            final String jvmRoute, final LoginType loginType ) throws Exception {
+        return getTestUtils().tomcatBuilder().port(port).memcachedNodes(_memcachedNodes)
+                .sticky(sessionAffinityMode.isSticky()).jvmRoute(jvmRoute).loginType(loginType).buildAndStart();
     }
 
     @AfterMethod
@@ -156,8 +150,8 @@ public abstract class TomcatFailoverIntegrationTest {
 
 
 
-        final SessionManager manager1 = getManager( _tomcat1 );
-        final SessionManager manager2 = getManager( _tomcat2 );
+        final SessionManager manager1 = _tomcat1.getManager();
+        final SessionManager manager2 = _tomcat2.getManager();
 
         final SessionIdFormat format = new SessionIdFormat();
 
@@ -196,8 +190,8 @@ public abstract class TomcatFailoverIntegrationTest {
         _tomcat1 = startTomcat( TC_PORT_1, null );
         _tomcat2 = startTomcat( TC_PORT_2, null );
 
-        final SessionManager manager1 = getManager( _tomcat1 );
-        final SessionManager manager2 = getManager( _tomcat2 );
+        final SessionManager manager1 = _tomcat1.getManager();
+        final SessionManager manager2 = _tomcat2.getManager();
 
         final SessionIdFormat format = new SessionIdFormat();
 
@@ -319,8 +313,8 @@ public abstract class TomcatFailoverIntegrationTest {
         _tomcat1 = startTomcat( TC_PORT_1, stickyness, stickyness.isSticky() ? JVM_ROUTE_1 : null, LoginType.FORM );
         _tomcat2 = startTomcat( TC_PORT_2, stickyness, stickyness.isSticky() ? JVM_ROUTE_2 : null, LoginType.FORM );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
@@ -349,8 +343,8 @@ public abstract class TomcatFailoverIntegrationTest {
         _tomcat1 = startTomcat( TC_PORT_1, stickyness, stickyness.isSticky() ? JVM_ROUTE_1 : null, LoginType.BASIC );
         _tomcat2 = startTomcat( TC_PORT_2, stickyness, stickyness.isSticky() ? JVM_ROUTE_2 : null, LoginType.BASIC );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
@@ -383,8 +377,8 @@ public abstract class TomcatFailoverIntegrationTest {
         _tomcat1 = startTomcat( TC_PORT_1, SessionAffinityMode.STICKY, JVM_ROUTE_1, LoginType.BASIC );
         _tomcat2 = startTomcat( TC_PORT_2, SessionAffinityMode.STICKY, JVM_ROUTE_2, LoginType.BASIC );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         /* tomcat1: request secured resource, login and check that secured resource is accessable
          */
@@ -413,8 +407,8 @@ public abstract class TomcatFailoverIntegrationTest {
         _tomcat1 = startTomcat( TC_PORT_1, stickyness, stickyness.isSticky() ? JVM_ROUTE_1 : null, LoginType.BASIC );
         _tomcat2 = startTomcat( TC_PORT_2, stickyness, stickyness.isSticky() ? JVM_ROUTE_2 : null, LoginType.BASIC );
 
-        setChangeSessionIdOnAuth( _tomcat1, false );
-        setChangeSessionIdOnAuth( _tomcat2, false );
+        _tomcat1.setChangeSessionIdOnAuth( false );
+        _tomcat2.setChangeSessionIdOnAuth( false );
 
         final Response tc1Response1 = get( _httpClient, TC_PORT_1, null, new UsernamePasswordCredentials( TestUtils.USER_NAME, TestUtils.PASSWORD ) );
         final String sessionId = tc1Response1.getSessionId();

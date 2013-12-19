@@ -55,18 +55,11 @@ import javax.servlet.http.HttpSessionEvent;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Container;
-import org.apache.catalina.Context;
-import org.apache.catalina.Engine;
-import org.apache.catalina.Host;
-import org.apache.catalina.Valve;
-import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.core.StandardService;
 import org.apache.catalina.loader.WebappLoader;
-import org.apache.catalina.startup.Embedded;
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpException;
@@ -100,14 +93,15 @@ import com.thimbleware.jmemcached.storage.hash.ConcurrentLinkedHashMap.EvictionP
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedSessionService;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
  * Integration test utils.
  *
+ * @param <T> The type of {@link TomcatBuilder}, returned by {@link #tomcatBuilder()}.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public abstract class TestUtils {
+public abstract class TestUtils<T extends TomcatBuilder<?>> {
 
     private static final String CONTEXT_PATH = "/";
     private static final String DEFAULT_HOST = "localhost";
@@ -123,7 +117,7 @@ public abstract class TestUtils {
         initLogConfig(TestUtils.class);
     }
 
-    private static void initLogConfig(final Class<? extends TestUtils> clazz) {
+    private static void initLogConfig(@SuppressWarnings("rawtypes") final Class<? extends TestUtils> clazz) {
         final URL loggingProperties = clazz.getResource("/logging.properties");
         try {
             System.setProperty("java.util.logging.config.file", new File(loggingProperties.toURI()).getAbsolutePath());
@@ -449,50 +443,13 @@ public abstract class TestUtils {
         return daemon;
     }
 
-    public TomcatBuilder tomcatBuilder() {
-        return new TomcatBuilder() {
-            @Override
-            @Nonnull
-            protected SessionManager createSessionManager() {
-                return TestUtils.this.createSessionManager();
-            }
-        };
-    }
-
     /**
-     * Must create a {@link SessionManager} for the current tomcat version.
+     * Must create a {@link TomcatBuilder} for the current tomcat version.
      */
-    @Nonnull
-    protected abstract SessionManager createSessionManager();
+    public abstract T tomcatBuilder();
 
     public static enum LoginType {
         BASIC, FORM
-    }
-
-    public static Context getContext( final Embedded tomcat ) {
-        return (Context) tomcat.getContainer().findChild( DEFAULT_HOST ).findChild( CONTEXT_PATH );
-    }
-
-    public static SessionManager getManager( final Embedded tomcat ) {
-        return (SessionManager) getContext(tomcat).getManager();
-    }
-
-    public static MemcachedSessionService getService( final Embedded tomcat ) {
-        return ((SessionManager) getContext(tomcat).getManager()).getMemcachedSessionService();
-    }
-
-    public static Engine getEngine( final Embedded tomcat ) {
-        return (Engine) tomcat.getContainer();
-    }
-
-    public static void setChangeSessionIdOnAuth( final Embedded tomcat, final boolean changeSessionIdOnAuth ) {
-        final Engine engine = (StandardEngine)tomcat.getContainer();
-        final Host host = (Host)engine.findChild( DEFAULT_HOST );
-        final Container context = host.findChild( CONTEXT_PATH );
-        final Valve first = context.getPipeline().getFirst();
-        if ( first instanceof AuthenticatorBase ) {
-            ((AuthenticatorBase)first).setChangeSessionIdOnAuthentication( changeSessionIdOnAuth );
-        }
     }
 
     /**

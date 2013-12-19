@@ -16,19 +16,17 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
- * Integration test utils.
+ * Integration test utils impl for tomcat8.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC8 extends TestUtils {
-
-    @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
-    }
+public class TestUtilsTC8 extends TestUtils<Tomcat8Builder> {
+	
+	@Override
+	public Tomcat8Builder tomcatBuilder() {
+		return new Tomcat8Builder();
+	}
 
 }
