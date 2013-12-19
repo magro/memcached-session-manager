@@ -30,7 +30,7 @@ import de.javakaffee.web.msm.integration.TestUtilsTC8;
 public class CouchbaseIntegrationTC8Test extends CouchbaseIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC8();
     }
 

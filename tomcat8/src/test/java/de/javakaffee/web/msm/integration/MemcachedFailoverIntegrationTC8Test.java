@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 public class MemcachedFailoverIntegrationTC8Test extends MemcachedFailoverIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC8();
     }
 

@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 public class NonStickySessionsIntegrationTC8Test extends NonStickySessionsIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC8();
     }
     @Test( enabled = true )
