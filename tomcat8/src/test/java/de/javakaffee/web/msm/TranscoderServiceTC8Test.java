@@ -16,7 +16,13 @@
  */
 package de.javakaffee.web.msm;
 
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
 import java.util.ArrayList;
+
+import org.apache.catalina.Context;
+import org.apache.catalina.LifecycleException;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.testng.annotations.Test;
 
@@ -28,6 +34,14 @@ import org.testng.annotations.Test;
  */
 @Test
 public class TranscoderServiceTC8Test extends TranscoderServiceTest {
+	
+	@Override
+	public void setup() throws LifecycleException, ClassNotFoundException,
+			IOException {
+		super.setup();
+        final Context context = (Context)_manager.getContainer();
+		when( _manager.getContext() ).thenReturn( context ); // needed for createSession
+	}
 
     @Override
     protected GenericPrincipal createPrincipal() {
