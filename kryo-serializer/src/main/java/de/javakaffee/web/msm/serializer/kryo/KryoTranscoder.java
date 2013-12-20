@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -63,6 +64,7 @@ import de.javakaffee.kryoserializers.EnumSetSerializer;
 import de.javakaffee.kryoserializers.GregorianCalendarSerializer;
 import de.javakaffee.kryoserializers.JdkProxySerializer;
 import de.javakaffee.kryoserializers.KryoReflectionFactorySupport;
+import de.javakaffee.kryoserializers.LocaleSerializer;
 import de.javakaffee.kryoserializers.StringBufferSerializer;
 import de.javakaffee.kryoserializers.StringBuilderSerializer;
 import de.javakaffee.kryoserializers.SubListSerializer;
@@ -202,6 +204,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         kryo.register( InvocationHandler.class, new JdkProxySerializer( kryo ) );
         UnmodifiableCollectionsSerializer.registerSerializers( kryo );
         SynchronizedCollectionsSerializer.registerSerializers( kryo );
+        kryo.register( Locale.class, new LocaleSerializer() );
         
         final Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> pair = loadCustomConverter( customConverterClassNames,
                 classLoader, kryo );
