@@ -16,19 +16,20 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import org.testng.annotations.Test;
 
 /**
- * Integration test utils.
+ * Integration test testing memcached failover.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
  */
-public class TestUtilsTC6 extends EmbeddedTestUtils {
+@Test
+public class MemcachedFailoverIntegrationTC8Test extends MemcachedFailoverIntegrationTest {
 
     @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
+    TestUtils<?> getTestUtils() {
+        return new TestUtilsTC8();
     }
 
 }

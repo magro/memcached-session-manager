@@ -865,6 +865,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     @Override
+    public ClassLoader getContainerClassLoader() {
+        return getContainer().getLoader().getClassLoader();
+    }
+
+    @Override
     public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois );
     }

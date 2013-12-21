@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Martin Grotzke
+ * Copyright 2011 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,24 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import org.testng.annotations.Test;
+
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtilsTC8;
 
 /**
- * Integration test utils.
+ * Integration test testing session manager functionality with membase.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC6 extends EmbeddedTestUtils {
+@Test
+public class CouchbaseIntegrationTC8Test extends CouchbaseIntegrationTest {
 
     @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
+    TestUtils<?> getTestUtils() {
+        return new TestUtilsTC8();
     }
 
 }

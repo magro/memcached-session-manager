@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Martin Grotzke
+ * Copyright 2011 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,22 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import org.testng.annotations.Test;
 
 /**
- * Integration test utils.
+ * Integration test testing non-sticky sessions.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC6 extends EmbeddedTestUtils {
+@Test
+public class NonStickySessionsIntegrationTC8Test extends NonStickySessionsIntegrationTest {
 
     @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
+    TestUtils<?> getTestUtils() {
+        return new TestUtilsTC8();
     }
-
+    @Test( enabled = true )
+    public void testSessionCreatedForContainerProtectedResourceIsStoredInMemcached() throws Exception {
+    	super.testSessionCreatedForContainerProtectedResourceIsStoredInMemcached();
+    }
 }

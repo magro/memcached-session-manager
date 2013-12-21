@@ -14,21 +14,25 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import org.testng.annotations.Test;
+
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtilsTC8;
 
 /**
- * Integration test utils.
+ * Integration test testing basic session manager functionality.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
  */
-public class TestUtilsTC6 extends EmbeddedTestUtils {
+@Test
+public class MemcachedSessionManagerIntegrationTC8Test extends MemcachedSessionManagerIntegrationTest {
 
     @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
+    TestUtils<?> getTestUtils() {
+        return new TestUtilsTC8();
     }
 
 }

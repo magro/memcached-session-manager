@@ -17,8 +17,6 @@
 package de.javakaffee.web.msm;
 
 
-import static de.javakaffee.web.msm.Configurations.MAX_RECONNECT_DELAY_KEY;
-import static de.javakaffee.web.msm.Configurations.getSystemProperty;
 import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
@@ -36,8 +34,13 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import net.spy.memcached.BinaryConnectionFactory;
+import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.auth.AuthDescriptor;
+import net.spy.memcached.auth.PlainCallbackHandler;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -46,12 +49,14 @@ import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.connector.Request;
-import org.apache.catalina.connector.Response;
-import org.apache.catalina.deploy.LoginConfig;
-import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.session.StandardSession;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.descriptor.web.LoginConfig;
+import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
+
+import com.couchbase.client.CouchbaseClient;
+import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
@@ -79,6 +84,34 @@ public class MemcachedSessionService {
         LOCK_NOT_REQUIRED,
         LOCKED,
         COULD_NOT_AQUIRE_LOCK
+    }
+
+    static class ConnectionType {
+
+        private final boolean couchbaseBucketConfig;
+        private final String username;
+        private final String password;
+        public ConnectionType(final boolean couchbaseBucketConfig, final String username, final String password) {
+            this.couchbaseBucketConfig = couchbaseBucketConfig;
+            this.username = username;
+            this.password = password;
+        }
+        public static ConnectionType valueOf(final boolean couchbaseBucketConfig, final String username, final String password) {
+            return new ConnectionType(couchbaseBucketConfig, username, password);
+        }
+        boolean isCouchbaseBucketConfig() {
+            return couchbaseBucketConfig;
+        }
+        boolean isSASL() {
+            return !couchbaseBucketConfig && !isBlank(username) && !isBlank(password);
+        }
+        boolean isDefault() {
+            return !isCouchbaseBucketConfig() && !isSASL();
+        }
+
+        boolean isBlank(final String value) {
+            return value == null || value.trim().length() == 0;
+        }
     }
 
     public static final String PROTOCOL_TEXT = "text";
@@ -264,11 +297,6 @@ public class MemcachedSessionService {
         @Nonnull
         String getSessionCookieName();
 
-        /**
-         * Reads the Set-Cookie header(s) from the given response.
-         */
-        String[] getSetCookieHeaders(Response response);
-
         String generateSessionId();
         void expireSession( final String sessionId );
         MemcachedBackupSession getSessionInternal( String sessionId );
@@ -376,16 +404,13 @@ public class MemcachedSessionService {
     public void shutdown() {
         _log.info( "Stopping services." );
         _manager.getContainer().getParent().getPipeline().removeValve(_trackingHostValve);
-        _manager.getContainer().getPipeline().removeValve(_trackingContextValve);
         _backupSessionService.shutdown();
         if ( _lockingStrategy != null ) {
             _lockingStrategy.shutdown();
         }
         if ( _memcached != null ) {
             _memcached.shutdown();
-            _memcached = null;
         }
-        _transcoderFactory = null;
     }
 
     /**
@@ -421,9 +446,9 @@ public class MemcachedSessionService {
 
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
-        _trackingHostValve = createRequestTrackingHostValve(sessionCookieName, _currentRequest);
+        _trackingHostValve = new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, _currentRequest);
         _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
-        _trackingContextValve = createRequestTrackingContextValve(sessionCookieName);
+        _trackingContextValve = new RequestTrackingContextValve(sessionCookieName, this);
         _manager.getContainer().getPipeline().addValve( _trackingContextValve );
 
         initNonStickyLockingMode( _memcachedNodesManager );
@@ -436,19 +461,6 @@ public class MemcachedSessionService {
         _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky + ", operation timeout " + _operationTimeout +", with node ids " +
         		_memcachedNodesManager.getPrimaryNodeIds() + " and failover node ids " + _memcachedNodesManager.getFailoverNodeIds() );
 
-    }
-
-    protected RequestTrackingContextValve createRequestTrackingContextValve(final String sessionCookieName) {
-        return new RequestTrackingContextValve(sessionCookieName, this);
-    }
-
-    protected RequestTrackingHostValve createRequestTrackingHostValve(final String sessionCookieName, final CurrentRequest currentRequest) {
-        return new RequestTrackingHostValve(_requestUriIgnorePattern, sessionCookieName, this, _statistics, _enabled, currentRequest) {
-            @Override
-            protected String[] getSetCookieHeaders(final Response response) {
-                return _manager.getSetCookieHeaders(response);
-            }
-        };
     }
 
 	protected MemcachedClientCallback createMemcachedClientCallback() {
@@ -484,10 +496,44 @@ public class MemcachedSessionService {
         if ( ! _enabled.get() ) {
             return null;
         }
+        try {
+            final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), _username, _password);
+            if (connectionType.isCouchbaseBucketConfig()) {
+            	// For membase connectivity: http://docs.couchbase.org/membase-sdk-java-api-reference/membase-sdk-java-started.html
+            	// And: http://code.google.com/p/spymemcached/wiki/Examples#Establishing_a_Membase_Connection
+                final CouchbaseConnectionFactoryBuilder factory = new CouchbaseConnectionFactoryBuilder();
+                factory.setOpTimeout(_operationTimeout);
+                return new CouchbaseClient(factory.buildCouchbaseConnection(memcachedNodesManager.getCouchbaseBucketURIs(), _username, _password));
+            }
+            final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, statistics);
+            return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
+        } catch (final Exception e) {
+            throw new RuntimeException("Could not create memcached client", e);
+        }
+    }
 
-        final long maxReconnectDelay = getSystemProperty(MAX_RECONNECT_DELAY_KEY, DefaultConnectionFactory.DEFAULT_MAX_RECONNECT_DELAY);
-        return new MemcachedClientFactory().createMemcachedClient(memcachedNodesManager, _memcachedProtocol, _username, _password, _operationTimeout,
-                maxReconnectDelay, statistics);
+    protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
+            final ConnectionType connectionType, final Statistics statistics ) {
+        if (PROTOCOL_BINARY.equals( _memcachedProtocol )) {
+            if (connectionType.isSASL()) {
+                final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"}, new PlainCallbackHandler(_username, _password));
+                return memcachedNodesManager.isEncodeNodeIdInSessionId()
+                        ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                                memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout,
+                                authDescriptor)
+                        : new ConnectionFactoryBuilder().setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
+                                .setAuthDescriptor(authDescriptor)
+                                .setOpTimeout(_operationTimeout).build();
+            }
+            else {
+                return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
+                        memcachedNodesManager.getSessionIdFormat(),
+                        statistics, _operationTimeout ) : new BinaryConnectionFactory();
+            }
+        }
+        return memcachedNodesManager.isEncodeNodeIdInSessionId()
+        		? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, _operationTimeout )
+        		: new DefaultConnectionFactory();
     }
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
@@ -623,7 +669,7 @@ public class MemcachedSessionService {
         final SecurityConstraint[] constraints = context.findConstraints();
         final LoginConfig loginConfig = context.getLoginConfig();
         _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
-                && loginConfig != null && Constants.FORM_METHOD.equals( loginConfig.getAuthMethod() );
+                && loginConfig != null && "FORM".equals( loginConfig.getAuthMethod() );
         return _contextHasFormBasedSecurityConstraint;
     }
 

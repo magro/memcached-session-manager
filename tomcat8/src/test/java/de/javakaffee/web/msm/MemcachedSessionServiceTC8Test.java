@@ -14,21 +14,33 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import net.spy.memcached.MemcachedClient;
+
+import org.apache.catalina.LifecycleException;
+import org.testng.annotations.Test;
+
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
- * Integration test utils.
+ * Test the {@link MemcachedSessionService} for tomcat7.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
  */
-public class TestUtilsTC6 extends EmbeddedTestUtils {
+@Test
+public class MemcachedSessionServiceTC8Test extends MemcachedSessionServiceTest {
 
     @Override
     protected SessionManager createSessionManager() {
         return new MemcachedBackupSessionManager();
+    }
+
+    @Override
+    protected void startInternal( final SessionManager manager, final MemcachedClient memcachedMock ) throws LifecycleException {
+        manager.getMemcachedSessionService().setMemcachedClient(memcachedMock);
+        ((MemcachedBackupSessionManager)manager).start();
     }
 
 }

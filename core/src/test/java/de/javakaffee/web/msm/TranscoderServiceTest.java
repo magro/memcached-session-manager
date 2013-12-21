@@ -53,7 +53,7 @@ import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
  */
 public abstract class TranscoderServiceTest {
 
-    private static SessionManager _manager;
+    protected static SessionManager _manager;
 
     @BeforeMethod
     public void setup() throws LifecycleException, ClassNotFoundException, IOException {

@@ -19,11 +19,9 @@ package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.Statistics.StatsType.*;
 
-import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -34,19 +32,17 @@ import javax.annotation.Nullable;
 
 import net.spy.memcached.MemcachedClient;
 
-import org.apache.catalina.Container;
 import org.apache.catalina.Context;
-import org.apache.catalina.Globals;
 import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleListener;
+import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
-import org.apache.catalina.connector.Response;
+import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
-import org.apache.catalina.util.LifecycleSupport;
+import org.apache.catalina.util.SessionConfig;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -75,36 +71,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
-    private static final String INFO = NAME + "/1.0";
-
     protected final Log _log = LogFactory.getLog( getClass() );
-
-    private final LifecycleSupport _lifecycle = new LifecycleSupport( this );
-
-    private int _maxActiveSessions = -1;
-    private int _rejectedSessions;
-
-    /**
-     * Has this component been _started yet?
-     */
-    protected boolean _started = false;
 
     protected MemcachedSessionService _msm;
 
     public MemcachedBackupSessionManager() {
         _msm = new MemcachedSessionService( this );
-    }
-
-    /**
-     * Return descriptive information about this Manager implementation and the
-     * corresponding version number, in the format
-     * <code>&lt;description&gt;/&lt;version&gt;</code>.
-     *
-     * @return the info string
-     */
-    @Override
-    public String getInfo() {
-        return INFO;
     }
 
     /**
@@ -118,37 +90,32 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
-     * Initialize this manager. The memcachedClient parameter is there for testing
-     * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
-     * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
-     *
-     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
+     * {@inheritDoc}
      */
-    protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        _msm.setMemcachedClient(memcachedClient);
-        _msm.startInternal();
+    @Override
+    public void load() throws ClassNotFoundException, IOException {
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public void setContainer( final Container container ) {
+    public void unload() throws IOException {
+    }
 
-        // De-register from the old Container (if any)
-        if ( this.container != null && this.container instanceof Context ) {
-            ( (Context) this.container ).removePropertyChangeListener( this );
-        }
+    @Override
+    public MemcachedBackupSession createSession( final String sessionId ) {
+        return _msm.createSession( sessionId );
+    }
 
-        // Default processing provided by our superclass
-        super.setContainer( container );
+    @Override
+    public MemcachedBackupSession createEmptySession() {
+        return _msm.createEmptySession();
+    }
 
-        // Register with the new Container (if any)
-        if ( this.container != null && this.container instanceof Context ) {
-            setMaxInactiveInterval( ( (Context) this.container ).getSessionTimeout() * 60 );
-            ( (Context) this.container ).addPropertyChangeListener( this );
-        }
-
+    @Override
+    public MemcachedBackupSession newMemcachedBackupSession() {
+        return new MemcachedBackupSession( this );
     }
 
     /**
@@ -175,17 +142,16 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public void remove( final Session session ) {
-        remove( session, session.getNote( MemcachedSessionService.NODE_FAILURE ) != Boolean.TRUE );
+    public void remove( final Session session, final boolean update ) {
+        removeInternal( session, update, session.getNote( MemcachedSessionService.NODE_FAILURE ) != Boolean.TRUE );
     }
 
     @Override
     public void removeInternal( final Session session, final boolean update ) {
-        // update is there for tomcat7, not available in tomcat6
-        super.remove( session );
+        super.remove( session, update );
     }
 
-    private void remove( final Session session, final boolean removeFromMemcached ) {
+    private void removeInternal( final Session session, final boolean update, final boolean removeFromMemcached ) {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "remove invoked, removeFromMemcached: " + removeFromMemcached +
                     ", id: " + session.getId() );
@@ -193,7 +159,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if ( removeFromMemcached ) {
             _msm.deleteFromMemcached( session.getId() );
         }
-        super.remove( session );
+        super.remove( session, update );
         _msm.sessionRemoved((MemcachedBackupSession) session);
     }
 
@@ -217,76 +183,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _msm.findSession( id );
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public MemcachedBackupSession createSession( final String sessionId ) {
-        return _msm.createSession( sessionId );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public MemcachedBackupSession createEmptySession() {
-        return _msm.createEmptySession();
-    }
-
-    @Override
-    public MemcachedBackupSession newMemcachedBackupSession() {
-        return new MemcachedBackupSession( this );
-    }
-
     @Override
     public void changeSessionId( final Session session ) {
         // e.g. invoked by the AuthenticatorBase (for BASIC auth) on login to prevent session fixation
         // so that session backup won't be omitted we must store this event
         super.changeSessionId( session );
         ((MemcachedBackupSession)session).setSessionIdChanged( true );
-    }
-
-    /**
-     * Set the maximum number of active Sessions allowed, or -1 for no limit.
-     *
-     * @param max
-     *            The new maximum number of sessions
-     */
-    public void setMaxActiveSessions( final int max ) {
-        final int oldMaxActiveSessions = _maxActiveSessions;
-        _maxActiveSessions = max;
-        support.firePropertyChange( "maxActiveSessions",
-                Integer.valueOf( oldMaxActiveSessions ),
-                Integer.valueOf( _maxActiveSessions ) );
-    }
-
-    @Override
-    public int getMaxActiveSessions() {
-        return _maxActiveSessions;
-    }
-
-    @Override
-    public void setRejectedSessions( final int rejectedSessions ) {
-        _rejectedSessions = rejectedSessions;
-    }
-
-    @Override
-    public int getRejectedSessions() {
-        return _rejectedSessions;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void load() throws ClassNotFoundException, IOException {
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void unload() throws IOException {
     }
 
     /**
@@ -546,7 +448,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return _msm.isSticky();
     }
 
-	@Override
+    @Override
 	public void setOperationTimeout(final long operationTimeout ) {
 		_msm.setOperationTimeout(operationTimeout);
 	}
@@ -589,89 +491,29 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public void addLifecycleListener( final LifecycleListener arg0 ) {
-        _lifecycle.addLifecycleListener( arg0 );
+    public void startInternal() throws LifecycleException {
+        super.startInternal();
+        _msm.startInternal();
+        setState(LifecycleState.STARTING);
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public LifecycleListener[] findLifecycleListeners() {
-        return _lifecycle.findLifecycleListeners();
-    }
+    public void stopInternal() throws LifecycleException {
+    	setState(LifecycleState.STOPPING);
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void removeLifecycleListener( final LifecycleListener arg0 ) {
-        _lifecycle.removeLifecycleListener( arg0 );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void start() throws LifecycleException {
-
-        if( ! initialized ) {
-            init();
-        }
-
-        // Validate and update our current component state
-        if (_started) {
-            return;
-        }
-        _lifecycle.fireLifecycleEvent(START_EVENT, null);
-        _started = true;
-
-        // Force initialization of the random number generator
-        if (log.isDebugEnabled()) {
-            log.debug("Force random number initialization starting");
-        }
-        super.generateSessionId();
-        if (log.isDebugEnabled()) {
-            log.debug("Force random number initialization completed");
-        }
-
-        startInternal( null );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void stop() throws LifecycleException {
-
-        if (log.isDebugEnabled()) {
-            log.debug("Stopping");
-        }
-
-        // Validate and update our current component state
-        if (!_started) {
-            throw new LifecycleException
-                (sm.getString("standardManager.notStarted"));
-        }
-        _lifecycle.fireLifecycleEvent(STOP_EVENT, null);
-        _started = false;
-
-        // Require a new random number generator if we are restarted
-        random = null;
-
-        if ( initialized ) {
-
-            if ( _msm.isSticky() ) {
-                _log.info( "Removing sessions from local session map." );
-                for( final Session session : sessions.values() ) {
-                    swapOut( (StandardSession) session );
-                }
+        if ( _msm.isSticky() ) {
+            _log.info( "Removing sessions from local session map." );
+            for( final Session session : sessions.values() ) {
+                swapOut( (StandardSession) session );
             }
-
-            _msm.shutdown();
-
-            destroy();
         }
+
+        _msm.shutdown();
+
+        super.stopInternal();
     }
 
     private void swapOut( @Nonnull final StandardSession session ) {
@@ -680,7 +522,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
             return;
         }
         session.passivate();
-        remove( session, false );
+        removeInternal( session, true );
         session.recycle();
     }
 
@@ -691,28 +533,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void backgroundProcess() {
         _msm.updateExpirationInMemcached();
         super.backgroundProcess();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void propertyChange( final PropertyChangeEvent event ) {
-
-        // Validate the source of this event
-        if ( !( event.getSource() instanceof Context ) ) {
-            return;
-        }
-
-        // Process a relevant property change
-        if ( event.getPropertyName().equals( "sessionTimeout" ) ) {
-            try {
-                setMaxInactiveInterval( ( (Integer) event.getNewValue() ).intValue() * 60 );
-            } catch ( final NumberFormatException e ) {
-                _log.warn( "standardManager.sessionTimeout: " + event.getNewValue().toString() );
-            }
-        }
-
     }
 
     /**
@@ -978,31 +798,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public String getSessionCookieName() {
-        String result = getSessionCookieNameFromContext((Context) getContainer());
-        if ( result == null ) {
-            result = Globals.SESSION_COOKIE_NAME;
-            _log.debug( "Using session cookie name from context: " + result );
-        }
-        return result;
-    }
-
-    @CheckForNull
-    private String getSessionCookieNameFromContext( final Context context ) {
-        // since 6.0.27 the session cookie name, domain and path is configurable per context,
-        // see issue http://issues.apache.org/bugzilla/show_bug.cgi?id=48379
-        try {
-            final Method getSessionCookieName = Context.class.getDeclaredMethod( "getSessionCookieName" );
-            final String result = (String) getSessionCookieName.invoke( context );
-            if ( result != null ) {
-                _log.debug( "Using session cookie name from context: " + result );
-            }
-            return result;
-        } catch( final NoSuchMethodException e ) {
-            // the context does not provide the method getSessionCookieName
-        } catch ( final Exception e ) {
-            throw new RuntimeException( "Could not read session cookie name from context.", e );
-        }
-        return null;
+        return SessionConfig.getSessionCookieName(getContext());
     }
 
     @Override
@@ -1027,12 +823,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public void incrementRejectedSessions() {
-        _rejectedSessions++;
+        rejectedSessions++;
     }
 
     @Override
     public boolean isInitialized() {
-        return initialized;
+        return getState() == LifecycleState.INITIALIZED || getState() == LifecycleState.STARTED;
     }
 
     @Override
@@ -1042,22 +838,17 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     @Override
     public ClassLoader getContainerClassLoader() {
-        return getContainer().getLoader().getClassLoader();
+        return getContext().getLoader().getClassLoader();
     }
 
     @Override
     public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
-        return SerializablePrincipal.readPrincipal( ois, getContainer().getRealm() );
+        return SerializablePrincipal.readPrincipal( ois );
     }
 
     @Override
     public MemcachedSessionService getMemcachedSessionService() {
         return _msm;
-    }
-
-    @Override
-    public String[] getSetCookieHeaders(final Response response) {
-        return response.getHeaderValues("Set-Cookie");
     }
 
 }
