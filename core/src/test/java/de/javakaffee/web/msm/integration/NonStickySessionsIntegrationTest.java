@@ -928,7 +928,7 @@ public abstract class NonStickySessionsIntegrationTest {
         LOG.info("END foo1234");
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(response1.getContent().contains("j_security_check"), "/j_security_check not found, app is not properly initialized");
+        assertTrue(response1.getContent().contains("j_security_check"), "IllegalState: /j_security_check not found, app is not properly initialized");
 
         // failed sometimes, randomly (timing issue?)?!
         Thread.sleep(200);
@@ -940,7 +940,7 @@ public abstract class NonStickySessionsIntegrationTest {
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
         final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, false );
         assertNull(response2.getResponseSessionId());
-        assertEquals(response2.getStatusCode(), 302, response2.getContent());
+        assertEquals(response2.getStatusCode(), 302, "IllegalState: 'POST /j_security_check' did not return a 302 but a 200, app is not properly initialized. Page content: " + response2.getContent());
 
         // 2 gets for session and validity
         assertEquals( _daemon1.getCache().getGetHits(), 2 );
@@ -971,7 +971,7 @@ public abstract class NonStickySessionsIntegrationTest {
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(response1.getContent().contains("j_security_check"), "/j_security_check not found, app is not properly initialized");
+        assertTrue(response1.getContent().contains("j_security_check"), "IllegalState: /j_security_check not found, app is not properly initialized");
 
         // Wait some time so that the GET is finished
         Thread.sleep(200);
