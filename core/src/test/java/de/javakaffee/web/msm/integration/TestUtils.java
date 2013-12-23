@@ -73,6 +73,7 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.params.HttpClientParams;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
@@ -118,7 +119,7 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
         initLogConfig(TestUtils.class);
     }
 
-    private static void initLogConfig(@SuppressWarnings("rawtypes") final Class<? extends TestUtils> clazz) {
+    public static void initLogConfig(@SuppressWarnings("rawtypes") final Class<? extends TestUtils> clazz) {
         final URL loggingProperties = clazz.getResource("/logging.properties");
         try {
             System.setProperty("java.util.logging.config.file", new File(loggingProperties.toURI()).getAbsolutePath());
@@ -335,6 +336,11 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
 
         method.setEntity( createFormEntity( params ) );
 
+        // For 303 httpclient automatically redirects, so let's prevent this if requested.
+        if (!followRedirects) {
+            HttpClientParams.setRedirecting(method.getParams(), false);
+        }
+
         // System.out.println( "cookies: " + method.getParams().getCookiePolicy() );
         //method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
         final HttpResponse response = credentials == null
@@ -342,16 +348,20 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
             : executeRequestWithAuth( client, method, credentials );
 
         final int statusCode = response.getStatusLine().getStatusCode();
-        if ( followRedirects && statusCode == 302 ) {
+        if ( followRedirects && isRedirect(statusCode) ) {
             return redirect( response, client, port, rsessionId, baseUri );
         }
 
-        if ( statusCode != 200 && !(!followRedirects && statusCode == 302) ) {
+        if ( statusCode != 200 && !(!followRedirects && isRedirect(statusCode)) ) {
             throw new RuntimeException( "POST"+(path != null ? " " + path : "")+" did not return status 200, but " + response.getStatusLine() +
                     "\n" + toString(response.getEntity().getContent()) );
         }
 
         return readResponse( rsessionId, response );
+    }
+
+    public static boolean isRedirect(final int statusCode) {
+        return statusCode == 302 || statusCode == 303;
     }
 
     public static String toString(final InputStream in) {

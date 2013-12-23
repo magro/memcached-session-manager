@@ -940,7 +940,8 @@ public abstract class NonStickySessionsIntegrationTest {
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
         final Response response2 = post( _httpClient, TC_PORT_2, "/j_security_check", sessionId, params, null, false );
         assertNull(response2.getResponseSessionId());
-        assertEquals(response2.getStatusCode(), 302, "IllegalState: 'POST /j_security_check' did not return a 302 but a 200, app is not properly initialized. Page content: " + response2.getContent());
+        assertTrue(isRedirect(response2.getStatusCode()), "IllegalState: 'POST /j_security_check' did not issue a redirect,"
+                + " but status " + response2.getStatusCode() +". Page content: " + response2.getContent());
 
         // 2 gets for session and validity
         assertEquals( _daemon1.getCache().getGetHits(), 2 );
