@@ -16,19 +16,15 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-
 /**
  * Integration test utils.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class TestUtilsTC6 extends EmbeddedTestUtils {
+public class TestUtilsTC6 extends TestUtils<Tomcat6Builder> {
 
     @Override
-    protected SessionManager createSessionManager() {
-        return new MemcachedBackupSessionManager();
+    public Tomcat6Builder tomcatBuilder() {
+        return new Tomcat6Builder();
     }
-
 }

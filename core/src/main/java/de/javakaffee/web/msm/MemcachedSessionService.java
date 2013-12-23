@@ -17,10 +17,27 @@
 package de.javakaffee.web.msm;
 
 
-import static de.javakaffee.web.msm.Statistics.StatsType.DELETE_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
-import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
+import com.couchbase.client.CouchbaseClient;
+import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
+import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
+import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
+import de.javakaffee.web.msm.LockingStrategy.LockingMode;
+import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import net.spy.memcached.*;
+import net.spy.memcached.auth.AuthDescriptor;
+import net.spy.memcached.auth.PlainCallbackHandler;
+import org.apache.catalina.Container;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Manager;
+import org.apache.catalina.Session;
+import org.apache.catalina.connector.Request;
+import org.apache.catalina.session.StandardSession;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.security.Principal;
@@ -30,39 +47,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-import net.spy.memcached.BinaryConnectionFactory;
-import net.spy.memcached.ConnectionFactory;
-import net.spy.memcached.ConnectionFactoryBuilder;
-import net.spy.memcached.DefaultConnectionFactory;
-import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.auth.AuthDescriptor;
-import net.spy.memcached.auth.PlainCallbackHandler;
-
-import org.apache.catalina.Container;
-import org.apache.catalina.Context;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Manager;
-import org.apache.catalina.Session;
-import org.apache.catalina.authenticator.Constants;
-import org.apache.catalina.connector.Request;
-import org.apache.catalina.deploy.LoginConfig;
-import org.apache.catalina.deploy.SecurityConstraint;
-import org.apache.catalina.session.StandardSession;
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-
-import com.couchbase.client.CouchbaseClient;
-import com.couchbase.client.CouchbaseConnectionFactoryBuilder;
-
-import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
-import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
-import net.spy.memcached.FailureMode;
+import static de.javakaffee.web.msm.Statistics.StatsType.*;
 
 /**
  * This is the core of memcached session manager, managing sessions in memcached.
@@ -76,7 +61,7 @@ import net.spy.memcached.FailureMode;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class MemcachedSessionService {
+public abstract class MemcachedSessionService {
 
     static enum LockStatus {
         /**
@@ -269,9 +254,7 @@ public class MemcachedSessionService {
     private RequestTrackingHostValve _trackingHostValve;
     private RequestTrackingContextValve _trackingContextValve;
 
-    private Boolean _contextHasFormBasedSecurityConstraint;
-
-    private final SessionManager _manager;
+    protected final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
 
     private final LRUCache<String, Object> _removedSessions = new LRUCache<String, Object>( 2000, 5000 );
@@ -666,7 +649,7 @@ public class MemcachedSessionService {
         addValidLoadedSession( result, activate );
     }
 
-    private boolean contextHasFormBasedSecurityConstraint() {
+    protected abstract boolean contextHasFormBasedSecurityConstraint();/* {
         if(_contextHasFormBasedSecurityConstraint != null) {
             return _contextHasFormBasedSecurityConstraint.booleanValue();
         }
@@ -676,7 +659,7 @@ public class MemcachedSessionService {
         _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
                 && loginConfig != null && Constants.FORM_METHOD.equals( loginConfig.getAuthMethod() );
         return _contextHasFormBasedSecurityConstraint;
-    }
+    }*/
 
     private void addValidLoadedSession( final StandardSession session, final boolean activate ) {
         // make sure the listeners know about it. (as done by PersistentManagerBase)

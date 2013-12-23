@@ -49,6 +49,12 @@
 			<version>${tomcat-version}</version>
 			<scope>provided</scope>
 		</dependency>
+        <dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>tomcat-jasper</artifactId>
+            <version>${tomcat-version}</version>
+            <scope>provided</scope>
+        </dependency>
 
 		<!-- use msm core test classes in tests -->
 		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->

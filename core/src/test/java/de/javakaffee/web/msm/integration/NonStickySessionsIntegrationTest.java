@@ -928,7 +928,7 @@ public abstract class NonStickySessionsIntegrationTest {
         LOG.info("END foo1234");
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(response1.getContent().contains("j_security_check"));
+        assertTrue(response1.getContent().contains("j_security_check"), "/j_security_check not found, app is not properly initialized");
 
         // failed sometimes, randomly (timing issue?)?!
         Thread.sleep(200);
@@ -971,7 +971,7 @@ public abstract class NonStickySessionsIntegrationTest {
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(response1.getContent().contains("j_security_check"));
+        assertTrue(response1.getContent().contains("j_security_check"), "/j_security_check not found, app is not properly initialized");
 
         // Wait some time so that the GET is finished
         Thread.sleep(200);

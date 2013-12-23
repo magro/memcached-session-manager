@@ -48,6 +48,8 @@ import org.apache.tomcat.util.buf.ByteChunk;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
+import javax.servlet.http.HttpServletRequest;
+
 /**
  * This service is responsible for serializing/deserializing session data
  * so that this can be stored in / loaded from memcached.
@@ -584,10 +586,10 @@ public class TranscoderService {
     private static enum AuthType {
 
         NONE( (short)0, null ),
-        BASIC( (short)1, Constants.BASIC_METHOD ),
-        CLIENT_CERT( (short)2, Constants.CERT_METHOD ),
-        DIGEST( (short)3, Constants.DIGEST_METHOD ),
-        FORM( (short)4, Constants.FORM_METHOD );
+        BASIC( (short)1, HttpServletRequest.BASIC_AUTH ),
+        CLIENT_CERT( (short)2, HttpServletRequest.CLIENT_CERT_AUTH ),
+        DIGEST( (short)3, HttpServletRequest.DIGEST_AUTH ),
+        FORM( (short)4, HttpServletRequest.FORM_AUTH );
 
         private final short _id;
         private final String _value;

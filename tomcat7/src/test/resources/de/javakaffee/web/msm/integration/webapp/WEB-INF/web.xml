@@ -6,13 +6,13 @@
     <display-name>IntegrationTest Application</display-name>
   
     <servlet>
-        <servlet-name>default</servlet-name>
+        <servlet-name>TestServlet</servlet-name>
         <servlet-class>de.javakaffee.web.msm.integration.TestServlet</servlet-class>
         <load-on-startup>1</load-on-startup>
     </servlet>
 
     <servlet-mapping>
-        <servlet-name>default</servlet-name>
+        <servlet-name>TestServlet</servlet-name>
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
     

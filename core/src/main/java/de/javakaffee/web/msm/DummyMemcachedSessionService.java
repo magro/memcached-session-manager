@@ -109,6 +109,11 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
     }
 
     @Override
+    protected boolean contextHasFormBasedSecurityConstraint() {
+        throw new IllegalStateException();
+    }
+
+    @Override
     public MemcachedBackupSession findSession( final String id ) throws IOException {
         final MemcachedBackupSession result = super.findSession( id );
         if ( result != null ) {

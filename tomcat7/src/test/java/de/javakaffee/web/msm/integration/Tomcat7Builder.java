@@ -15,40 +15,33 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.UnknownHostException;
-
-import javax.annotation.Nonnull;
-import javax.servlet.ServletException;
-
+import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.MemcachedSessionService;
-import org.apache.catalina.Container;
-import org.apache.catalina.Context;
-import org.apache.catalina.Engine;
-import org.apache.catalina.Host;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Valve;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.integration.TestUtils.LoginType;
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
+import org.apache.catalina.*;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.startup.Tomcat;
-import org.apache.tomcat.util.descriptor.web.LoginConfig;
-import org.apache.tomcat.util.descriptor.web.SecurityCollection;
-import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
+import org.apache.catalina.deploy.LoginConfig;
+import org.apache.catalina.deploy.SecurityCollection;
+import org.apache.catalina.deploy.SecurityConstraint;
 
-import de.javakaffee.web.msm.MemcachedBackupSessionManager;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.integration.TestUtils.LoginType;
-import edu.umd.cs.findbugs.annotations.SuppressWarnings;
+import javax.annotation.Nonnull;
+import javax.servlet.ServletException;
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.UnknownHostException;
 
 /**
  * Builder for {@link Tomcat} tomcat.
  *
  * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
+public class Tomcat7Builder extends TomcatBuilder<Tomcat> {
 
     @SuppressWarnings( "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" )
     public Tomcat build() throws MalformedURLException,
@@ -145,7 +138,7 @@ public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
     private Tomcat tomcat;
 
     @Override
-    public Tomcat8Builder buildAndStart() throws Exception {
+    public Tomcat7Builder buildAndStart() throws Exception {
         tomcat = build();
         tomcat.start();
         return this;
@@ -178,7 +171,7 @@ public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
 
     @Override
     public void setChangeSessionIdOnAuth(final boolean changeSessionIdOnAuth) {
-        final Engine engine = tomcat.getEngine();
+        final Engine engine = (StandardEngine)tomcat.getEngine();
         final Host host = (Host)engine.findChild( DEFAULT_HOST );
         final Container context = host.findChild( CONTEXT_PATH );
         final Valve first = context.getPipeline().getFirst();

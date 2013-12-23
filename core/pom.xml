@@ -13,6 +13,10 @@
 	<name>memcached-session-manager core</name>
 	<description>The msm core, provides java serialization strategy.</description>
 
+	<properties>
+		<tomcat-version>7.0.40</tomcat-version>
+	</properties>
+	
 	<dependencies>
 		<dependency>
 			<groupId>javax.servlet</groupId>
@@ -22,19 +26,19 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
-			<artifactId>catalina</artifactId>
+			<artifactId>tomcat-catalina</artifactId>
 			<version>${tomcat-version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
-			<artifactId>catalina-ha</artifactId>
+			<artifactId>tomcat-catalina-ha</artifactId>
 			<version>${tomcat-version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
-			<artifactId>coyote</artifactId>
+			<artifactId>tomcat-coyote</artifactId>
 			<version>${tomcat-version}</version>
 			<scope>provided</scope>
 		</dependency>
@@ -99,7 +103,7 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-
+	
 	<build>
 		<plugins>
 			<plugin>

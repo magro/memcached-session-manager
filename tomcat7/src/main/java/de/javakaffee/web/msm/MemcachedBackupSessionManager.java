@@ -38,6 +38,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
@@ -77,7 +78,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected MemcachedSessionService _msm;
 
     public MemcachedBackupSessionManager() {
-        _msm = new MemcachedSessionService( this );
+        _msm = new MemcachedSessionServiceTC7( this );
     }
 
     /**

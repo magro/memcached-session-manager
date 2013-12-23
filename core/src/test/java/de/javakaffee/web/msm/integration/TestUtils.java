@@ -139,7 +139,7 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
         final Response tc1Response1 = get( client, tcPort, null );
         final String sessionId = tc1Response1.getSessionId();
         assertNotNull( sessionId );
-        assertTrue(tc1Response1.getContent().contains("j_security_check"));
+        assertTrue(tc1Response1.getContent().contains("j_security_check"), "/j_security_check not found, app is not properly initialized");
 
         final Map<String, String> params = new HashMap<String, String>();
         params.put( LoginServlet.J_USERNAME, TestUtils.USER_NAME );

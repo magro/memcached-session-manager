@@ -91,7 +91,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected MemcachedSessionService _msm;
 
     public MemcachedBackupSessionManager() {
-        _msm = new MemcachedSessionService( this );
+        _msm = new MemcachedSessionServiceTC6( this );
     }
 
     /**
