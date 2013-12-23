@@ -141,7 +141,6 @@ public abstract class MemcachedFailoverIntegrationTest {
      * the session id reflects this. The session must no longer be available under the old
      * session id.
      */
-    @SuppressWarnings("unchecked")
     @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
     public void testRelocateSession( final SessionAffinityMode sessionAffinity ) throws Throwable {
 
@@ -186,7 +185,6 @@ public abstract class MemcachedFailoverIntegrationTest {
     /**
      * Tests that multiple memcached nodes can fail and backup/relocation handles this.
      */
-    @SuppressWarnings("unchecked")
     @Test( enabled = true, dataProviderClass = TestUtils.class, dataProvider = STICKYNESS_PROVIDER )
     public void testMultipleMemcachedNodesFailure( final SessionAffinityMode sessionAffinity ) throws Throwable {
 
@@ -352,7 +350,6 @@ public abstract class MemcachedFailoverIntegrationTest {
      *
      * @throws Throwable
      */
-    @SuppressWarnings("unchecked")
     @Test( enabled = true )
     public void testAllMemcachedNodesFailure() throws Throwable {
 

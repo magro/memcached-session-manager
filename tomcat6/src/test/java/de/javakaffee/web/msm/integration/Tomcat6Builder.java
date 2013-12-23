@@ -1,7 +1,6 @@
 package de.javakaffee.web.msm.integration;
 
 import de.javakaffee.web.msm.MemcachedSessionService;
-import edu.umd.cs.findbugs.annotations.*;
 import org.apache.catalina.*;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;

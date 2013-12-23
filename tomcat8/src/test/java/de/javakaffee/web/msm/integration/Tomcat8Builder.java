@@ -32,7 +32,6 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
-import org.apache.catalina.core.StandardEngine;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
 import org.apache.tomcat.util.descriptor.web.SecurityCollection;

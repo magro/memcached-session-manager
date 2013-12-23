@@ -132,7 +132,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final SchemeRegistry schemeRegistry = new SchemeRegistry();
         schemeRegistry.register(
-                new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
+                new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
         _httpClient = new DefaultHttpClient(new ThreadSafeClientConnManager(schemeRegistry));
 
         _executor = Executors.newCachedThreadPool();

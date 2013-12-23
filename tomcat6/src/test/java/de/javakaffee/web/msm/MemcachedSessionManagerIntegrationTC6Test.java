@@ -31,7 +31,7 @@ import de.javakaffee.web.msm.integration.TestUtilsTC6;
 public class MemcachedSessionManagerIntegrationTC6Test extends MemcachedSessionManagerIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC6();
     }
 

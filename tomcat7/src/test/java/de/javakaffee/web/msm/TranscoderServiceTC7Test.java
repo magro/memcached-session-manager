@@ -30,7 +30,7 @@ public class TranscoderServiceTC7Test extends TranscoderServiceTest {
 
     @Override
     protected GenericPrincipal createPrincipal() {
-        return new GenericPrincipal( "foo", "bar" );
+        return new GenericPrincipal( "foo", "bar", null );
     }
 
 }

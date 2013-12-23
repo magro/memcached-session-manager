@@ -31,7 +31,7 @@ import de.javakaffee.web.msm.integration.TestUtilsTC7;
 public class MemcachedSessionManagerIntegrationTC7Test extends MemcachedSessionManagerIntegrationTest {
 
     @Override
-    TestUtils getTestUtils() {
+    TestUtils<?> getTestUtils() {
         return new TestUtilsTC7();
     }
 

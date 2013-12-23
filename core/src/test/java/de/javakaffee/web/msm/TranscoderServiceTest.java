@@ -69,7 +69,7 @@ public abstract class TranscoderServiceTest {
             }
         });
 
-        final MemcachedSessionService service = new DummyMemcachedSessionService( _manager );
+        final MemcachedSessionService service = new DummyMemcachedSessionService<SessionManager>( _manager );
         when( _manager.createSession( anyString() ) ).thenAnswer(new Answer<MemcachedBackupSession>() {
             @Override
             public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {

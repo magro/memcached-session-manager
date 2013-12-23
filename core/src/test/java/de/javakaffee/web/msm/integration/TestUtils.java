@@ -78,6 +78,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EntityUtils;
 import org.apache.juli.logging.LogFactory;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
@@ -174,7 +175,7 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
         // System.out.println( "response cookie: " + responseSessionId );
 
         // We must consume the content so that the connection will be released
-        response.getEntity().consumeContent();
+        EntityUtils.consume(response.getEntity());
 
         return responseSessionId == null ? rsessionId : responseSessionId;
     }
@@ -381,7 +382,7 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
         }
         /* consume content so that the connection can be released
          */
-        response.getEntity().consumeContent();
+        EntityUtils.consume(response.getEntity());
 
         /* redirect
          */

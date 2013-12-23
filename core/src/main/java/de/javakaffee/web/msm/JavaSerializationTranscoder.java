@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.catalina.Loader;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
 import org.apache.juli.logging.Log;

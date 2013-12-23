@@ -35,6 +35,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.catalina.Manager;
 import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
@@ -47,8 +49,6 @@ import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.ByteChunk;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-
-import javax.servlet.http.HttpServletRequest;
 
 /**
  * This service is responsible for serializing/deserializing session data
@@ -377,7 +377,6 @@ public class TranscoderService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static byte[] serializeSavedRequest( final Object obj ) {
         if(obj == null) {
             return null;
@@ -460,7 +459,6 @@ public class TranscoderService {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, List<String>> getHeaders(final SavedRequest obj) {
         final Map<String, List<String>> result = new HashMap<String, List<String>>();
         final Iterator<String> namesIter = obj.getHeaderNames();
