@@ -27,10 +27,4 @@
         <servlet-name>login</servlet-name>
         <url-pattern>/login</url-pattern>
     </servlet-mapping>
-
-    <servlet-mapping>
-        <!-- FIXME: temporary workaround: tomcat8 redirects form-auth to "//login"" instead of "/login" -->
-        <servlet-name>login</servlet-name>
-        <url-pattern>//login</url-pattern>
-    </servlet-mapping>
 </web-app>

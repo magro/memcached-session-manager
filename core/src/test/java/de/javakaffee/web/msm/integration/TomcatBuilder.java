@@ -37,7 +37,7 @@ import de.javakaffee.web.msm.integration.TestUtils.LoginType;
  */
 public abstract class TomcatBuilder<T> {
 
-    public static final String CONTEXT_PATH = "/";
+    public static final String CONTEXT_PATH = "";
     protected static final String DEFAULT_HOST = "localhost";
     protected static final String DEFAULT_TRANSCODER_FACTORY = JavaSerializationTranscoderFactory.class.getName();
 
