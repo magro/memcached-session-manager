@@ -1,0 +1,79 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>de.javakaffee.msm</groupId>
+		<artifactId>memcached-session-manager-project</artifactId>
+		<version>1.6.6-SNAPSHOT</version>
+	</parent>
+
+	<groupId>de.javakaffee.msm</groupId>
+	<artifactId>memcached-session-manager-tc8</artifactId>
+	<version>1.6.6-SNAPSHOT</version>
+	<packaging>jar</packaging>
+	<name>memcached-session-manager tomcat8</name>
+	<description>The msm tomcat8 specific implementation.</description>
+
+	<properties>
+		<tomcat-version>8.0.0</tomcat-version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
+		<!-- Tomcat dependencies -->
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-servlet-api</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-catalina</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-catalina-ha</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-coyote</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- use msm core test classes in tests -->
+		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
+		<dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+			<!-- use classifier:tests, as type:test-jar creates a wrong classpath,
+			     see http://jira.codehaus.org/browse/MNG-5096 -->
+			<classifier>tests</classifier>
+			<scope>test</scope>
+		</dependency>
+		<!-- Mocks -->
+		<dependency>
+			<groupId>org.couchbase.mock</groupId>
+			<artifactId>CouchbaseMock</artifactId>
+			<version>${couchbasemock-version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Needed for membase via http -->
+		<dependency>
+			<groupId>org.codehaus.jettison</groupId>
+			<artifactId>jettison</artifactId>
+			<version>1.3</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

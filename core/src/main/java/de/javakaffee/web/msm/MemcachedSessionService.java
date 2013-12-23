@@ -329,6 +329,12 @@ public class MemcachedSessionService {
         Container getContainer();
 
         /**
+         * Return the Context with which this Manager is associated.
+         */
+        @Nonnull
+        ClassLoader getContainerClassLoader();
+
+        /**
          * Reads the Principal from the given OIS.
          * @param ois the object input stream to read from. Will be closed by the caller.
          * @return the deserialized principal
@@ -498,7 +504,7 @@ public class MemcachedSessionService {
 
     private Class<? extends TranscoderFactory> loadTranscoderFactoryClass() throws ClassNotFoundException {
         Class<? extends TranscoderFactory> transcoderFactoryClass;
-        final ClassLoader classLoader = _manager.getContainer().getLoader().getClassLoader();
+        final ClassLoader classLoader = _manager.getContainerClassLoader();
         try {
             _log.debug( "Loading transcoder factory class " + _transcoderFactoryClassName + " using classloader " + classLoader );
             transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, classLoader ).asSubclass( TranscoderFactory.class );
