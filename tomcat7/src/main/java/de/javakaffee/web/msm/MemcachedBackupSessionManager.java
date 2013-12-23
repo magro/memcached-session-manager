@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -38,6 +39,8 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.deploy.LoginConfig;
+import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
@@ -76,8 +79,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected MemcachedSessionService _msm;
 
+    private Boolean _contextHasFormBasedSecurityConstraint;
+
     public MemcachedBackupSessionManager() {
-        _msm = new MemcachedSessionServiceTC7( this );
+        _msm = new MemcachedSessionService( this );
     }
 
     /**
@@ -857,6 +862,19 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois );
+    }
+
+    @Override
+	public boolean contextHasFormBasedSecurityConstraint(){
+        if(_contextHasFormBasedSecurityConstraint != null) {
+            return _contextHasFormBasedSecurityConstraint.booleanValue();
+        }
+        final Context context = (Context)getContainer();
+        final SecurityConstraint[] constraints = context.findConstraints();
+        final LoginConfig loginConfig = context.getLoginConfig();
+        _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
+                && loginConfig != null && HttpServletRequest.FORM_AUTH.equals( loginConfig.getAuthMethod() );
+        return _contextHasFormBasedSecurityConstraint;
     }
 
     @Override

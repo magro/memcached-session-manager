@@ -61,7 +61,7 @@ import static de.javakaffee.web.msm.Statistics.StatsType.*;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public abstract class MemcachedSessionService {
+public class MemcachedSessionService {
 
     static enum LockStatus {
         /**
@@ -356,6 +356,11 @@ public abstract class MemcachedSessionService {
         @Nonnull
         Principal readPrincipal( @Nonnull ObjectInputStream ois ) throws ClassNotFoundException, IOException;
 
+        /**
+         * Determines if the context has a security contraint with form based login.
+         */
+        boolean contextHasFormBasedSecurityConstraint();
+
         // --------------------- setters for testing
         /**
          * Sets the sticky mode, must be provided for tests at least.
@@ -586,7 +591,7 @@ public abstract class MemcachedSessionService {
             // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
             // constraint needs the session to get the authenticated principal)
             if ( !_sticky && isContainerSessionLookup()
-                    && !contextHasFormBasedSecurityConstraint() ) {
+                    && !_manager.contextHasFormBasedSecurityConstraint() ) {
                 // we can return just null as the requestedSessionId will still be set on
                 // the request.
                 return null;
@@ -648,18 +653,6 @@ public abstract class MemcachedSessionService {
         final boolean activate = !sessionIdWillBeChanged;
         addValidLoadedSession( result, activate );
     }
-
-    protected abstract boolean contextHasFormBasedSecurityConstraint();/* {
-        if(_contextHasFormBasedSecurityConstraint != null) {
-            return _contextHasFormBasedSecurityConstraint.booleanValue();
-        }
-        final Context context = (Context)_manager.getContainer();
-        final SecurityConstraint[] constraints = context.findConstraints();
-        final LoginConfig loginConfig = context.getLoginConfig();
-        _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
-                && loginConfig != null && Constants.FORM_METHOD.equals( loginConfig.getAuthMethod() );
-        return _contextHasFormBasedSecurityConstraint;
-    }*/
 
     private void addValidLoadedSession( final StandardSession session, final boolean activate ) {
         // make sure the listeners know about it. (as done by PersistentManagerBase)

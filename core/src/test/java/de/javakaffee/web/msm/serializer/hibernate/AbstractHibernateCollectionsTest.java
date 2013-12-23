@@ -34,7 +34,6 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
 
-import de.javakaffee.web.msm.*;
 import org.apache.catalina.core.StandardContext;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -51,7 +50,11 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.MemcachedBackupSession;
+import de.javakaffee.web.msm.MemcachedSessionService;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.TranscoderService;
 import de.javakaffee.web.msm.integration.TestUtils;
 
 /**
@@ -217,7 +220,9 @@ public abstract class AbstractHibernateCollectionsTest {
         return manager;
     }
 
-    protected abstract MemcachedSessionService newMemcachedSessionService(SessionManager manager);
+    protected MemcachedSessionService newMemcachedSessionService(final SessionManager manager) {
+        return new MemcachedSessionService(manager);
+    }
 
     private static MemcachedBackupSession createSession( final SessionManager manager, final String id ) {
         final MemcachedBackupSession session = manager.getMemcachedSessionService().createEmptySession();

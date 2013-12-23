@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 
 import net.spy.memcached.MemcachedClient;
 
@@ -43,6 +44,8 @@ import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.SessionConfig;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.descriptor.web.LoginConfig;
+import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 
@@ -73,8 +76,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected MemcachedSessionService _msm;
 
+    private Boolean _contextHasFormBasedSecurityConstraint;
+
     public MemcachedBackupSessionManager() {
-        _msm = new MemcachedSessionServiceTC8( this );
+        _msm = new MemcachedSessionService( this );
     }
 
     /**
@@ -842,6 +847,17 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois );
+    }
+
+    public boolean contextHasFormBasedSecurityConstraint(){
+        if(_contextHasFormBasedSecurityConstraint != null) {
+            return _contextHasFormBasedSecurityConstraint.booleanValue();
+        }
+        final SecurityConstraint[] constraints = getContext().findConstraints();
+        final LoginConfig loginConfig = getContext().getLoginConfig();
+        _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0
+                && loginConfig != null && HttpServletRequest.FORM_AUTH.equals( loginConfig.getAuthMethod() );
+        return _contextHasFormBasedSecurityConstraint;
     }
 
     @Override
