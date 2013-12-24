@@ -23,6 +23,7 @@ import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.security.Principal;
+import java.util.Collection;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -38,6 +39,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
+import org.apache.catalina.connector.Response;
 import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
@@ -863,6 +865,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public MemcachedSessionService getMemcachedSessionService() {
         return _msm;
+    }
+
+    @Override
+    public String[] getSetCookieHeaders(final Response response) {
+        final Collection<String> result = response.getHeaders("Set-Cookie");
+        return result.toArray(new String[result.size()]);
     }
 
 }
