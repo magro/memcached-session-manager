@@ -221,7 +221,8 @@ public class MemcachedBackupSession extends StandardSession {
          */
         final int timeIdle = Math.round( (float)timeIdleInMillis / 1000L );
         final int expirationTime = getMaxInactiveInterval() - timeIdle;
-        return expirationTime;
+        final int processExpiresOffset = ((SessionManager)manager).getProcessExpiresFrequency() * manager.getContainer().getBackgroundProcessorDelay();
+        return expirationTime + processExpiresOffset;
     }
 
     /**

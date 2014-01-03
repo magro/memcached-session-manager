@@ -369,6 +369,14 @@ public class MemcachedSessionService {
          */
         @Nonnull
         MemcachedBackupSession newMemcachedBackupSession();
+
+        /**
+         * Frequency of the session expiration, and related manager operations.
+         * Manager operations will be done once for the specified amount of
+         * backgrondProcess calls (ie, the lower the amount, the most often the
+         * checks will occur).
+         */
+        int getProcessExpiresFrequency();
     }
 
     public void shutdown() {
