@@ -265,4 +265,40 @@ public class MemcachedNodesManagerTest {
                 Arrays.asList(new URI("http://10.10.0.1:8091/pools"), new URI("http://10.10.0.2:8091/pools")));
     }
 
+    @Test
+    public void testChangeSessionIdForTomcatFailover() {
+        assertEquals(createFor("localhost:11211", null, _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", null, null), null), sessionId("123", null, null));
+        assertEquals(createFor("localhost:11211", null, _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", null, "tc1"), "tc2"), sessionId("123", null, "tc2"));
+
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), null), sessionId("123", "n1", null));
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), "tc2"), sessionId("123", "n1", "tc2"));
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", "tc1"), "tc2"), sessionId("123", "n1", "tc2"));
+
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), null), sessionId("123", "n1", null));
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), "tc2"), sessionId("123", "n1", "tc2"));
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", "tc1"), "tc2"), sessionId("123", "n1", "tc2"));
+
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), null), sessionId("123", "n2", null));
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), "tc2"), sessionId("123", "n2", "tc2"));
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", _mcc)
+                .changeSessionIdForTomcatFailover(sessionId("123", "n1", "tc1"), "tc2"), sessionId("123", "n2", "tc2"));
+
+    }
+
+    private static String sessionId(final String plainId, final String memcachedId, final String jvmRoute) {
+        final SessionIdFormat sessionIdFormat = new SessionIdFormat();
+        final String withMemcachedId = sessionIdFormat.createSessionId(plainId, memcachedId);
+        return jvmRoute != null ? sessionIdFormat.changeJvmRoute(withMemcachedId, jvmRoute) : withMemcachedId;
+    }
+
 }

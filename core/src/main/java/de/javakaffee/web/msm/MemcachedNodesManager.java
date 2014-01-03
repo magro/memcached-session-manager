@@ -490,6 +490,29 @@ public class MemcachedNodesManager {
 		return null;
 	}
 
+    /**
+     * Changes the sessionId by setting the given jvmRoute and replacing the memcachedNodeId if it's currently
+     * set to a failoverNodeId.
+     * @param sessionId the current session id
+     * @param jvmRoute the new jvmRoute to set.
+     * @return the session id with maybe new jvmRoute and/or new memcachedId.
+     */
+    public String changeSessionIdForTomcatFailover( @Nonnull final String sessionId, final String jvmRoute ) {
+        final String newSessionId = jvmRoute != null && !jvmRoute.trim().isEmpty()
+                ? _sessionIdFormat.changeJvmRoute( sessionId, jvmRoute )
+                : _sessionIdFormat.stripJvmRoute(sessionId);
+        if ( isEncodeNodeIdInSessionId() ) {
+            final String nodeId = _sessionIdFormat.extractMemcachedId( newSessionId );
+            if(_failoverNodeIds != null && _failoverNodeIds.contains(nodeId)) {
+                final String newNodeId = _nodeIdService.getAvailableNodeId( nodeId );
+                if ( newNodeId != null ) {
+                    return _sessionIdFormat.createNewSessionId( newSessionId, newNodeId);
+                }
+            }
+        }
+        return newSessionId;
+    }
+
 	/**
 	 * Determines, if the current memcachedNodes configuration is a couchbase bucket configuration
 	 * (like e.g. http://10.10.0.1:8091/pools).

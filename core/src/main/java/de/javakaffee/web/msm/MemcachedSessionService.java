@@ -763,7 +763,7 @@ public class MemcachedSessionService {
 
         final String origSessionId = session.getIdInternal();
 
-        final String newSessionId = getSessionIdFormat().changeJvmRoute( session.getIdInternal(), _manager.getJvmRoute() );
+        final String newSessionId = _memcachedNodesManager.changeSessionIdForTomcatFailover(session.getIdInternal(), _manager.getJvmRoute());
 
         // If this session was already loaded we need to remove it from the session map
         // See http://code.google.com/p/memcached-session-manager/issues/detail?id=92

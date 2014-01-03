@@ -430,4 +430,48 @@ public abstract class TomcatFailoverIntegrationTest {
 
     }
 
+    @Test( enabled = true )
+    public void testTomcatFailoverMovesSessionToNonFailoverNode() throws Exception {
+
+        final MemCacheDaemon<?> daemon2 = startMemcached(MEMCACHED_PORT + 1);
+        final String memcachedNodes = _memcachedNodes + "," + "n2:localhost:" + (MEMCACHED_PORT + 1);
+
+        _tomcat1.getService().setMemcachedNodes(memcachedNodes);
+        _tomcat1.getService().setFailoverNodes("n1");
+        _tomcat2.getService().setMemcachedNodes(memcachedNodes);
+        _tomcat2.getService().setFailoverNodes("n2");
+
+        final SessionIdFormat format = new SessionIdFormat();
+
+        final String key = "foo";
+        final String value = "bar";
+        final String sessionId1 = post( _httpClient, TC_PORT_1, null, key, value ).getSessionId();
+        assertEquals( format.extractMemcachedId( sessionId1 ), "n2" );
+        assertEquals(_daemon.getCache().getCurrentItems(), 0);
+        assertEquals(daemon2.getCache().getCurrentItems(), 1);
+
+        // failover simulation, just request the session from tomcat2
+        final Response response = get( _httpClient, TC_PORT_2, sessionId1 );
+        final String sessionId2 = response.getSessionId();
+        assertEquals( format.extractMemcachedId( sessionId2 ), "n1" );
+        assertEquals(_daemon.getCache().getCurrentItems(), 1);
+
+        assertEquals( format.stripJvmRoute( sessionId1 ).replaceAll("n2", "n1"), format.stripJvmRoute( sessionId2 ) );
+
+        /* check session attributes could be read
+         */
+        final String actualValue = response.get( key );
+        assertEquals( value, actualValue );
+
+        Thread.sleep( 10 );
+
+    }
+
+    private MemCacheDaemon<?> startMemcached(final int memcachedPort) throws IOException {
+        final InetSocketAddress address = new InetSocketAddress( "localhost", memcachedPort );
+        final MemCacheDaemon<?> daemon2 = createDaemon( address );
+        daemon2.start();
+        return daemon2;
+    }
+
 }
