@@ -18,6 +18,7 @@ package de.javakaffee.web.msm;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 import java.util.Arrays;
@@ -117,6 +118,14 @@ public class LRUCacheTest {
         cut.put(f, 3);
         Assert.assertTrue( Arrays.equals( new String[]{ br, f }, cut.getKeysSortedByValue( c ).toArray() ),
                 "invalid order of items, the keys are not order by their values" );
+    }
+
+    @Test
+    public void testClear() {
+        final LRUCache<String,Integer> cut = new LRUCache<String, Integer>( 3 );
+        cut.put("foo", 1);
+        cut.clear();
+        assertNull(cut.get("foo"));
     }
 
 }

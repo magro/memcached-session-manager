@@ -208,8 +208,11 @@ public class MemcachedSessionService {
      *
      * this solution: use a LRUCache with a timeout to store, which session had
      * been requested in the last <n> millis.
+     *
+     * this cache is also used to track sessions that are not existing in memcached
+     * or that got invalidated, to be able to handle backupSession (in non-sticky mode) correctly.
      */
-    private LRUCache<String, Boolean> _missingSessionsCache;
+    private final LRUCache<String, Boolean> _invalidSessionsCache = new LRUCache<String, Boolean>( 2000, 5000 );
 
 	private MemcachedNodesManager _memcachedNodesManager;
 
@@ -232,8 +235,6 @@ public class MemcachedSessionService {
 
     protected final SessionManager _manager;
 	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
-
-    private final LRUCache<String, Object> _removedSessions = new LRUCache<String, Object>( 2000, 5000 );
 
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
@@ -392,6 +393,7 @@ public class MemcachedSessionService {
             _memcached = null;
         }
         _transcoderFactory = null;
+        _invalidSessionsCache.clear();
     }
 
     /**
@@ -420,10 +422,6 @@ public class MemcachedSessionService {
         if(_memcached == null) {
             _memcached = createMemcachedClient( _memcachedNodesManager, _statistics );
         }
-
-        /* create the missing sessions cache
-         */
-        _missingSessionsCache = new LRUCache<String, Boolean>( 200, 500 );
 
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
@@ -553,7 +551,7 @@ public class MemcachedSessionService {
                 result.registerReference();
             }
         }
-        else if ( canHitMemcached( id ) && _missingSessionsCache.get( id ) == null ) {
+        else if ( canHitMemcached( id ) && _invalidSessionsCache.get( id ) == null ) {
             // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
             // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
             // constraint needs the session to get the authenticated principal)
@@ -691,7 +689,7 @@ public class MemcachedSessionService {
                 _lockingStrategy.releaseLock(session.getIdInternal());
                 session.releaseLock();
             }
-            _removedSessions.put(session.getIdInternal(), "unused");
+            _invalidSessionsCache.put(session.getIdInternal(), Boolean.TRUE);
         }
     }
 
@@ -997,8 +995,8 @@ public class MemcachedSessionService {
             if(_log.isDebugEnabled())
                 _log.debug( "No session found in session map for " + sessionId );
             if ( !_sticky ) {
-                // Issue 116: Only notify the lockingStrategy if the session has not been removed/invalidated
-                if(_removedSessions.remove(sessionId) == null) {
+                // Issue 116/137: Only notify the lockingStrategy if the session was loaded and has not been removed/invalidated
+                if(!_invalidSessionsCache.containsKey(sessionId)) {
                     _lockingStrategy.onBackupWithoutLoadedSession( sessionId, requestId, _backupSessionService );
                 }
             }
@@ -1042,7 +1040,7 @@ public class MemcachedSessionService {
     }
 
     protected MemcachedBackupSession loadFromMemcachedWithCheck( final String sessionId ) {
-        if ( !canHitMemcached( sessionId ) || _missingSessionsCache.get( sessionId ) != null ) {
+        if ( !canHitMemcached( sessionId ) || _invalidSessionsCache.get( sessionId ) != null ) {
             return null;
         }
         return loadFromMemcached( sessionId );
@@ -1105,7 +1103,7 @@ public class MemcachedSessionService {
                 if ( lockStatus == LockStatus.LOCKED ) {
                     _lockingStrategy.releaseLock( sessionId );
                 }
-                _missingSessionsCache.put( sessionId, Boolean.TRUE );
+                _invalidSessionsCache.put( sessionId, Boolean.TRUE );
                 if ( _log.isDebugEnabled() ) {
                     _log.debug( "Session " + sessionId + " not found in memcached." );
                 }
@@ -1514,7 +1512,7 @@ public class MemcachedSessionService {
     public void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
         _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _memcachedNodesManager,
-                _missingSessionsCache, storeSecondaryBackup, _statistics, _currentRequest );
+                _invalidSessionsCache, storeSecondaryBackup, _statistics, _currentRequest );
     }
 
     protected void updateExpirationInMemcached() {

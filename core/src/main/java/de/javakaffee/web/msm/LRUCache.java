@@ -69,6 +69,15 @@ public class LRUCache<K, V> {
     }
 
     /**
+     * Removes all cache entries.
+     */
+    public void clear() {
+        synchronized ( _map ) {
+            _map.clear();
+        }
+    }
+
+    /**
      * Put the key and value.
      *
      * @param key
@@ -241,22 +250,27 @@ public class LRUCache<K, V> {
             a = array;
         }
 
+        @Override
         public int size() {
             return a.length;
         }
 
+        @Override
         public <T> T[] toArray( final T[] a ) {
             throw new UnsupportedOperationException( "Not implemented." );
         }
 
+        @Override
         public E get( final int index ) {
             return a[index].getKey();
         }
 
+        @Override
         public E set( final int index, final E element ) {
             throw new UnsupportedOperationException( "Not implemented." );
         }
 
+        @Override
         public int indexOf( final Object o ) {
             if ( o == null ) {
                 for ( int i = 0; i < a.length; i++ ) {
@@ -275,6 +289,7 @@ public class LRUCache<K, V> {
             return -1;
         }
 
+        @Override
         public boolean contains( final Object o ) {
             return indexOf( o ) != -1;
         }

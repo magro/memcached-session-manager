@@ -623,4 +623,29 @@ public abstract class MemcachedSessionServiceTest {
 
     }
 
+    @Test
+    public void testInvalidNonStickySessionDoesNotCallOnBackupWithoutLoadedSessionIssue137() throws Exception {
+
+        _service.setStickyInternal( false );
+        _service.setLockingMode( LockingMode.NONE, null, false );
+        _service.startInternal(_memcachedMock); // we must put in our mock again
+
+        final String sessionId = "nonStickySessionToTimeOut-n1";
+
+        // For findSession needed
+        final Request requestMock = mock(Request.class);
+        when(requestMock.getNote(eq(RequestTrackingContextValve.INVOKED))).thenReturn(Boolean.TRUE);
+        _service.getTrackingHostValve().storeRequestThreadLocal(requestMock);
+
+        final MemcachedBackupSession session = _service.findSession(sessionId);
+        assertNull(session);
+
+        _service.backupSession( sessionId, false, null ).get();
+
+        // check that validity info is not loaded - this would trigger the
+        // WARNING: Found no validity info for session id ...
+        final String validityKey = createValidityInfoKeyName( sessionId );
+        verify( _memcachedMock, times( 0 ) ).get( eq( validityKey ) );
+    }
+
 }
