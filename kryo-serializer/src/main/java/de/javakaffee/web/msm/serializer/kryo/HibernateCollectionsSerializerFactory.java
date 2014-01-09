@@ -23,13 +23,30 @@ import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.serialize.FieldSerializer;
 
 /**
- * {@link SerializerFactory} that supports hibernate persistent collections.
+ * {@link SerializerFactory} that supports hibernate persistent collections (Hibernate 3 and Nibernate 4).
+ * <p/>
  * It creates a {@link FieldSerializer} for subclasses of {@link AbstractPersistentCollection}.
- * 
+ * <p/>
+ * If Hibernate is not in the classpath, this {@link SerializerFactory} is no-op.
+ *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class HibernateCollectionsSerializerFactory implements SerializerFactory {
-    
+
+    private static Class<?> HIBERNATE_ABSTRACT_COLLECTION_CLASS;
+
+    static {
+        try {
+            HIBERNATE_ABSTRACT_COLLECTION_CLASS = Class.forName("org.hibernate.collection.AbstractPersistentCollection");
+        } catch (ClassNotFoundException e) {
+            try {
+                HIBERNATE_ABSTRACT_COLLECTION_CLASS = Class.forName("org.hibernate.collection.internal.AbstractPersistentCollection");
+            } catch (ClassNotFoundException e2) {
+                HIBERNATE_ABSTRACT_COLLECTION_CLASS = null;
+            }
+        }
+    }
+
     private final Kryo _kryo;
 
     public HibernateCollectionsSerializerFactory( final Kryo kryo ) {
@@ -38,10 +55,12 @@ public class HibernateCollectionsSerializerFactory implements SerializerFactory 
 
     @Override
     public Serializer newSerializer( final Class<?> type ) {
-        if ( AbstractPersistentCollection.class.isAssignableFrom( type ) ) {
+        if( HIBERNATE_ABSTRACT_COLLECTION_CLASS == null ) {
+            return null;
+        } else if ( HIBERNATE_ABSTRACT_COLLECTION_CLASS.isAssignableFrom( type ) ) {
             return new FieldSerializer( _kryo, type );
         }
         return null;
     }
-    
+
 }
