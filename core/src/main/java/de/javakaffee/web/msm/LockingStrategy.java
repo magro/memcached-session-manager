@@ -390,13 +390,13 @@ public abstract class LockingStrategy {
     private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {
         final Future<Boolean> touchResult = _memcached.add( sessionId, 1, 1 );
         try {
-            _log.debug( "Got ping result " + touchResult.get() );
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
                 _log.warn( "The session " + sessionId
                         + " should be touched in memcached, but it does not exist therein." );
                 return false;
             }
+            _log.debug( "The session was ping'ed successfully." );
             return true;
         } catch ( final ExecutionException e ) {
             _log.warn( "An exception occurred when trying to ping session " + sessionId, e );
@@ -408,7 +408,6 @@ public abstract class LockingStrategy {
             @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
         final Future<Boolean> touchResult = _memcached.add( session.getIdInternal(), 5, 1 );
         try {
-            _log.debug( "Got ping result " + touchResult.get() );
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
                 _log.warn( "The session " + session.getIdInternal()
@@ -416,6 +415,8 @@ public abstract class LockingStrategy {
                         + " therein. Will store in memcached again." );
                 updateSession( session, backupSessionService );
             }
+            else
+                _log.debug( "The session was ping'ed successfully." );
         } catch ( final ExecutionException e ) {
             _log.warn( "An exception occurred when trying to ping session " + session.getIdInternal(), e );
         }
@@ -521,13 +522,14 @@ public abstract class LockingStrategy {
             final Future<Boolean> touchResultFuture = _memcached.add( key, 5, 1 );
             try {
                 final boolean touchResult = touchResultFuture.get(_manager.getOperationTimeout(), TimeUnit.MILLISECONDS);
-                _log.debug( "Got backup ping result " + touchResult );
                 if ( touchResult ) {
                     _log.warn( "The secondary backup for session " + session.getIdInternal()
                             + " should be touched in memcached, but it seemed to be"
                             + " not existing. Will store in memcached again." );
                     saveSessionBackup( session, key );
                 }
+                else
+                    _log.debug( "The secondary session backup was ping'ed successfully." );
             } catch ( final TimeoutException e ) {
                 _log.warn( "The secondary backup for session " + session.getIdInternal()
                 		+ " could not be completed within " + _manager.getOperationTimeout() + " millis, was cancelled now." );
@@ -603,13 +605,13 @@ public abstract class LockingStrategy {
             final Future<Boolean> touchResultFuture = _memcached.add( key, 1, 1 );
             try {
                 final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
-                _log.debug( "Got backup ping result " + touchResult );
                 if ( touchResult ) {
                     _log.warn( "The secondary backup for session " + sessionId
                             + " should be touched in memcached, but it seemed to be"
                             + " not existing." );
                     return false;
                 }
+                _log.debug( "The secondary session backup was ping'ed successfully." );
                 return true;
             } catch ( final TimeoutException e ) {
                 _log.warn( "The secondary backup for session " + sessionId
