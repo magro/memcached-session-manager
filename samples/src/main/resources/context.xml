@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Context>
+
+    <Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager"
+	    sticky="${sticky}"
+	    memcachedNodes="${memcachedNodes}"
+	    failoverNodes="${failoverNodes}"
+	    requestUriIgnorePattern=".*\.(png|gif|jpg|css|js|ico)$"
+	    sessionBackupAsync="false"
+	    sessionBackupTimeout="100"
+	    transcoderFactoryClass="de.javakaffee.web.msm.serializer.kryo.KryoTranscoderFactory"
+    />
+
+</Context>

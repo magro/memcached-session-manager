@@ -1,0 +1,139 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>de.javakaffee.msm.samples</groupId>
+	<artifactId>msm-samples-project</artifactId>
+	<packaging>pom</packaging>
+	<version>1.7.1-SNAPSHOT</version>
+	<name>msm-samples project</name>
+	<description>Parent pom for msm samples</description>
+	<!-- TODO <organization> <name>company name</name> <url>company url</url> 
+		</organization> -->
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<modules>
+		<module>simpleservlet</module>
+	</modules>
+
+	<properties>
+		<tomcat-version>7.0.40</tomcat-version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-servlet-api</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.tomcat.maven</groupId>
+					<artifactId>tomcat6-maven-plugin</artifactId>
+					<version>2.2</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.tomcat.maven</groupId>
+					<artifactId>tomcat7-maven-plugin</artifactId>
+					<version>2.2</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.1</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+		<plugins>
+			<!-- Not working... <plugin> <groupId>org.codehaus.mojo</groupId> <artifactId>properties-maven-plugin</artifactId> 
+				<version>1.0-alpha-2</version> <executions> <execution> <phase>validate</phase> 
+				<goals> <goal>set-system-properties</goal> </goals> <configuration> <properties> 
+				<property> <name>java.util.logging.config.file</name> <value>..src/main/resources/logging.properties</value> 
+				</property> </properties> </configuration> </execution> </executions> </plugin -->
+			<plugin>
+				<groupId>org.apache.tomcat.maven</groupId>
+				<artifactId>tomcat7-maven-plugin</artifactId>
+				<configuration>
+					<!-- http port -->
+					<port>9090</port>
+					<!-- application path always starts with / -->
+					<path>/</path>
+					<backgroundProcessorDelay>10</backgroundProcessorDelay>
+					<tomcatLoggingFile>../src/main/resources/logging.properties</tomcatLoggingFile>
+					<!-- When run with `mvn tomcat7:run -pl :simpleservlet -am` 
+						the plugin is run in the submodule's directory, so we must walk up to the 
+						(this) parent project -->
+					<contextFile>../src/main/resources/context.xml</contextFile>
+					<systemProperties>
+						<!-- DOESN'T WORK, specify with -D...! // For maven tomcat plugin, 
+							relative to this project dir -->
+						<java.util.logging.config.file>src/main/resources/logging.properties</java.util.logging.config.file>
+						<!-- msm properties as used by context.xml -->
+						<sticky>${msm.sticky}</sticky>
+						<memcachedNodes>${msm.memcachedNodes}</memcachedNodes>
+						<failoverNodes>${msm.failoverNodes}</failoverNodes>
+					</systemProperties>
+				</configuration>
+				<!-- For any extra dependencies needed when running embedded Tomcat (not 
+					WAR dependencies) add them below -->
+				<dependencies>
+					<!-- <dependency> <groupId>de.javakaffee.msm</groupId> <artifactId>memcached-session-manager</artifactId> 
+						<version>${project.version}</version> </dependency> -->
+					<dependency>
+						<groupId>de.javakaffee.msm</groupId>
+						<artifactId>memcached-session-manager-tc7</artifactId>
+						<version>${project.version}</version>
+					</dependency>
+					<!-- <dependency> <groupId>net.spy</groupId> <artifactId>spymemcached</artifactId> 
+						<version>2.10.2</version> <scope>compile</scope> </dependency> -->
+				</dependencies>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>sticky</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<properties>
+				<msm.memcachedNodes>n1:localhost:11211,n2:localhost:11212</msm.memcachedNodes>
+				<msm.failoverNodes>n1</msm.failoverNodes>
+				<msm.sticky>true</msm.sticky>
+			</properties>
+		</profile>
+		<profile>
+			<id>single-memcached</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<properties>
+				<msm.sticky>true</msm.sticky>
+				<msm.memcachedNodes>localhost:11211</msm.memcachedNodes>
+				<!-- use space because tc mvn plugin does not set empty properties -->
+				<msm.failoverNodes><![CDATA[ ]]></msm.failoverNodes>
+			</properties>
+		</profile>
+		<profile>
+			<id>non-sticky</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<properties>
+				<msm.memcachedNodes>n1:localhost:11211,n2:localhost:11212</msm.memcachedNodes>
+				<msm.failoverNodes> </msm.failoverNodes>
+				<msm.sticky>false</msm.sticky>
+			</properties>
+		</profile>
+	</profiles>
+</project>
