@@ -187,6 +187,7 @@ public abstract class TranscoderServiceTest {
 
         assertSessionFields( session, deserialized );
         Assert.assertEquals( value, deserialized.getAttribute( "foo" ) );
+
     }
 
     private void assertSessionFields( final MemcachedBackupSession session, final MemcachedBackupSession deserialized ) {

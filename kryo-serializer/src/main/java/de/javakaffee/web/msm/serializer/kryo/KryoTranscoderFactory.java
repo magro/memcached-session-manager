@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import org.apache.catalina.Manager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -44,7 +43,11 @@ public class KryoTranscoderFactory implements TranscoderFactory {
      * {@inheritDoc}
      */
     public SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
-        return getTranscoder( manager );
+        return getTranscoder( manager.getContainer().getLoader().getClassLoader() );
+    }
+
+    protected SessionAttributesTranscoder createTranscoder( final ClassLoader loader ) {
+        return getTranscoder( loader );
     }
 
     /**
@@ -54,11 +57,11 @@ public class KryoTranscoderFactory implements TranscoderFactory {
      * @param manager the manager that will be passed to the transcoder.
      * @return for all invocations the same instance of {@link JavolutionTranscoder}.
      */
-    private KryoTranscoder getTranscoder( final Manager manager ) {
+    private KryoTranscoder getTranscoder( final ClassLoader classLoader ) {
         if ( _transcoder == null ) {
             final int initialBufferSize = getSysPropValue( PROP_INIT_BUFFER_SIZE, KryoTranscoder.DEFAULT_INITIAL_BUFFER_SIZE );
             final int maxBufferSize = getSysPropValue( PROP_ENV_MAX_BUFFER_SIZE, KryoTranscoder.DEFAULT_MAX_BUFFER_SIZE );
-            _transcoder = new KryoTranscoder( manager.getContainer().getLoader().getClassLoader(),
+            _transcoder = new KryoTranscoder( classLoader,
                     _customConverterClassNames, _copyCollectionsForSerialization, initialBufferSize, maxBufferSize );
         }
         return _transcoder;

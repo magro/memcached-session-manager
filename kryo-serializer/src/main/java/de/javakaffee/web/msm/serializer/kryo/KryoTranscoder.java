@@ -43,6 +43,7 @@ import org.apache.juli.logging.LogFactory;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.ObjectBuffer;
+import com.esotericsoftware.kryo.SerializationException;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.serialize.BigDecimalSerializer;
 import com.esotericsoftware.kryo.serialize.BigIntegerSerializer;
@@ -72,6 +73,7 @@ import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
 import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.TranscoderDeserializationException;
 
 /**
  * A {@link SessionAttributesTranscoder} that uses {@link Kryo} for serialization.
@@ -261,7 +263,11 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     @SuppressWarnings( "unchecked" )
     @Override
     public Map<String, Object> deserializeAttributes( final byte[] data ) {
-        return new ObjectBuffer( _kryo ).readObject( data, ConcurrentHashMap.class );
+        try {
+            return new ObjectBuffer( _kryo ).readObject( data, ConcurrentHashMap.class );
+        } catch ( final SerializationException e ) {
+            throw new TranscoderDeserializationException( e );
+        }
     }
 
     /**
