@@ -35,7 +35,7 @@ public class KryoTranscoderHibernateCollectionsTest extends AbstractHibernateCol
         final String[] customConverter = new String[] {
             HibernateCollectionsSerializerFactory.class.getName()
         };
-        final KryoTranscoder result = new KryoTranscoder( getClass().getClassLoader(), customConverter, false );
+        final KryoTranscoder result = new KryoTranscoder( getClass().getClassLoader(), customConverter, KryoTranscoderConfiguration.getDefault() );
         return result;
     }
 
