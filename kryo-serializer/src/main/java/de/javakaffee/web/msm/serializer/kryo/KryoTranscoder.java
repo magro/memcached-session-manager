@@ -128,6 +128,57 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     private Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> createKryo( final ClassLoader classLoader,
             final String[] customConverterClassNames, final KryoTranscoderConfiguration configuration ) {
         
+        final Kryo kryo = makeKryo( configuration );
+        
+        if ( classLoader != null ) {
+            kryo.setClassLoader( classLoader );
+        }
+        
+        // com.esotericsoftware.minlog.Log.TRACE = true;
+        
+        kryo.setRegistrationOptional( true );
+        kryo.register( ArrayList.class );
+        kryo.register( LinkedList.class );
+        kryo.register( HashSet.class );
+        kryo.register( HashMap.class );
+        kryo.register( Arrays.asList( "" ).getClass(), new ArraysAsListSerializer( kryo ) );
+        kryo.register( Currency.class, new CurrencySerializer( kryo ) );
+        kryo.register( StringBuffer.class, new StringBufferSerializer( kryo ) );
+        kryo.register( StringBuilder.class, new StringBuilderSerializer( kryo ) );
+        kryo.register( Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer() );
+        kryo.register( Collections.EMPTY_MAP.getClass(), new CollectionsEmptyMapSerializer() );
+        kryo.register( Collections.EMPTY_SET.getClass(), new CollectionsEmptySetSerializer() );
+        kryo.register( Collections.singletonList( "" ).getClass(), new CollectionsSingletonListSerializer( kryo ) );
+        kryo.register( Collections.singleton( "" ).getClass(), new CollectionsSingletonSetSerializer( kryo ) );
+        kryo.register( Collections.singletonMap( "", "" ).getClass(), new CollectionsSingletonMapSerializer( kryo ) );
+        kryo.register( Class.class, new ClassSerializer( kryo ) );
+        kryo.register( BigDecimal.class, new BigDecimalSerializer() );
+        kryo.register( BigInteger.class, new BigIntegerSerializer() );
+        kryo.register( GregorianCalendar.class, new GregorianCalendarSerializer() );
+        kryo.register( InvocationHandler.class, new JdkProxySerializer( kryo ) );
+        UnmodifiableCollectionsSerializer.registerSerializers( kryo );
+        SynchronizedCollectionsSerializer.registerSerializers( kryo );
+        kryo.register( Locale.class, new LocaleSerializer() );
+        
+        final Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> pair = loadCustomConverter( customConverterClassNames,
+                classLoader, kryo );
+        
+        final KryoCustomization[] customizations = pair.a;
+        if ( customizations != null ) {
+            for( final KryoCustomization customization : customizations ) {
+                try {
+                    LOG.info( "Executing KryoCustomization " + customization.getClass().getName() );
+                    customization.customize( kryo );
+                } catch( final Throwable e ) {
+                    LOG.error( "Could not execute customization " + customization, e );
+                }
+            }
+        }
+        
+        return Triple.create( kryo, pair.b, pair.c );
+    }
+
+    protected Kryo makeKryo( final KryoTranscoderConfiguration configuration ) {
         final Kryo kryo = new KryoReflectionFactorySupport() {
             
             @Override
@@ -185,53 +236,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
             }
             
         };
-        
-        if ( classLoader != null ) {
-            kryo.setClassLoader( classLoader );
-        }
-        
-        // com.esotericsoftware.minlog.Log.TRACE = true;
-        
-        kryo.setRegistrationOptional( true );
-        kryo.register( ArrayList.class );
-        kryo.register( LinkedList.class );
-        kryo.register( HashSet.class );
-        kryo.register( HashMap.class );
-        kryo.register( Arrays.asList( "" ).getClass(), new ArraysAsListSerializer( kryo ) );
-        kryo.register( Currency.class, new CurrencySerializer( kryo ) );
-        kryo.register( StringBuffer.class, new StringBufferSerializer( kryo ) );
-        kryo.register( StringBuilder.class, new StringBuilderSerializer( kryo ) );
-        kryo.register( Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer() );
-        kryo.register( Collections.EMPTY_MAP.getClass(), new CollectionsEmptyMapSerializer() );
-        kryo.register( Collections.EMPTY_SET.getClass(), new CollectionsEmptySetSerializer() );
-        kryo.register( Collections.singletonList( "" ).getClass(), new CollectionsSingletonListSerializer( kryo ) );
-        kryo.register( Collections.singleton( "" ).getClass(), new CollectionsSingletonSetSerializer( kryo ) );
-        kryo.register( Collections.singletonMap( "", "" ).getClass(), new CollectionsSingletonMapSerializer( kryo ) );
-        kryo.register( Class.class, new ClassSerializer( kryo ) );
-        kryo.register( BigDecimal.class, new BigDecimalSerializer() );
-        kryo.register( BigInteger.class, new BigIntegerSerializer() );
-        kryo.register( GregorianCalendar.class, new GregorianCalendarSerializer() );
-        kryo.register( InvocationHandler.class, new JdkProxySerializer( kryo ) );
-        UnmodifiableCollectionsSerializer.registerSerializers( kryo );
-        SynchronizedCollectionsSerializer.registerSerializers( kryo );
-        kryo.register( Locale.class, new LocaleSerializer() );
-        
-        final Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> pair = loadCustomConverter( customConverterClassNames,
-                classLoader, kryo );
-        
-        final KryoCustomization[] customizations = pair.a;
-        if ( customizations != null ) {
-            for( final KryoCustomization customization : customizations ) {
-                try {
-                    LOG.info( "Executing KryoCustomization " + customization.getClass().getName() );
-                    customization.customize( kryo );
-                } catch( final Throwable e ) {
-                    LOG.error( "Could not execute customization " + customization, e );
-                }
-            }
-        }
-        
-        return Triple.create( kryo, pair.b, pair.c );
+        return kryo;
     }
     
     private Serializer loadCustomSerializer( final Class<?> clazz ) {
