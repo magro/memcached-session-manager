@@ -1100,23 +1100,30 @@ public class MemcachedSessionService {
                 return result;
             }
             else {
-                if ( lockStatus == LockStatus.LOCKED ) {
-                    _lockingStrategy.releaseLock( sessionId );
-                }
+                releaseIfLocked( sessionId, lockStatus );
                 _invalidSessionsCache.put( sessionId, Boolean.TRUE );
                 if ( _log.isDebugEnabled() ) {
                     _log.debug( "Session " + sessionId + " not found in memcached." );
                 }
                 return null;
             }
-
+        } catch ( final TranscoderDeserializationException e ) {
+            _log.warn( "Could not deserialize session with id " + sessionId + " from memcached, session will be purged from storage.", e );
+            releaseIfLocked( sessionId, lockStatus );
+            _memcached.delete( sessionId );
+            _invalidSessionsCache.put( sessionId, Boolean.TRUE );
         } catch ( final Exception e ) {
             _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
-            if ( lockStatus == LockStatus.LOCKED ) {
-                _lockingStrategy.releaseLock( sessionId );
-            }
+            releaseIfLocked( sessionId, lockStatus );
+        } finally {
         }
         return null;
+    }
+
+    protected void releaseIfLocked( final String sessionId, LockStatus lockStatus ) {
+        if ( lockStatus == LockStatus.LOCKED ) {
+            _lockingStrategy.releaseLock( sessionId );
+        }
     }
 
     /**
