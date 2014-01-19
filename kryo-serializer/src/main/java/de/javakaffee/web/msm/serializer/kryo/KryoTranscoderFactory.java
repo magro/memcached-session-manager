@@ -33,8 +33,8 @@ public class KryoTranscoderFactory implements TranscoderFactory {
     
     private static final Log LOG = LogFactory.getLog( KryoTranscoderFactory.class );
     
-    public static final String PROP_INIT_BUFFER_SIZE = "msm.kryo.buffersize.initial";
-    public static final String PROP_ENV_MAX_BUFFER_SIZE = "msm.kryo.buffersize.max";
+    public static final String PROP_INIT_BUFFER_SIZE = "msm.kryo.bufferSize.initial";
+    public static final String PROP_ENV_MAX_BUFFER_SIZE = "msm.kryo.bufferSize.max";
     public static final String PROP_ENV_DEFAULT_FACTORY = "msm.kryo.defaultSerializerFactory";
 
     private boolean _copyCollectionsForSerialization;
