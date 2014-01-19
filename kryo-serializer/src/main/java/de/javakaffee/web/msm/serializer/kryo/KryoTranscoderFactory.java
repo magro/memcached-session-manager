@@ -35,6 +35,7 @@ public class KryoTranscoderFactory implements TranscoderFactory {
     
     public static final String PROP_INIT_BUFFER_SIZE = "msm.kryo.buffersize.initial";
     public static final String PROP_ENV_MAX_BUFFER_SIZE = "msm.kryo.buffersize.max";
+    public static final String PROP_COMPATIBLE_SERIALIZER = "msm.kryo.compatible";
 
     private boolean _copyCollectionsForSerialization;
     private String[] _customConverterClassNames;
@@ -58,8 +59,12 @@ public class KryoTranscoderFactory implements TranscoderFactory {
         if ( _transcoder == null ) {
             final int initialBufferSize = getSysPropValue( PROP_INIT_BUFFER_SIZE, KryoTranscoder.DEFAULT_INITIAL_BUFFER_SIZE );
             final int maxBufferSize = getSysPropValue( PROP_ENV_MAX_BUFFER_SIZE, KryoTranscoder.DEFAULT_MAX_BUFFER_SIZE );
+            final boolean useCompatibleFieldSerializer = getSysPropValue( PROP_COMPATIBLE_SERIALIZER, false );
+            final KryoTranscoderConfiguration configuration = KryoTranscoderConfiguration.create( _copyCollectionsForSerialization,
+                    useCompatibleFieldSerializer );
+
             _transcoder = new KryoTranscoder( manager.getContainer().getLoader().getClassLoader(),
-                    _customConverterClassNames, _copyCollectionsForSerialization, initialBufferSize, maxBufferSize );
+                    _customConverterClassNames, configuration, initialBufferSize, maxBufferSize );
         }
         return _transcoder;
     }
@@ -75,6 +80,14 @@ public class KryoTranscoderFactory implements TranscoderFactory {
             }
         }
         return value;
+    }
+
+    private boolean getSysPropValue( final String propName, final boolean defaultValue ) {
+        final String propValue = System.getProperty( propName );
+        if ( propValue == null ) {
+            return defaultValue;
+        }
+        return Boolean.parseBoolean( propValue );
     }
 
     /**

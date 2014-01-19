@@ -46,6 +46,7 @@ import com.esotericsoftware.kryo.ObjectBuffer;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.serialize.BigDecimalSerializer;
 import com.esotericsoftware.kryo.serialize.BigIntegerSerializer;
+import com.esotericsoftware.kryo.serialize.CompatibleFieldSerializer;
 
 import de.javakaffee.kryoserializers.ArraysAsListSerializer;
 import de.javakaffee.kryoserializers.ClassSerializer;
@@ -96,7 +97,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      * 
      */
     public KryoTranscoder() {
-        this( null, null, false );
+        this( null, null, KryoTranscoderConfiguration.getDefault() );
     }
     
     /**
@@ -104,8 +105,8 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      * @param copyCollectionsForSerialization 
      * @param customConverterClassNames 
      */
-    public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
-        this( classLoader, customConverterClassNames, copyCollectionsForSerialization, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE );
+    public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames, final KryoTranscoderConfiguration configuration ) {
+        this( classLoader, customConverterClassNames, configuration, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE );
     }
     
     /**
@@ -114,9 +115,9 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      * @param customConverterClassNames 
      */
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames,
-            final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize ) {
+            final KryoTranscoderConfiguration configuration, final int initialBufferSize, final int maxBufferSize ) {
         LOG.info( "Starting with initialBufferSize " + initialBufferSize + " and maxBufferSize " + maxBufferSize );
-        final Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> triple = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
+        final Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> triple = createKryo( classLoader, customConverterClassNames, configuration );
         _kryo = triple.a;
         _serializerFactories = triple.b;
         _unregisteredClassHandlers = triple.c;
@@ -125,56 +126,9 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     }
 
     private Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> createKryo( final ClassLoader classLoader,
-            final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
+            final String[] customConverterClassNames, final KryoTranscoderConfiguration configuration ) {
         
-        final Kryo kryo = new KryoReflectionFactorySupport() {
-            
-            @Override
-            @SuppressWarnings( { "rawtypes", "unchecked" } )
-            public Serializer newSerializer(final Class clazz) {
-                final Serializer customSerializer = loadCustomSerializer( clazz );
-                if ( customSerializer != null ) {
-                    return customSerializer;
-                }
-                if ( EnumSet.class.isAssignableFrom( clazz ) ) {
-                    return new EnumSetSerializer( this );
-                }
-                if ( EnumMap.class.isAssignableFrom( clazz ) ) {
-                    return new EnumMapSerializer( this );
-                }
-                if ( SubListSerializer.canSerialize( clazz ) ) {
-                    return new SubListSerializer( this, clazz );
-                }
-                if ( copyCollectionsForSerialization ) {
-                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
-                    if ( copyCollectionSerializer != null ) {
-                        return copyCollectionSerializer;
-                    }
-                }
-                if ( Date.class.isAssignableFrom( clazz ) ) {
-                    return new DateSerializer( clazz );
-                }
-                return super.newSerializer( clazz );
-            }
-            
-            @SuppressWarnings( { "rawtypes" } )
-            @Override
-            protected void handleUnregisteredClass( final Class clazz ) {
-                if ( _unregisteredClassHandlers != null ) {
-                    for( int i = 0; i < _unregisteredClassHandlers.length; i++ ) {
-                        final boolean handled = _unregisteredClassHandlers[i].handleUnregisteredClass( clazz );
-                        if ( handled ) {
-                            if ( LOG.isDebugEnabled() ) {
-                                LOG.debug( "UnregisteredClassHandler " + _unregisteredClassHandlers[i].getClass().getName() + " handled class " + clazz );
-                            }
-                            return;
-                        }
-                    }
-                }
-                super.handleUnregisteredClass( clazz );
-            }
-            
-        };
+        final Kryo kryo = makeKryo( configuration );
         
         if ( classLoader != null ) {
             kryo.setClassLoader( classLoader );
@@ -222,6 +176,67 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         }
         
         return Triple.create( kryo, pair.b, pair.c );
+    }
+
+    protected Kryo makeKryo( final KryoTranscoderConfiguration configuration ) {
+        final Kryo kryo = new KryoReflectionFactorySupport() {
+            
+            @Override
+            @SuppressWarnings( { "rawtypes", "unchecked" } )
+            public Serializer newSerializer(final Class clazz) {
+                final Serializer customSerializer = loadCustomSerializer( clazz );
+                if ( customSerializer != null ) {
+                    return customSerializer;
+                }
+                if ( EnumSet.class.isAssignableFrom( clazz ) ) {
+                    return new EnumSetSerializer( this );
+                }
+                if ( EnumMap.class.isAssignableFrom( clazz ) ) {
+                    return new EnumMapSerializer( this );
+                }
+                if ( SubListSerializer.canSerialize( clazz ) ) {
+                    return new SubListSerializer( this, clazz );
+                }
+                if ( configuration.isCopyCollectionsForSerialization() ) {
+                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
+                    if ( copyCollectionSerializer != null ) {
+                        return copyCollectionSerializer;
+                    }
+                }
+                if ( Date.class.isAssignableFrom( clazz ) ) {
+                    return new DateSerializer( clazz );
+                }
+                return super.newSerializer( clazz );
+            }
+            
+            @Override
+            protected Serializer newDefaultSerializer( @SuppressWarnings( "rawtypes" ) Class type ) {
+                if ( configuration.isUseCompatibleFieldSerializer() ) {
+                    return new CompatibleFieldSerializer( this, type );
+                }
+
+                return super.newDefaultSerializer( type );
+            }
+
+            @SuppressWarnings( { "rawtypes" } )
+            @Override
+            protected void handleUnregisteredClass( final Class clazz ) {
+                if ( _unregisteredClassHandlers != null ) {
+                    for( int i = 0; i < _unregisteredClassHandlers.length; i++ ) {
+                        final boolean handled = _unregisteredClassHandlers[i].handleUnregisteredClass( clazz );
+                        if ( handled ) {
+                            if ( LOG.isDebugEnabled() ) {
+                                LOG.debug( "UnregisteredClassHandler " + _unregisteredClassHandlers[i].getClass().getName() + " handled class " + clazz );
+                            }
+                            return;
+                        }
+                    }
+                }
+                super.handleUnregisteredClass( clazz );
+            }
+            
+        };
+        return kryo;
     }
     
     private Serializer loadCustomSerializer( final Class<?> clazz ) {
