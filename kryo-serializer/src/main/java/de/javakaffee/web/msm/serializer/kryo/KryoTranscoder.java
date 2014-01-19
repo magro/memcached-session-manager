@@ -84,6 +84,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     
     public static final int DEFAULT_INITIAL_BUFFER_SIZE = 100 * 1024;
     public static final int DEFAULT_MAX_BUFFER_SIZE = 2000 * 1024;
+    public static final String DEFAULT_SERIALIZER_FACTORY_CLASS = "de.javakaffee.web.msm.serializer.kryo.ReferenceFieldSerializerFactory";
     
     private final Kryo _kryo;
     private final SerializerFactory[] _serializerFactories;
@@ -91,6 +92,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
 
     private final int _initialBufferSize;
     private final int _maxBufferSize;
+    private final KryoDefaultSerializerFactory _defaultSerializerFactory;
 
     /**
      * 
@@ -105,7 +107,8 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      * @param customConverterClassNames 
      */
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
-        this( classLoader, customConverterClassNames, copyCollectionsForSerialization, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE );
+        this( classLoader, customConverterClassNames, copyCollectionsForSerialization, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE,
+                DEFAULT_SERIALIZER_FACTORY_CLASS );
     }
     
     /**
@@ -114,7 +117,8 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      * @param customConverterClassNames 
      */
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames,
-            final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize ) {
+            final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize,
+            final String defaultSerializerFactoryClass ) {
         LOG.info( "Starting with initialBufferSize " + initialBufferSize + " and maxBufferSize " + maxBufferSize );
         final Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> triple = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
         _kryo = triple.a;
@@ -122,6 +126,18 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         _unregisteredClassHandlers = triple.c;
         _initialBufferSize = initialBufferSize;
         _maxBufferSize = maxBufferSize;
+        _defaultSerializerFactory = loadDefaultSerializerFactory( classLoader, defaultSerializerFactoryClass );
+    }
+
+    protected KryoDefaultSerializerFactory loadDefaultSerializerFactory( final ClassLoader classLoader, final String defaultSerializerFactoryClass ) {
+         try {
+             final ClassLoader loader = classLoader != null ? classLoader : Thread.currentThread().getContextClassLoader();
+             final Class<?> clazz = Class.forName( defaultSerializerFactoryClass, true, loader );
+
+             return (KryoDefaultSerializerFactory) clazz.newInstance();
+        } catch ( Exception e ) {
+            throw new RuntimeException("Could not load default serializer factory: " + defaultSerializerFactoryClass, e );
+        }
     }
 
     private Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> createKryo( final ClassLoader classLoader,
@@ -174,6 +190,11 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
                 super.handleUnregisteredClass( clazz );
             }
             
+            @Override
+            protected Serializer newDefaultSerializer( @SuppressWarnings( "rawtypes" ) Class type ) {
+                return _defaultSerializerFactory.newDefaultSerializer( this, type );
+            }
+
         };
         
         if ( classLoader != null ) {
