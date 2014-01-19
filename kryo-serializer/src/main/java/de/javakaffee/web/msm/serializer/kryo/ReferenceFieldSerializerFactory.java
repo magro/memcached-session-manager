@@ -22,7 +22,8 @@ import com.esotericsoftware.kryo.serialize.ReferenceFieldSerializer;
 
 /**
  * Default Serializer used by memcached-session-manager.
- * Creates a {@link ReferenceFieldSerializer} which does not ignores synthetic fields.
+ * Creates a {@link ReferenceFieldSerializer} which does not ignores synthetic fields (so that inner classes
+ * are handled correctly).
  *
  * @author Marcus Thiesen (marcus.thiesen@freiheit.com) (initial creation)
  */

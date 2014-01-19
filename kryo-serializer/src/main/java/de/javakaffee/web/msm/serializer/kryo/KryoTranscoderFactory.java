@@ -35,7 +35,7 @@ public class KryoTranscoderFactory implements TranscoderFactory {
     
     public static final String PROP_INIT_BUFFER_SIZE = "msm.kryo.buffersize.initial";
     public static final String PROP_ENV_MAX_BUFFER_SIZE = "msm.kryo.buffersize.max";
-    public static final String PROP_ENV_DEFAULT_FACTORY = "msm.kryo.default.serializer.factory";
+    public static final String PROP_ENV_DEFAULT_FACTORY = "msm.kryo.defaultSerializerFactory";
 
     private boolean _copyCollectionsForSerialization;
     private String[] _customConverterClassNames;
@@ -44,7 +44,8 @@ public class KryoTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    public SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
+    @Override
+	public SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
         return getTranscoder( manager );
     }
 
@@ -91,14 +92,16 @@ public class KryoTranscoderFactory implements TranscoderFactory {
     /**
      * {@inheritDoc}
      */
-    public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
+    @Override
+	public void setCopyCollectionsForSerialization( final boolean copyCollectionsForSerialization ) {
         _copyCollectionsForSerialization = copyCollectionsForSerialization;
     }
 
     /**
      * {@inheritDoc}
      */
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings("EI_EXPOSE_REP2")
+    @Override
+	@edu.umd.cs.findbugs.annotations.SuppressWarnings("EI_EXPOSE_REP2")
     public void setCustomConverterClassNames( final String[] customConverterClassNames ) {
         _customConverterClassNames = customConverterClassNames;
     }

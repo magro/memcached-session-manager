@@ -84,7 +84,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     
     public static final int DEFAULT_INITIAL_BUFFER_SIZE = 100 * 1024;
     public static final int DEFAULT_MAX_BUFFER_SIZE = 2000 * 1024;
-    public static final String DEFAULT_SERIALIZER_FACTORY_CLASS = "de.javakaffee.web.msm.serializer.kryo.ReferenceFieldSerializerFactory";
+    public static final String DEFAULT_SERIALIZER_FACTORY_CLASS = ReferenceFieldSerializerFactory.class.getName();
     
     private final Kryo _kryo;
     private final SerializerFactory[] _serializerFactories;
@@ -119,7 +119,8 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames,
             final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize,
             final String defaultSerializerFactoryClass ) {
-        LOG.info( "Starting with initialBufferSize " + initialBufferSize + " and maxBufferSize " + maxBufferSize );
+        LOG.info( "Starting with initialBufferSize " + initialBufferSize + ", maxBufferSize " + maxBufferSize +
+                " and defaultSerializerFactory " + defaultSerializerFactoryClass );
         final Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> triple = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
         _kryo = triple.a;
         _serializerFactories = triple.b;
@@ -135,7 +136,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
              final Class<?> clazz = Class.forName( defaultSerializerFactoryClass, true, loader );
 
              return (KryoDefaultSerializerFactory) clazz.newInstance();
-        } catch ( Exception e ) {
+        } catch ( final Exception e ) {
             throw new RuntimeException("Could not load default serializer factory: " + defaultSerializerFactoryClass, e );
         }
     }
@@ -191,7 +192,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
             }
             
             @Override
-            protected Serializer newDefaultSerializer( @SuppressWarnings( "rawtypes" ) Class type ) {
+            protected Serializer newDefaultSerializer( @SuppressWarnings( "rawtypes" ) final Class type ) {
                 return _defaultSerializerFactory.newDefaultSerializer( this, type );
             }
 
