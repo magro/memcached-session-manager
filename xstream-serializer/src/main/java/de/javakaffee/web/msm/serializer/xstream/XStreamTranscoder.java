@@ -31,6 +31,7 @@ import com.thoughtworks.xstream.XStream;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.TranscoderDeserializationException;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -95,7 +96,7 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
             return result;
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
-            throw e ;
+            throw new TranscoderDeserializationException(e);
         } finally {
             closeSilently( bis );
         }

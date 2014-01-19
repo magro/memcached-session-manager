@@ -182,10 +182,10 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
             return attributes;
         } catch ( final ClassNotFoundException e ) {
             LOG.warn( "Caught CNFE decoding "+ in.length +" bytes of data", e );
-            throw new RuntimeException( "Caught CNFE decoding data", e );
+            throw new TranscoderDeserializationException( "Caught CNFE decoding data", e );
         } catch ( final IOException e ) {
             LOG.warn( "Caught IOException decoding "+ in.length +" bytes of data", e );
-            throw new RuntimeException( "Caught IOException decoding data", e );
+            throw new TranscoderDeserializationException( "Caught IOException decoding data", e );
         } finally {
             closeSilently( bis );
             closeSilently( ois );

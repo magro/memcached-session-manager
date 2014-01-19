@@ -27,6 +27,7 @@ import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.TranscoderDeserializationException;
 import flexjson.JSONDeserializer;
 import flexjson.JSONSerializer;
 
@@ -71,7 +72,7 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 			return result;
 		} catch( final RuntimeException e) {
 			LOG.warn("Caught Exception deserializing JSON "+e);
-			throw e;
+			throw new TranscoderDeserializationException(e);
 		}
 	}
 

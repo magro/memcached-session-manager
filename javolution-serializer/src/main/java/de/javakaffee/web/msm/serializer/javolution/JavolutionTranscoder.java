@@ -32,6 +32,7 @@ import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
+import de.javakaffee.web.msm.TranscoderDeserializationException;
 
 /**
  * A {@link net.spy.memcached.transcoders.Transcoder} that serializes catalina
@@ -174,10 +175,10 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
             return reader.<T> read( name );
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
-            throw e;
+            throw new TranscoderDeserializationException(e);
         } catch ( final XMLStreamException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );
-            throw new RuntimeException( e );
+            throw new TranscoderDeserializationException( e );
         } finally {
             closeSilently( reader );
         }

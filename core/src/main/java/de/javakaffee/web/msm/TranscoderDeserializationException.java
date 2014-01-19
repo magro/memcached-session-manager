@@ -16,6 +16,11 @@
  */
 package de.javakaffee.web.msm;
 
+/**
+ * Thrown by transcoders/serializers when there's an error during session attributes deserialization.
+ *
+ * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ */
 public class TranscoderDeserializationException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
@@ -23,15 +28,15 @@ public class TranscoderDeserializationException extends RuntimeException {
     public TranscoderDeserializationException() {
     }
 
-    public TranscoderDeserializationException( String message ) {
+    public TranscoderDeserializationException( final String message ) {
         super( message );
     }
 
-    public TranscoderDeserializationException( Throwable cause ) {
+    public TranscoderDeserializationException( final Throwable cause ) {
         super( cause );
     }
 
-    public TranscoderDeserializationException( String message, Throwable cause ) {
+    public TranscoderDeserializationException( final String message, final Throwable cause ) {
         super( message, cause );
     }
 
