@@ -74,4 +74,28 @@ public class SessionIdFormatTest {
         assertTrue( cut.isValid( "foo-n.j-v-m1" ) );
     }
 
+    @Test
+    public void testCreateBackupKey() {
+        final SessionIdFormat cut = new SessionIdFormat(StorageKeyFormat.ofHost("localhost"));
+        assertEquals(cut.createBackupKey("foo"), "bak:localhost_foo");
+    }
+
+    @Test
+    public void testIsBackupKey() {
+        final SessionIdFormat cut = new SessionIdFormat(StorageKeyFormat.ofHost("localhost"));
+        assertTrue(cut.isBackupKey("bak:localhost_foo"));
+    }
+
+    @Test
+    public void testCreateLockName() {
+        final SessionIdFormat cut = new SessionIdFormat(StorageKeyFormat.ofHost("localhost"));
+        assertEquals(cut.createLockName("foo"), "lock:localhost_foo");
+    }
+
+    @Test
+    public void testCreateValidityInfoKeyName() {
+        final SessionIdFormat cut = new SessionIdFormat(StorageKeyFormat.ofHost("localhost"));
+        assertEquals(cut.createValidityInfoKeyName("foo"), "validity:localhost_foo");
+    }
+
 }

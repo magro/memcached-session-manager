@@ -55,27 +55,27 @@ public class MemcachedNodesManagerTest {
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void testParseWithNullShouldThrowException() {
-		createFor(null, null, _mcc);
+		createFor(null, null, null, _mcc);
 	}
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void testParseWithEmptyStringShouldThrowException() {
-		createFor("", null, _mcc);
+		createFor("", null, null, _mcc);
 	}
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void testSingleSimpleNodeAndFailoverNodeShouldThrowException() {
-		createFor("localhost:11211", "n1", _mcc);
+		createFor("localhost:11211", "n1", null, _mcc);
 	}
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void testSingleNodeAndFailoverNodeShouldThrowException() {
-		createFor("n1:localhost:11211", "n1", _mcc);
+		createFor("n1:localhost:11211", "n1", null, _mcc);
 	}
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testCouchbaseNodesAndFailoverNodeShouldThrowException() {
-        createFor("http://localhost:8091/pools", "n1", _mcc);
+        createFor("http://localhost:8091/pools", "n1", null, _mcc);
     }
 
 	@DataProvider
@@ -92,7 +92,7 @@ public class MemcachedNodesManagerTest {
 
 	@Test( dataProvider = "nodesAndExpectedCountDataProvider" )
 	public void testCountNodes( final String memcachedNodes, final int expectedCount ) {
-		final MemcachedNodesManager result = createFor( memcachedNodes, null, _mcc );
+		final MemcachedNodesManager result = createFor( memcachedNodes, null, null, _mcc );
 		assertNotNull(result);
 		assertEquals(result.getCountNodes(),  expectedCount);
 	}
@@ -112,7 +112,7 @@ public class MemcachedNodesManagerTest {
 
 	@Test( dataProvider = "nodesAndPrimaryNodesDataProvider" )
 	public void testPrimaryNodes(final String memcachedNodes, final String failoverNodes, final NodeIdList expectedPrimaryNodeIds) {
-		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, _mcc );
+		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, null, _mcc );
 		assertNotNull(result);
 		assertEquals(result.getPrimaryNodeIds(), expectedPrimaryNodeIds);
 	}
@@ -132,7 +132,7 @@ public class MemcachedNodesManagerTest {
 
 	@Test( dataProvider = "nodesAndFailoverNodesDataProvider" )
 	public void testFailoverNodes(final String memcachedNodes, final String failoverNodes, final List<String> expectedFailoverNodeIds) {
-		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, _mcc );
+		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, null, _mcc );
 		assertNotNull(result);
 		assertEquals(result.getFailoverNodeIds(), expectedFailoverNodeIds);
 	}
@@ -150,14 +150,14 @@ public class MemcachedNodesManagerTest {
 
 	@Test( dataProvider = "nodesAndExpectedEncodedInSessionIdDataProvider" )
 	public void testIsEncodeNodeIdInSessionId( final String memcachedNodes, final String failoverNodes, final boolean expectedIsEncodeNodeIdInSessionId ) {
-		final MemcachedNodesManager result = createFor( memcachedNodes, null, _mcc );
+		final MemcachedNodesManager result = createFor( memcachedNodes, null, null, _mcc );
 		assertNotNull(result);
 		assertEquals(result.isEncodeNodeIdInSessionId(), expectedIsEncodeNodeIdInSessionId);
 	}
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	public void testGetNodeIdShouldThrowExceptionForNullArgument() {
-		final MemcachedNodesManager result = createFor( "n1:localhost:11211", null, _mcc );
+		final MemcachedNodesManager result = createFor( "n1:localhost:11211", null, null, _mcc );
 		result.getNodeId(null);
 	}
 
@@ -172,7 +172,7 @@ public class MemcachedNodesManagerTest {
 
 	@Test( dataProvider = "testGetNodeIdDataProvider" )
 	public void testGetNodeId(final String memcachedNodes, final String failoverNodes, final InetSocketAddress socketAddress, final String expectedNodeId) {
-		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, _mcc );
+		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, null, _mcc );
 		assertEquals(result.getNodeId(socketAddress), expectedNodeId);
 	}
 
@@ -183,21 +183,21 @@ public class MemcachedNodesManagerTest {
 	 */
 	@Test
 	public void testGetNextPrimaryNodeId() {
-		assertNull(createFor( "n1:localhost:11211", null, _mcc ).getNextPrimaryNodeId("n1"));
-		assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212", null, _mcc ).getNextPrimaryNodeId("n1"), "n2");
+		assertNull(createFor( "n1:localhost:11211", null, null, _mcc ).getNextPrimaryNodeId("n1"));
+		assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212", null, null, _mcc ).getNextPrimaryNodeId("n1"), "n2");
 	}
 
     @Test
     public void testGetNextAvailableNodeId() {
-        assertNull(createFor( "n1:localhost:11211", null, _mcc ).getNextAvailableNodeId("n1"));
-        assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212", null, _mcc ).getNextAvailableNodeId("n1"), "n2");
+        assertNull(createFor( "n1:localhost:11211", null, null, _mcc ).getNextAvailableNodeId("n1"));
+        assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212", null, null, _mcc ).getNextAvailableNodeId("n1"), "n2");
 
         final MemcachedClientCallback mcc = mock(MemcachedClientCallback.class);
         when(mcc.get(anyString())).thenReturn(null);
         when(mcc.get(endsWith("n2"))).thenThrow(new OperationTimeoutException("SimulatedException"));
-        assertNull(createFor( "n1:localhost:11211,n2:localhost:11212", null, mcc).getNextAvailableNodeId("n1"));
+        assertNull(createFor( "n1:localhost:11211,n2:localhost:11212", null, null, mcc).getNextAvailableNodeId("n1"));
 
-        assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212,n3:localhost:11213", null, mcc).getNextAvailableNodeId("n1"), "n3");
+        assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212,n3:localhost:11213", null, null, mcc).getNextAvailableNodeId("n1"), "n3");
     }
 
 	@DataProvider
@@ -215,19 +215,19 @@ public class MemcachedNodesManagerTest {
 
 	@Test( dataProvider = "testgGetAllMemcachedAddressesDataProvider" )
 	public void testGetAllMemcachedAddresses(final String memcachedNodes, final String failoverNodes, final Collection<InetSocketAddress> expectedSocketAddresses) {
-		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, _mcc );
+		final MemcachedNodesManager result = createFor( memcachedNodes, failoverNodes, null, _mcc );
 		assertEquals(result.getAllMemcachedAddresses(), expectedSocketAddresses);
 	}
 
 	@Test
 	public void testGetSessionIdFormat() {
-		final SessionIdFormat sessionIdFormat = createFor( "n1:localhost:11211", null, _mcc ).getSessionIdFormat();
+		final SessionIdFormat sessionIdFormat = createFor( "n1:localhost:11211", null, null, _mcc ).getSessionIdFormat();
 		assertNotNull(sessionIdFormat);
 	}
 
     @Test
     public void testSessionIdFormatForSingleNodeSetupShouldSupportLocking() {
-        final SessionIdFormat sessionIdFormat = createFor( "localhost:11211", null, _mcc ).getSessionIdFormat();
+        final SessionIdFormat sessionIdFormat = createFor( "localhost:11211", null, StorageKeyFormat.EMPTY, _mcc ).getSessionIdFormat();
         assertNotNull(sessionIdFormat);
         final String sessionId = "12345678";
         assertEquals(sessionIdFormat.createLockName(sessionId), "lock:" + sessionId);
@@ -235,13 +235,13 @@ public class MemcachedNodesManagerTest {
 
 	@Test
 	public void testCreateSessionIdShouldOnlyAddNodeIdIfPresent() {
-		assertEquals(createFor( "n1:localhost:11211", null, _mcc ).createSessionId("foo"), "foo-n1" );
-		assertEquals(createFor( "localhost:11211", null, _mcc ).createSessionId("foo"), "foo" );
+		assertEquals(createFor( "n1:localhost:11211", null, null, _mcc ).createSessionId("foo"), "foo-n1" );
+		assertEquals(createFor( "localhost:11211", null, null, _mcc ).createSessionId("foo"), "foo" );
 	}
 
 	@Test
 	public void testSetNodeAvailable() {
-		final MemcachedNodesManager cut = createFor( "n1:localhost:11211,n2:localhost:11212", null, _mcc );
+		final MemcachedNodesManager cut = createFor( "n1:localhost:11211,n2:localhost:11212", null, null, _mcc );
 		assertTrue(cut.isNodeAvailable("n1"));
 		assertTrue(cut.isNodeAvailable("n2"));
 
@@ -253,44 +253,44 @@ public class MemcachedNodesManagerTest {
 
     @Test
     public void testIsCouchbaseBucketConfig() {
-        assertTrue(createFor("http://10.10.0.1:8091/pools", null, _mcc ).isCouchbaseBucketConfig());
-        assertTrue(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).isCouchbaseBucketConfig());
+        assertTrue(createFor("http://10.10.0.1:8091/pools", null, null, _mcc ).isCouchbaseBucketConfig());
+        assertTrue(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, null, _mcc ).isCouchbaseBucketConfig());
     }
 
     @Test
     public void testGetCouchbaseBucketURIs() throws URISyntaxException {
-        assertEquals(createFor("http://10.10.0.1:8091/pools", null, _mcc ).getCouchbaseBucketURIs(),
+        assertEquals(createFor("http://10.10.0.1:8091/pools", null, null, _mcc ).getCouchbaseBucketURIs(),
                 Arrays.asList(new URI("http://10.10.0.1:8091/pools")));
-        assertEquals(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, _mcc ).getCouchbaseBucketURIs(),
+        assertEquals(createFor("http://10.10.0.1:8091/pools,http://10.10.0.2:8091/pools", null, null, _mcc ).getCouchbaseBucketURIs(),
                 Arrays.asList(new URI("http://10.10.0.1:8091/pools"), new URI("http://10.10.0.2:8091/pools")));
     }
 
     @Test
     public void testChangeSessionIdForTomcatFailover() {
-        assertEquals(createFor("localhost:11211", null, _mcc)
+        assertEquals(createFor("localhost:11211", null, null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", null, null), null), sessionId("123", null, null));
-        assertEquals(createFor("localhost:11211", null, _mcc)
+        assertEquals(createFor("localhost:11211", null, null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", null, "tc1"), "tc2"), sessionId("123", null, "tc2"));
 
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), null), sessionId("123", "n1", null));
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), "tc2"), sessionId("123", "n1", "tc2"));
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", null, null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", "tc1"), "tc2"), sessionId("123", "n1", "tc2"));
 
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), null), sessionId("123", "n1", null));
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), "tc2"), sessionId("123", "n1", "tc2"));
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n2", null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", "tc1"), "tc2"), sessionId("123", "n1", "tc2"));
 
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), null), sessionId("123", "n2", null));
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", null), "tc2"), sessionId("123", "n2", "tc2"));
-        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", _mcc)
+        assertEquals(createFor("n1:localhost:11211,n2:localhost:11212", "n1", null, _mcc)
                 .changeSessionIdForTomcatFailover(sessionId("123", "n1", "tc1"), "tc2"), sessionId("123", "n2", "tc2"));
 
     }

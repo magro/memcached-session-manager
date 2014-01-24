@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static de.javakaffee.web.msm.integration.TestUtils.createContext;
@@ -335,8 +334,8 @@ public abstract class MemcachedSessionServiceTest {
         if ( !stickyness.isSticky() ) {
             Thread.sleep(200l);
             // check validity info
-            verify( _memcachedMock, times( 1 ) ).delete( eq( createValidityInfoKeyName( oldSessionId ) ) );
-            verify( _memcachedMock, times( 1 ) ).set( eq( createValidityInfoKeyName( session.getId() ) ), anyInt(), any() );
+            verify( _memcachedMock, times( 1 ) ).delete( eq( new SessionIdFormat().createValidityInfoKeyName( oldSessionId ) ) );
+            verify( _memcachedMock, times( 1 ) ).set( eq( new SessionIdFormat().createValidityInfoKeyName( session.getId() ) ), anyInt(), any() );
         }
 
     }
@@ -374,7 +373,7 @@ public abstract class MemcachedSessionServiceTest {
 
         if ( !stickyness.isSticky() ) {
             // check validity info
-            final String validityKey = createValidityInfoKeyName( sessionId );
+            final String validityKey = new SessionIdFormat().createValidityInfoKeyName( sessionId );
             verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
 
             // As the backup is done asynchronously, we shutdown the executor so that we know the backup
@@ -412,7 +411,7 @@ public abstract class MemcachedSessionServiceTest {
         final String sessionId = "someSessionNotLoaded-n1";
 
         // stub loading of validity info
-        final String validityKey = createValidityInfoKeyName( sessionId );
+        final String validityKey = new SessionIdFormat().createValidityInfoKeyName( sessionId );
         final byte[] validityData = encode( -1, System.currentTimeMillis(), System.currentTimeMillis() );
         when( _memcachedMock.get( eq( validityKey ) ) ).thenReturn( validityData );
 
@@ -644,7 +643,7 @@ public abstract class MemcachedSessionServiceTest {
 
         // check that validity info is not loaded - this would trigger the
         // WARNING: Found no validity info for session id ...
-        final String validityKey = createValidityInfoKeyName( sessionId );
+        final String validityKey = new SessionIdFormat().createValidityInfoKeyName( sessionId );
         verify( _memcachedMock, times( 0 ) ).get( eq( validityKey ) );
     }
 

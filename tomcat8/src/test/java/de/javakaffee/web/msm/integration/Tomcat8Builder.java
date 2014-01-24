@@ -117,6 +117,7 @@ public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName != null ? transcoderFactoryClassName : DEFAULT_TRANSCODER_FACTORY );
         sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(".*\\.(png|gif|jpg|css|js|ico)$");
+        sessionManager.getMemcachedSessionService().setStorageKeyPrefix(storageKeyPrefix);
 
         return tomcat;
     }

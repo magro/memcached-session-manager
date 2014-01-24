@@ -17,7 +17,6 @@
 package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.MemcachedUtil.toMemcachedExpiration;
-import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.SessionValidityInfo.decode;
 import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.Statistics.StatsType.*;
@@ -79,6 +78,7 @@ public abstract class LockingStrategy {
     private final boolean _storeSecondaryBackup;
     protected final Statistics _stats;
     protected final CurrentRequest _currentRequest;
+    protected final StorageKeyFormat _storageKeyFormat;
 
     protected LockingStrategy( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
@@ -93,6 +93,7 @@ public abstract class LockingStrategy {
         _storeSecondaryBackup = storeSecondaryBackup;
         _stats = stats;
         _currentRequest = currentRequest;
+        _storageKeyFormat = memcachedNodesManager.getStorageKeyFormat();
         _executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors(), new NamedThreadFactory("msm-2ndary-backup") );
     }
 
@@ -226,7 +227,7 @@ public abstract class LockingStrategy {
 
             final long start = System.currentTimeMillis();
 
-            final String validityKey = createValidityInfoKeyName( sessionId );
+            final String validityKey = _sessionIdFormat.createValidityInfoKeyName( sessionId );
             final SessionValidityInfo validityInfo = loadSessionValidityInfoForValidityKey( validityKey );
             if ( validityInfo == null ) {
                 _log.warn( "Found no validity info for session id " + sessionId );
@@ -283,7 +284,7 @@ public abstract class LockingStrategy {
             final int maxInactiveInterval = session.getMaxInactiveInterval();
             final byte[] validityData = encode( maxInactiveInterval, session.getLastAccessedTimeInternal(),
                     session.getThisAccessedTimeInternal() );
-            final String validityKey = createValidityInfoKeyName( session.getIdInternal() );
+            final String validityKey = _sessionIdFormat.createValidityInfoKeyName( session.getIdInternal() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
             final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
@@ -324,18 +325,18 @@ public abstract class LockingStrategy {
 
     @CheckForNull
     protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String sessionId ) {
-        return loadSessionValidityInfoForValidityKey( createValidityInfoKeyName( sessionId ) );
+        return loadSessionValidityInfoForValidityKey( _sessionIdFormat.createValidityInfoKeyName( sessionId ) );
     }
 
     @CheckForNull
     protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) {
-        final byte[] validityInfo = (byte[]) _memcached.get( validityInfoKey );
+        final byte[] validityInfo = (byte[]) _memcached.get( _storageKeyFormat.format( validityInfoKey ) );
         return validityInfo != null ? decode( validityInfo ) : null;
     }
 
     @CheckForNull
     protected SessionValidityInfo loadBackupSessionValidityInfo( @Nonnull final String sessionId ) {
-        final String key = createValidityInfoKeyName( sessionId );
+        final String key = _sessionIdFormat.createValidityInfoKeyName( sessionId );
         final String backupKey = _sessionIdFormat.createBackupKey( key );
         return loadSessionValidityInfoForValidityKey( backupKey );
     }
@@ -376,7 +377,7 @@ public abstract class LockingStrategy {
     protected void onAfterDeleteFromMemcached( @Nonnull final String sessionId ) {
         final long start = System.currentTimeMillis();
 
-        final String validityInfoKey = createValidityInfoKeyName( sessionId );
+        final String validityInfoKey = _sessionIdFormat.createValidityInfoKeyName( sessionId );
         _memcached.delete( validityInfoKey );
 
         if (_storeSecondaryBackup) {
@@ -388,7 +389,7 @@ public abstract class LockingStrategy {
     }
 
     private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( sessionId, 1, 1 );
+        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(sessionId), 1, 1 );
         try {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
@@ -406,7 +407,7 @@ public abstract class LockingStrategy {
 
     private void pingSession( @Nonnull final MemcachedBackupSession session,
             @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( session.getIdInternal(), 5, 1 );
+        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(session.getIdInternal()), 5, 1 );
         try {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();

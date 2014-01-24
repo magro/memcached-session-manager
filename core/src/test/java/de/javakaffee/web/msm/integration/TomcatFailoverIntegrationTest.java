@@ -110,7 +110,7 @@ public abstract class TomcatFailoverIntegrationTest {
             throw e;
         }
 
-        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(_memcachedNodes, null, _memcachedClientCallback);
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(_memcachedNodes, null, null, _memcachedClientCallback);
         final ConnectionFactory cf = nodesManager.isEncodeNodeIdInSessionId()
             ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 )
             : new DefaultConnectionFactory();
@@ -127,7 +127,7 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private TomcatBuilder<?> startTomcat( final int port, final SessionAffinityMode sessionAffinityMode,
             final String jvmRoute, final LoginType loginType ) throws Exception {
-        return getTestUtils().tomcatBuilder().port(port).memcachedNodes(_memcachedNodes)
+        return getTestUtils().tomcatBuilder().port(port).memcachedNodes(_memcachedNodes).storageKeyPrefix(null)
                 .sticky(sessionAffinityMode.isSticky()).jvmRoute(jvmRoute).loginType(loginType).buildAndStart();
     }
 

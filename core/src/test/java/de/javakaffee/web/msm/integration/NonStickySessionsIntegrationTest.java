@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.integration.TestServlet.*;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static de.javakaffee.web.msm.integration.TestUtils.Predicates.equalTo;
@@ -125,7 +124,7 @@ public abstract class NonStickySessionsIntegrationTest {
             throw e;
         }
 
-        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, _memcachedClientCallback);
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, null, _memcachedClientCallback);
         _client =
                 new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 ),
                         Arrays.asList( address1, address2 ) );
@@ -146,7 +145,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private TomcatBuilder<?> startTomcat( final int port, final String memcachedNodes, final LockingMode lockingMode ) throws Exception {
         return getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).memcachedNodes(memcachedNodes)
-                .sticky(false).lockingMode(lockingMode).buildAndStart();
+                .sticky(false).lockingMode(lockingMode).storageKeyPrefix(null).buildAndStart();
     }
 
     @AfterMethod
@@ -596,14 +595,14 @@ public abstract class NonStickySessionsIntegrationTest {
         final MemCacheDaemon<?> primary = nodeId.equals( NODE_ID_1 ) ? _daemon1 : _daemon2;
         final MemCacheDaemon<?> secondary = nodeId.equals( NODE_ID_1 ) ? _daemon2 : _daemon1;
 
-        assertNotNull( primary.getCache().get( key( sessionId1 ) )[0] );
-        assertNotNull( primary.getCache().get( key( createValidityInfoKeyName( sessionId1 ) ) )[0] );
+        assertNotNull( primary.getCache().get( key( sessionId1 ) )[0], sessionId1 );
+        assertNotNull( primary.getCache().get( key( fmt.createValidityInfoKeyName( sessionId1 ) ) )[0], fmt.createValidityInfoKeyName( sessionId1 ) );
 
         // The executor needs some time to finish the backup...
         Thread.sleep( 500 );
 
         assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( sessionId1 ) ) )[0] );
-        assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
+        assertNotNull( secondary.getCache().get( key( fmt.createBackupKey( fmt.createValidityInfoKeyName( sessionId1 ) ) ) )[0] );
 
     }
 
@@ -642,12 +641,12 @@ public abstract class NonStickySessionsIntegrationTest {
 
         // the memcached client writes async, so it's ok to wait a little bit (especially on windows)
         assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( sessionId1 ) );
-        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( createValidityInfoKeyName( sessionId1 ) ) );
+        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( fmt.createValidityInfoKeyName( sessionId1 ) ) );
 
         // The executor needs some time to finish the backup...
         final MemCacheDaemon<?> second = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeId));
         assertNotNullElementWaitingWithProxy(0, 4000, second.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
-        assertNotNullElementWaitingWithProxy(0, 200, second.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, second.getCache()).get( key( fmt.createBackupKey( fmt.createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the secondary memcached, so that the next backup should got to the next node
         second.stop();
@@ -661,7 +660,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final MemCacheDaemon<?> third = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeIdList.getNextNodeId(nodeId)));
         assertNotNullElementWaitingWithProxy(0, 4000, third.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
-        assertNotNullElementWaitingWithProxy(0, 200, third.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, third.getCache()).get( key( fmt.createBackupKey( fmt.createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the first node, so it should be loaded from the 3rd memcached
         first.stop();
@@ -714,12 +713,12 @@ public abstract class NonStickySessionsIntegrationTest {
         final MemCacheDaemon<?> first = memcachedsByNodeId.get(nodeId);
 
         assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( sessionId1 ) );
-        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( createValidityInfoKeyName( sessionId1 ) ) );
+        assertNotNullElementWaitingWithProxy(0, 100, first.getCache()).get( key( fmt.createValidityInfoKeyName( sessionId1 ) ) );
 
         // The executor needs some time to finish the backup...
         final MemCacheDaemon<?> second = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeId));
         assertNotNullElementWaitingWithProxy(0, 4000, second.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
-        assertNotNullElementWaitingWithProxy(0, 200, second.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, second.getCache()).get( key( fmt.createBackupKey( fmt.createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the secondary memcached, so that the next backup should got to the next node
         second.stop();
@@ -732,7 +731,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         final MemCacheDaemon<?> third = memcachedsByNodeId.get(nodeIdList.getNextNodeId(nodeIdList.getNextNodeId(nodeId)));
         assertNotNullElementWaitingWithProxy(0, 4000, third.getCache()).get( key( fmt.createBackupKey( sessionId1 ) ) );
-        assertNotNullElementWaitingWithProxy(0, 200, third.getCache()).get( key( fmt.createBackupKey( createValidityInfoKeyName( sessionId1 ) ) ) );
+        assertNotNullElementWaitingWithProxy(0, 200, third.getCache()).get( key( fmt.createBackupKey( fmt.createValidityInfoKeyName( sessionId1 ) ) ) );
 
         // Shutdown the first node, so it should be loaded from the 3rd memcached
         first.stop();

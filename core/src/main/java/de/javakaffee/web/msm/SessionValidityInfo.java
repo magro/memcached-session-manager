@@ -52,18 +52,6 @@ public class SessionValidityInfo {
     }
 
     /**
-     * Creates the name/key that can be used for storing the encoded session validity information.
-     */
-    @Nonnull
-    public static String createValidityInfoKeyName( @Nonnull final String sessionId ) {
-        if ( sessionId == null ) {
-            throw new IllegalArgumentException( "The sessionId must not be null." );
-        }
-        return "validity:" + sessionId;
-    }
-
-
-    /**
      * Encode the given information to a byte[], that can be decoded later via {@link #decode(byte[])}.
      */
     @Nonnull

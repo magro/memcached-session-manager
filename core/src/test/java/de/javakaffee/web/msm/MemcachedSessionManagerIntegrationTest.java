@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.SessionValidityInfo.createValidityInfoKeyName;
 import static de.javakaffee.web.msm.integration.TestServlet.PARAM_REMOVE;
 import static de.javakaffee.web.msm.integration.TestServlet.PATH_INVALIDATE;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
@@ -127,7 +126,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     }
 
     private MemcachedClient createMemcachedClient( final String memcachedNodes, final InetSocketAddress address ) throws IOException, InterruptedException {
-    	final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(memcachedNodes, null, _memcachedClientCallback);
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(memcachedNodes, null, null, _memcachedClientCallback);
         final ConnectionFactory cf = nodesManager.isEncodeNodeIdInSessionId()
             ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 )
             : new DefaultConnectionFactory();
@@ -333,7 +332,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
         assertNull( _memcached.get( sessionId1 ), "Invalidated session still existing in memcached" );
         if(!sessionAffinity.isSticky()) {
-            assertNull( _memcached.get(createValidityInfoKeyName( sessionId1 )), "ValidityInfo for invalidated session still exists in memcached." );
+            assertNull( _memcached.get(new SessionIdFormat().createValidityInfoKeyName( sessionId1 )), "ValidityInfo for invalidated session still exists in memcached." );
         }
     }
 
@@ -471,7 +470,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         _daemon.start();
 
         // Wait so that the daemon will be available and the client can reconnect (async get didn't do the trick)
-        Thread.sleep( 4000 );
+        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 1, 4000);
 
         final String newSessionId = manager.getMemcachedSessionService().changeSessionIdOnMemcachedFailover( session.getId() );
         assertNotNull( newSessionId );

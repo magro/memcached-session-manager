@@ -15,26 +15,32 @@
  */
 package de.javakaffee.web.msm.integration;
 
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.UnknownHostException;
+
+import javax.annotation.Nonnull;
+import javax.servlet.ServletException;
+
+import org.apache.catalina.Container;
+import org.apache.catalina.Context;
+import org.apache.catalina.Engine;
+import org.apache.catalina.Host;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Valve;
+import org.apache.catalina.authenticator.AuthenticatorBase;
+import org.apache.catalina.connector.Connector;
+import org.apache.catalina.deploy.LoginConfig;
+import org.apache.catalina.deploy.SecurityCollection;
+import org.apache.catalina.deploy.SecurityConstraint;
+import org.apache.catalina.startup.Tomcat;
+
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.MemcachedSessionService;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import edu.umd.cs.findbugs.annotations.SuppressWarnings;
-import org.apache.catalina.*;
-import org.apache.catalina.authenticator.AuthenticatorBase;
-import org.apache.catalina.connector.Connector;
-import org.apache.catalina.core.StandardEngine;
-import org.apache.catalina.startup.Tomcat;
-import org.apache.catalina.deploy.LoginConfig;
-import org.apache.catalina.deploy.SecurityCollection;
-import org.apache.catalina.deploy.SecurityConstraint;
-
-import javax.annotation.Nonnull;
-import javax.servlet.ServletException;
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.UnknownHostException;
 
 /**
  * Builder for {@link Tomcat} tomcat.
@@ -76,7 +82,7 @@ public class Tomcat7Builder extends TomcatBuilder<Tomcat> {
         Context context;
         try {
             context = tomcat.addWebapp(CONTEXT_PATH, docBase + fileSeparator + "webapp");
-        } catch (ServletException e) {
+        } catch (final ServletException e) {
             throw new IllegalStateException(e);
         }
 
@@ -111,6 +117,7 @@ public class Tomcat7Builder extends TomcatBuilder<Tomcat> {
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName != null ? transcoderFactoryClassName : DEFAULT_TRANSCODER_FACTORY );
         sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(".*\\.(png|gif|jpg|css|js|ico)$");
+        sessionManager.getMemcachedSessionService().setStorageKeyPrefix(storageKeyPrefix);
 
         return tomcat;
     }
@@ -119,6 +126,7 @@ public class Tomcat7Builder extends TomcatBuilder<Tomcat> {
     /**
      * Must create a {@link SessionManager} for the current tomcat version.
      */
+    @Override
     @Nonnull
     protected SessionManager createSessionManager() {
         return new MemcachedBackupSessionManager();
@@ -171,7 +179,7 @@ public class Tomcat7Builder extends TomcatBuilder<Tomcat> {
 
     @Override
     public void setChangeSessionIdOnAuth(final boolean changeSessionIdOnAuth) {
-        final Engine engine = (StandardEngine)tomcat.getEngine();
+        final Engine engine = tomcat.getEngine();
         final Host host = (Host)engine.findChild( DEFAULT_HOST );
         final Container context = host.findChild( CONTEXT_PATH );
         final Valve first = context.getPipeline().getFirst();

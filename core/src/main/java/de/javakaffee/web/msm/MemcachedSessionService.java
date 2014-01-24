@@ -39,6 +39,7 @@ import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Container;
+import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
@@ -191,6 +192,8 @@ public class MemcachedSessionService {
     private String _password;
 
     private final AtomicBoolean _enabled = new AtomicBoolean( true );
+
+    private String _storageKeyPrefix = StorageKeyFormat.WEBAPP_VERSION;
 
     // -------------------- END configuration properties --------------------
 
@@ -426,9 +429,10 @@ public class MemcachedSessionService {
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
         _trackingHostValve = createRequestTrackingHostValve(sessionCookieName, _currentRequest);
-        _manager.getContainer().getParent().getPipeline().addValve(_trackingHostValve);
+        final Context context = (Context) _manager.getContainer();
+        context.getParent().getPipeline().addValve(_trackingHostValve);
         _trackingContextValve = createRequestTrackingContextValve(sessionCookieName);
-        _manager.getContainer().getPipeline().addValve( _trackingContextValve );
+        context.getPipeline().addValve( _trackingContextValve );
 
         initNonStickyLockingMode( _memcachedNodesManager );
 
@@ -437,8 +441,13 @@ public class MemcachedSessionService {
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                 _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
 
-        _log.info( getClass().getSimpleName() + " finished initialization, sticky "+ _sticky + ", operation timeout " + _operationTimeout +", with node ids " +
-        		_memcachedNodesManager.getPrimaryNodeIds() + " and failover node ids " + _memcachedNodesManager.getFailoverNodeIds() );
+        _log.info( "--------\n- " + getClass().getSimpleName() + " finished initialization:" +
+                "\n- sticky: "+ _sticky +
+                "\n- operation timeout: " + _operationTimeout +
+                "\n- node ids: " + _memcachedNodesManager.getPrimaryNodeIds() +
+                "\n- failover node ids: " + _memcachedNodesManager.getFailoverNodeIds() +
+                "\n- storage key prefix: " + _memcachedNodesManager.getStorageKeyFormat().prefix +
+                "\n--------");
 
     }
 
@@ -459,13 +468,16 @@ public class MemcachedSessionService {
 		return new MemcachedClientCallback() {
 			@Override
 			public Object get(final String key) {
-				return _memcached.get(key);
+				return _memcached.get(_memcachedNodesManager.getStorageKeyFormat().format( key ));
 			}
 		};
 	}
 
     protected MemcachedNodesManager createMemcachedNodesManager(final String memcachedNodes, final String failoverNodes) {
-		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, _memcachedClientCallback );
+        final Context context = (Context) _manager.getContainer();
+        final String webappVersion = Reflections.invoke(context, "getWebappVersion", null);
+        final StorageKeyFormat storageKeyFormat = StorageKeyFormat.of(_storageKeyPrefix, context.getParent().getName(), context.getName(), webappVersion);
+		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _memcachedClientCallback );
 	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
@@ -788,7 +800,7 @@ public class MemcachedSessionService {
             }
             try {
                 final long start = System.currentTimeMillis();
-                _memcached.delete( sessionId ).get();
+                _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) ).get();
                 _statistics.registerSince( DELETE_FROM_MEMCACHED, start );
                 if ( !_sticky ) {
                     _lockingStrategy.onAfterDeleteFromMemcached( sessionId );
@@ -1077,7 +1089,7 @@ public class MemcachedSessionService {
              * they get deserialized by BaseSerializingTranscoder.deserialize or the appropriate
              * specializations.
              */
-            final Object object = _memcached.get( sessionId );
+            final Object object = _memcached.get( _memcachedNodesManager.getStorageKeyFormat().format( sessionId ) );
             _memcachedNodesManager.onLoadFromMemcachedSuccess( sessionId );
 
             if ( object != null ) {
@@ -1110,7 +1122,7 @@ public class MemcachedSessionService {
         } catch ( final TranscoderDeserializationException e ) {
             _log.warn( "Could not deserialize session with id " + sessionId + " from memcached, session will be purged from storage.", e );
             releaseIfLocked( sessionId, lockStatus );
-            _memcached.delete( sessionId );
+            _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) );
             _invalidSessionsCache.put( sessionId, Boolean.TRUE );
         } catch ( final Exception e ) {
             _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
@@ -1120,7 +1132,7 @@ public class MemcachedSessionService {
         return null;
     }
 
-    protected void releaseIfLocked( final String sessionId, LockStatus lockStatus ) {
+    protected void releaseIfLocked( final String sessionId, final LockStatus lockStatus ) {
         if ( lockStatus == LockStatus.LOCKED ) {
             _lockingStrategy.releaseLock( sessionId );
         }
@@ -1706,6 +1718,34 @@ public class MemcachedSessionService {
      */
     public String getPassword() {
         return _password;
+    }
+
+    public String getStorageKeyPrefix() {
+        return _storageKeyPrefix;
+    }
+
+    /**
+     * Configure the storage key prefix, this is prepended to the session id in e.g. memcached.
+     *
+     * The configuration has the form <code>$token,$token</code>
+     *
+     * Some examples which config would create which output for the key / session id "foo" with context path "ctxt",
+     * host "hst" and webappVersion "001" (webappVersion as specified for parallel deployment):
+     * <dl>
+     * <dt>static:x</dt><dd>x_foo</dd>
+     * <dt>host</dt><dd>hst_foo</dd>
+     * <dt>host.hash</dt><dd>e93c085e_foo</dd>
+     * <dt>context</dt><dd>ctxt_foo</dd>
+     * <dt>context.hash</dt><dd>45e6345f_foo</dd>
+     * <dt>host,context</dt><dd>hst:ctxt_foo</dd>
+     * <dt>webappVersion</dt><dd>001_foo</dd>
+     * <dt>host.hash,context.hash,webappVersion</dt><dd>e93c085e:45e6345f:001_foo</dd>
+     * </dl>
+     *
+     * @param storageKeyPrefix
+     */
+    public void setStorageKeyPrefix(final String storageKeyPrefix) {
+        _storageKeyPrefix = storageKeyPrefix;
     }
 
 }

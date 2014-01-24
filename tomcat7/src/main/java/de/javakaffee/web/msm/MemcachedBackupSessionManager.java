@@ -520,6 +520,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _msm.setPassword(password);
     }
 
+    public void setStorageKeyPrefix(final String storageKeyPrefix) {
+        _msm.setStorageKeyPrefix(storageKeyPrefix);
+    }
+
     /**
      * {@inheritDoc}
      */

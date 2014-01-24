@@ -80,6 +80,7 @@ public class MemcachedNodesManager {
     private final List<String> _failoverNodeIds;
     private final LinkedHashMap<InetSocketAddress, String> _address2Ids;
     private final boolean _encodeNodeIdInSessionId;
+    private final StorageKeyFormat _storageKeyFormat;
     @Nullable
 	private NodeIdService _nodeIdService;
 	private SessionIdFormat _sessionIdFormat;
@@ -90,16 +91,18 @@ public class MemcachedNodesManager {
      * @param primaryNodeIds the list of primary node ids (memcachedNodes without failoverNodes).
      * @param failoverNodeIds the configured failover node ids.
      * @param address2Ids a mapping of inet addresses from the memcachedNodes configuration to their node ids.
+     * @param storageKeyFormat the storage key format
      * @param memcachedClientCallback a callback to memcached, can only be null if the memcachedNodes config
      * 		contains a single node without node id.
      */
 	public MemcachedNodesManager(final String memcachedNodes, @Nonnull final NodeIdList primaryNodeIds, @Nonnull final List<String> failoverNodeIds,
 			@Nonnull final LinkedHashMap<InetSocketAddress, String> address2Ids,
-			@Nullable final MemcachedClientCallback memcachedClientCallback) {
+			@Nullable final StorageKeyFormat storageKeyFormat, @Nullable final MemcachedClientCallback memcachedClientCallback) {
 		_memcachedNodes = memcachedNodes;
 		_primaryNodeIds = primaryNodeIds;
 		_failoverNodeIds = failoverNodeIds;
 		_address2Ids = address2Ids;
+		_storageKeyFormat = storageKeyFormat;
 
         _encodeNodeIdInSessionId = !((getCountNodes() <= 1 || isCouchbaseConfig(memcachedNodes)) && _primaryNodeIds.isEmpty());
 
@@ -107,12 +110,12 @@ public class MemcachedNodesManager {
 			if (memcachedClientCallback == null) {
 				throw new IllegalArgumentException("The MemcachedClientCallback must not be null.");
 			}
-			_sessionIdFormat = new SessionIdFormat();
+			_sessionIdFormat = new SessionIdFormat(storageKeyFormat);
 	        _nodeIdService = new NodeIdService( createNodeAvailabilityCache( getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, memcachedClientCallback ),
 	        				primaryNodeIds, failoverNodeIds );
 		}
 		else {
-			_sessionIdFormat = new SessionIdFormat() {
+			_sessionIdFormat = new SessionIdFormat(storageKeyFormat) {
 				@Override
 				public boolean isValid(final String sessionId) {
 					return sessionId != null;
@@ -171,11 +174,13 @@ public class MemcachedNodesManager {
 	 * </ul>
 	 * @param memcachedNodes
 	 * @param failoverNodes TODO
+	 * @param storageKeyPrefix TODO
 	 * @param memcachedClientCallback TODO
 	 * @return
 	 */
 	@Nonnull
-	public static MemcachedNodesManager createFor(final String memcachedNodes, final String failoverNodes, final MemcachedClientCallback memcachedClientCallback) {
+    public static MemcachedNodesManager createFor(final String memcachedNodes, final String failoverNodes, final StorageKeyFormat storageKeyFormat,
+            final MemcachedClientCallback memcachedClientCallback) {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
 		}
@@ -235,7 +240,7 @@ public class MemcachedNodesManager {
 	        }
         }
 
-		return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, memcachedClientCallback);
+        return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, storageKeyFormat, memcachedClientCallback);
 	}
 
     private static InetSocketAddress getSingleShortNodeDefinition(final Matcher singleNodeMatcher) {
@@ -366,6 +371,14 @@ public class MemcachedNodesManager {
 	public SessionIdFormat getSessionIdFormat() {
 		return _sessionIdFormat;
 	}
+
+    /**
+     * Provides the {@link StorageKeyFormat} to create the storage key.
+     */
+    @Nonnull
+    public StorageKeyFormat getStorageKeyFormat() {
+        return _storageKeyFormat;
+    }
 
 	/**
 	 * Must return all known memcached addresses.

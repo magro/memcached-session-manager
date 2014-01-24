@@ -48,6 +48,16 @@ public class SessionIdFormat {
      */
     private final Pattern _pattern = Pattern.compile( "[^-.]+-[^.]+(\\.[^.]+)?" );
 
+    private final StorageKeyFormat _storageKeyFormat;
+
+    public SessionIdFormat() {
+        this(StorageKeyFormat.EMPTY);
+    }
+
+    public SessionIdFormat(final StorageKeyFormat storageKeyFormat) {
+        _storageKeyFormat = storageKeyFormat;
+    }
+
     /**
      * Create a session id including the provided memcachedId.
      *
@@ -57,7 +67,7 @@ public class SessionIdFormat {
      *            the memcached id to encode in the session id, may be <code>null</code>.
      * @return the sessionId which now contains the memcachedId if one was provided, otherwise
      *  the sessionId unmodified.
-     */ 
+     */
     @Nonnull
     public String createSessionId(@Nonnull final String sessionId, @Nullable final String memcachedId) {
         if ( LOG.isDebugEnabled() ) {
@@ -199,7 +209,20 @@ public class SessionIdFormat {
         if ( sessionId == null ) {
             throw new IllegalArgumentException( "The sessionId must not be null." );
         }
-        return "lock:" + sessionId;
+        return "lock:" + _storageKeyFormat.format(sessionId);
+    }
+
+    /**
+     * Creates the name/key that can be used for storing the encoded session validity information.
+     * @param origKey the session id (or validity info key) for that a key shall be created.
+     * @return a String.
+     */
+    @Nonnull
+    public String createValidityInfoKeyName( @Nonnull final String origKey ) {
+        if ( origKey == null ) {
+            throw new IllegalArgumentException( "The sessionId must not be null." );
+        }
+        return "validity:" + _storageKeyFormat.format(origKey);
     }
 
     /**
@@ -213,7 +236,7 @@ public class SessionIdFormat {
         if ( origKey == null ) {
             throw new IllegalArgumentException( "The origKey must not be null." );
         }
-        return BACKUP_PREFIX + origKey;
+        return BACKUP_PREFIX + _storageKeyFormat.format(origKey);
     }
 
     /**

@@ -225,7 +225,9 @@ public class BackupSessionTask implements Callable<BackupResult> {
         final int expirationTime = session.getMemcachedExpirationTimeToSet();
         final long start = System.currentTimeMillis();
         try {
-            final Future<Boolean> future = _memcached.set( session.getId(), toMemcachedExpiration(expirationTime), data );
+            final Future<Boolean> future = _memcached.set(
+                    _memcachedNodesManager.getStorageKeyFormat().format(session.getId()),
+                    toMemcachedExpiration(expirationTime), data );
             if ( !_sessionBackupAsync ) {
                 future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
                 session.setLastMemcachedExpirationTime( expirationTime );

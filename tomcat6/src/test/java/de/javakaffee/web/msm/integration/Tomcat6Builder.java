@@ -1,7 +1,20 @@
 package de.javakaffee.web.msm.integration;
 
-import de.javakaffee.web.msm.MemcachedSessionService;
-import org.apache.catalina.*;
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.UnknownHostException;
+import java.util.Hashtable;
+
+import javax.annotation.Nonnull;
+import javax.naming.NamingException;
+
+import org.apache.catalina.Container;
+import org.apache.catalina.Context;
+import org.apache.catalina.Engine;
+import org.apache.catalina.Host;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.core.StandardEngine;
@@ -13,15 +26,8 @@ import org.apache.catalina.realm.UserDatabaseRealm;
 import org.apache.catalina.startup.Embedded;
 import org.apache.naming.NamingContext;
 
-import javax.annotation.Nonnull;
-import javax.naming.NamingException;
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.UnknownHostException;
-import java.util.Hashtable;
-
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
+import de.javakaffee.web.msm.MemcachedSessionService;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
@@ -154,6 +160,7 @@ public class Tomcat6Builder extends TomcatBuilder<Embedded> {
         sessionManager.setProcessExpiresFrequency( 1 ); // 1 second (factor for context.setBackgroundProcessorDelay)
         sessionManager.getMemcachedSessionService().setTranscoderFactoryClass( transcoderFactoryClassName != null ? transcoderFactoryClassName : DEFAULT_TRANSCODER_FACTORY );
         sessionManager.getMemcachedSessionService().setRequestUriIgnorePattern(".*\\.(png|gif|jpg|css|js|ico)$");
+        sessionManager.getMemcachedSessionService().setStorageKeyPrefix(storageKeyPrefix);
 
         final Connector connector = catalina.createConnector( "localhost", port, false );
         connector.setProperty("bindOnInit", "false");
@@ -170,6 +177,7 @@ public class Tomcat6Builder extends TomcatBuilder<Embedded> {
     /**
      * Must create a {@link SessionManager} for the current tomcat version.
      */
+    @Override
     @Nonnull
     protected SessionManager createSessionManager() {
         return new MemcachedBackupSessionManager();

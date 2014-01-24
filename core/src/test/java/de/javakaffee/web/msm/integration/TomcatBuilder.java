@@ -62,6 +62,7 @@ public abstract class TomcatBuilder<T> {
     protected String memcachedProtocol = MemcachedSessionService.PROTOCOL_TEXT;
     protected String username = null;
     protected String transcoderFactoryClassName = JavaSerializationTranscoderFactory.class.getName();
+    protected String storageKeyPrefix;
 
     public TomcatBuilder<T> port(final int port) {
         this.port = port;
@@ -85,6 +86,11 @@ public abstract class TomcatBuilder<T> {
 
     public TomcatBuilder<T> failoverNodes(final String failoverNodes) {
         this.failoverNodes = failoverNodes;
+        return this;
+    }
+
+    public TomcatBuilder<T> storageKeyPrefix(final String storageKeyPrefix) {
+        this.storageKeyPrefix = storageKeyPrefix;
         return this;
     }
 
