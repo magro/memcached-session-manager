@@ -45,7 +45,7 @@ public class KryoTranscoderFactory implements TranscoderFactory {
      */
     @Override
     public SessionAttributesTranscoder createTranscoder( final SessionManager manager ) {
-        return getTranscoder( manager.getContainer().getLoader().getClassLoader() );
+        return getTranscoder( manager.getContainerClassLoader() );
     }
 
     protected SessionAttributesTranscoder createTranscoder( final ClassLoader loader ) {

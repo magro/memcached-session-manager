@@ -50,7 +50,7 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
      * @param manager the manager that will be passed to the transcoder.
      * @return for all invocations the same instance of {@link JavolutionTranscoder}.
      */
-    private JavolutionTranscoder getTranscoder( final Manager manager ) {
+    private JavolutionTranscoder getTranscoder( final SessionManager manager ) {
         if ( _transcoder == null ) {
             final CustomXMLFormat<?>[] customFormats = loadCustomFormats( manager );
             _transcoder = new JavolutionTranscoder( manager, _copyCollectionsForSerialization, customFormats );
@@ -58,16 +58,15 @@ public class JavolutionTranscoderFactory implements TranscoderFactory {
         return _transcoder;
     }
 
-    private CustomXMLFormat<?>[] loadCustomFormats( final Manager manager ) {
+    private CustomXMLFormat<?>[] loadCustomFormats( final SessionManager manager ) {
         if ( _customConverterClassNames == null || _customConverterClassNames.length == 0 ) {
             return null;
         }
         final CustomXMLFormat<?>[] customFormats = new CustomXMLFormat<?>[ _customConverterClassNames.length ];
-        final Loader loader = manager.getContainer().getLoader();
         for ( int i = 0; i < _customConverterClassNames.length; i++ ) {
             final String className = _customConverterClassNames[i];
             try {
-                final CustomXMLFormat<?> xmlFormat = Class.forName( className, true, loader.getClassLoader() )
+                final CustomXMLFormat<?> xmlFormat = Class.forName( className, true, manager.getContainerClassLoader() )
                     .asSubclass( CustomXMLFormat.class )
                     .newInstance();
                 customFormats[i] = xmlFormat;
