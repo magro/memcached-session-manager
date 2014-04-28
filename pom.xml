@@ -203,7 +203,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<tomcat-version>6.0.37</tomcat-version>
+		<tomcat-version>6.0.39</tomcat-version>
 		<slf4j-version>1.5.8</slf4j-version>
 		<hibernate-core-version>3.3.2.GA</hibernate-core-version>
 		<couchbasemock-version>0.5-69e953bd</couchbasemock-version>

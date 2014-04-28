@@ -12,7 +12,7 @@
 	<description>The msm tomcat8 specific implementation.</description>
 
 	<properties>
-		<tomcat-version>8.0.0-RC10</tomcat-version>
+		<tomcat-version>8.0.5</tomcat-version>
 	</properties>
 
 	<dependencies>
