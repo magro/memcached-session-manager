@@ -22,7 +22,7 @@
 	</modules>
 
 	<properties>
-		<tomcat-version>7.0.40</tomcat-version>
+		<tomcat-version>7.0.53</tomcat-version>
 	</properties>
 
 	<dependencies>
@@ -94,7 +94,7 @@
 						<version>${project.version}</version>
 					</dependency>
 					<!-- <dependency> <groupId>net.spy</groupId> <artifactId>spymemcached</artifactId> 
-						<version>2.10.2</version> <scope>compile</scope> </dependency> -->
+						<version>2.11.1</version> <scope>compile</scope> </dependency> -->
 				</dependencies>
 			</plugin>
 		</plugins>
