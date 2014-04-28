@@ -118,7 +118,8 @@ public final class SuffixLocatorBinaryConnectionFactory extends DefaultConnectio
             createWriteOperationQueue(),
             createOperationQueue(),
             getOpQueueMaxBlockTime(),
-            doAuth, defaultOpTimeout);
+            doAuth, defaultOpTimeout,
+            getAuthWaitTime(), this);
     }
 
     @Override
