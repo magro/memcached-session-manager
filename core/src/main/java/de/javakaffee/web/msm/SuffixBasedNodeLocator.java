@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import net.spy.memcached.MemcachedConnection;
 
 import net.spy.memcached.MemcachedNode;
 import net.spy.memcached.NodeLocator;
@@ -329,6 +330,15 @@ class SuffixBasedNodeLocator implements NodeLocator {
         public void completedRead() {
           throw new UnsupportedOperationException();
         }
-    }
 
+        @Override
+        public MemcachedConnection getConnection() {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void setConnection(MemcachedConnection mc) {
+          throw new UnsupportedOperationException();
+        }
+    }
 }

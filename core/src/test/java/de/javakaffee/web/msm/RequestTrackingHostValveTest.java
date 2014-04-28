@@ -178,7 +178,8 @@ public abstract class RequestTrackingHostValveTest {
 
     protected abstract void setupGetResponseSetCookieHeadersExpectations(Response response, String[] result);
 
-    private String generateCookieString(final Cookie cookie) {
+    @Nonnull
+    protected String generateCookieString(final Cookie cookie) {
         final StringBuffer sb = new StringBuffer();
         ServerCookie.appendCookieValue
                 (sb, cookie.getVersion(), cookie.getName(), cookie.getValue(),

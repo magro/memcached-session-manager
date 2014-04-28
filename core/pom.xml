@@ -14,7 +14,7 @@
 	<description>The msm core, provides java serialization strategy.</description>
 
 	<properties>
-		<tomcat-version>7.0.40</tomcat-version>
+		<tomcat-version>7.0.53</tomcat-version>
 	</properties>
 	
 	<dependencies>
@@ -45,13 +45,13 @@
 		<dependency>
 			<groupId>net.spy</groupId>
 			<artifactId>spymemcached</artifactId>
-			<version>2.10.2</version>
+			<version>2.11.1</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.couchbase.client</groupId>
 			<artifactId>couchbase-client</artifactId>
-			<version>1.2.2</version>
+			<version>1.4.0</version>
 			<scope>compile</scope>
 		</dependency>
 		<!-- Needed if used with membase via http -->
