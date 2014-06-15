@@ -81,7 +81,20 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     private Boolean _contextHasFormBasedSecurityConstraint;
 
     public MemcachedBackupSessionManager() {
-        _msm = new MemcachedSessionService( this );
+        _msm = new MemcachedSessionService( this ) {
+            @Override
+            protected RequestTrackingContextValve createRequestTrackingContextValve(final String sessionCookieName) {
+                final RequestTrackingContextValve result = super.createRequestTrackingContextValve(sessionCookieName);
+                result.setAsyncSupported(true);
+                return result;
+            }
+            @Override
+            protected RequestTrackingHostValve createRequestTrackingHostValve(final String sessionCookieName, final CurrentRequest currentRequest) {
+                final RequestTrackingHostValve result = super.createRequestTrackingHostValve(sessionCookieName, currentRequest);
+                result.setAsyncSupported(true);
+                return result;
+            }
+        };
     }
 
     /**
