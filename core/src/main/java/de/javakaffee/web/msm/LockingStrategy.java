@@ -330,7 +330,7 @@ public abstract class LockingStrategy {
 
     @CheckForNull
     protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) {
-        final byte[] validityInfo = (byte[]) _memcached.get( _storageKeyFormat.format( validityInfoKey ) );
+        final byte[] validityInfo = (byte[]) _memcached.get( validityInfoKey );
         return validityInfo != null ? decode( validityInfo ) : null;
     }
 
