@@ -148,7 +148,11 @@ public class BackupSessionTask implements Callable<BackupResult> {
 
             return result;
 
-        } finally {
+        } catch (Exception e) {
+            _log.warn("FAILED for session id " + _session.getId(), e);
+            throw e;
+        }
+        finally {
             _session.setBackupRunning( false );
             releaseLock();
         }
