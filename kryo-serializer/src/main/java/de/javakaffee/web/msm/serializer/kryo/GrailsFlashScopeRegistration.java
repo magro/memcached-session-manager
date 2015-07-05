@@ -16,14 +16,13 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import org.codehaus.groovy.grails.web.servlet.GrailsFlashScope;
-
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.serialize.ReferenceFieldSerializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
+import org.codehaus.groovy.grails.web.servlet.GrailsFlashScope;
 
 /**
  * {@link SerializerFactory} that supports grails flash scope.
- * It creates a {@link ReferenceFieldSerializer} for {@link GrailsFlashScope}.
+ * It creates a {@link FieldSerializer} for {@link GrailsFlashScope} and enables references.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
@@ -31,7 +30,8 @@ public class GrailsFlashScopeRegistration implements KryoCustomization {
     
 	@Override
 	public void customize(Kryo kryo) {
-        kryo.register( GrailsFlashScope.class, new ReferenceFieldSerializer( kryo, GrailsFlashScope.class ) );
+		kryo.setReferences(true);
+        kryo.register( GrailsFlashScope.class, new FieldSerializer( kryo, GrailsFlashScope.class ) );
 	}
     
 }

@@ -16,15 +16,22 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
+import de.javakaffee.kryoserializers.jodatime.JodaIntervalSerializer;
+import de.javakaffee.kryoserializers.jodatime.JodaLocalDateSerializer;
+import de.javakaffee.kryoserializers.jodatime.JodaLocalDateTimeSerializer;
 import org.joda.time.DateTime;
 
 import com.esotericsoftware.kryo.Kryo;
 
 import de.javakaffee.kryoserializers.jodatime.JodaDateTimeSerializer;
+import org.joda.time.Interval;
+import org.joda.time.LocalDate;
+
+import java.time.LocalDateTime;
 
 /**
- * A {@link KryoCustomization} that registers the {@link JodaDateTimeSerializer} for
- * joda's {@link DateTime} class.
+ * A {@link KryoCustomization} that registers serializers for
+ * joda's {@link Interval}, {@link DateTime}, {@link LocalDateTime}, {@link LocalDate} classes.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
@@ -32,7 +39,10 @@ public class JodaDateTimeRegistration implements KryoCustomization {
     
     @Override
     public void customize( final Kryo kryo ) {
-        kryo.register( DateTime.class, new JodaDateTimeSerializer() );
+        kryo.register( Interval.class, new JodaIntervalSerializer());
+        kryo.register( DateTime.class, new JodaDateTimeSerializer());
+        kryo.register( LocalDateTime.class, new JodaLocalDateTimeSerializer());
+        kryo.register( LocalDate.class, new JodaLocalDateSerializer());
     }
     
 }

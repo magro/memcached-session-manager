@@ -16,18 +16,17 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import static com.esotericsoftware.minlog.Log.TRACE;
-import static com.esotericsoftware.minlog.Log.trace;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.sun.faces.util.LRUMap;
 
 import java.lang.reflect.Field;
-import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map.Entry;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.serialize.IntSerializer;
-import com.esotericsoftware.kryo.serialize.SimpleSerializer;
-import com.sun.faces.util.LRUMap;
+import static com.esotericsoftware.minlog.Log.TRACE;
+import static com.esotericsoftware.minlog.Log.trace;
 
 /**
  * A {@link KryoCustomization} that registers a custom serializer for
@@ -42,7 +41,7 @@ public class FacesLRUMapRegistration implements KryoCustomization {
         kryo.register( LRUMap.class, new LRUMapSerializer( kryo ) );
     }
     
-    static class LRUMapSerializer extends SimpleSerializer<LRUMap<?, ?>> {
+    static class LRUMapSerializer extends Serializer<LRUMap<?, ?>> {
         
         private static final Field MAX_CAPACITY_FIELD;
         
@@ -65,26 +64,25 @@ public class FacesLRUMapRegistration implements KryoCustomization {
         }
 
         @Override
-        public LRUMap<?, ?> read( final ByteBuffer buffer ) {
-            final int maxCapacity = IntSerializer.get( buffer, true );
+        public LRUMap<?, ?> read(Kryo kryo, Input input, Class<LRUMap<?, ?>> type) {
+            final int maxCapacity = input.readInt(true);
             final LRUMap<Object, Object> result = new LRUMap<Object, Object>( maxCapacity );
-            final int size = IntSerializer.get( buffer, true );
+            final int size = input.readInt(true);
             for ( int i = 0; i < size; i++ ) {
-                final Object key = _kryo.readClassAndObject( buffer );
-                final Object value = _kryo.readClassAndObject( buffer );
-                result.put( key, value );
+                final Object key = _kryo.readClassAndObject(input);
+                final Object value = _kryo.readClassAndObject(input);
+                result.put(key, value);
             }
             return result;
         }
 
         @Override
-        public void write( final ByteBuffer buffer, final LRUMap<?, ?> map ) {
-            IntSerializer.put( buffer, getMaxCapacity( map ), true );
-            IntSerializer.put( buffer, map.size(), true );
-            for ( final Iterator<? extends Entry<?, ?>> iter = map.entrySet().iterator(); iter.hasNext(); ) {
-                final Entry<?, ?> entry = iter.next();
-                _kryo.writeClassAndObject( buffer, entry.getKey() );
-                _kryo.writeClassAndObject( buffer, entry.getValue() );
+        public void write(Kryo kryo, Output output, LRUMap<?, ?> map) {
+            output.writeInt(getMaxCapacity(map), true);
+            output.writeInt(map.size(), true);
+            for (final Entry<?, ?> entry : map.entrySet()) {
+                _kryo.writeClassAndObject(output, entry.getKey());
+                _kryo.writeClassAndObject(output, entry.getValue());
             }
             if ( TRACE ) trace( "kryo", "Wrote map: " + map );
         }
@@ -96,7 +94,6 @@ public class FacesLRUMapRegistration implements KryoCustomization {
                 throw new RuntimeException( "Could not access maxCapacity field.", e );
             }
         }
-
     }
     
 }

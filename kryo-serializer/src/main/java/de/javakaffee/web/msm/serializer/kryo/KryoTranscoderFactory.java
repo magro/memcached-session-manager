@@ -16,12 +16,11 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderFactory;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * Creates a {@link KryoTranscoder}.
@@ -53,11 +52,10 @@ public class KryoTranscoderFactory implements TranscoderFactory {
     }
 
     /**
-     * Gets/creates a single instance of {@link JavolutionTranscoder}. We need to have a single
-     * instance so that {@link XMLFormat}s are not created twice which would lead to errors.
+     * Gets/creates a single instance of {@link KryoTranscoder}.
      *
-     * @param manager the manager that will be passed to the transcoder.
-     * @return for all invocations the same instance of {@link JavolutionTranscoder}.
+     * @param classLoader the class loader of the web app container/context.
+     * @return for all invocations the same instance of {@link KryoTranscoder}.
      */
     private KryoTranscoder getTranscoder( final ClassLoader classLoader ) {
         if ( _transcoder == null ) {

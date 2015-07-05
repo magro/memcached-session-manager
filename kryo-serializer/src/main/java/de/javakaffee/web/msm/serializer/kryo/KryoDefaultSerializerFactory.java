@@ -32,5 +32,18 @@ public interface KryoDefaultSerializerFactory {
      */
     public Serializer newDefaultSerializer( Kryo kryo, Class<?> type );
 
+    static class SerializerFactoryAdapter implements com.esotericsoftware.kryo.factories.SerializerFactory {
+
+        private final KryoDefaultSerializerFactory delegate;
+
+        public SerializerFactoryAdapter(KryoDefaultSerializerFactory delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public Serializer makeSerializer(Kryo kryo, Class<?> type) {
+            return delegate.newDefaultSerializer(kryo, type);
+        }
+    }
 
 }

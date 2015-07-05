@@ -18,7 +18,7 @@ package de.javakaffee.web.msm.serializer.kryo;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.serialize.CompatibleFieldSerializer;
+import com.esotericsoftware.kryo.serializers.CompatibleFieldSerializer;
 
 /**
  * Default Serializer Factory that creates a {@link CompatibleFieldSerializer}

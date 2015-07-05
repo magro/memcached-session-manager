@@ -16,11 +16,9 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import org.apache.wicket.util.collections.MiniMap;
-
 import com.esotericsoftware.kryo.Kryo;
-
 import de.javakaffee.kryoserializers.wicket.MiniMapSerializer;
+import org.apache.wicket.util.collections.MiniMap;
 
 /**
  * A {@link KryoCustomization} that registers the {@link MiniMapSerializer} for
@@ -32,7 +30,7 @@ public class WicketMiniMapRegistration implements KryoCustomization {
     
     @Override
     public void customize( final Kryo kryo ) {
-        kryo.register( MiniMap.class, new MiniMapSerializer( kryo ) );
+        kryo.register( MiniMap.class, new MiniMapSerializer() );
     }
     
 }

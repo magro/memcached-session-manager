@@ -18,20 +18,20 @@ package de.javakaffee.web.msm.serializer.kryo;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.serialize.ReferenceFieldSerializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
 
 /**
  * Default Serializer used by memcached-session-manager.
- * Creates a {@link ReferenceFieldSerializer} which does not ignores synthetic fields (so that inner classes
+ * Creates a {@link FieldSerializer} which does not ignores synthetic fields (so that inner classes
  * are handled correctly).
  *
  * @author Marcus Thiesen (marcus.thiesen@freiheit.com) (initial creation)
  */
-public class ReferenceFieldSerializerFactory implements KryoDefaultSerializerFactory {
+public class DefaultFieldSerializerFactory implements KryoDefaultSerializerFactory {
 
     @Override
     public Serializer newDefaultSerializer( final Kryo kryo, final Class<?> type ) {
-        final ReferenceFieldSerializer result = new ReferenceFieldSerializer( kryo, type );
+        final FieldSerializer result = new FieldSerializer( kryo, type );
         result.setIgnoreSyntheticFields( false );
         return result;
     }

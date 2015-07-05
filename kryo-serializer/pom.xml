@@ -6,7 +6,6 @@
 		<version>1.8.4-SNAPSHOT</version>
 	</parent>
 
-	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>msm-kryo-serializer</artifactId>
 	<name>memcached-session-manager kryo-serializer</name>
 	<version>1.8.4-SNAPSHOT</version>
@@ -22,7 +21,12 @@
 		<dependency>
 			<groupId>de.javakaffee</groupId>
 			<artifactId>kryo-serializers</artifactId>
-			<version>0.11</version>
+			<version>0.34</version>
+		</dependency>
+		<dependency>
+			<groupId>com.esotericsoftware</groupId>
+			<artifactId>kryo</artifactId>
+			<version>3.0.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>

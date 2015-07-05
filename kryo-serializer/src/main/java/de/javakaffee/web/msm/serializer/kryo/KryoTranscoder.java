@@ -16,64 +16,24 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Currency;
-import java.util.Date;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.ObjectBuffer;
-import com.esotericsoftware.kryo.SerializationException;
-import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.serialize.BigDecimalSerializer;
-import com.esotericsoftware.kryo.serialize.BigIntegerSerializer;
-
-import de.javakaffee.kryoserializers.ArraysAsListSerializer;
-import de.javakaffee.kryoserializers.ClassSerializer;
-import de.javakaffee.kryoserializers.CollectionsEmptyListSerializer;
-import de.javakaffee.kryoserializers.CollectionsEmptyMapSerializer;
-import de.javakaffee.kryoserializers.CollectionsEmptySetSerializer;
-import de.javakaffee.kryoserializers.CollectionsSingletonListSerializer;
-import de.javakaffee.kryoserializers.CollectionsSingletonMapSerializer;
-import de.javakaffee.kryoserializers.CollectionsSingletonSetSerializer;
-import de.javakaffee.kryoserializers.CopyForIterateCollectionSerializer;
-import de.javakaffee.kryoserializers.CopyForIterateMapSerializer;
-import de.javakaffee.kryoserializers.CurrencySerializer;
-import de.javakaffee.kryoserializers.DateSerializer;
-import de.javakaffee.kryoserializers.EnumMapSerializer;
-import de.javakaffee.kryoserializers.EnumSetSerializer;
-import de.javakaffee.kryoserializers.GregorianCalendarSerializer;
-import de.javakaffee.kryoserializers.JdkProxySerializer;
-import de.javakaffee.kryoserializers.KryoReflectionFactorySupport;
-import de.javakaffee.kryoserializers.LocaleSerializer;
-import de.javakaffee.kryoserializers.StringBufferSerializer;
-import de.javakaffee.kryoserializers.StringBuilderSerializer;
-import de.javakaffee.kryoserializers.SubListSerializer;
-import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
-import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
+import com.esotericsoftware.kryo.*;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.pool.KryoFactory;
+import com.esotericsoftware.kryo.pool.KryoPool;
+import de.javakaffee.kryoserializers.*;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderDeserializationException;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+import org.objenesis.strategy.StdInstantiatorStrategy;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A {@link SessionAttributesTranscoder} that uses {@link Kryo} for serialization.
@@ -86,47 +46,30 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     
     public static final int DEFAULT_INITIAL_BUFFER_SIZE = 100 * 1024;
     public static final int DEFAULT_MAX_BUFFER_SIZE = 2000 * 1024;
-    public static final String DEFAULT_SERIALIZER_FACTORY_CLASS = ReferenceFieldSerializerFactory.class.getName();
+    public static final String DEFAULT_SERIALIZER_FACTORY_CLASS = DefaultFieldSerializerFactory.class.getName();
     
-    private final Kryo _kryo;
-    private final SerializerFactory[] _serializerFactories;
-    private final UnregisteredClassHandler[] _unregisteredClassHandlers;
+    private final KryoPool _kryoPool;
 
     private final int _initialBufferSize;
     private final int _maxBufferSize;
     private final KryoDefaultSerializerFactory _defaultSerializerFactory;
 
-    /**
-     * 
-     */
     public KryoTranscoder() {
         this( null, null, false );
     }
-    
-    /**
-     * @param classLoader
-     * @param copyCollectionsForSerialization 
-     * @param customConverterClassNames 
-     */
+
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
         this( classLoader, customConverterClassNames, copyCollectionsForSerialization, DEFAULT_INITIAL_BUFFER_SIZE, DEFAULT_MAX_BUFFER_SIZE,
                 DEFAULT_SERIALIZER_FACTORY_CLASS );
     }
-    
-    /**
-     * @param classLoader
-     * @param copyCollectionsForSerialization 
-     * @param customConverterClassNames 
-     */
+
     public KryoTranscoder( final ClassLoader classLoader, final String[] customConverterClassNames,
             final boolean copyCollectionsForSerialization, final int initialBufferSize, final int maxBufferSize,
             final String defaultSerializerFactoryClass ) {
         LOG.info( "Starting with initialBufferSize " + initialBufferSize + ", maxBufferSize " + maxBufferSize +
                 " and defaultSerializerFactory " + defaultSerializerFactoryClass );
-        final Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> triple = createKryo( classLoader, customConverterClassNames, copyCollectionsForSerialization );
-        _kryo = triple.a;
-        _serializerFactories = triple.b;
-        _unregisteredClassHandlers = triple.c;
+        final KryoFactory kryoFactory = createKryoFactory(classLoader, customConverterClassNames, copyCollectionsForSerialization);
+        _kryoPool = new KryoPool.Builder(kryoFactory).softReferences().build();
         _initialBufferSize = initialBufferSize;
         _maxBufferSize = maxBufferSize;
         _defaultSerializerFactory = loadDefaultSerializerFactory( classLoader, defaultSerializerFactoryClass );
@@ -143,138 +86,115 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         }
     }
 
-    private Triple<Kryo, SerializerFactory[], UnregisteredClassHandler[]> createKryo( final ClassLoader classLoader,
-            final String[] customConverterClassNames, final boolean copyCollectionsForSerialization ) {
-        
-        final Kryo kryo = new KryoReflectionFactorySupport() {
-            
+    private KryoFactory createKryoFactory(final ClassLoader classLoader,
+                                          final String[] customConverterClassNames,
+                                          final boolean copyCollectionsForSerialization) {
+
+        final KryoBuilder kryoBuilder = new KryoBuilder() {
+            @Override
+            protected Kryo createKryo(ClassResolver classResolver, ReferenceResolver referenceResolver, StreamFactory streamFactory) {
+                return KryoTranscoder.this.createKryo(classResolver, referenceResolver, streamFactory,
+                        classLoader, customConverterClassNames, copyCollectionsForSerialization);
+            }
+        }.withInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+
+        final List<KryoBuilderConfiguration> builderConfigs = load(KryoBuilderConfiguration.class, customConverterClassNames, classLoader);
+        for(KryoBuilderConfiguration config : builderConfigs) {
+            config.configure(kryoBuilder);
+        }
+
+        return new KryoFactory() {
+            @Override
+            public Kryo create() {
+                Kryo kryo = kryoBuilder.build();
+
+                kryo.setDefaultSerializer(new KryoDefaultSerializerFactory.SerializerFactoryAdapter(_defaultSerializerFactory));
+
+                if ( classLoader != null ) {
+                    kryo.setClassLoader( classLoader );
+                }
+
+                // com.esotericsoftware.minlog.Log.TRACE = true;
+
+                kryo.setRegistrationRequired(false);
+                kryo.register( Arrays.asList( "" ).getClass(), new ArraysAsListSerializer() );
+                kryo.register(InvocationHandler.class, new JdkProxySerializer());
+                UnmodifiableCollectionsSerializer.registerSerializers(kryo);
+                SynchronizedCollectionsSerializer.registerSerializers(kryo);
+
+                kryo.addDefaultSerializer(EnumMap.class, EnumMapSerializer.class);
+                SubListSerializers.addDefaultSerializers(kryo);
+
+                final List<KryoCustomization> customizations = load(KryoCustomization.class, customConverterClassNames, classLoader, kryo);
+                if ( customizations != null ) {
+                    for( final KryoCustomization customization : customizations ) {
+                        try {
+                            LOG.info( "Executing KryoCustomization " + customization.getClass().getName() );
+                            customization.customize( kryo );
+                        } catch( final Throwable e ) {
+                            LOG.error( "Could not execute customization " + customization, e );
+                        }
+                    }
+                }
+
+                return kryo;
+            }
+        };
+    }
+
+    protected Kryo createKryo(final ClassResolver classResolver, final ReferenceResolver referenceResolver, final StreamFactory streamFactory,
+                              final ClassLoader classLoader, final String[] customConverterClassNames, final boolean copyCollectionsForSerialization) {
+        return new Kryo(classResolver, referenceResolver, streamFactory) {
+
+            private final List<SerializerFactory> serializerFactories = load(SerializerFactory.class, customConverterClassNames, classLoader, this);
+
             @Override
             @SuppressWarnings( { "rawtypes", "unchecked" } )
-            public Serializer newSerializer(final Class clazz) {
-                final Serializer customSerializer = loadCustomSerializer( clazz );
+            public Serializer getDefaultSerializer(final Class clazz) {
+                final Serializer customSerializer = loadCustomSerializer( clazz, serializerFactories );
                 if ( customSerializer != null ) {
                     return customSerializer;
                 }
-                if ( EnumSet.class.isAssignableFrom( clazz ) ) {
-                    return new EnumSetSerializer( this );
-                }
-                if ( EnumMap.class.isAssignableFrom( clazz ) ) {
-                    return new EnumMapSerializer( this );
-                }
-                if ( SubListSerializer.canSerialize( clazz ) ) {
-                    return new SubListSerializer( this, clazz );
-                }
                 if ( copyCollectionsForSerialization ) {
-                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz, this );
+                    // could also be installed via addDefaultSerializer
+                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz );
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
                 }
-                if ( Date.class.isAssignableFrom( clazz ) ) {
-                    return new DateSerializer( clazz );
-                }
-                return super.newSerializer( clazz );
+                return super.getDefaultSerializer( clazz );
             }
-            
-            @SuppressWarnings( { "rawtypes" } )
-            @Override
-            protected void handleUnregisteredClass( final Class clazz ) {
-                if ( _unregisteredClassHandlers != null ) {
-                    for( int i = 0; i < _unregisteredClassHandlers.length; i++ ) {
-                        final boolean handled = _unregisteredClassHandlers[i].handleUnregisteredClass( clazz );
-                        if ( handled ) {
-                            if ( LOG.isDebugEnabled() ) {
-                                LOG.debug( "UnregisteredClassHandler " + _unregisteredClassHandlers[i].getClass().getName() + " handled class " + clazz );
+
+            private Serializer loadCustomSerializer(final Class<?> clazz, List<SerializerFactory> serializerFactories) {
+                if ( serializerFactories != null ) {
+                    for (SerializerFactory serializerFactory : serializerFactories) {
+                        final Serializer serializer = serializerFactory.newSerializer(clazz);
+                        if (serializer != null) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Loading custom serializer " + serializer.getClass().getName() + " for class " + clazz);
                             }
-                            return;
+                            return serializer;
                         }
                     }
                 }
-                super.handleUnregisteredClass( clazz );
-            }
-            
-            @Override
-            protected Serializer newDefaultSerializer( @SuppressWarnings( "rawtypes" ) final Class type ) {
-                return _defaultSerializerFactory.newDefaultSerializer( this, type );
+                return null;
             }
 
         };
-        
-        if ( classLoader != null ) {
-            kryo.setClassLoader( classLoader );
-        }
-        
-        // com.esotericsoftware.minlog.Log.TRACE = true;
-        
-        kryo.setRegistrationOptional( true );
-        kryo.register( ArrayList.class );
-        kryo.register( LinkedList.class );
-        kryo.register( HashSet.class );
-        kryo.register( HashMap.class );
-        kryo.register( Arrays.asList( "" ).getClass(), new ArraysAsListSerializer( kryo ) );
-        kryo.register( Currency.class, new CurrencySerializer( kryo ) );
-        kryo.register( StringBuffer.class, new StringBufferSerializer( kryo ) );
-        kryo.register( StringBuilder.class, new StringBuilderSerializer( kryo ) );
-        kryo.register( Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer() );
-        kryo.register( Collections.EMPTY_MAP.getClass(), new CollectionsEmptyMapSerializer() );
-        kryo.register( Collections.EMPTY_SET.getClass(), new CollectionsEmptySetSerializer() );
-        kryo.register( Collections.singletonList( "" ).getClass(), new CollectionsSingletonListSerializer( kryo ) );
-        kryo.register( Collections.singleton( "" ).getClass(), new CollectionsSingletonSetSerializer( kryo ) );
-        kryo.register( Collections.singletonMap( "", "" ).getClass(), new CollectionsSingletonMapSerializer( kryo ) );
-        kryo.register( Class.class, new ClassSerializer( kryo ) );
-        kryo.register( BigDecimal.class, new BigDecimalSerializer() );
-        kryo.register( BigInteger.class, new BigIntegerSerializer() );
-        kryo.register( GregorianCalendar.class, new GregorianCalendarSerializer() );
-        kryo.register( InvocationHandler.class, new JdkProxySerializer( kryo ) );
-        UnmodifiableCollectionsSerializer.registerSerializers( kryo );
-        SynchronizedCollectionsSerializer.registerSerializers( kryo );
-        kryo.register( Locale.class, new LocaleSerializer() );
-        
-        final Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> pair = loadCustomConverter( customConverterClassNames,
-                classLoader, kryo );
-        
-        final KryoCustomization[] customizations = pair.a;
-        if ( customizations != null ) {
-            for( final KryoCustomization customization : customizations ) {
-                try {
-                    LOG.info( "Executing KryoCustomization " + customization.getClass().getName() );
-                    customization.customize( kryo );
-                } catch( final Throwable e ) {
-                    LOG.error( "Could not execute customization " + customization, e );
-                }
-            }
-        }
-        
-        return Triple.create( kryo, pair.b, pair.c );
     }
     
-    private Serializer loadCustomSerializer( final Class<?> clazz ) {
-        if ( _serializerFactories != null ) {
-            for( int i = 0; i < _serializerFactories.length; i++ ) {
-                final Serializer serializer = _serializerFactories[i].newSerializer( clazz );
-                if ( serializer != null ) {
-                    if ( LOG.isDebugEnabled() ) {
-                        LOG.debug( "Loading custom serializer " + serializer.getClass().getName() + " for class " + clazz );
-                    }
-                    return serializer;
-                }
-            }
-        }
-        return null;
-    }
-    
-    private Serializer loadCopyCollectionSerializer( final Class<?> clazz, final Kryo kryo ) {
+    private Serializer loadCopyCollectionSerializer( final Class<?> clazz ) {
         if ( Collection.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateCollectionSerializer for class " + clazz );
             }
-            return new CopyForIterateCollectionSerializer( kryo );
+            return new CopyForIterateCollectionSerializer();
         }
         if ( Map.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateMapSerializer for class " + clazz );
             }
-            return new CopyForIterateMapSerializer( kryo );
+            return new CopyForIterateMapSerializer();
         }
         return null;
     }
@@ -285,10 +205,13 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     @SuppressWarnings( "unchecked" )
     @Override
     public Map<String, Object> deserializeAttributes( final byte[] data ) {
+        final Kryo kryo = _kryoPool.borrow();
         try {
-            return new ObjectBuffer( _kryo ).readObject( data, ConcurrentHashMap.class );
-        } catch ( final SerializationException e ) {
+            return kryo.readObject(new Input(data), ConcurrentHashMap.class);
+        } catch ( final RuntimeException e ) {
             throw new TranscoderDeserializationException( e );
+        } finally {
+            _kryoPool.release(kryo);
         }
     }
 
@@ -297,59 +220,45 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      */
     @Override
     public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
-        /**
-         * Creates an ObjectStream with an initial buffer size of 50KB and a maximum size of 1000KB.
-         */
-        return new ObjectBuffer( _kryo, _initialBufferSize, _maxBufferSize  ).writeObject( attributes );
+        final Kryo kryo = _kryoPool.borrow();
+        try {
+            /**
+             * Creates an ObjectStream with an initial buffer size of 50KB and a maximum size of 1000KB.
+             */
+            Output out = new Output(_initialBufferSize, _maxBufferSize);
+            kryo.writeObject(out, attributes);
+            return out.toBytes();
+        } catch ( final RuntimeException e ) {
+            throw new TranscoderDeserializationException( e );
+        } finally {
+            _kryoPool.release(kryo);
+        }
     }
 
-    private Triple<KryoCustomization[], SerializerFactory[], UnregisteredClassHandler[]> loadCustomConverter( final String[] customConverterClassNames, final ClassLoader classLoader,
-            final Kryo kryo ) {
-        if ( customConverterClassNames == null || customConverterClassNames.length == 0 ) {
-            return Triple.empty();
+    private <T> List<T> load( Class<T> type, final String[] customConverterClassNames, final ClassLoader classLoader) {
+        return load(type, customConverterClassNames, classLoader, null);
+    }
+
+    private <T> List<T> load( Class<T> type, final String[] customConverterClassNames, final ClassLoader classLoader, final Kryo kryo) {
+        if (customConverterClassNames == null || customConverterClassNames.length == 0 ) {
+            return Collections.emptyList();
         }
-        final List<KryoCustomization> customizations = new ArrayList<KryoCustomization>();
-        final List<SerializerFactory> serializerFactories = new ArrayList<SerializerFactory>();
-        final List<UnregisteredClassHandler> unregisteredClassHandlers = new ArrayList<UnregisteredClassHandler>();
+        final List<T> result = new ArrayList<T>();
         final ClassLoader loader = classLoader != null ? classLoader : Thread.currentThread().getContextClassLoader();
-        for ( int i = 0; i < customConverterClassNames.length; i++ ) {
-            final String element = customConverterClassNames[i];
+        for (final String element : customConverterClassNames) {
             try {
-                processElement( element, customizations, serializerFactories, unregisteredClassHandlers, kryo, loader );
-            } catch ( final Exception e ) {
-                LOG.error( "Could not instantiate " + element + ", omitting this KryoCustomization/SerializerFactory.", e );
-                throw new RuntimeException( "Could not load serializer " + element, e );
+                final Class<?> clazz = Class.forName( element, true, loader );
+                if ( type.isAssignableFrom( clazz ) ) {
+                    LOG.info("Loading " + type.getSimpleName() + " " + element);
+                    final T item = createInstance(clazz.asSubclass(type), kryo);
+                    result.add( item );
+                }
+            } catch (final Exception e) {
+                LOG.error("Could not instantiate " + element + ", omitting this "+ type.getSimpleName() +".", e);
+                throw new RuntimeException("Could not load "+ type.getSimpleName() +" " + element, e);
             }
         }
-        final KryoCustomization[] customizationsArray = customizations.toArray( new KryoCustomization[customizations.size()] );
-        final SerializerFactory[] serializerFactoriesArray = serializerFactories.toArray( new SerializerFactory[serializerFactories.size()] );
-        final UnregisteredClassHandler[] unregisteredClassHandlersArray = unregisteredClassHandlers.toArray( new UnregisteredClassHandler[unregisteredClassHandlers.size()] );
-        return Triple.create( customizationsArray, serializerFactoriesArray, unregisteredClassHandlersArray );
-    }
-
-    private void processElement( final String element, final List<KryoCustomization> customizations,
-            final List<SerializerFactory> serializerFactories, final List<UnregisteredClassHandler> unregisteredClassHandlers, final Kryo kryo, final ClassLoader loader )
-        throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException,
-        InvocationTargetException {
-        final Class<?> clazz = Class.forName( element, true, loader );
-        if ( KryoCustomization.class.isAssignableFrom( clazz ) ) {
-            LOG.info( "Loading KryoCustomization " + element );
-            final KryoCustomization customization = createInstance( clazz.asSubclass( KryoCustomization.class ), kryo );
-            customizations.add( customization );
-            if ( customization instanceof SerializerFactory ) {
-                serializerFactories.add( (SerializerFactory) customization );
-            }
-        }
-        if ( SerializerFactory.class.isAssignableFrom( clazz ) ) {
-            LOG.info( "Loading SerializerFactory " + element );
-            final SerializerFactory factory = createInstance( clazz.asSubclass( SerializerFactory.class ), kryo );
-            serializerFactories.add( factory );
-        }
-        if ( UnregisteredClassHandler.class.isAssignableFrom( clazz ) ) {
-            LOG.info( "Loading UnregisteredClassHandler " + element );
-            final UnregisteredClassHandler handler = createInstance( clazz.asSubclass( UnregisteredClassHandler.class ), kryo );
-            unregisteredClassHandlers.add( handler );
-        }
+        return result;
     }
 
     private static <T> T createInstance( final Class<? extends T> clazz, final Kryo kryo ) throws SecurityException, NoSuchMethodException, IllegalArgumentException, InstantiationException, IllegalAccessException, InvocationTargetException {
@@ -359,25 +268,6 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         } catch ( final NoSuchMethodException nsme ) {
             final Constructor<? extends T> constructor = clazz.getConstructor();
             return constructor.newInstance();
-        }
-    }
-    
-    private static class Triple<A,B,C> {
-        private static final Triple<?, ?, ?> EMPTY = Triple.create( null, null, null );
-        private final A a;
-        private final B b;
-        private final C c;
-        public Triple( final A a, final B b, final C c ) {
-            this.a = a;
-            this.b = b;
-            this.c = c;
-        }
-        public static <A, B, C> Triple<A, B, C> create( final A a, final B b, final C c ) {
-            return new Triple<A, B, C>( a, b, c );
-        }
-        @SuppressWarnings( "unchecked" )
-        public static <A, B, C> Triple<A, B, C> empty() {
-            return (Triple<A, B, C>) EMPTY;
         }
     }
 

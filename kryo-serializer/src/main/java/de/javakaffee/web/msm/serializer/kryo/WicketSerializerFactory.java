@@ -18,6 +18,7 @@ package de.javakaffee.web.msm.serializer.kryo;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
+import org.objenesis.strategy.StdInstantiatorStrategy;
 
 /**
  * A meta {@link SerializerFactory} and {@link KryoCustomization} that represents {@link WicketMiniMapRegistration}
@@ -26,10 +27,9 @@ import com.esotericsoftware.kryo.Serializer;
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class WicketSerializerFactory implements SerializerFactory, KryoCustomization {
+public class WicketSerializerFactory implements KryoBuilderConfiguration, SerializerFactory, KryoCustomization {
     
     private final WicketChildListSerializerFactory _childListSerializerFactory;
-    private final ComponentSerializerFactory _componentSerializerFactory;
 
     /**
      * Creates a new instances.
@@ -40,7 +40,20 @@ public class WicketSerializerFactory implements SerializerFactory, KryoCustomiza
             throw new NullPointerException( "Kryo is not provided but null!" );
         }
         _childListSerializerFactory = new WicketChildListSerializerFactory( kryo );
-        _componentSerializerFactory = new ComponentSerializerFactory( kryo );
+    }
+
+    @Override
+    public KryoBuilder configure(KryoBuilder kryoBuilder) {
+        return kryoBuilder
+                .withInstantiatorStrategy(
+                        new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()))
+                .withReferences(true);
+    }
+
+    @Override
+    public void customize( final Kryo kryo ) {
+        new WicketMiniMapRegistration().customize( kryo );
+        new ComponentSerializerFactory().customize( kryo );
     }
 
     @Override
@@ -49,15 +62,7 @@ public class WicketSerializerFactory implements SerializerFactory, KryoCustomiza
         if ( ( serializer = _childListSerializerFactory.newSerializer( type ) ) != null ) {
             return serializer;
         }
-        if ( ( serializer = _componentSerializerFactory.newSerializer( type ) ) != null ) {
-            return serializer;
-        }
         return null;
-    }
-    
-    @Override
-    public void customize( final Kryo kryo ) {
-        new WicketMiniMapRegistration().customize( kryo );
     }
     
 }

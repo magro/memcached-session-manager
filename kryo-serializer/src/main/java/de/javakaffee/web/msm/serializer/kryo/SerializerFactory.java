@@ -21,7 +21,7 @@ import com.esotericsoftware.kryo.Serializer;
 
 /**
  * This factory creates a new {@link Serializer} for a given class. It is
- * used in {@link Kryo#newSerializer(Class)}.
+ * used in {@link Kryo#newDefaultSerializer(Class)}.
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */

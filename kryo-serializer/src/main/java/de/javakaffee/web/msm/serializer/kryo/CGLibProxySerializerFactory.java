@@ -16,10 +16,14 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
+import com.esotericsoftware.kryo.ClassResolver;
 import com.esotericsoftware.kryo.Kryo;
 
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.util.DefaultClassResolver;
 import de.javakaffee.kryoserializers.cglib.CGLibProxySerializer;
 import de.javakaffee.kryoserializers.cglib.CGLibProxySerializer.CGLibProxyMarker;
+import org.objenesis.strategy.StdInstantiatorStrategy;
 
 /**
  * A {@link SerializerFactory} that creates {@link CGLibProxySerializer} instances. Additionally
@@ -28,33 +32,53 @@ import de.javakaffee.kryoserializers.cglib.CGLibProxySerializer.CGLibProxyMarker
  * 
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class CGLibProxySerializerFactory implements UnregisteredClassHandler, KryoCustomization {
-    
-    private final Kryo _kryo;
+public class CGLibProxySerializerFactory implements KryoCustomization, SerializerFactory, KryoBuilderConfiguration {
+
+    private final Kryo kryo;
 
     /**
-     * Creates a new instances.
-     * @param kryo the kryo instance that must be provided.
+     * Needed for instantiation as KryoBuilderConfiguration.
      */
-    public CGLibProxySerializerFactory( final Kryo kryo ) {
-        if ( kryo == null ) {
-            throw new NullPointerException( "Kryo is not provided but null!" );
-        }
-        _kryo = kryo;
+    public CGLibProxySerializerFactory() {
+        this(null);
     }
-    
+
+    public CGLibProxySerializerFactory(Kryo kryo) {
+        this.kryo = kryo;
+    }
+
+    @Override
+    public KryoBuilder configure(KryoBuilder kryoBuilder) {
+        return kryoBuilder
+                .withClassResolver(createClassResolver())
+                .withInstantiatorStrategy(
+                        new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+    }
+
     @Override
     public void customize( final Kryo kryo ) {
-        kryo.register( CGLibProxySerializer.CGLibProxyMarker.class, new CGLibProxySerializer( kryo ) );
+        kryo.register( CGLibProxySerializer.CGLibProxyMarker.class, new CGLibProxySerializer() );
     }
-    
+
     @Override
-    public boolean handleUnregisteredClass( final Class<?> type ) {
+    public Serializer newSerializer(Class<?> type) {
         if ( CGLibProxySerializer.canSerialize( type ) ) {
-            _kryo.register( type, _kryo.getRegisteredClass( CGLibProxySerializer.CGLibProxyMarker.class ) );
-            return true;
+            return kryo.getSerializer(CGLibProxySerializer.CGLibProxyMarker.class);
         }
-        return false;
+        return null;
     }
-    
+
+    protected ClassResolver createClassResolver() {
+        return new CGLibProxyClassResolver();
+    }
+
+    static class CGLibProxyClassResolver extends DefaultClassResolver {
+        @Override
+        protected Class<?> getTypeByName(final String className) {
+            if (className.indexOf(CGLibProxySerializer.DEFAULT_NAMING_MARKER) > 0) {
+                return CGLibProxyMarker.class;
+            }
+            return super.getTypeByName(className);
+        }
+    }
 }

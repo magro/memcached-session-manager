@@ -16,11 +16,10 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import org.apache.wicket.MarkupContainer;
-
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.serialize.FieldSerializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
+import org.apache.wicket.MarkupContainer;
 
 /**
  * A {@link SerializerFactory} that creates a {@link FieldSerializer} instance for
