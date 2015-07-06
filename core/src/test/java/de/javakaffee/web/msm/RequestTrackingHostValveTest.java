@@ -50,11 +50,18 @@ import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
  */
 public abstract class RequestTrackingHostValveTest {
 
+    private static final String PRIMARY_NODE_IDENTIFIER = "n2";
+    private static final boolean IS_PRIMARY_MEMCACHED_NODE_OPERATIONAL = true;
+    private static final String SESSION_ID = "9956461BA10903169EB0C4041DCA7BF1-n2";
+    private static final String REQUEST_IGNORED = "de.javakaffee.msm.request.ignored";
+
     protected MemcachedSessionService _service;
     private RequestTrackingHostValve _sessionTrackerValve;
     private Valve _nextValve;
     private Request _request;
     private Response _response;
+    private MemcachedNodesManager _memcachedNodesManager;
+    private SessionIdFormat _sessionIdFormat;
 
     @BeforeMethod
     public void setUp() throws Exception {
@@ -75,6 +82,8 @@ public abstract class RequestTrackingHostValveTest {
         _nextValve = mock( Valve.class );
         _sessionTrackerValve.setNext( _nextValve );
         _sessionTrackerValve.setContainer(_hostContainer);
+        _memcachedNodesManager = mock( MemcachedNodesManager.class );
+        _sessionIdFormat = mock( SessionIdFormat.class );
 
         when(_request.getRequestURI()).thenReturn( "/someRequest");
         when(_request.getMethod()).thenReturn("GET");
@@ -83,6 +92,11 @@ public abstract class RequestTrackingHostValveTest {
 
         when(_request.getNote(eq(RequestTrackingHostValve.REQUEST_PROCESSED))).thenReturn(Boolean.TRUE);
         when(_request.getNote(eq(RequestTrackingHostValve.SESSION_ID_CHANGED))).thenReturn(Boolean.FALSE);
+
+        when(_sessionIdFormat.extractMemcachedId(anyString())).thenReturn(PRIMARY_NODE_IDENTIFIER);
+        when(_service.getMemcachedNodesManager()).thenReturn(_memcachedNodesManager);
+        when(_memcachedNodesManager.isNodeAvailable(PRIMARY_NODE_IDENTIFIER)).thenReturn(IS_PRIMARY_MEMCACHED_NODE_OPERATIONAL);
+        when(_memcachedNodesManager.getSessionIdFormat()).thenReturn(_sessionIdFormat);
     }
 
     @Nonnull
@@ -174,6 +188,24 @@ public abstract class RequestTrackingHostValveTest {
         _sessionTrackerValve.invoke( _request, _response );
 
         verify( _service ).requestFinished( eq( "foo" ), anyString() );
+    }
+
+    @Test
+    public final void testRequestUrlIgnorePatternIsSkippedIfPrimaryMemcachedNodeIsDown() throws IOException, ServletException {
+        when(_memcachedNodesManager.isNodeAvailable(PRIMARY_NODE_IDENTIFIER)).thenReturn(false);
+        when(_request.getRequestedSessionId()).thenReturn(SESSION_ID);
+        _sessionTrackerValve.invoke( _request, _response );
+
+        verify( _request ).setNote(RequestTrackingHostValve.REQUEST_PROCESS, Boolean.TRUE);
+    }
+
+    @Test
+    public final void testRequestUrlIgnorePatternIsUsedIfPrimaryMemcachedNodeIsOperational() throws IOException, ServletException {
+        when(_memcachedNodesManager.isNodeAvailable(PRIMARY_NODE_IDENTIFIER)).thenReturn(true);
+        when(_request.getRequestURI()).thenReturn("/pixel.gif");
+        _sessionTrackerValve.invoke( _request, _response );
+
+        verify(_request).setNote(REQUEST_IGNORED, Boolean.TRUE);
     }
 
     protected abstract void setupGetResponseSetCookieHeadersExpectations(Response response, String[] result);

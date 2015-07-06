@@ -122,7 +122,7 @@ public abstract class RequestTrackingHostValve extends ValveBase {
         final String requestId = getURIWithQueryString( request );
         if(!_enabled.get() || !_msmContext.equals(request.getContext())) {
             getNext().invoke( request, response );
-        } else if ( _ignorePattern != null && _ignorePattern.matcher( requestId ).matches() ) {
+        } else if ( _ignorePattern != null && _ignorePattern.matcher( requestId ).matches() && isPrimaryMemcachedNodeIsAvailable(request)) {
             if(_log.isDebugEnabled()) {
                 _log.debug( ">>>>>> Ignoring: " + requestId + " (requestedSessionId "+ request.getRequestedSessionId() +") ==================" );
             }
@@ -278,6 +278,13 @@ public abstract class RequestTrackingHostValve extends ValveBase {
         if ( header != null && header.contains( _sessionCookieName ) ) {
             _log.debug( "Request finished, with Set-Cookie header: " + header );
         }
+    }
+
+    private boolean isPrimaryMemcachedNodeIsAvailable(Request request) {
+        MemcachedNodesManager memcachedNodesManager = _sessionBackupService.getMemcachedNodesManager();
+        String primaryNodeIdentifier = memcachedNodesManager.getSessionIdFormat().extractMemcachedId(request.getRequestedSessionId());
+        /* In case we have no primary node identifier then primary node is definitely not available for the session */
+        return primaryNodeIdentifier == null ? false : memcachedNodesManager.isNodeAvailable(primaryNodeIdentifier);
     }
 
 }
