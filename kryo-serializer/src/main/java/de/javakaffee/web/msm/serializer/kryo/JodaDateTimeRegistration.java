@@ -26,8 +26,7 @@ import com.esotericsoftware.kryo.Kryo;
 import de.javakaffee.kryoserializers.jodatime.JodaDateTimeSerializer;
 import org.joda.time.Interval;
 import org.joda.time.LocalDate;
-
-import java.time.LocalDateTime;
+import org.joda.time.LocalDateTime;
 
 /**
  * A {@link KryoCustomization} that registers serializers for
