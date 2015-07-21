@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>de.javakaffee.msm.samples</groupId>
 		<artifactId>msm-samples-project</artifactId>
-		<version>1.7.1-SNAPSHOT</version>
+		<version>1.8.4-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>simpleservlet</artifactId>
