@@ -62,10 +62,11 @@ serialized size is 70122 bytes.
         final MemcachedBackupSessionManager manager = createManager();
         
         // some warmup
-        final int warmupCycles = 100000;
+        // final int warmupCycles = 100000;
+        final int warmupCycles = 100;
+        warmup( manager, new KryoTranscoder(), warmupCycles, 100, 3 );
         warmup( manager, new JavaSerializationTranscoder(), warmupCycles, 100, 3 );
         warmup( manager, new JavolutionTranscoder( Thread.currentThread().getContextClassLoader(), false ), warmupCycles, 100, 3 );
-        warmup( manager, new KryoTranscoder(), warmupCycles, 100, 3 );
         recover();
 
         benchmark( manager, 10, 500, 4 /* 4^4 = 256 */ );
@@ -77,6 +78,11 @@ serialized size is 70122 bytes.
 
     private static void benchmark( final MemcachedBackupSessionManager manager, final int rounds, final int countPersons,
             final int nodesPerEdge ) throws InterruptedException {
+
+        final Stats kryoSerStats = new Stats();
+        final Stats kryoDeSerStats = new Stats();
+        benchmark( manager, new KryoTranscoder(), kryoSerStats, kryoDeSerStats, rounds, countPersons, nodesPerEdge );
+
         final Stats javaSerStats = new Stats();
         final Stats javaDeSerStats = new Stats();
         benchmark( manager, new JavaSerializationTranscoder(), javaSerStats, javaDeSerStats, rounds, countPersons, nodesPerEdge );
@@ -89,10 +95,6 @@ serialized size is 70122 bytes.
                 javolutionDeSerStats, rounds, countPersons, nodesPerEdge );
 
         recover();
-
-        final Stats kryoSerStats = new Stats();
-        final Stats kryoDeSerStats = new Stats();
-        benchmark( manager, new KryoTranscoder(), kryoSerStats, kryoDeSerStats, rounds, countPersons, nodesPerEdge );
         
         System.out.println( "Serialization,Size,Ser-Min,Ser-Avg,Ser-Max,Deser-Min,Deser-Avg,Deser-Max");
         System.out.println( toCSV( "Java", javaSerStats, javaDeSerStats ) );
