@@ -11,7 +11,7 @@
 
 	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>memcached-session-manager-project</artifactId>
-	<version>1.9.0-RC1</version>
+	<version>1.9.0-RC2-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>memcached-session-manager project</name>
 	<description>
