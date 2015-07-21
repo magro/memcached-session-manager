@@ -83,7 +83,7 @@ public class ReflectionFormat<T> extends XMLFormat<T> {
         super( null );
         try {
             _constructor =
-                    REFLECTION_FACTORY.newConstructorForSerialization( clazz, Object.class.getDeclaredConstructor( new Class[0] ) );
+                    (Constructor<T>)REFLECTION_FACTORY.newConstructorForSerialization( clazz, Object.class.getDeclaredConstructor( new Class[0] ) );
             _constructor.setAccessible( true );
         } catch ( final SecurityException e ) {
             throw new RuntimeException( e );
