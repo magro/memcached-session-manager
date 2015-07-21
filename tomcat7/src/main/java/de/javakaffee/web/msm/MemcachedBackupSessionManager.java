@@ -155,7 +155,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * {@inheritDoc}
      */
     @Override
-    public synchronized String generateSessionId() {
+    public String generateSessionId() {
         return _msm.newSessionId( super.generateSessionId() );
     }
 
