@@ -1,6 +1,6 @@
 # msm simpleservlet sample
 
-A sample webapp for testing [memcached-session-manager](http://code.google.com/p/memcached-session-manager/) (msm).
+A sample webapp for testing [memcached-session-manager](https://github.com/magro/memcached-session-manager) (msm).
 
 It provides this API:
 

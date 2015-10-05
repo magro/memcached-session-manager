@@ -17,11 +17,11 @@
 	<description>
     A tomcat session manager that provides session failover / session replication using memcached (or a memcached compatible store). It supports both sticky and non-sticky sessions.
     </description>
-	<url>http://code.google.com/p/memcached-session-manager/</url>
+	<url>https://github.com/magro/memcached-session-manager/</url>
 
 	<issueManagement>
-		<system>code.google.com</system>
-		<url>http://code.google.com/p/memcached-session-manager/issues</url>
+		<system>github</system>
+		<url>https://github.com/magro/memcached-session-manager/issues</url>
 	</issueManagement>
 	<inceptionYear>2009</inceptionYear>
 	<prerequisites>
@@ -43,7 +43,7 @@
 		<developer>
 			<id>martin.grotzke</id>
 			<name>Martin Grotzke</name>
-			<email>martin.grotzke@googlecode.com</email>
+			<email>martin.grotzke@googlemail.com</email>
 			<roles>
 				<role>owner</role>
 				<role>developer</role>
