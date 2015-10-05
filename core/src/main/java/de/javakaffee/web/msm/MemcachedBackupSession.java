@@ -122,6 +122,11 @@ public class MemcachedBackupSession extends StandardSession {
         _refCount = new HashSet<Long>();
     }
 
+    @Override
+    public SessionManager getManager() {
+        return (SessionManager) super.getManager();
+    }
+
     /**
      * {@inheritDoc}
      */

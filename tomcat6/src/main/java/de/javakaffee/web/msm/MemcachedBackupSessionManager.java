@@ -23,6 +23,7 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Map;
@@ -47,6 +48,7 @@ import org.apache.catalina.connector.Response;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityConstraint;
 import org.apache.catalina.ha.session.SerializablePrincipal;
+import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.catalina.session.ManagerBase;
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.LifecycleSupport;
@@ -1052,6 +1054,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     @Override
     public ClassLoader getContainerClassLoader() {
         return getContainer().getLoader().getClassLoader();
+    }
+
+    @Override
+    public void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutputStream oos) throws IOException {
+        SerializablePrincipal.writePrincipal((GenericPrincipal) principal, oos );
     }
 
     @Override

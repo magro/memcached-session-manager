@@ -24,6 +24,7 @@ import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -330,6 +331,14 @@ public class MemcachedSessionService {
          */
         @Nonnull
         ClassLoader getContainerClassLoader();
+
+        /**
+         * Writes the given Principal to the provided output stream.
+         * @param principal the principal
+         * @param oos the output stream
+         * @throws IOException expected to be declared by the implementation.
+         */
+        void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutputStream oos) throws IOException;
 
         /**
          * Reads the Principal from the given OIS.

@@ -42,7 +42,6 @@ import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.authenticator.SavedRequest;
-import org.apache.catalina.ha.session.SerializablePrincipal;
 import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -198,13 +197,13 @@ public class TranscoderService {
 
         final byte[] idData = serializeId( session.getIdInternal() );
 
-        final byte[] principalData = serializePrincipal( session.getPrincipal() );
+        final byte[] principalData = serializePrincipal( session.getPrincipal(), session.getManager() );
         final int principalDataLength = principalData != null ? principalData.length : 0;
 
         final byte[] savedRequestData = serializeSavedRequest(session.getNote(Constants.FORM_REQUEST_NOTE));
         final int savedRequestDataLength = savedRequestData != null ? savedRequestData.length : 0;
 
-        final byte[] savedPrincipalData = serializePrincipal((Principal) session.getNote(Constants.FORM_PRINCIPAL_NOTE));
+        final byte[] savedPrincipalData = serializePrincipal((Principal) session.getNote(Constants.FORM_PRINCIPAL_NOTE), session.getManager());
         final int savedPrincipalDataLength = savedPrincipalData != null ? savedPrincipalData.length : 0;
 
         int sessionFieldsDataLength = 2 // short value for the version
@@ -340,7 +339,7 @@ public class TranscoderService {
         }
     }
 
-    private static byte[] serializePrincipal( final Principal principal ) {
+    private static byte[] serializePrincipal( final Principal principal, final SessionManager manager ) {
         if(principal == null) {
             return null;
         }
@@ -349,7 +348,7 @@ public class TranscoderService {
         try {
             bos = new ByteArrayOutputStream();
             oos = new ObjectOutputStream( bos );
-            SerializablePrincipal.writePrincipal((GenericPrincipal) principal, oos );
+            manager.writePrincipal(principal, oos);
             oos.flush();
             return bos.toByteArray();
         } catch ( final IOException e ) {
