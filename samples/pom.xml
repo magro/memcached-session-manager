@@ -4,7 +4,7 @@
 	<groupId>de.javakaffee.msm.samples</groupId>
 	<artifactId>msm-samples-project</artifactId>
 	<packaging>pom</packaging>
-	<version>1.8.4-SNAPSHOT</version>
+	<version>1.9.0-RC1</version>
 	<name>msm-samples project</name>
 	<description>Parent pom for msm samples</description>
 	<!-- TODO <organization> <name>company name</name> <url>company url</url> 
