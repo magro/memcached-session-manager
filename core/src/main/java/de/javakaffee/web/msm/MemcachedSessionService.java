@@ -757,6 +757,14 @@ public class MemcachedSessionService {
         final String localJvmRoute = _manager.getJvmRoute();
         if ( localJvmRoute != null && !localJvmRoute.equals( getSessionIdFormat().extractJvmRoute( requestedSessionId ) ) ) {
 
+            // the session might already be relocated, e.g. if some ajax calls are running concurrently.
+            // if we'd run session takeover again, a new empty session would be created.
+            // see https://github.com/magro/memcached-session-manager/issues/282
+            final String newSessionId = _memcachedNodesManager.changeSessionIdForTomcatFailover(requestedSessionId, _manager.getJvmRoute());
+            if (_manager.getSessionInternal(newSessionId) != null) {
+                return newSessionId;
+            }
+
             // the session might have been loaded already (by some valve), so let's check our session map
             MemcachedBackupSession session = _manager.getSessionInternal( requestedSessionId );
             if ( session == null ) {
@@ -766,6 +774,8 @@ public class MemcachedSessionService {
             // checking valid() can expire() the session!
             if ( session != null && session.isValid() ) {
                 return handleSessionTakeOver( session );
+            } else if (_manager.getSessionInternal(newSessionId) != null) {
+                return newSessionId;
             }
         }
         return null;
@@ -792,11 +802,14 @@ public class MemcachedSessionService {
 
         session.setIdInternal( newSessionId );
 
-        addValidLoadedSession( session, true );
+        // a concurrent/earlier request might already have added the session (#282)
+        if ( !_manager.getSessionsInternal().containsKey( newSessionId ) ) {
+            addValidLoadedSession(session, true);
 
-        deleteFromMemcached( origSessionId );
+            deleteFromMemcached(origSessionId);
 
-        _statistics.requestWithTomcatFailover();
+            _statistics.requestWithTomcatFailover();
+        }
 
         return newSessionId;
 
