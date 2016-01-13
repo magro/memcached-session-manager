@@ -683,6 +683,14 @@ public class MemcachedSessionService {
             request.setNote(NEW_SESSION_ID, sessionId);
         }
 
+        // we must register us as holding a reference, otherwise we might remove the session too early. (#283)
+        if(!_sticky) {
+            // synchronized to have correct refcounts
+            synchronized (_manager.getSessionsInternal()) {
+                session.registerReference();
+            }
+        }
+
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Created new session with id " + session.getId() );
         }
