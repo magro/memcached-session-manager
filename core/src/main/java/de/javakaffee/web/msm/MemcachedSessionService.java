@@ -696,7 +696,13 @@ public class MemcachedSessionService {
         }
 
         _manager.incrementSessionCounter();
-
+        //if the new session exist in _invalidSessionsCache, we should remove it marking this session valid.(#284)
+        if( _invalidSessionsCache.get(session.getId()) ){
+            if ( _log.isDebugEnabled() ) {
+                _log.debug( "Remove session id  " + session.getId() + "  from _invalidSessionsCache, marking new session valid" );
+            }
+            _invalidSessionsCache.remove(session.getId());            
+        }
         return session;
 
     }
