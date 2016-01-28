@@ -387,18 +387,14 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
 
     private static Response redirect( final HttpResponse response, final DefaultHttpClient client, final int port,
             final String rsessionId, final String baseUri ) throws IOException, HttpException {
-        final String location = response.getFirstHeader( "Location" ).getValue();
-        if ( !location.startsWith( baseUri ) ) {
-            throw new RuntimeException( "There's s.th. wrong, the location header should start with the base URI " + baseUri +
-                    ". The location header: " + location );
-        }
         /* consume content so that the connection can be released
          */
         EntityUtils.consume(response.getEntity());
 
         /* redirect
          */
-        final String redirectPath = location.substring( baseUri.length(), location.length() );
+        final String location = response.getFirstHeader( "Location" ).getValue();
+        final String redirectPath = location.startsWith( baseUri ) ? location.substring( baseUri.length(), location.length() ) : location;
         return get( client, port, redirectPath, rsessionId );
     }
 

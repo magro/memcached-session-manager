@@ -12,9 +12,9 @@
 	<packaging>jar</packaging>
 	<name>memcached-session-manager tomcat6</name>
 	<description>The msm tomcat6 specific implementation.</description>
-	
+
 	<properties>
-		<tomcat-version>6.0.39</tomcat-version>
+		<tomcat-version>6.0.44</tomcat-version>
 	</properties>
 	
 	<dependencies>
