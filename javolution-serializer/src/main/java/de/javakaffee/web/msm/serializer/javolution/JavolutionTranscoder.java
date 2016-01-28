@@ -25,6 +25,7 @@ import javolution.xml.XMLObjectWriter;
 import javolution.xml.XMLReferenceResolver;
 import javolution.xml.stream.XMLStreamException;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 import org.apache.juli.logging.Log;
@@ -83,7 +84,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
     public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization,
             final CustomXMLFormat<?> ... customFormats ) {
         _manager = manager;
-        final Loader loader = _manager.getContainer().getLoader();
+        final Loader loader = ((Context)_manager.getContainer()).getLoader();
         _xmlBinding = new ReflectionBinding( loader.getClassLoader(), copyCollectionsForSerialization, customFormats );
     }
 
