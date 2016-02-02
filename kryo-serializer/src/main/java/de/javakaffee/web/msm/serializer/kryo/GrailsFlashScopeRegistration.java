@@ -18,7 +18,7 @@ package de.javakaffee.web.msm.serializer.kryo;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import org.codehaus.groovy.grails.web.servlet.GrailsFlashScope;
+import org.grails.web.servlet.GrailsFlashScope;
 
 /**
  * {@link SerializerFactory} that supports grails flash scope.
