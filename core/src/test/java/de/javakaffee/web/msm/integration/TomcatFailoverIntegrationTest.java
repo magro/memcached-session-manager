@@ -66,6 +66,7 @@ public abstract class TomcatFailoverIntegrationTest {
     private static final String GROUP_WITHOUT_NODE_ID = "withoutNodeId";
 
     private MemCacheDaemon<?> _daemon;
+    private MemCacheDaemon<?> _daemon2 = null;
     private MemcachedClient _client;
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
@@ -134,10 +135,12 @@ public abstract class TomcatFailoverIntegrationTest {
     @AfterMethod
     public void tearDown() throws Exception {
         _client.shutdown();
-        _daemon.stop();
+        _httpClient.getConnectionManager().shutdown();
         _tomcat1.stop();
         _tomcat2.stop();
-        _httpClient.getConnectionManager().shutdown();
+        _daemon.stop();
+        if(_daemon2 != null)
+            _daemon2.stop();
     }
 
     /**
@@ -433,7 +436,7 @@ public abstract class TomcatFailoverIntegrationTest {
     @Test( enabled = true )
     public void testTomcatFailoverMovesSessionToNonFailoverNode() throws Exception {
 
-        final MemCacheDaemon<?> daemon2 = startMemcached(MEMCACHED_PORT + 1);
+        _daemon2 = startMemcached(MEMCACHED_PORT + 1);
         final String memcachedNodes = _memcachedNodes + "," + "n2:localhost:" + (MEMCACHED_PORT + 1);
 
         _tomcat1.getService().setMemcachedNodes(memcachedNodes);
@@ -448,7 +451,7 @@ public abstract class TomcatFailoverIntegrationTest {
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, key, value ).getSessionId();
         assertEquals( format.extractMemcachedId( sessionId1 ), "n2" );
         assertEquals(_daemon.getCache().getCurrentItems(), 0);
-        assertEquals(daemon2.getCache().getCurrentItems(), 1);
+        assertEquals(_daemon2.getCache().getCurrentItems(), 1);
 
         // failover simulation, just request the session from tomcat2
         final Response response = get( _httpClient, TC_PORT_2, sessionId1 );
@@ -462,8 +465,6 @@ public abstract class TomcatFailoverIntegrationTest {
          */
         final String actualValue = response.get( key );
         assertEquals( value, actualValue );
-
-        Thread.sleep( 10 );
 
     }
 
