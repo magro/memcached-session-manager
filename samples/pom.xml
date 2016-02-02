@@ -4,7 +4,7 @@
 	<groupId>de.javakaffee.msm.samples</groupId>
 	<artifactId>msm-samples-project</artifactId>
 	<packaging>pom</packaging>
-	<version>1.9.0-RC1</version>
+	<version>1.9.0-RC2-SNAPSHOT</version>
 	<name>msm-samples project</name>
 	<description>Parent pom for msm samples</description>
 	<!-- TODO <organization> <name>company name</name> <url>company url</url> 
@@ -22,7 +22,7 @@
 	</modules>
 
 	<properties>
-		<tomcat-version>7.0.53</tomcat-version>
+		<tomcat-version>7.0.67</tomcat-version>
 	</properties>
 
 	<dependencies>
