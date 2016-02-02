@@ -12,6 +12,17 @@
         <load-on-startup>1</load-on-startup>
     </servlet>
 
+    <servlet>
+        <servlet-name>counter</servlet-name>
+        <servlet-class>de.javakaffee.web.msm.sample.CounterServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>counter</servlet-name>
+        <url-pattern>/counter</url-pattern>
+    </servlet-mapping>
+
     <servlet-mapping>
         <servlet-name>simple</servlet-name>
         <url-pattern>/*</url-pattern>
