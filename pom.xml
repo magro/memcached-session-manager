@@ -205,7 +205,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<tomcat-version>6.0.44</tomcat-version>
 		<slf4j-version>1.7.14</slf4j-version>
-		<hibernate-core-version>3.3.2.GA</hibernate-core-version>
+		<hibernate-core-version>5.0.7.Final</hibernate-core-version>
 		<couchbasemock-version>0.5-69e953bd</couchbasemock-version>
 	</properties>
 
@@ -309,13 +309,7 @@
 		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-core</artifactId>
-			<version>3.3.2.GA</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.hibernate</groupId>
-			<artifactId>hibernate-annotations</artifactId>
-			<version>3.4.0.GA</version>
+			<version>${hibernate-core-version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -331,9 +325,9 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>hsqldb</groupId>
+			<groupId>org.hsqldb</groupId>
 			<artifactId>hsqldb</artifactId>
-			<version>1.8.0.10</version>
+			<version>2.3.3</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

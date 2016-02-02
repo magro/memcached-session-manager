@@ -21,12 +21,12 @@
 		<dependency>
 			<groupId>de.javakaffee</groupId>
 			<artifactId>kryo-serializers</artifactId>
-			<version>0.34</version>
+			<version>0.37</version>
 		</dependency>
 		<dependency>
 			<groupId>com.esotericsoftware</groupId>
 			<artifactId>kryo</artifactId>
-			<version>3.0.2</version>
+			<version>3.0.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
@@ -68,7 +68,7 @@
 		<dependency>
 			<groupId>com.sun.faces</groupId>
 			<artifactId>jsf-impl</artifactId>
-			<version>2.1.0</version>
+			<version>2.2.12</version>
 			<optional>true</optional>
 		</dependency>
 		<dependency>
@@ -80,7 +80,7 @@
 		<dependency>
 		    <groupId>org.springframework.security</groupId>
 		    <artifactId>spring-security-core</artifactId>
-		    <version>3.1.4.RELEASE</version>
+		    <version>4.0.3.RELEASE</version>
 			<optional>true</optional>
 		</dependency> 
 

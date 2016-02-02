@@ -19,7 +19,6 @@ package de.javakaffee.web.msm.serializer.kryo;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import org.hibernate.collection.AbstractPersistentCollection;
 
 /**
  * {@link SerializerFactory} that supports hibernate persistent collections (Hibernate 3 and Nibernate 4).

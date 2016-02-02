@@ -16,10 +16,9 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import static junit.framework.Assert.*;
+import static org.testng.Assert.*;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
-import org.hibernate.collection.PersistentList;
 import org.testng.annotations.Test;
 
 /**
@@ -27,11 +26,25 @@ import org.testng.annotations.Test;
  */
 public class HibernateCollectionsSerializerFactoryTest {
 
+    private static Class<?> PERSISTENT_LIST_CLASS;
+
+    static {
+        try {
+            PERSISTENT_LIST_CLASS = Class.forName("org.hibernate.collection.PersistentList");
+        } catch (ClassNotFoundException e) {
+            try {
+                PERSISTENT_LIST_CLASS = Class.forName("org.hibernate.collection.internal.PersistentList");
+            } catch (ClassNotFoundException e2) {
+                PERSISTENT_LIST_CLASS = null;
+            }
+        }
+    }
+
     @Test
     public void test() {
         HibernateCollectionsSerializerFactory factory = new HibernateCollectionsSerializerFactory(new Kryo());
 
-        Serializer serializer = factory.newSerializer(PersistentList.class);
+        Serializer serializer = factory.newSerializer(PERSISTENT_LIST_CLASS);
         assertNotNull(serializer);
     }
 }

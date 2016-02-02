@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javolution.xml.XMLFormat;
 import javolution.xml.stream.XMLStreamException;
 
-import org.hibernate.collection.AbstractPersistentCollection;
+import org.hibernate.collection.internal.AbstractPersistentCollection;
 
 /**
  * A {@link CustomXMLFormat} that handles hibernate mapped collections (subclasses
