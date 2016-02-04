@@ -922,6 +922,7 @@ public abstract class NonStickySessionsIntegrationTest {
         // and should not update the session in memcached.
         final Response tc1Response2 = get(_httpClient, TC_PORT_1, "/pixel.gif", sessionId);
         assertNull(tc1Response2.getResponseSessionId());
+        assertEquals(tc1Response2.getStatusCode(), 200);
 
         // load session + validity info for pixel.gif
         assertEquals( _daemon1.getCache().getGetHits(), 8 );
