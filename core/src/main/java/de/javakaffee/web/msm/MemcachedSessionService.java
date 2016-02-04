@@ -216,7 +216,7 @@ public class MemcachedSessionService {
      * this cache is also used to track sessions that are not existing in memcached
      * or that got invalidated, to be able to handle backupSession (in non-sticky mode) correctly.
      */
-    private final LRUCache<String, Boolean> _invalidSessionsCache = new LRUCache<String, Boolean>( 2000, 5000 );
+    private final LRUCache<String, Boolean> _invalidSessionsCache = new LRUCache<String, Boolean>( 2000, 500 );
 
 	private MemcachedNodesManager _memcachedNodesManager;
 
