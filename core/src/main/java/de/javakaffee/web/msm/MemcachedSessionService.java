@@ -573,20 +573,19 @@ public class MemcachedSessionService {
             }
         }
         else if ( canHitMemcached( id ) && _invalidSessionsCache.get( id ) == null ) {
-            // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
-            // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
-            // constraint needs the session to get the authenticated principal)
-            if ( !_sticky && isContainerSessionLookup()
-                    && !_manager.contextHasFormBasedSecurityConstraint() ) {
-                // we can return just null as the requestedSessionId will still be set on
-                // the request.
-                return null;
-            }
 
             // If no current request is set (RequestTrackerHostValve was not passed) we got invoked
             // by CoyoteAdapter.parseSessionCookiesId - here we can just return null, the requestedSessionId
-            // will be accepted anyway
-            if(!_sticky && _currentRequest.get() == null) {
+            // will be accepted anyway.
+            // If form based security is used, then AuthenticatorBase.invoke might ask for the session (to get the authenticated principal),
+            // in this case we must return the session because valid requests would be rejected otherwise.
+            if(!_sticky && (
+                    isConnectorSessionLookup()
+                    || _trackingHostValve.isIgnoredRequest() && !_manager.contextHasFormBasedSecurityConstraint())) {
+                if(_log.isDebugEnabled()) {
+                    _log.debug("Returning for session id " + id + " (isConnectorSessionLookup: "+ isConnectorSessionLookup() +
+                            ", isIgnoredRequest: " + _trackingHostValve.isIgnoredRequest() + ")");
+                }
                 return null;
             }
 
@@ -625,6 +624,15 @@ public class MemcachedSessionService {
      */
     private boolean isContainerSessionLookup() {
         return !_trackingContextValve.wasInvokedWith(_currentRequest.get());
+    }
+
+    /**
+     * Determines if the request has already passed the RequestTrackerHostValve or not.
+     * If not, e.g. CoyoteAdapter.parseSessionCookiesId (invoked from CoyoteAdapter.postParseRequest) might ask
+     * for the session.
+     */
+    private boolean isConnectorSessionLookup() {
+        return _currentRequest.get() == null;
     }
 
     private void addValidLoadedSession(final MemcachedBackupSession result) {

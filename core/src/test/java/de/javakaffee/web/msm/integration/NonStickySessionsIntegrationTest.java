@@ -417,7 +417,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that for auto locking mode requests that are found to be readonly don't lock
      * the session
      */
-    @Test
+    @Test( enabled = true )
     public void testReadOnlyRequestsDontLockSessionForAutoLocking() throws IOException, InterruptedException, HttpException, ExecutionException {
 
         setLockingMode( LockingMode.AUTO, null );
@@ -480,7 +480,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that for uriPattern locking mode requests that don't match the pattern the
      * session is not locked.
      */
-    @Test
+    @Test( enabled = true )
     public void testRequestsDontLockSessionForNotMatchingUriPattern() throws IOException, InterruptedException, HttpException, ExecutionException {
 
         final String pathToLock = "/locksession";
@@ -800,7 +800,10 @@ public abstract class NonStickySessionsIntegrationTest {
         get( _httpClient, TC_PORT_1, PATH_NO_SESSION_ACCESS, sessionId1 );
 
         assertWaitingWithProxy(equalTo(3), 1000, _daemon1.getCache()).getSetCmds();
-        assertEquals( _daemon1.getCache().getGetHits(), 1 );
+
+        // node availability check + loading session from AuthenticatorBase.invoke(AuthenticatorBase.java:430) (in TC 7.0.67)
+        // which seems to be installed and always check the user principal
+        assertEquals( _daemon1.getCache().getGetHits(), 2 );
     }
 
 
