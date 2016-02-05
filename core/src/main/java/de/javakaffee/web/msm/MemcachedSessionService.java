@@ -573,24 +573,8 @@ public class MemcachedSessionService {
             }
         }
         else if ( canHitMemcached( id ) && _invalidSessionsCache.get( id ) == null ) {
-            // when the request comes from the container, it's from CoyoteAdapter.postParseRequest
-            // or AuthenticatorBase.invoke (for some kind of security-constraint, where a form-based
-            // constraint needs the session to get the authenticated principal)
-            if ( !_sticky && isContainerSessionLookup()
-                    && !_manager.contextHasFormBasedSecurityConstraint() ) {
-                // we can return just null as the requestedSessionId will still be set on
-                // the request.
-                return null;
-            }
-
-            // If no current request is set (RequestTrackerHostValve was not passed) we got invoked
-            // by CoyoteAdapter.parseSessionCookiesId - here we can just return null, the requestedSessionId
-            // will be accepted anyway
-            if(!_sticky && _currentRequest.get() == null) {
-                return null;
-            }
-
-            // else load the session from memcached
+            
+            //load the session from memcached
             result = loadFromMemcached( id );
             // checking valid() would expire() the session if it's not valid!
             if ( result != null && result.isValid() ) {
