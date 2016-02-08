@@ -3,12 +3,12 @@
 	<parent>
 		<groupId>de.javakaffee.msm</groupId>
 		<artifactId>memcached-session-manager-project</artifactId>
-		<version>1.9.1</version>
+		<version>1.9.2-SNAPSHOT</version>
 	</parent>
 
 	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>memcached-session-manager</artifactId>
-	<version>1.9.1</version>
+	<version>1.9.2-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager core</name>
 	<description>The msm core, provides java serialization strategy.</description>
