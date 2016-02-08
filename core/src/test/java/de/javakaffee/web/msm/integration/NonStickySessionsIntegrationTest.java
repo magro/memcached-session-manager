@@ -184,7 +184,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Test for issue http://code.google.com/p/memcached-session-manager/issues/detail?id=120
      */
-    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    @Test(enabled = false, dataProvider = "lockingModesWithSessionLocking")
     @edu.umd.cs.findbugs.annotations.SuppressWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     public void testLoadBackupSessionShouldWorkWithInfiniteSessionTimeoutIssue120(@Nonnull final LockingMode lockingMode,
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
@@ -220,7 +220,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Test for issue http://code.google.com/p/memcached-session-manager/issues/detail?id=104
      */
-    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    @Test(enabled = false, dataProvider = "lockingModesWithSessionLocking")
     @edu.umd.cs.findbugs.annotations.SuppressWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     public void testLoadBackupSessionShouldWorkWithHighSessionTimeoutIssue104(@Nonnull final LockingMode lockingMode,
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
@@ -262,7 +262,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Tests that parallel request to the same Tomcat instance don't lead to stale data.
      */
-    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    @Test(enabled = false, dataProvider = "lockingModesWithSessionLocking")
     public void testSessionLockingSupportedWithSingleNodeSetup(@Nonnull final LockingMode lockingMode,
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
             ExecutionException {
@@ -290,7 +290,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Tests that parallel request to the same Tomcat instance don't lead to stale data.
      */
-    @Test(enabled = true, dataProvider = "lockingModesWithSessionLocking")
+    @Test(enabled = false, dataProvider = "lockingModesWithSessionLocking")
     public void testParallelRequestsToSameTomcatInstanceIssue111(@Nonnull final LockingMode lockingMode,
             @Nullable final Pattern uriPattern) throws IOException, InterruptedException, HttpException,
             ExecutionException {
@@ -331,7 +331,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
      * tomcat when the request is finished.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testNoStaleSessionsWithNonStickySessions() throws IOException, InterruptedException, HttpException {
 
         _tomcat1.getManager().setMaxInactiveInterval( 1 );
@@ -368,7 +368,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that non-sticky sessions are not leading to stale data - that sessions are removed from
      * tomcat when the request is finished.
      */
-    @Test( enabled = true, dataProvider = "lockingModesWithSessionLocking" )
+    @Test( enabled = false, dataProvider = "lockingModesWithSessionLocking" )
     public void testParallelRequestsDontCauseDataLoss( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
         setLockingMode( lockingMode, uriPattern );
@@ -417,7 +417,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that for auto locking mode requests that are found to be readonly don't lock
      * the session
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testReadOnlyRequestsDontLockSessionForAutoLocking() throws IOException, InterruptedException, HttpException, ExecutionException {
 
         setLockingMode( LockingMode.AUTO, null );
@@ -480,7 +480,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that for uriPattern locking mode requests that don't match the pattern the
      * session is not locked.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testRequestsDontLockSessionForNotMatchingUriPattern() throws IOException, InterruptedException, HttpException, ExecutionException {
 
         final String pathToLock = "/locksession";
@@ -532,7 +532,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that non-sticky sessions are not invalidated too early when sessions are accessed readonly.
      * Each (even session readonly request) must update the lastAccessedTime for the session in memcached.
      */
-    @Test( enabled = true, dataProvider = "lockingModes" )
+    @Test( enabled = false, dataProvider = "lockingModes" )
     public void testNonStickySessionIsValidEvenWhenAccessedReadonly( @Nonnull final LockingMode lockingMode, @Nullable final Pattern uriPattern ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
         _tomcat1.getManager().setMaxInactiveInterval( 1 );
@@ -553,7 +553,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * Tests that non-sticky sessions are seen as valid (request.isRequestedSessionIdValid) and from
      * the correct source for different session tracking modes (uri/cookie).
      */
-    @Test( enabled = true, dataProvider = "sessionTrackingModesProvider" )
+    @Test( enabled = false, dataProvider = "sessionTrackingModesProvider" )
     public void testNonStickySessionIsValidForDifferentSessionTrackingModes( @Nonnull final SessionTrackingMode sessionTrackingMode ) throws IOException, InterruptedException, HttpException, ExecutionException {
 
         _tomcat1.getManager().setMaxInactiveInterval( 1 );
@@ -575,7 +575,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     }
 
-    @Test( enabled = true )
+    @Test( enabled = false )
     @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
     public void testNonStickySessionIsStoredInSecondaryMemcachedForBackup() throws IOException, InterruptedException, HttpException {
 
@@ -609,7 +609,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Test for issue #113: Backup of a session should take place on the next available node when the next logical node is unavailable.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
     public void testNonStickySessionSecondaryBackupFailover() throws IOException, InterruptedException, HttpException {
 
@@ -681,7 +681,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Test for issue #113: Backup of a session should take place on the next available node when the next logical node is unavailable.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     @SuppressWarnings( "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" )
     public void testNonStickySessionSecondaryBackupFailoverForSkippedUpdate() throws IOException, InterruptedException, HttpException {
 
@@ -750,7 +750,7 @@ public abstract class NonStickySessionsIntegrationTest {
     /**
      * Test for issue #79: In non-sticky sessions mode with only a single memcached the backup is done in the primary node.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testNoBackupWhenRunningASingleMemcachedOnly() throws IOException, HttpException, InterruptedException {
         _tomcat1.getManager().setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
 
@@ -783,7 +783,7 @@ public abstract class NonStickySessionsIntegrationTest {
 	}
 
     @Test( enabled = true )
-    public void testSessionNotLoadedForReadonlyRequest() throws IOException, HttpException, InterruptedException {
+    public void testSessionNotLoadedForNoSessionAccess() throws IOException, HttpException, InterruptedException {
         _tomcat1.getManager().setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
         waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
 
@@ -801,18 +801,25 @@ public abstract class NonStickySessionsIntegrationTest {
 
         assertWaitingWithProxy(equalTo(3), 1000, _daemon1.getCache()).getSetCmds();
 
-        // node availability check + loading session from AuthenticatorBase.invoke(AuthenticatorBase.java:430) (in TC 7.0.67)
-        // which seems to be installed and always check the user principal
-        assertEquals( _daemon1.getCache().getGetHits(), 2 );
+        // For TC7 the session is looked up by AuthenticatorBase.invoke(AuthenticatorBase.java:430) (TC 7.0.67) which seems
+        // to be installed and always check the user principal - therefore we have 2 hits for the session and the validity info.
+        // And we want to allow context level valves to access the session (issue #286), therefore we load the session even
+        // if our context valve has not been passed (i.e. findSession is not directly triggered from the webapp).
+        //
+        // For TC{6,8} there's no call from AuthenticatorBase, so there's only 1 hit (validity info)
+        assertEquals( _daemon1.getCache().getGetHits(), getExpectedHitsForNoSessionAccess());
     }
 
+    protected int getExpectedHitsForNoSessionAccess() {
+        return 1;
+    }
 
     /**
      * Ignored resources (requests matching uriIgnorePattern) should neither load the session
      * from memcached nor should they cause stale session (not released after the request has finished,
      * which was the original issue).
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testIgnoredResourcesWithSessionCookieDontCauseSessionStaleness() throws Exception {
 
         _tomcat1.stop();
@@ -859,7 +866,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     }
 
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testBasicAuth() throws Exception {
 
         _tomcat1.stop();
@@ -893,7 +900,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * from memcached but also clean up / free them after the request has finished.
      *
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testIgnoredResourcesWithFormAuthDontCauseSessionStaleness() throws Exception {
 
         // TODO: see testSessionCreatedForContainerProtectedResourceIsStoredInMemcached
@@ -956,7 +963,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * When a session is created for a request that tries to access a container protected
      * resource (container managed auth) this session must also be stored in memcached.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testSessionCreatedForContainerProtectedResourceIsStoredInMemcached() throws Exception {
 
         _tomcat1.stop();
@@ -999,7 +1006,7 @@ public abstract class NonStickySessionsIntegrationTest {
      * When a session is created with form based auth the session should be stored
      * appropriately.
      */
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testFormAuthDontCauseSessionStaleness() throws Exception {
 
         _tomcat1.stop();
@@ -1041,7 +1048,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     }
 
-    @Test( enabled = true )
+    @Test( enabled = false )
     public void testInvalidateSessionShouldReleaseLockIssue144() throws IOException, InterruptedException, HttpException {
         _tomcat1.getManager().setLockingMode(LockingMode.AUTO.name());
 

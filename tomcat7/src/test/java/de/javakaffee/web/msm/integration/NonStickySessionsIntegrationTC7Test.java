@@ -31,4 +31,10 @@ public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegr
         return new TestUtilsTC7();
     }
 
+    @Override
+    protected int getExpectedHitsForNoSessionAccess() {
+        // for testSessionNotLoadedForNoSessionAccess, see the comment there.
+        return 2;
+    }
+
 }
