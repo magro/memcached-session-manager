@@ -66,6 +66,7 @@ public class SimpleServlet extends HttpServlet {
 
         if ( pathInfo.startsWith( "/put" ) ) {
             final HttpSession session = request.getSession();
+            System.out.println( " + session.getMaxInactiveInterval(): " + session.getMaxInactiveInterval() );
             final Cache cache = getOrCreateCache( session );
             final Enumeration<String> names = request.getParameterNames();
             while ( names.hasMoreElements() ) {
@@ -78,6 +79,8 @@ public class SimpleServlet extends HttpServlet {
             final HttpSession session = request.getSession(false);
             if(session == null)
             	return;
+
+            System.out.println( " + session.getMaxInactiveInterval(): " + session.getMaxInactiveInterval() );
             
             final PrintWriter out = response.getWriter();
             final Cache cache = getOrCreateCache( session );

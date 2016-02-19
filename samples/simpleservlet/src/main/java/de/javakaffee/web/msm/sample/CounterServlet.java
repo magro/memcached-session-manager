@@ -39,6 +39,9 @@ public class CounterServlet extends HttpServlet {
 
 
         HttpSession session = req.getSession();
+
+        System.out.println( " + session.getMaxInactiveInterval(): " + session.getMaxInactiveInterval() );
+
         Integer counter = (Integer) session.getAttribute(COUNTER);
         int iTmp = 0;
         if ( counter != null ) {

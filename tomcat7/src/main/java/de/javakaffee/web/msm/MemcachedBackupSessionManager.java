@@ -73,7 +73,7 @@ import de.javakaffee.web.msm.LockingStrategy.LockingMode;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, PropertyChangeListener, MemcachedSessionService.SessionManager {
+public class MemcachedBackupSessionManager extends ManagerBase implements MemcachedSessionService.SessionManager {
 
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
@@ -621,7 +621,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * The timeout in milliseconds after that a session backup is considered as
-     * beeing failed when {@link #getSessionBackupAsync()}) is <code>false</code>.
+     * beeing failed when {@link #isSessionBackupAsync()}) is <code>false</code>.
      */
     public long getSessionBackupTimeout() {
         return _msm.getSessionBackupTimeout();

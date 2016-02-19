@@ -712,8 +712,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
         // Validate the source of this event
         if ( !( event.getSource() instanceof Context ) ) {
+            _log.info( "manager.propertyChange("+ event.getPropertyName() +"="+event.getNewValue()+").source: " + event.getSource().getClass() );
             return;
         }
+
+        _log.info( "manager.propertyChange("+ event.getPropertyName() +"="+event.getNewValue()+").source: " + event.getSource().getClass() );
 
         // Process a relevant property change
         if ( event.getPropertyName().equals( "sessionTimeout" ) ) {
