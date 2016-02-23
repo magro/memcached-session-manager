@@ -39,7 +39,7 @@ public class TranscoderServiceTC8Test extends TranscoderServiceTest {
 	public void setup() throws LifecycleException, ClassNotFoundException,
 			IOException {
 		super.setup();
-        final Context context = (Context)_manager.getContainer();
+        final Context context = (Context)_manager.getContext();
 		when( _manager.getContext() ).thenReturn( context ); // needed for createSession
 	}
 

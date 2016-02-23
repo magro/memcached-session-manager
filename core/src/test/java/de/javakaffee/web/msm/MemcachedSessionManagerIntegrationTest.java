@@ -368,7 +368,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         setStickyness(stickyness);
 
         // set to 1 sec above (in setup), default is 10 seconds
-        final int delay = manager.getContainer().getBackgroundProcessorDelay();
+        final int delay = manager.getContext().getBackgroundProcessorDelay();
         manager.setMaxInactiveInterval( delay * 4 );
 
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -411,7 +411,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         setStickyness(stickyness);
 
         // set to 1 sec above (in setup), default is 10 seconds
-        final int delay = manager.getContainer().getBackgroundProcessorDelay();
+        final int delay = manager.getContext().getBackgroundProcessorDelay();
         manager.setMaxInactiveInterval( delay * 4 );
 
         final String sessionId1 = makeRequest( _httpClient, _portTomcat1, null );
@@ -551,7 +551,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     private void waitForSessionExpiration(final boolean sticky) throws InterruptedException {
         final SessionManager manager = _tomcat1.getManager();
         assertEquals( manager.getMemcachedSessionService().isSticky(), sticky );
-        final Container container = manager.getContainer();
+        final Container container = manager.getContext();
         final long timeout = TimeUnit.SECONDS.toMillis(
                 sticky ? container.getBackgroundProcessorDelay() + manager.getMaxInactiveInterval()
                        : 2 * manager.getMaxInactiveInterval() ) + 1000;

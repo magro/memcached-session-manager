@@ -875,6 +875,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Memcac
         return sm.getString( key, args );
     }
 
+    @Nonnull
+    @Override
+    public Context getContext() {
+        return (Context) getContainer();
+    }
+
     @Override
     public ClassLoader getContainerClassLoader() {
         return getContainer().getLoader().getClassLoader();

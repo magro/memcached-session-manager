@@ -61,7 +61,7 @@ public abstract class TranscoderServiceTest {
 
         _manager = mock( SessionManager.class );
 
-        when( _manager.getContainer() ).thenReturn( new StandardContext() ); // needed for createSession
+        when( _manager.getContext() ).thenReturn( new StandardContext() ); // needed for createSession
         when( _manager.newMemcachedBackupSession() ).thenAnswer(new Answer<MemcachedBackupSession>() {
             @Override
             public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {

@@ -320,11 +320,10 @@ public class MemcachedSessionService {
         MemcachedSessionService getMemcachedSessionService();
 
         /**
-         * Return the Container with which this Manager is associated.
+         * Return the Context with which this Manager is associated.
          */
-        @Override
         @Nonnull
-        Container getContainer();
+        Context getContext();
 
         /**
          * Return the Context with which this Manager is associated.
@@ -394,8 +393,8 @@ public class MemcachedSessionService {
 
     public void shutdown() {
         _log.info( "Stopping services." );
-        _manager.getContainer().getParent().getPipeline().removeValve(_trackingHostValve);
-        _manager.getContainer().getPipeline().removeValve(_trackingContextValve);
+        _manager.getContext().getParent().getPipeline().removeValve(_trackingHostValve);
+        _manager.getContext().getPipeline().removeValve(_trackingContextValve);
         _backupSessionService.shutdown();
         if ( _lockingStrategy != null ) {
             _lockingStrategy.shutdown();
@@ -438,7 +437,7 @@ public class MemcachedSessionService {
         final String sessionCookieName = _manager.getSessionCookieName();
         _currentRequest = new CurrentRequest();
         _trackingHostValve = createRequestTrackingHostValve(sessionCookieName, _currentRequest);
-        final Context context = (Context) _manager.getContainer();
+        final Context context = _manager.getContext();
         context.getParent().getPipeline().addValve(_trackingHostValve);
         _trackingContextValve = createRequestTrackingContextValve(sessionCookieName);
         context.getPipeline().addValve( _trackingContextValve );
@@ -483,7 +482,7 @@ public class MemcachedSessionService {
 	}
 
     protected MemcachedNodesManager createMemcachedNodesManager(final String memcachedNodes, final String failoverNodes) {
-        final Context context = (Context) _manager.getContainer();
+        final Context context = _manager.getContext();
         final String webappVersion = Reflections.invoke(context, "getWebappVersion", null);
         final StorageKeyFormat storageKeyFormat = StorageKeyFormat.of(_storageKeyPrefix, context.getParent().getName(), context.getName(), webappVersion);
 		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _memcachedClientCallback );
@@ -1581,7 +1580,7 @@ public class MemcachedSessionService {
     protected void updateExpirationInMemcached() {
         if ( _enabled.get() && _sticky ) {
             final Session[] sessions = _manager.findSessions();
-            final int delay = _manager.getContainer().getBackgroundProcessorDelay();
+            final int delay = _manager.getContext().getBackgroundProcessorDelay();
             for ( final Session s : sessions ) {
                 final MemcachedBackupSession session = (MemcachedBackupSession) s;
                 if ( _log.isDebugEnabled() ) {

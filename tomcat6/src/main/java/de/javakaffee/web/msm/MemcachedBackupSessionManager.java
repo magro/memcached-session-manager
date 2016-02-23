@@ -124,6 +124,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return NAME;
     }
 
+    @Nonnull
+    @Override
+    public Context getContext() {
+        return (Context) getContainer();
+    }
+
     /**
      * Initialize this manager. The memcachedClient parameter is there for testing
      * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
