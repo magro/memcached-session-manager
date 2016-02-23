@@ -14,7 +14,7 @@
 	<description>The msm core, provides java serialization strategy.</description>
 
 	<properties>
-		<tomcat-version>7.0.67</tomcat-version>
+		<tomcat-version>${tomcat7-version}</tomcat-version>
 	</properties>
 	
 	<dependencies>

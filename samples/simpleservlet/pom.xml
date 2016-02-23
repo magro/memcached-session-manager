@@ -4,13 +4,13 @@
 	<parent>
 		<groupId>de.javakaffee.msm.samples</groupId>
 		<artifactId>msm-samples-project</artifactId>
-		<version>1.9.1</version>
+		<version>1.9.2-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>simpleservlet</artifactId>
 	<name>msm-sample simpleservlet</name>
 	<packaging>war</packaging>
-	<description></description>
+	<description>Simplest possible sample with just one or two servlets.</description>
 
 	<dependencies>
 		<dependency>
@@ -25,11 +25,6 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-log4j12</artifactId>
 			<version>1.7.5</version>
-		</dependency>
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.17</version>
 		</dependency>
 
 		<!-- msm/kryo -->

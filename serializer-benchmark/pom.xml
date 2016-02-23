@@ -13,7 +13,7 @@
 	<packaging>jar</packaging>
 
 	<properties>
-		<tomcat-version>7.0.53</tomcat-version>
+		<tomcat-version>${tomcat7-version}</tomcat-version>
 	</properties>
 
 	<dependencies>

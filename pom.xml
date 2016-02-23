@@ -213,8 +213,12 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<tomcat-version>6.0.44</tomcat-version>
-		<slf4j-version>1.7.14</slf4j-version>
+		<tomcat6-version>6.0.45</tomcat6-version>
+		<tomcat7-version>7.0.68</tomcat7-version>
+		<tomcat8-version>8.0.32</tomcat8-version>
+
+		<tomcat-version>${tomcat6-version}</tomcat-version>
+		<slf4j-version>1.7.15</slf4j-version>
 		<hibernate-core-version>5.0.7.Final</hibernate-core-version>
 		<couchbasemock-version>0.5-69e953bd</couchbasemock-version>
 	</properties>
