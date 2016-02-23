@@ -195,7 +195,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
     private ObjectInputStream createObjectInputStream( final ByteArrayInputStream bis ) throws IOException {
         final ObjectInputStream ois;
         ClassLoader classLoader = null;
-        if ( _manager != null && _manager.getContainer() != null ) {
+        if ( _manager != null && _manager.getContext() != null ) {
             classLoader = _manager.getContainerClassLoader();
         }
         if ( classLoader != null ) {

@@ -67,7 +67,7 @@ public abstract class RequestTrackingHostValveTest {
         final SessionManager _manager = mock(SessionManager.class);
 
         when(_service.getManager()).thenReturn(_manager);
-        when(_manager.getContainer()).thenReturn(_contextContainer);
+        when(_manager.getContext()).thenReturn(_contextContainer);
         when(_contextContainer.getParent()).thenReturn(_hostContainer);
         when(_contextContainer.getPath()).thenReturn("/");
 

@@ -97,7 +97,7 @@ public abstract class RequestTrackingHostValve extends ValveBase {
         _enabled = enabled;
         _currentRequest = currentRequest;
 
-        _msmContext = (Context) _sessionBackupService.getManager().getContainer();
+        _msmContext = _sessionBackupService.getManager().getContext();
     }
 
     /**
