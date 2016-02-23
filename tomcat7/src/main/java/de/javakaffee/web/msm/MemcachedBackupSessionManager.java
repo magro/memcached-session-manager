@@ -73,7 +73,7 @@ import de.javakaffee.web.msm.LockingStrategy.LockingMode;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, PropertyChangeListener, MemcachedSessionService.SessionManager {
+public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, MemcachedSessionService.SessionManager {
 
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
