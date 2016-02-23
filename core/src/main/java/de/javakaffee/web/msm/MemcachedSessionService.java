@@ -296,6 +296,9 @@ public class MemcachedSessionService {
          */
         String getString(final String key, final Object... args);
 
+        int getMaxInactiveInterval();
+        void setMaxInactiveInterval(int interval);
+
         int getMaxActiveSessions();
         void incrementSessionCounter();
         void incrementRejectedSessions();
@@ -677,7 +680,7 @@ public class MemcachedSessionService {
         session.setNew( true );
         session.setValid( true );
         session.setCreationTime( System.currentTimeMillis() );
-        session.setMaxInactiveInterval( _manager.getContext().getSessionTimeout() * 60 );
+        session.setMaxInactiveInterval( _manager.getMaxInactiveInterval() );
 
         if ( sessionId == null || !_memcachedNodesManager.canHitMemcached( sessionId ) ) {
             sessionId = _manager.generateSessionId();

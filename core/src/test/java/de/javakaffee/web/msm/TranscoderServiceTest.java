@@ -33,6 +33,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.authenticator.SavedRequest;
@@ -61,7 +62,9 @@ public abstract class TranscoderServiceTest {
 
         _manager = mock( SessionManager.class );
 
-        when( _manager.getContext() ).thenReturn( new StandardContext() ); // needed for createSession
+        final Context context = new StandardContext();
+        when( _manager.getContext() ).thenReturn( context ); // needed for createSession
+        when( _manager.getContainer() ).thenReturn( context ); // needed for createSession
         when( _manager.newMemcachedBackupSession() ).thenAnswer(new Answer<MemcachedBackupSession>() {
             @Override
             public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {
@@ -79,6 +82,7 @@ public abstract class TranscoderServiceTest {
 
         when( _manager.readPrincipal( (ObjectInputStream)any() ) ).thenReturn( createPrincipal() );
         when( _manager.getMemcachedSessionService() ).thenReturn( service );
+        when( _manager.willAttributeDistribute(anyString(), any())).thenReturn(true);
 
     }
 

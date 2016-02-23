@@ -78,6 +78,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     protected MemcachedSessionService _msm;
 
+    /**
+     * The default maximum inactive interval for Sessions created by
+     * this Manager.
+     * Used instead of Context.sessionTimeout to allow tests to set more fine grained session timeouts.
+     */
+    private int _maxInactiveInterval = 30 * 60;
+
     private Boolean _contextHasFormBasedSecurityConstraint;
 
     public MemcachedBackupSessionManager() {
@@ -207,6 +214,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         // so that session backup won't be omitted we must store this event
         super.changeSessionId( session );
         ((MemcachedBackupSession)session).setSessionIdChanged(true);
+    }
+
+    public int getMaxInactiveInterval() {
+        return _maxInactiveInterval;
+    }
+
+    public void setMaxInactiveInterval(int interval) {
+        int oldMaxInactiveInterval = _maxInactiveInterval;
+        _maxInactiveInterval = interval;
+        support.firePropertyChange("maxInactiveInterval",
+                Integer.valueOf(oldMaxInactiveInterval),
+                Integer.valueOf(_maxInactiveInterval));
     }
 
     /**

@@ -76,7 +76,7 @@ import de.javakaffee.web.msm.LockingStrategy.LockingMode;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, MemcachedSessionService.SessionManager {
+public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, PropertyChangeListener, MemcachedSessionService.SessionManager {
 
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
@@ -85,6 +85,13 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected final Log _log = LogFactory.getLog( getClass() );
 
     private final LifecycleSupport _lifecycle = new LifecycleSupport( this );
+
+    /**
+     * The default maximum inactive interval for Sessions created by
+     * this Manager.
+     * Used instead of Context.sessionTimeout to allow tests to set more fine grained session timeouts.
+     */
+    private int _maxInactiveInterval = 30 * 60;
 
     private int _maxActiveSessions = -1;
     private int _rejectedSessions;
@@ -140,6 +147,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
         _msm.setMemcachedClient(memcachedClient);
         _msm.startInternal();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setContainer( final Container container ) {
+
+        // De-register from the old Container (if any)
+        if ( this.container != null && this.container instanceof Context ) {
+            ( (Context) this.container ).removePropertyChangeListener( this );
+        }
+
+        // Default processing provided by our superclass
+        super.setContainer( container );
+
+        // Register with the new Container (if any)
+        if ( this.container != null && this.container instanceof Context ) {
+            setMaxInactiveInterval( ( (Context) this.container ).getSessionTimeout() * 60 );
+            ( (Context) this.container ).addPropertyChangeListener( this );
+        }
+
     }
 
     /**
@@ -235,6 +264,18 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         // so that session backup won't be omitted we must store this event
         super.changeSessionId( session );
         ((MemcachedBackupSession)session).setSessionIdChanged( true );
+    }
+
+    public int getMaxInactiveInterval() {
+        return _maxInactiveInterval;
+    }
+
+    public void setMaxInactiveInterval(int interval) {
+        int oldMaxInactiveInterval = _maxInactiveInterval;
+        _maxInactiveInterval = interval;
+        support.firePropertyChange("maxInactiveInterval",
+                                   Integer.valueOf(oldMaxInactiveInterval),
+                                   Integer.valueOf(_maxInactiveInterval));
     }
 
     /**
@@ -686,6 +727,28 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void backgroundProcess() {
         _msm.updateExpirationInMemcached();
         super.backgroundProcess();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void propertyChange( final PropertyChangeEvent event ) {
+
+        // Validate the source of this event
+        if ( !( event.getSource() instanceof Context ) ) {
+            return;
+        }
+
+        // Process a relevant property change
+        if ( event.getPropertyName().equals( "sessionTimeout" ) ) {
+            try {
+                setMaxInactiveInterval( ( (Integer) event.getNewValue() ).intValue() * 60 );
+            } catch ( final NumberFormatException e ) {
+                _log.warn( "standardManager.sessionTimeout: " + event.getNewValue().toString() );
+            }
+        }
+
     }
 
     /**

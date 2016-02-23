@@ -31,6 +31,7 @@ import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.criterion.Restrictions;
+import org.mockito.Matchers;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -44,6 +45,8 @@ import java.util.List;
 import java.util.Set;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createContext;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -208,9 +211,12 @@ public abstract class AbstractHibernateCollectionsTest {
     @Nonnull
     protected SessionManager createSessionManager() {
         final SessionManager manager = mock( SessionManager.class );
-        when( manager.getContext() ).thenReturn( new StandardContext() ); // needed for createSession
+        final StandardContext context = new StandardContext();
+        when( manager.getContext() ).thenReturn(context); // needed for createSession
+        when( manager.getContainer() ).thenReturn(context); // needed for createSession
         when( manager.getMemcachedSessionService() ).thenReturn(newMemcachedSessionService(manager));
         when( manager.newMemcachedBackupSession() ).thenReturn( new MemcachedBackupSession( manager ) );
+        when( manager.willAttributeDistribute(anyString(), anyObject())).thenReturn(true);
         return manager;
     }
 
