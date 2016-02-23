@@ -76,7 +76,7 @@ import de.javakaffee.web.msm.LockingStrategy.LockingMode;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  * @version $Id$
  */
-public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, PropertyChangeListener, MemcachedSessionService.SessionManager {
+public class MemcachedBackupSessionManager extends ManagerBase implements Lifecycle, MemcachedSessionService.SessionManager {
 
     protected static final String NAME = MemcachedBackupSessionManager.class.getSimpleName();
 
@@ -140,28 +140,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
         _msm.setMemcachedClient(memcachedClient);
         _msm.startInternal();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void setContainer( final Container container ) {
-
-        // De-register from the old Container (if any)
-        if ( this.container != null && this.container instanceof Context ) {
-            ( (Context) this.container ).removePropertyChangeListener( this );
-        }
-
-        // Default processing provided by our superclass
-        super.setContainer( container );
-
-        // Register with the new Container (if any)
-        if ( this.container != null && this.container instanceof Context ) {
-            setMaxInactiveInterval( ( (Context) this.container ).getSessionTimeout() * 60 );
-            ( (Context) this.container ).addPropertyChangeListener( this );
-        }
-
     }
 
     /**
@@ -708,31 +686,6 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     public void backgroundProcess() {
         _msm.updateExpirationInMemcached();
         super.backgroundProcess();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void propertyChange( final PropertyChangeEvent event ) {
-
-        // Validate the source of this event
-        if ( !( event.getSource() instanceof Context ) ) {
-            _log.info( "manager.propertyChange("+ event.getPropertyName() +"="+event.getNewValue()+").source: " + event.getSource().getClass() );
-            return;
-        }
-
-        _log.info( "manager.propertyChange("+ event.getPropertyName() +"="+event.getNewValue()+").source: " + event.getSource().getClass() );
-
-        // Process a relevant property change
-        if ( event.getPropertyName().equals( "sessionTimeout" ) ) {
-            try {
-                setMaxInactiveInterval( ( (Integer) event.getNewValue() ).intValue() * 60 );
-            } catch ( final NumberFormatException e ) {
-                _log.warn( "standardManager.sessionTimeout: " + event.getNewValue().toString() );
-            }
-        }
-
     }
 
     /**
