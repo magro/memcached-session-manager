@@ -23,6 +23,7 @@
 
 	<properties>
 		<tomcat-version>7.0.68</tomcat-version>
+		<tomcat.port>9090</tomcat.port>
 	</properties>
 
 	<dependencies>
@@ -169,7 +170,7 @@
 				<artifactId>tomcat7-maven-plugin</artifactId>
 				<configuration>
 					<!-- http port -->
-					<port>9090</port>
+					<port>${tomcat.port}</port>
 					<!-- application path always starts with / -->
 					<path>/</path>
 					<backgroundProcessorDelay>10</backgroundProcessorDelay>
