@@ -8,6 +8,7 @@ It provides this API:
 GET /list
 GET /put?{key}={value}
 GET /counter
+GET /autocounter?to={number}
 ```
 
-Of course `/put` and `/counter` are not RESTful at all, but that's really not important here. It shall just be convenient to be able to use this stuff in the browser.
+Of course `/put`, `/counter` and `/autocounter` are not RESTful at all, but that's really not important here. It shall just be convenient to be able to use this stuff in the browser.

@@ -18,9 +18,20 @@
         <load-on-startup>1</load-on-startup>
     </servlet>
 
+    <servlet>
+        <servlet-name>autocounter</servlet-name>
+        <servlet-class>de.javakaffee.web.msm.sample.AutoCounterServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
     <servlet-mapping>
         <servlet-name>counter</servlet-name>
         <url-pattern>/counter</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>autocounter</servlet-name>
+        <url-pattern>/autocounter</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
