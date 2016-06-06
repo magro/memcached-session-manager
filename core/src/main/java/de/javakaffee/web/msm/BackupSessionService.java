@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -127,7 +128,7 @@ public class BackupSessionService {
         session.setExpirationUpdateRunning( true );
         session.setLastBackupTime( System.currentTimeMillis() );
         try {
-            final Map<String, Object> attributes = session.getAttributesFiltered();
+            final ConcurrentMap<String, Object> attributes = session.getAttributesFiltered();
             final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
             final byte[] data = _transcoderService.serialize( session, attributesData );
             createBackupSessionTask( session, true ).doBackupSession( session, data, attributesData );

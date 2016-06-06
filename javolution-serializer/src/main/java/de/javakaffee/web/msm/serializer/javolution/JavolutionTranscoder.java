@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.serializer.javolution;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 
 import javolution.xml.XMLObjectReader;
 import javolution.xml.XMLObjectWriter;
@@ -108,7 +109,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
      * {@inheritDoc}
      */
     @Override
-    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         return doSerialize( attributes, "attributes" );
     }
 
@@ -150,7 +151,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
      * @return the resulting object
      */
     @Override
-    public Map<String, Object> deserializeAttributes( final byte[] in ) {
+    public ConcurrentMap<String, Object> deserializeAttributes(final byte[] in ) {
 
         if ( LOG.isDebugEnabled() ) {
             LOG.debug( "Reading serialized data:\n" + new String( in ) );

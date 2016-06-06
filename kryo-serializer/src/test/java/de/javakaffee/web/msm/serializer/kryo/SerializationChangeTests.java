@@ -16,8 +16,9 @@
  */
 package de.javakaffee.web.msm.serializer.kryo;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.testng.annotations.Test;
 
@@ -48,7 +49,7 @@ public class SerializationChangeTests {
 
         // serialize one instance
         final MemcachedBackupSession memcachedBackupSession = new MemcachedBackupSession();
-        final Map<String, Object> attributes = new HashMap<String, Object>();
+        final ConcurrentMap<String, Object> attributes = new ConcurrentHashMap<String, Object>();
         attributes.put( "test", value );
 
         byte[] data = transcoder.serializeAttributes( memcachedBackupSession, attributes );

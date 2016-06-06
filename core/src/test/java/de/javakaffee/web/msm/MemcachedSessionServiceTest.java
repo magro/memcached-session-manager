@@ -27,6 +27,7 @@ import static org.testng.Assert.*;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -242,7 +243,7 @@ public abstract class MemcachedSessionServiceTest {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
         @SuppressWarnings( "unchecked" )
-        final Map<String, Object> anyMap = any( Map.class );
+        final ConcurrentMap<String, Object> anyMap = any( ConcurrentMap.class );
         when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
         _service.setTranscoderService( transcoderServiceMock );
 
@@ -273,7 +274,7 @@ public abstract class MemcachedSessionServiceTest {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
         @SuppressWarnings( "unchecked" )
-        final Map<String, Object> anyMap = any( Map.class );
+        final ConcurrentMap<String, Object> anyMap = any( ConcurrentMap.class );
         when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
         _service.setTranscoderService( transcoderServiceMock );
 
@@ -467,7 +468,7 @@ public abstract class MemcachedSessionServiceTest {
 
         _service.backupSession( session.getIdInternal(), false, null ).get();
 
-        verify( transcoderServiceMock, never() ).serializeAttributes( (MemcachedBackupSession)any(), anyMap() );
+        verify( transcoderServiceMock, never() ).serializeAttributes( (MemcachedBackupSession)any(), (ConcurrentMap)any() );
 
     }
 
@@ -479,7 +480,7 @@ public abstract class MemcachedSessionServiceTest {
     public void testOnlyFilteredAttributesAreIncludedInSessionBackup() throws InterruptedException, ExecutionException {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
-        final Map<String, Object> anyMap = any( Map.class );
+        final ConcurrentMap<String, Object> anyMap = any( ConcurrentMap.class );
         when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
         _service.setTranscoderService( transcoderServiceMock );
 
@@ -493,7 +494,7 @@ public abstract class MemcachedSessionServiceTest {
         _service.backupSession( session.getIdInternal(), false, null ).get();
 
         // capture the supplied argument, alternatively we could have used some Matcher (but there seems to be no MapMatcher).
-        final ArgumentCaptor<Map> model = ArgumentCaptor.forClass( Map.class );
+        final ArgumentCaptor<ConcurrentMap> model = ArgumentCaptor.forClass( ConcurrentMap.class );
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), model.capture() );
 
         // the serialized attributes must only contain allowed ones
@@ -511,7 +512,7 @@ public abstract class MemcachedSessionServiceTest {
     public void testOnlyFilteredAttributesAreIncludedDuringUpdateExpiration() throws InterruptedException, ExecutionException {
 
         final TranscoderService transcoderServiceMock = mock( TranscoderService.class );
-        final Map<String, Object> anyMap = any( Map.class );
+        final ConcurrentMap<String, Object> anyMap = any( ConcurrentMap.class );
         when( transcoderServiceMock.serializeAttributes( any( MemcachedBackupSession.class ), anyMap ) ).thenReturn( new byte[0] );
         _service.setTranscoderService( transcoderServiceMock );
 
@@ -528,7 +529,7 @@ public abstract class MemcachedSessionServiceTest {
         _service.updateExpirationInMemcached();
 
         // capture the supplied argument, alternatively we could have used some Matcher (but there seems to be no MapMatcher).
-        final ArgumentCaptor<Map> model = ArgumentCaptor.forClass( Map.class );
+        final ArgumentCaptor<ConcurrentMap> model = ArgumentCaptor.forClass( ConcurrentMap.class );
         verify( transcoderServiceMock, times( 1 ) ).serializeAttributes( eq( session ), model.capture() );
 
         // the serialized attributes must only contain allowed ones

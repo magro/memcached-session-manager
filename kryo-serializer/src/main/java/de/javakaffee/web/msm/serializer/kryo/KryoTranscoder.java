@@ -34,6 +34,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * A {@link SessionAttributesTranscoder} that uses {@link Kryo} for serialization.
@@ -204,7 +205,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      */
     @SuppressWarnings( "unchecked" )
     @Override
-    public Map<String, Object> deserializeAttributes( final byte[] data ) {
+    public ConcurrentMap<String, Object> deserializeAttributes(final byte[] data ) {
         final Kryo kryo = _kryoPool.borrow();
         try {
             return kryo.readObject(new Input(data), ConcurrentHashMap.class);
@@ -219,7 +220,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
      * {@inheritDoc}
      */
     @Override
-    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         final Kryo kryo = _kryoPool.borrow();
         try {
             /**

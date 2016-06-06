@@ -24,8 +24,8 @@ import static de.javakaffee.web.msm.Statistics.StatsType.MEMCACHED_UPDATE;
 import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
 
 import java.util.Arrays;
-import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -64,15 +64,15 @@ public class BackupSessionTask implements Callable<BackupResult> {
     /**
      * @param session
      *            the session to save
-     * @param sessionBackupAsync
-     * @param sessionBackupTimeout
-     * @param memcached
-     * @param force
+     * @param sessionIdChanged
      *            specifies, if the session needs to be saved by all means, e.g.
      *            as it has to be relocated to another memcached
      *            node (the session id had been changed before in this case).
+     * @param sessionBackupAsync
+     * @param sessionBackupTimeout
+     * @param memcached
      * @param memcachedNodesManager
-     * @param failoverNodeIds
+     * @param statistics
      */
     public BackupSessionTask( final MemcachedBackupSession session,
             final boolean sessionIdChanged,
@@ -106,7 +106,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
 
             final long startBackup = System.currentTimeMillis();
 
-            final Map<String, Object> attributes = _session.getAttributesFiltered();
+            final ConcurrentMap<String, Object> attributes = _session.getAttributesFiltered();
             final byte[] attributesData = serializeAttributes( _session, attributes );
             final int hashCode = Arrays.hashCode( attributesData );
             final BackupResult result;
@@ -175,7 +175,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
         }
     }
 
-    private byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    private byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         final long start = System.currentTimeMillis();
         final byte[] attributesData = _transcoderService.serializeAttributes( session, attributes );
         _statistics.registerSince( ATTRIBUTES_SERIALIZATION, start );

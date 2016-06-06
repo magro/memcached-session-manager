@@ -17,7 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.apache.catalina.session.StandardSession;
 
@@ -39,16 +39,16 @@ public interface SessionAttributesTranscoder {
      * @param attributes the attributes to serialize.
      * @return a byte array representing the serialized attributes.
      */
-    byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes );
+    byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes );
 
     /**
      * Deserialize the given byte array to session attributes. The map implementation
-     * should be a {@link ConcurrentHashMap} as this is the implementation currently used
-     * by the {@link StandardSession}.
+     * should be a {@link java.util.concurrent.ConcurrentHashMap ConcurrentHashMap} as this is the implementation
+     * currently used by the {@link StandardSession}.
      *
      * @param data the serialized attributes
      * @return the deserialized attributes
      */
-    Map<String, Object> deserializeAttributes( final byte[] data );
+    ConcurrentMap<String, Object> deserializeAttributes(final byte[] data );
 
 }

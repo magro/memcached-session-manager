@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
@@ -59,7 +60,7 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
      * {@inheritDoc}
      */
     @Override
-    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         return doSerialize( attributes );
 
     }
@@ -88,11 +89,11 @@ public class XStreamTranscoder implements SessionAttributesTranscoder {
      * @return the resulting object
      */
     @Override
-    public Map<String, Object> deserializeAttributes( final byte[] in ) {
+    public ConcurrentMap<String, Object> deserializeAttributes(final byte[] in ) {
         final ByteArrayInputStream bis = new ByteArrayInputStream( in );
         try {
             @SuppressWarnings( "unchecked" )
-            final Map<String, Object> result = (Map<String, Object>) _xstream.fromXML( bis );
+            final ConcurrentMap<String, Object> result = (ConcurrentMap<String, Object>) _xstream.fromXML( bis );
             return result;
         } catch ( final RuntimeException e ) {
             LOG.warn( "Caught Exception decoding "+ in.length +" bytes of data", e );

@@ -16,7 +16,6 @@ package de.javakaffee.web.msm.serializer.json;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,6 +27,7 @@ import org.testng.annotations.Test;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedBackupSessionManager;
 import de.javakaffee.web.msm.serializer.json.JSONTranscoderTest.Person.Gender;
+
 /**
  * Test for {@link JSONTranscoder}
  * @author Sandeep More
@@ -54,9 +54,8 @@ public class JSONTranscoderTest {
 		final long start = System.nanoTime();
 		final byte[] json = transcoder.serializeAttributes( session, session.getAttributesInternal() );
 		final Map<String, Object> readValue = transcoder.deserializeAttributes( json );
-		System.out.println("json-round took " + (System.nanoTime() - start)/1000);
 
-		assertEquals( readValue, new HashMap<String, Object>(session.getAttributesInternal()) );
+		assertEquals( readValue, session.getAttributesInternal() );
 
 	}
 

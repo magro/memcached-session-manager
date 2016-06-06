@@ -19,6 +19,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
@@ -43,6 +45,7 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
     private static final Log LOG = LogFactory.getLog(JSONTranscoder.class);
 
 	private final JSONSerializer serializer;
+	private final JSONDeserializer<ConcurrentMap<String, Object>> deserializer;
 
 	/**
 	 * Constructor
@@ -50,6 +53,7 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 	 */
 	public JSONTranscoder(final Manager manager) {
 		serializer = new JSONSerializer();
+		deserializer = new JSONDeserializer<ConcurrentMap<String, Object>>();
 		if (LOG.isDebugEnabled()) {
 		    LOG.debug("Initialized json serializer");
 		}
@@ -62,14 +66,13 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 	 *  @return map of deserialized objects
 	 */
 	@Override
-	public Map<String, Object> deserializeAttributes(final byte[] in) {
+	public ConcurrentMap<String, Object> deserializeAttributes(final byte[] in) {
 		final InputStreamReader inputStream = new InputStreamReader( new ByteArrayInputStream( in ) );
 		if (LOG.isDebugEnabled()) {
 		    LOG.debug("deserialize the stream");
 		}
 		try {
-			final Map<String, Object> result = new JSONDeserializer<Map<String, Object>>().deserialize(inputStream);
-			return result;
+			return deserializer.deserializeInto(inputStream, new ConcurrentHashMap<String, Object>());
 		} catch( final RuntimeException e) {
 			LOG.warn("Caught Exception deserializing JSON "+e);
 			throw new TranscoderDeserializationException(e);
@@ -80,7 +83,7 @@ public class JSONTranscoder implements SessionAttributesTranscoder {
 	 * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serializeAttributes(de.javakaffee.web.msm.MemcachedBackupSession, java.util.Map)
 	 */
 	@Override
-	public byte[] serializeAttributes(final MemcachedBackupSession sessions, final Map<String, Object> attributes) {
+	public byte[] serializeAttributes(final MemcachedBackupSession sessions, final ConcurrentMap<String, Object> attributes) {
 		if (attributes == null) {
         	throw new NullPointerException();
         }

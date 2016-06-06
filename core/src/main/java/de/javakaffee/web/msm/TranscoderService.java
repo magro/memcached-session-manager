@@ -34,15 +34,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentMap;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.apache.catalina.Manager;
-import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.authenticator.SavedRequest;
-import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.ByteChunk;
@@ -87,11 +85,11 @@ public class TranscoderService {
      * final byte[] attributesData = serializeAttributes( session, session.getAttributes() );
      * serialize( session, attributesData );
      * </pre></code>
-     * The returned byte array can be deserialized using {@link #deserialize(byte[], Realm, Manager)}.
+     * The returned byte array can be deserialized using {@link #deserialize(byte[], SessionManager)}.
      *
-     * @see #serializeAttributes(MemcachedBackupSession, Map)
+     * @see #serializeAttributes(MemcachedBackupSession, ConcurrentMap)
      * @see #serialize(MemcachedBackupSession, byte[])
-     * @see #deserialize(byte[], Realm, Manager)
+     * @see #deserialize(byte[], SessionManager)
      * @param session the session to serialize.
      * @return the serialized session data.
      */
@@ -102,7 +100,7 @@ public class TranscoderService {
 
     /**
      * Deserialize session data that was serialized using {@link #serialize(MemcachedBackupSession)}
-     * (or a combination of {@link #serializeAttributes(MemcachedBackupSession, Map)} and
+     * (or a combination of {@link #serializeAttributes(MemcachedBackupSession, ConcurrentMap)} and
      * {@link #serialize(MemcachedBackupSession, byte[])}).
      * <p>
      * Note: the returned session already has the manager set and
@@ -111,7 +109,6 @@ public class TranscoderService {
      * </p>
      *
      * @param data the byte array of the serialized session and its session attributes. Can be <code>null</code>.
-     * @param realm the realm that is used to reconstruct the principal if there was any stored in the session.
      * @param manager the manager to set on the deserialized session.
      *
      * @return the deserialized {@link MemcachedBackupSession}
@@ -124,7 +121,7 @@ public class TranscoderService {
         try {
             final DeserializationResult deserializationResult = deserializeSessionFields( data, manager );
             final byte[] attributesData = deserializationResult.getAttributesData();
-            final Map<String, Object> attributes = deserializeAttributes( attributesData );
+            final ConcurrentMap<String, Object> attributes = deserializeAttributes( attributesData );
             final MemcachedBackupSession session = deserializationResult.getSession();
             session.setAttributesInternal( attributes );
             session.setDataHashCode( Arrays.hashCode( attributesData ) );
@@ -141,16 +138,16 @@ public class TranscoderService {
 
     /**
      * Serialize the given session attributes to a byte array, this is delegated
-     * to {@link SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, Map)} (using
+     * to {@link SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, ConcurrentMap)} (using
      * the {@link SessionAttributesTranscoder} provided in the constructor of this class).
      *
      * @param session the session that owns the given attributes.
      * @param attributes the attributes to serialize.
      * @return a byte array representing the serialized attributes.
      *
-     * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, Map)
+     * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, ConcurrentMap)
      */
-    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         return _attributesTranscoder.serializeAttributes( session, attributes );
     }
 
@@ -166,7 +163,7 @@ public class TranscoderService {
      *
      * @see de.javakaffee.web.msm.SessionAttributesTranscoder#deserializeAttributes(byte[])
      */
-    public Map<String, Object> deserializeAttributes( final byte[] data ) {
+    public ConcurrentMap<String, Object> deserializeAttributes(final byte[] data ) {
         return _attributesTranscoder.deserializeAttributes( data );
     }
 
@@ -176,7 +173,7 @@ public class TranscoderService {
      * session attributes.
      *
      * @param session its fields will be serialized to a byte[]
-     * @param attributesData the serialized session attributes (e.g. from {@link #serializeAttributes(MemcachedBackupSession, Map)})
+     * @param attributesData the serialized session attributes (e.g. from {@link #serializeAttributes(MemcachedBackupSession, ConcurrentMap)})
      * @return a byte[] containing both the serialized session fields and the provided serialized session attributes
      */
     public byte[] serialize( final MemcachedBackupSession session, final byte[] attributesData ) {

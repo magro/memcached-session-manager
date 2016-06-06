@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.apache.catalina.session.StandardSession;
 import org.apache.catalina.util.CustomObjectInputStream;
@@ -85,7 +86,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      * {@inheritDoc}
      */
     @Override
-    public byte[] serializeAttributes( final MemcachedBackupSession session, final Map<String, Object> attributes ) {
+    public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         if ( attributes == null ) {
             throw new NullPointerException( "Can't serialize null" );
         }
@@ -158,14 +159,14 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
      * @return the resulting object
      */
     @Override
-    public Map<String, Object> deserializeAttributes( final byte[] in ) {
+    public ConcurrentMap<String, Object> deserializeAttributes(final byte[] in ) {
         ByteArrayInputStream bis = null;
         ObjectInputStream ois = null;
         try {
             bis = new ByteArrayInputStream( in );
             ois = createObjectInputStream( bis );
 
-            final Map<String, Object> attributes = new ConcurrentHashMap<String, Object>();
+            final ConcurrentMap<String, Object> attributes = new ConcurrentHashMap<String, Object>();
             final int n = ( (Integer) ois.readObject() ).intValue();
             for ( int i = 0; i < n; i++ ) {
                 final String name = (String) ois.readObject();
