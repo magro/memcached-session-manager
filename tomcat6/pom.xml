@@ -3,12 +3,12 @@
 	<parent>
 		<groupId>de.javakaffee.msm</groupId>
 		<artifactId>memcached-session-manager-project</artifactId>
-		<version>1.9.4-SNAPSHOT</version>
+		<version>1.9.4</version>
 	</parent>
 
 	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>memcached-session-manager-tc6</artifactId>
-	<version>1.9.4-SNAPSHOT</version>
+	<version>1.9.4</version>
 	<packaging>jar</packaging>
 	<name>memcached-session-manager tomcat6</name>
 	<description>The msm tomcat6 specific implementation.</description>
