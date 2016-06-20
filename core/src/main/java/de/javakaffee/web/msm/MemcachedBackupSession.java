@@ -593,8 +593,8 @@ public class MemcachedBackupSession extends StandardSession {
      * {@inheritDoc}
      */
     @Override
-    protected boolean exclude( final String name ) {
-        return super.exclude( name );
+    protected boolean exclude( final String name, Object value ) {
+        return super.exclude( name, value );
     }
 
     /**

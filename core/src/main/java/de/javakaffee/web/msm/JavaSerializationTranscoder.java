@@ -118,7 +118,7 @@ public class JavaSerializationTranscoder implements SessionAttributesTranscoder 
         final List<Object> saveValues = new ArrayList<Object>();
         for ( int i = 0; i < keys.length; i++ ) {
             final Object value = attributes.get( keys[i] );
-            if ( value == null || session.exclude( keys[i] ) ) {
+            if ( value == null || session.exclude( keys[i], value ) ) {
                 continue;
             } else if ( value instanceof Serializable ) {
                 saveNames.add( keys[i] );
