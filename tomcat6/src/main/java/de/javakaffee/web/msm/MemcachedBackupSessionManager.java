@@ -1096,7 +1096,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         if(_contextHasFormBasedSecurityConstraint != null) {
             return _contextHasFormBasedSecurityConstraint.booleanValue();
         }
-        final Context context = (Context)getContainer();
+        final Context context = getContext();
         final SecurityConstraint[] constraints = context.findConstraints();
         final LoginConfig loginConfig = context.getLoginConfig();
         _contextHasFormBasedSecurityConstraint = constraints != null && constraints.length > 0

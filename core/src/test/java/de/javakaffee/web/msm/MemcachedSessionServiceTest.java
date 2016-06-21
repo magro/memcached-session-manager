@@ -41,6 +41,7 @@ import javax.annotation.Nonnull;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.internal.OperationFuture;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.core.StandardContext;
@@ -72,16 +73,15 @@ public abstract class MemcachedSessionServiceTest {
     @BeforeMethod
     public void setup() throws Exception {
 
-        final SessionManager manager = createSessionManager();
+        final StandardContext context = createContext();
+        context.setBackgroundProcessorDelay( 1 ); // needed for test of updateExpiration
+
+        final SessionManager manager = createSessionManager(context);
 
         _service = manager.getMemcachedSessionService();
         _service.setMemcachedNodes( "n1:127.0.0.1:11211" );
         _service.setSessionBackupAsync( false );
         _service.setSticky( true );
-
-        final StandardContext context = createContext();
-        context.setBackgroundProcessorDelay( 1 ); // needed for test of updateExpiration
-        manager.setContainer( context );
 
         _memcachedMock = mock( MemcachedClient.class );
 
@@ -110,7 +110,7 @@ public abstract class MemcachedSessionServiceTest {
     }
 
     @Nonnull
-    protected abstract SessionManager createSessionManager();
+    protected abstract SessionManager createSessionManager(Context context);
 
     @Test
     public void testConfigurationFormatMemcachedNodesFeature44() throws LifecycleException {

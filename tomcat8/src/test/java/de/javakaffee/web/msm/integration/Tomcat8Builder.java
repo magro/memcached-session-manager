@@ -19,8 +19,10 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.security.Security;
 
 import javax.annotation.Nonnull;
+import javax.security.auth.message.config.AuthConfigFactory;
 import javax.servlet.ServletException;
 
 import de.javakaffee.web.msm.MemcachedSessionService;
@@ -31,6 +33,7 @@ import org.apache.catalina.Host;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Valve;
 import org.apache.catalina.authenticator.AuthenticatorBase;
+import org.apache.catalina.authenticator.jaspic.AuthConfigFactoryImpl;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
@@ -48,6 +51,15 @@ import edu.umd.cs.findbugs.annotations.SuppressWarnings;
  * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
+
+    static {
+        // set jaspic AuthConfigFactory to prevent NPEs like this:
+        // java.lang.NullPointerException
+        //     at org.apache.catalina.authenticator.AuthenticatorBase.getJaspicProvider(AuthenticatorBase.java:1140)
+        //     at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:431)
+        //     at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:140)
+        Security.setProperty(AuthConfigFactory.DEFAULT_FACTORY_SECURITY_PROPERTY, AuthConfigFactoryImpl.class.getName());
+    }
 
     @SuppressWarnings( "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" )
     public Tomcat build() throws MalformedURLException,

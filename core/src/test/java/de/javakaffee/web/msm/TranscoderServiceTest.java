@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
+import org.apache.catalina.Manager;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.authenticator.SavedRequest;
 import org.apache.catalina.core.StandardContext;
@@ -47,7 +48,6 @@ import org.testng.annotations.Test;
 
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
-
 /**
  * Test the {@link TranscoderService}.
  *
@@ -57,6 +57,15 @@ public abstract class TranscoderServiceTest {
 
     protected static SessionManager _manager;
 
+    private static boolean _managerHasGetContainer;
+
+    static {
+        try {
+            Manager.class.getDeclaredMethod("getContainer");
+            _managerHasGetContainer = true;
+        } catch (NoSuchMethodException e) { }
+    }
+
     @BeforeMethod
     public void setup() throws LifecycleException, ClassNotFoundException, IOException {
 
@@ -64,7 +73,10 @@ public abstract class TranscoderServiceTest {
 
         final Context context = new StandardContext();
         when( _manager.getContext() ).thenReturn( context ); // needed for createSession
-        when( _manager.getContainer() ).thenReturn( context ); // needed for createSession
+        // Manager.getContainer no longer available in tc 8.5+
+        if(_managerHasGetContainer) {
+            when( _manager.getContainer() ).thenReturn( context );
+        }
         when( _manager.newMemcachedBackupSession() ).thenAnswer(new Answer<MemcachedBackupSession>() {
             @Override
             public MemcachedBackupSession answer(final InvocationOnMock invocation) throws Throwable {

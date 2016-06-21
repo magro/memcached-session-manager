@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import javolution.xml.XMLObjectReader;
 import javolution.xml.XMLObjectWriter;
 import javolution.xml.XMLReferenceResolver;
@@ -59,7 +60,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
 
     private static final Log LOG = LogFactory.getLog( JavolutionTranscoder.class );
 
-    private final Manager _manager;
+    private final SessionManager _manager;
     private final ReflectionBinding _xmlBinding;
 
     /**
@@ -68,7 +69,7 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
      * @param manager
      *            the manager
      */
-    public JavolutionTranscoder( final Manager manager ) {
+    public JavolutionTranscoder( final SessionManager manager ) {
         this( manager, false );
     }
 
@@ -82,10 +83,10 @@ public class JavolutionTranscoder implements SessionAttributesTranscoder {
      *            on a copy of the collection or on the collection itself
      * @param customFormats a list of {@link CustomXMLFormat}s or <code>null</code>.
      */
-    public JavolutionTranscoder( final Manager manager, final boolean copyCollectionsForSerialization,
-            final CustomXMLFormat<?> ... customFormats ) {
+    public JavolutionTranscoder(final SessionManager manager, final boolean copyCollectionsForSerialization,
+                                final CustomXMLFormat<?> ... customFormats ) {
         _manager = manager;
-        final Loader loader = ((Context)_manager.getContainer()).getLoader();
+        final Loader loader = _manager.getContext().getLoader();
         _xmlBinding = new ReflectionBinding( loader.getClassLoader(), copyCollectionsForSerialization, customFormats );
     }
 

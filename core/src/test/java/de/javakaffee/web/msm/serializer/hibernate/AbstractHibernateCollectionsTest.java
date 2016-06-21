@@ -25,19 +25,28 @@ import de.javakaffee.web.msm.integration.TestUtils;
 import org.apache.catalina.core.StandardContext;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.hibernate.*;
+import org.hibernate.Criteria;
+import org.hibernate.Hibernate;
+import org.hibernate.HibernateException;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.hibernate.annotations.AttributeAccessor;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.criterion.Restrictions;
-import org.mockito.Matchers;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import javax.annotation.Nonnull;
-import javax.persistence.*;
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -45,8 +54,8 @@ import java.util.List;
 import java.util.Set;
 
 import static de.javakaffee.web.msm.integration.TestUtils.createContext;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -77,7 +86,6 @@ public abstract class AbstractHibernateCollectionsTest {
     public void testDeserializeHibernateCollection() {
 
         final SessionManager manager = createSessionManager();
-        manager.setContainer( createContext() );
 
         final Set<Animal> animals = new HashSet<Animal>( Arrays.asList( new Animal( "cat" ) ) );
         final Person person = new Person( "foo bar", animals );
@@ -211,7 +219,7 @@ public abstract class AbstractHibernateCollectionsTest {
     @Nonnull
     protected SessionManager createSessionManager() {
         final SessionManager manager = mock( SessionManager.class );
-        final StandardContext context = new StandardContext();
+        final StandardContext context = createContext();
         when( manager.getContext() ).thenReturn(context); // needed for createSession
         when( manager.getContainer() ).thenReturn(context); // needed for createSession
         when( manager.getMemcachedSessionService() ).thenReturn(newMemcachedSessionService(manager));

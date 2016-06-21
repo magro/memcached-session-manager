@@ -29,6 +29,13 @@
 			<version>${tomcat-version}</version>
 			<scope>provided</scope>
 		</dependency>
+		<!-- JASPIC -->
+		<dependency>
+			<groupId>javax.security.auth.message</groupId>
+			<artifactId>javax.security.auth.message-api</artifactId>
+			<version>1.1</version>
+			<scope>provided</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
 			<artifactId>tomcat-catalina</artifactId>
