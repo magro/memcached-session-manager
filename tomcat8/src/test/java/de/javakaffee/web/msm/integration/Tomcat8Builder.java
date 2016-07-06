@@ -120,6 +120,7 @@ public class Tomcat8Builder extends TomcatBuilder<Tomcat> {
         sessionManager.getMemcachedSessionService().setSticky(sticky);
         if(lockingMode != null) {
             sessionManager.getMemcachedSessionService().setLockingMode(lockingMode.name());
+            sessionManager.getMemcachedSessionService().setLockExpiration(lockExpire);
         }
         sessionManager.getMemcachedSessionService().setMemcachedProtocol(memcachedProtocol);
         sessionManager.getMemcachedSessionService().setUsername(username);

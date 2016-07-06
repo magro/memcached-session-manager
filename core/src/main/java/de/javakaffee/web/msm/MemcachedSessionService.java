@@ -229,6 +229,7 @@ public class MemcachedSessionService {
     private String _lockingMode;
     private LockingStrategy _lockingStrategy;
     private long _operationTimeout = 1000;
+    private int _lockExpiration = 5;
 
     private CurrentRequest _currentRequest;
     private RequestTrackingHostValve _trackingHostValve;
@@ -363,7 +364,7 @@ public class MemcachedSessionService {
         void setSticky( boolean sticky );
         void setEnabled( boolean b );
         void setOperationTimeout(long operationTimeout);
-
+        void setLockExpiration(int lockExpiration);
         /**
          * Set the manager checks frequency in seconds.
          * @param processExpiresFrequency the new manager checks frequency
@@ -460,6 +461,7 @@ public class MemcachedSessionService {
                 "\n- node ids: " + _memcachedNodesManager.getPrimaryNodeIds() +
                 "\n- failover node ids: " + _memcachedNodesManager.getFailoverNodeIds() +
                 "\n- storage key prefix: " + _memcachedNodesManager.getStorageKeyFormat().prefix +
+                "\n- locking mode: " + _lockingMode + " (expiration: " + _lockExpiration + "s)" +
                 "\n--------");
 
     }
@@ -1680,9 +1682,30 @@ public class MemcachedSessionService {
 		return _operationTimeout;
 	}
 
+    /**
+     * This LockExpiration(seconds) avoid duplicated processing.
+     * The session lock will automatically expire by memcached after this LockExpiration seconds, <br/>
+     * when {@link #getLockingStrategy()} is <code>{@link LockingMode#AUTO} or {@link LockingMode#ALL}</code>. <br/>
+     * If {@link #getOperationTimeout()} is less then this LockExpiration,
+     * The other request accepted by other tomcat is available session backup before current request finished.<br/>
+     * <code>lockExpiration &gt; OperationTimeout : </code><br/>
+     * - The other request wait for lockExpiration or unlocking  <br/>
+     * - The other request wait for as much as OperationTimeout, after then backup session used as {@link LockStatus#COULD_NOT_AQUIRE_LOCK}<br/>
+     * <code>lockExpiration &lt; OperationTimeout : </code><br/>
+     * - The other request wait for as much as lockExpiration, that is accepted in lockExpiration <br/>
+     * - The other request don't wait, that is accepted after lockExpiration <br/>
+     */
+    public int getLockExpiration() {
+        return _lockExpiration;
+    }
+
 	public void setOperationTimeout(final long operationTimeout ) {
 		_operationTimeout = operationTimeout;
 	}
+
+    public void setLockExpiration(final int lockExpiration) {
+        _lockExpiration = lockExpiration;
+    }
 
     // ----------------------- protected getters/setters for testing ------------------
 
