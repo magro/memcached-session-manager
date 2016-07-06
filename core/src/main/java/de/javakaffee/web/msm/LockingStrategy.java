@@ -166,7 +166,7 @@ public abstract class LockingStrategy {
 
     protected void acquireLock( @Nonnull final String sessionId, final long retryInterval, final long maxRetryInterval,
             final long timeout, final long start ) throws InterruptedException, ExecutionException, TimeoutException {
-        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, LOCK_VALUE );
+        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), _manager.getLockExpire() , LOCK_VALUE );
         if ( result.get().booleanValue() ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Locked session " + sessionId );

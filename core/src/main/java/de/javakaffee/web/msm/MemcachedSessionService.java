@@ -231,6 +231,7 @@ public class MemcachedSessionService {
     private String _lockingMode;
     private LockingStrategy _lockingStrategy;
     private long _operationTimeout = 1000;
+    private int _lockExpire = 5;
 
     private CurrentRequest _currentRequest;
     private RequestTrackingHostValve _trackingHostValve;
@@ -354,7 +355,7 @@ public class MemcachedSessionService {
         void setSticky( boolean sticky );
         void setEnabled( boolean b );
         void setOperationTimeout(long operationTimeout);
-
+        void setLockExpire(int lockExpire);
         /**
          * Set the manager checks frequency in seconds.
          * @param processExpiresFrequency the new manager checks frequency
@@ -447,6 +448,7 @@ public class MemcachedSessionService {
                 "\n- node ids: " + _memcachedNodesManager.getPrimaryNodeIds() +
                 "\n- failover node ids: " + _memcachedNodesManager.getFailoverNodeIds() +
                 "\n- storage key prefix: " + _memcachedNodesManager.getStorageKeyFormat().prefix +
+                "\n- locking mode: " + _lockingMode + "(expire " + _lockExpire + "s)" +
                 "\n--------");
 
     }
@@ -1633,9 +1635,23 @@ public class MemcachedSessionService {
 		return _operationTimeout;
 	}
 
+    /**
+     * The expire in seconds after that a session backup is locked automatically works by memcached
+     * when {@link #getLockingStrategy()} is <code>{@link LockingMode#AUTO} or {@link LockingMode#ALL}</code>.
+     * If {@link #getOperationTimeout()} is less then this, Other request is available session backup
+     * when before request that processed by other tomcat delayed over {@link #getOperationTimeout()}.
+     */
+    public int getLockExpire() {
+        return _lockExpire;
+    }
+
 	public void setOperationTimeout(final long operationTimeout ) {
 		_operationTimeout = operationTimeout;
 	}
+
+    public void setLockExpire(final int lockExpire) {
+        _lockExpire = lockExpire;
+    }
 
     // ----------------------- protected getters/setters for testing ------------------
 

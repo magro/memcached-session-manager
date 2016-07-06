@@ -560,6 +560,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 		return _msm.getOperationTimeout();
 	}
 
+    @Override
+    public void setLockExpire(int lockExpire) {
+        _msm.setLockExpire(lockExpire);
+    }
+
     /**
      * Sets the session locking mode. Possible values:
      * <ul>

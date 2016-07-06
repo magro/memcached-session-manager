@@ -59,6 +59,7 @@ public abstract class TomcatBuilder<T> {
     protected boolean enabled = true;
     protected boolean sticky = true;
     protected LockingMode lockingMode;
+    protected int lockExpire;
     protected String memcachedProtocol = MemcachedSessionService.PROTOCOL_TEXT;
     protected String username = null;
     protected String transcoderFactoryClassName = JavaSerializationTranscoderFactory.class.getName();
@@ -106,6 +107,11 @@ public abstract class TomcatBuilder<T> {
 
     public TomcatBuilder<T> lockingMode(final LockingMode lockingMode) {
         this.lockingMode = lockingMode;
+        return this;
+    }
+
+    public TomcatBuilder<T> lockExpire(final int lockExpire) {
+        this.lockExpire = lockExpire;
         return this;
     }
 
