@@ -476,8 +476,8 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 	}
 
     @Override
-    public void setLockExpire(int lockExpire) {
-        _msm.setLockExpire(lockExpire);
+    public void setLockExpiration(int lockExpiration) {
+        _msm.setLockExpiration(lockExpiration);
     }
 
     /**
