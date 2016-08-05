@@ -145,7 +145,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private TomcatBuilder<?> startTomcat( final int port, final String memcachedNodes, final LockingMode lockingMode ) throws Exception {
         return getTestUtils().tomcatBuilder().port(port).sessionTimeout(5).memcachedNodes(memcachedNodes)
-                .sticky(false).lockingMode(lockingMode).storageKeyPrefix(null).buildAndStart();
+                .sticky(false).lockingMode(lockingMode).lockExpire(5).storageKeyPrefix(null).buildAndStart();
     }
 
     @AfterMethod
