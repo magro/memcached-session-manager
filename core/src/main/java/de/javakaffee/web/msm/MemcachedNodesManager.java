@@ -18,6 +18,7 @@ package de.javakaffee.web.msm;
 import static de.javakaffee.web.msm.Configurations.NODE_AVAILABILITY_CACHE_TTL_KEY;
 import static de.javakaffee.web.msm.Configurations.getSystemProperty;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -50,10 +51,12 @@ public class MemcachedNodesManager {
 	 */
 	public static interface MemcachedClientCallback {
 		/**
-		 * Must query the given key in memcached.
+		 * Must query the given key in memcached using the {@link MemcachedStorageClient.ByteArrayTranscoder}.
+		 * 
+		 * @throws IOException if the get() operation cannot be performed
 		 */
 		@Nullable
-		Object get(@Nonnull String key);
+		byte[] get(@Nonnull String key) throws IOException;
 	}
 
 	private static final Log LOG = LogFactory.getLog(MemcachedNodesManager.class);
@@ -183,6 +186,12 @@ public class MemcachedNodesManager {
             final MemcachedClientCallback memcachedClientCallback) {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
+		}
+		
+		if (memcachedNodes.startsWith("redis://") || memcachedNodes.startsWith("rediss://")) {
+		    // Redis configuration
+		    return new MemcachedNodesManager(memcachedNodes, new NodeIdList(), new ArrayList<String>(),
+		            new LinkedHashMap<InetSocketAddress, String>(), storageKeyFormat, memcachedClientCallback);
 		}
 
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
@@ -534,6 +543,14 @@ public class MemcachedNodesManager {
         return COUCHBASE_BUCKET_NODES_PATTERN.matcher(_memcachedNodes).matches();
     }
 
+    /**
+     * Determines, if the current memcachedNodes configuration is a Redis configuration
+     * (like e.g. redis://example.com or rediss://example.com).
+     */
+    public boolean isRedisConfig() {
+        return _memcachedNodes.startsWith("redis://") || _memcachedNodes.startsWith("rediss://");
+    }
+    
     /**
      * Returns a list of couchbase REST interface uris if the current configuration is
      * a couchbase bucket configuration.

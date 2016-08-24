@@ -16,16 +16,14 @@
  */
 package de.javakaffee.web.msm;
 
-import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.catalina.connector.Request;
 
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * This locking strategy locks requests matching a configured uri pattern.
@@ -39,7 +37,7 @@ public class LockingStrategyUriPattern extends LockingStrategy {
     public LockingStrategyUriPattern( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final Pattern uriPattern,
-            @Nonnull final MemcachedClient memcached,
+            @Nonnull final StorageClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
@@ -52,8 +50,7 @@ public class LockingStrategyUriPattern extends LockingStrategy {
     }
 
     @Override
-    protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) throws InterruptedException,
-            ExecutionException {
+    protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) {
 
         final Request request = _currentRequest.get();
 

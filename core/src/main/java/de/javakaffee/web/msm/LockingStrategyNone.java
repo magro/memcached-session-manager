@@ -16,12 +16,10 @@
  */
 package de.javakaffee.web.msm;
 
-import java.util.concurrent.ExecutionException;
-
 import javax.annotation.Nonnull;
 
-import net.spy.memcached.MemcachedClient;
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * Ths locking strategy does not lock the session at all.
@@ -32,7 +30,7 @@ public class LockingStrategyNone extends LockingStrategy {
 
     public LockingStrategyNone( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
-            @Nonnull final MemcachedClient memcached,
+            @Nonnull final StorageClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
@@ -41,7 +39,7 @@ public class LockingStrategyNone extends LockingStrategy {
     }
 
     @Override
-    protected LockStatus onBeforeLoadFromMemcached( @Nonnull final String sessionId ) throws InterruptedException, ExecutionException {
+    protected LockStatus onBeforeLoadFromMemcached( @Nonnull final String sessionId ) {
         return LockStatus.LOCK_NOT_REQUIRED;
     }
 

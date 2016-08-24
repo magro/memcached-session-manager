@@ -58,6 +58,7 @@ import de.javakaffee.web.msm.integration.TestUtils.Predicates;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 import de.javakaffee.web.msm.integration.TomcatBuilder;
+import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
 
 /**
  * Integration test testing basic session manager functionality.
@@ -87,8 +88,12 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
 		@Override
-		public Object get(final String key) {
-			return _memcached.get(key);
+		public byte[] get(final String key) throws IOException {
+			try {
+			    return _memcached.get(key, ByteArrayTranscoder.INSTANCE);
+            } catch (Exception e) {
+                throw new IOException("Error getting key " + key, e);
+            }
 		}
 	};
 
