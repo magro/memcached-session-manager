@@ -40,6 +40,7 @@ import javax.annotation.Nonnull;
 
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.internal.OperationFuture;
+import net.spy.memcached.transcoders.Transcoder;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
@@ -86,8 +87,9 @@ public abstract class MemcachedSessionServiceTest {
         _memcachedMock = mock( MemcachedClient.class );
 
         final OperationFuture<Boolean> setResultMock = mock( OperationFuture.class );
+        when( setResultMock.get( ) ).thenReturn( Boolean.TRUE );
         when( setResultMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.TRUE );
-        when( _memcachedMock.set(  any( String.class ), anyInt(), any() ) ).thenReturn( setResultMock );
+        when( _memcachedMock.set( any( String.class ), anyInt(), any(), any( Transcoder.class ) ) ).thenReturn( setResultMock );
 
         final OperationFuture<Boolean> deleteResultMock = mock( OperationFuture.class );
         when( deleteResultMock.get() ).thenReturn( Boolean.TRUE );
@@ -184,12 +186,13 @@ public abstract class MemcachedSessionServiceTest {
 
         @SuppressWarnings( "unchecked" )
         final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
+        when( futureMock.get( ) ).thenThrow(new ExecutionException(new RuntimeException("Simulated exception.")));
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenThrow(new ExecutionException(new RuntimeException("Simulated exception.")));
-        when( _memcachedMock.set(  eq( session.getId() ), anyInt(), any() ) ).thenReturn( futureMock );
+        when( _memcachedMock.set(  eq( session.getId() ), anyInt(), any(), any( Transcoder.class ) ) ).thenReturn( futureMock );
 
         final BackupResult backupResult = _service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.FAILURE);
-        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any(), any( Transcoder.class ) );
     }
 
     /**
@@ -207,7 +210,7 @@ public abstract class MemcachedSessionServiceTest {
         session.endAccess();
         session.setAttribute( "foo", "bar" );
         _service.backupSession( session.getIdInternal(), false, null ).get();
-        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any(), any( Transcoder.class ) );
 
         // we need some millis between last backup and next access (due to check in BackupSessionService)
         Thread.sleep(5L);
@@ -219,7 +222,7 @@ public abstract class MemcachedSessionServiceTest {
         session.setAttribute( "foo", "bar" );
         session.setAttribute( "bar", "baz" );
         _service.backupSession( session.getIdInternal(), false, null ).get();
-        verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
+        verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any(), any( Transcoder.class ) );
 
         // we need some millis between last backup and next access (due to check in BackupSessionService)
         Thread.sleep(5L);
@@ -227,7 +230,7 @@ public abstract class MemcachedSessionServiceTest {
         /* simulate the third request, without session access
          */
         _service.backupSession( session.getIdInternal(), false, null ).get();
-        verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any() );
+        verify( _memcachedMock, times( 2 ) ).set( eq( session.getId() ), anyInt(), any(), any( Transcoder.class ) );
 
     }
 
@@ -330,13 +333,13 @@ public abstract class MemcachedSessionServiceTest {
 
         // remove session with old id and add it with the new id
         verify( _memcachedMock, times( 1 ) ).delete( eq( oldSessionId ) );
-        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any() );
+        verify( _memcachedMock, times( 1 ) ).set( eq( session.getId() ), anyInt(), any(), any( Transcoder.class ) );
 
         if ( !stickyness.isSticky() ) {
             Thread.sleep(200l);
             // check validity info
             verify( _memcachedMock, times( 1 ) ).delete( eq( new SessionIdFormat().createValidityInfoKeyName( oldSessionId ) ) );
-            verify( _memcachedMock, times( 1 ) ).set( eq( new SessionIdFormat().createValidityInfoKeyName( session.getId() ) ), anyInt(), any() );
+            verify( _memcachedMock, times( 1 ) ).set( eq( new SessionIdFormat().createValidityInfoKeyName( session.getId() ) ), anyInt(), any(), any( Transcoder.class ) );
         }
 
     }
@@ -370,12 +373,12 @@ public abstract class MemcachedSessionServiceTest {
 
         _service.backupSession( sessionId, false, null ).get();
 
-        verify( _memcachedMock, times( 1 ) ).set( eq( sessionId ), eq( 0 ), any() );
+        verify( _memcachedMock, times( 1 ) ).set( eq( sessionId ), eq( 0 ), any(), any( Transcoder.class ) );
 
         if ( !stickyness.isSticky() ) {
             // check validity info
             final String validityKey = new SessionIdFormat().createValidityInfoKeyName( sessionId );
-            verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
+            verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any(), any( Transcoder.class ) );
 
             // As the backup is done asynchronously, we shutdown the executor so that we know the backup
             // task is executed/finished.
@@ -385,9 +388,9 @@ public abstract class MemcachedSessionServiceTest {
             Thread.sleep(15);
 
             final String backupSessionKey = new SessionIdFormat().createBackupKey( sessionId );
-            verify( _memcachedMock, times( 1 ) ).set( eq( backupSessionKey ), eq( 0 ), any() );
+            verify( _memcachedMock, times( 1 ) ).set( eq( backupSessionKey ), eq( 0 ), any(), any( Transcoder.class ) );
             final String backupValidityKey = new SessionIdFormat().createBackupKey( validityKey );
-            verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any() );
+            verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any(), any( Transcoder.class ) );
         }
     }
 
@@ -414,19 +417,19 @@ public abstract class MemcachedSessionServiceTest {
         // stub loading of validity info
         final String validityKey = new SessionIdFormat().createValidityInfoKeyName( sessionId );
         final byte[] validityData = encode( -1, System.currentTimeMillis(), System.currentTimeMillis() );
-        when( _memcachedMock.get( eq( validityKey ) ) ).thenReturn( validityData );
+        when( _memcachedMock.get( eq( validityKey ), any ( Transcoder.class) ) ).thenReturn( validityData );
 
         // stub session (backup) ping
         @SuppressWarnings( "unchecked" )
         final OperationFuture<Boolean> futureMock = mock( OperationFuture.class );
         when( futureMock.get() ).thenReturn( Boolean.FALSE );
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.FALSE );
-        when( _memcachedMock.add(  any( String.class ), anyInt(), any() ) ).thenReturn( futureMock );
+        when( _memcachedMock.add( any( String.class ), anyInt(), any(), any( Transcoder.class ) ) ).thenReturn( futureMock );
 
         _service.backupSession( sessionId, false, null ).get();
 
         // update validity info
-        verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any() );
+        verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any(), any( Transcoder.class ) );
 
         // As the backup is done asynchronously, we shutdown the executor so that we know the backup
         // task is executed/finished.
@@ -436,15 +439,15 @@ public abstract class MemcachedSessionServiceTest {
         Thread.sleep(15);
 
         // ping session
-        verify( _memcachedMock, times( 1 ) ).add( eq( sessionId ), anyInt(), any() );
+        verify( _memcachedMock, times( 1 ) ).add( eq( sessionId ), anyInt(), any(), any( Transcoder.class ) );
 
         // ping session backup
         final String backupSessionKey = new SessionIdFormat().createBackupKey( sessionId );
-        verify( _memcachedMock, times( 1 ) ).add( eq( backupSessionKey ), anyInt(), any() );
+        verify( _memcachedMock, times( 1 ) ).add( eq( backupSessionKey ), anyInt(), any(), any( Transcoder.class ) );
 
         // update validity backup
         final String backupValidityKey = new SessionIdFormat().createBackupKey( validityKey );
-        verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any() );
+        verify( _memcachedMock, times( 1 ) ).set( eq( backupValidityKey ), eq( 0 ), any(), any( Transcoder.class ) );
     }
 
     /**
@@ -554,7 +557,7 @@ public abstract class MemcachedSessionServiceTest {
         final OperationFuture<Boolean> addResultMock = mock(OperationFuture.class);
         when(addResultMock.get()).thenReturn(true);
         when(addResultMock.get(anyLong(), any(TimeUnit.class))).thenReturn(true);
-        when(_memcachedMock.add(anyString(), anyInt(), any(TimeUnit.class))).thenReturn(addResultMock);
+        when(_memcachedMock.add(anyString(), anyInt(), any(), any(Transcoder.class))).thenReturn(addResultMock);
 
         final MemcachedBackupSession session = createSession( _service );
         // the session is now already added to the internal session map
@@ -568,7 +571,7 @@ public abstract class MemcachedSessionServiceTest {
         when(requestMock.getNote(eq(RequestTrackingContextValve.INVOKED))).thenReturn(Boolean.TRUE);
         _service.getTrackingHostValve().storeRequestThreadLocal(requestMock);
 
-        when(_memcachedMock.get(eq(session.getId()))).thenReturn(transcoderService.serialize(session));
+        when(_memcachedMock.get(eq(session.getId()), any(Transcoder.class))).thenReturn(transcoderService.serialize(session));
 
         final MemcachedBackupSession session2 = _service.findSession(session.getId());
         assertTrue(session2.isLocked());

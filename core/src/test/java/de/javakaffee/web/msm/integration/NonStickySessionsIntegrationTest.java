@@ -65,6 +65,8 @@ import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
 import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
+import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
+
 import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 /**
  * Integration test testing non-sticky sessions.
@@ -82,8 +84,8 @@ public abstract class NonStickySessionsIntegrationTest {
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
         @Override
-        public Object get(final String key) {
-            return _client.get(key);
+        public byte[] get(final String key) {
+            return _client.get(key, ByteArrayTranscoder.INSTANCE);
         }
     };
 

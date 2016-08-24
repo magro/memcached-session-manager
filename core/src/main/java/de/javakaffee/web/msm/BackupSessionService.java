@@ -34,18 +34,17 @@ import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nonnull;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.catalina.Session;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * This service is responsible for storing sessions memcached. This includes
  * serialization (which is delegated to the {@link TranscoderService}) and
- * the communication with memcached (using a provided {@link MemcachedClient}).
+ * the communication with memcached (using a provided {@link StorageClient}).
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
@@ -56,7 +55,7 @@ public class BackupSessionService {
     private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
-    private final MemcachedClient _memcached;
+    private final StorageClient _memcached;
     private final MemcachedNodesManager _memcachedNodesManager;
     private final Statistics _statistics;
 
@@ -75,7 +74,7 @@ public class BackupSessionService {
             final boolean sessionBackupAsync,
             final int sessionBackupTimeout,
             final int backupThreadCount,
-            final MemcachedClient memcached,
+            final StorageClient memcached,
             final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         _transcoderService = transcoderService;

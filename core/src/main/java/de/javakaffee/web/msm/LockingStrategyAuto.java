@@ -24,13 +24,12 @@ import java.util.concurrent.Future;
 
 import javax.annotation.Nonnull;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.catalina.connector.Request;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * This locking strategy locks all requests except those that are registed (via autodetection)
@@ -45,7 +44,7 @@ public class LockingStrategyAuto extends LockingStrategy {
 
     public LockingStrategyAuto( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
-            @Nonnull final MemcachedClient memcached,
+            @Nonnull final StorageClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
