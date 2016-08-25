@@ -16,7 +16,6 @@
  */
 package de.javakaffee.web.msm.storage;
 
-import java.io.IOException;
 import java.util.concurrent.Future;
 
 import net.spy.memcached.CachedData;
@@ -49,42 +48,23 @@ public class MemcachedStorageClient implements StorageClient {
     }
 
     @Override
-    public boolean add(String key, int exp, byte[] o) throws IOException {
-        try {
-            Future<Boolean> future = _memcached.add(key, exp, o, ByteArrayTranscoder.INSTANCE);
-            return future.get();
-        } catch (Exception e) {
-            throw new IOException(String.format("Error adding key \"%s\"", key), e);
-        }
+    public Future<Boolean> add(String key, int exp, byte[] o) {
+        return _memcached.add(key, exp, o, ByteArrayTranscoder.INSTANCE);
     }
 
     @Override
-    public boolean set(String key, int exp, byte[] o) throws IOException {
-        try {
-            Future<Boolean> future = _memcached.set(key, exp, o, ByteArrayTranscoder.INSTANCE);
-            return future.get();
-        } catch (Exception e) {
-            throw new IOException(String.format("Error setting key \"%s\"", key), e);
-        }
+    public Future<Boolean> set(String key, int exp, byte[] o) {
+        return _memcached.set(key, exp, o, ByteArrayTranscoder.INSTANCE);
     }
     
     @Override
-    public byte[] get(String key) throws IOException {
-        try {
-            return (byte[])_memcached.get(key, ByteArrayTranscoder.INSTANCE);
-        } catch (Exception e) {
-            throw new IOException(String.format("Error getting key \"%s\"", key), e);
-        }
+    public byte[] get(String key) {
+        return _memcached.get(key, ByteArrayTranscoder.INSTANCE);
     }
     
     @Override
-    public boolean delete(String key) throws IOException {
-        try {
-            Future<Boolean> future = _memcached.delete(key);
-            return future.get();
-        } catch (Exception e) {
-            throw new IOException(String.format("Error deleting key \"%s\"", key), e);
-        }
+    public Future<Boolean> delete(String key) {
+        return _memcached.delete(key);
     }
 
     @Override

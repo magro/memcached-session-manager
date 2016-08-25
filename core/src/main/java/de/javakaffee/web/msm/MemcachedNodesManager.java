@@ -18,7 +18,6 @@ package de.javakaffee.web.msm;
 import static de.javakaffee.web.msm.Configurations.NODE_AVAILABILITY_CACHE_TTL_KEY;
 import static de.javakaffee.web.msm.Configurations.getSystemProperty;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -51,12 +50,10 @@ public class MemcachedNodesManager {
 	 */
 	public static interface MemcachedClientCallback {
 		/**
-		 * Must query the given key in memcached using the {@link MemcachedStorageClient.ByteArrayTranscoder}.
-		 * 
-		 * @throws IOException if the get() operation cannot be performed
+		 * Must query the given key in memcached.
 		 */
 		@Nullable
-		byte[] get(@Nonnull String key) throws IOException;
+		byte[] get(@Nonnull String key);
 	}
 
 	private static final Log LOG = LogFactory.getLog(MemcachedNodesManager.class);
@@ -188,6 +185,7 @@ public class MemcachedNodesManager {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
 		}
 		
+        // Support a Redis URL in the form "redis://hostname:port" or "rediss://" (for SSL connections) like the client "Lettuce" does
 		if (memcachedNodes.startsWith("redis://") || memcachedNodes.startsWith("rediss://")) {
 		    // Redis configuration
 		    return new MemcachedNodesManager(memcachedNodes, new NodeIdList(), new ArrayList<String>(),

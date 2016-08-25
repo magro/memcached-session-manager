@@ -16,7 +16,7 @@
  */
 package de.javakaffee.web.msm.storage;
 
-import java.io.IOException;
+import java.util.concurrent.Future;
 
 /**
  * Abstracts access to a memcached service, or another service, which provides a protocol similar to memcached.
@@ -27,6 +27,7 @@ public interface StorageClient {
     /**
      * <p>
      * Adds an object to the cache iff it does not exist already.
+     * The operation is performed asynchronously if the underlying implementation supports it.
      * </p>
      * <p>
      * The expiration is defined according to the memcached protocol as follows: The actual value sent may either be
@@ -40,15 +41,16 @@ public interface StorageClient {
      * @param exp object expiration
      * @param o object bytes to store
      * 
-     * @return a boolean indicating whether the object was actually added
-     * 
-     * @throws IOException if there is a problem communicating with the service
+     * @return a future representing the processing of this operation.
+     *         If the boolean value returned by the future is <code>true</code>, the key was added successfully.
+     *         If the boolean value returned by the future is <code>false</code>, the key was already there.
      */
-    boolean add(String key, int exp, byte[] o) throws IOException;
+    Future<Boolean> add(String key, int exp, byte[] o);
     
     /**
      * <p>
      * Sets an object in the cache regardless of any existing value.
+     * The operation is performed asynchronously if the underlying implementation supports it.
      * </p>
      * <p>
      * The expiration is defined according to the memcached protocol as follows: The actual value sent may either be
@@ -62,33 +64,31 @@ public interface StorageClient {
      * @param exp object expiration
      * @param o object bytes to store
      * 
-     * @return a boolean indicating whether the operation was successful
-     * 
-     * @throws IOException if there is a problem communicating with the service
+     * @return a future representing the processing of this operation. The boolean value indicates whether the value
+     *         was set successfully. Setting a value can fail e.g. if the memory limit of the storage was reached.
      */
-    boolean set(String key, int exp, byte[] o) throws IOException;
+    Future<Boolean> set(String key, int exp, byte[] o);
     
     /**
-     * Gets a single key.
+     * Gets an object by key.
      * 
      * @param key object key
      * 
-     * @return object bytes or <code>null</code> if the key is not found
-     * 
-     * @throws IOException if there is a problem communicating with the service
+     * @return object bytes or <code>null</code> if an object with the given key does not exist
      */
-    byte[] get(String key) throws IOException;
+    byte[] get(String key);
 
     /**
      * Deletes the given key from the cache.
+     * The operation is performed asynchronously if the underlying implementation supports it.
      * 
      * @param key object key
      * 
-     * @return a boolean indicating whether the operation was successful
-     * 
-     * @throws IOException if there is a problem communicating with the service
+     * @return a future representing the processing of this operation. The boolean value indicates whether the value
+     *         was deleted successfully. The main reason why <code>false</code> would be returned is if the value to
+     *         delete does not exist.
      */
-    boolean delete(String key) throws IOException;
+    Future<Boolean> delete(String key);
 
    /**
      * Shuts this client down immediately.

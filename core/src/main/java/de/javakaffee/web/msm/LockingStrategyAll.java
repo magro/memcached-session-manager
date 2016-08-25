@@ -16,6 +16,8 @@
  */
 package de.javakaffee.web.msm;
 
+import java.util.concurrent.ExecutionException;
+
 import javax.annotation.Nonnull;
 
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
@@ -39,7 +41,7 @@ public class LockingStrategyAll extends LockingStrategy {
     }
 
     @Override
-    protected LockStatus onBeforeLoadFromMemcached( @Nonnull final String sessionId ) {
+    protected LockStatus onBeforeLoadFromMemcached( @Nonnull final String sessionId ) throws InterruptedException, ExecutionException {
         return lock( sessionId );
     }
 

@@ -88,12 +88,8 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
 		@Override
-		public byte[] get(final String key) throws IOException {
-			try {
-			    return _memcached.get(key, ByteArrayTranscoder.INSTANCE);
-            } catch (Exception e) {
-                throw new IOException("Error getting key " + key, e);
-            }
+		public byte[] get(final String key) {
+		    return _memcached.get(key, ByteArrayTranscoder.INSTANCE);
 		}
 	};
 

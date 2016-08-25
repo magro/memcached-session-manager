@@ -23,7 +23,6 @@ import static de.javakaffee.web.msm.Statistics.StatsType.*;
 import static java.lang.Math.min;
 import static java.lang.Thread.sleep;
 
-import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -158,7 +157,7 @@ public abstract class LockingStrategy {
         } catch ( final InterruptedException e ) {
             Thread.currentThread().interrupt();
             throw new RuntimeException( "Got interrupted while trying to lock session.", e );
-        } catch ( final IOException e ) {
+        } catch ( final ExecutionException e ) {
             _log.warn( "An exception occurred when trying to aquire lock for session " + sessionId );
             _stats.registerSince( ACQUIRE_LOCK_FAILURE, start );
             return LockStatus.COULD_NOT_AQUIRE_LOCK;
@@ -166,9 +165,9 @@ public abstract class LockingStrategy {
     }
 
     protected void acquireLock( @Nonnull final String sessionId, final long retryInterval, final long maxRetryInterval,
-            final long timeout, final long start ) throws IOException, InterruptedException, TimeoutException {
-        boolean result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, LOCK_VALUE );
-        if ( result ) {
+            final long timeout, final long start ) throws InterruptedException, ExecutionException, TimeoutException {
+        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, LOCK_VALUE );
+        if ( result.get().booleanValue() ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Locked session " + sessionId );
             }
@@ -198,9 +197,9 @@ public abstract class LockingStrategy {
                 _log.debug( "Releasing lock for session " + sessionId );
             }
             final long start = System.currentTimeMillis();
-            _memcached.delete( _sessionIdFormat.createLockName( sessionId ) );
+            _memcached.delete( _sessionIdFormat.createLockName( sessionId ) ).get();
             _stats.registerSince( RELEASE_LOCK, start );
-        } catch ( final IOException e ) {
+        } catch ( final Exception e ) {
             _log.warn( "Caught exception when trying to release lock for session " + sessionId, e );
         }
     }
@@ -240,7 +239,10 @@ public abstract class LockingStrategy {
                     System.currentTimeMillis() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
+            final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
+            if ( !_manager.isSessionBackupAsync() ) {
+                validityResult.get( _manager.getSessionBackupTimeout(), TimeUnit.MILLISECONDS );
+            }
 
             /*
              * - ping session
@@ -285,7 +287,15 @@ public abstract class LockingStrategy {
             final String validityKey = _sessionIdFormat.createValidityInfoKeyName( session.getIdInternal() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
+            final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
+            if ( !_manager.isSessionBackupAsync() ) {
+                // TODO: together with session backup wait not longer than sessionBackupTimeout.
+                // Details: Now/here we're waiting the whole session backup timeout, even if (perhaps) some time
+                // was spent before when waiting for session backup result.
+                // For sync session backup it would be better to set both the session data and
+                // validity info and afterwards wait for both results (but in sum no longer than sessionBackupTimeout)
+                validityResult.get( _manager.getSessionBackupTimeout(), TimeUnit.MILLISECONDS );
+            }
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Stored session validity info for session " + session.getIdInternal() );
             }
@@ -314,18 +324,18 @@ public abstract class LockingStrategy {
     }
 
     @CheckForNull
-    protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String sessionId ) throws IOException {
+    protected SessionValidityInfo loadSessionValidityInfo( @Nonnull final String sessionId ) {
         return loadSessionValidityInfoForValidityKey( _sessionIdFormat.createValidityInfoKeyName( sessionId ) );
     }
 
     @CheckForNull
-    protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) throws IOException {
+    protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) {
         final byte[] validityInfo = _memcached.get( validityInfoKey );
         return validityInfo != null ? decode( validityInfo ) : null;
     }
 
     @CheckForNull
-    protected SessionValidityInfo loadBackupSessionValidityInfo( @Nonnull final String sessionId ) throws IOException {
+    protected SessionValidityInfo loadBackupSessionValidityInfo( @Nonnull final String sessionId ) {
         final String key = _sessionIdFormat.createValidityInfoKeyName( sessionId );
         final String backupKey = _sessionIdFormat.createBackupKey( key );
         return loadSessionValidityInfoForValidityKey( backupKey );
@@ -336,7 +346,7 @@ public abstract class LockingStrategy {
      */
     @CheckForNull
     protected abstract LockStatus onBeforeLoadFromMemcached( @Nonnull String sessionId ) throws InterruptedException,
-            IOException;
+            ExecutionException;
 
     /**
      * Invoked after a non-sticky session is loaded from memcached, can be used to update some session fields based on
@@ -346,7 +356,7 @@ public abstract class LockingStrategy {
      *            the {@link LockStatus} that was returned from {@link #onBeforeLoadFromMemcached(String)}.
      */
     protected void onAfterLoadFromMemcached( @Nonnull final MemcachedBackupSession session,
-            @Nullable final LockStatus lockStatus ) throws IOException {
+            @Nullable final LockStatus lockStatus ) {
         session.setLockStatus( lockStatus );
 
         final long start = System.currentTimeMillis();
@@ -364,7 +374,7 @@ public abstract class LockingStrategy {
     /**
      * Invoked after a non-sticky session is removed from memcached.
      */
-    protected void onAfterDeleteFromMemcached( @Nonnull final String sessionId ) throws IOException {
+    protected void onAfterDeleteFromMemcached( @Nonnull final String sessionId ) {
         final long start = System.currentTimeMillis();
 
         final String validityInfoKey = _sessionIdFormat.createValidityInfoKeyName( sessionId );
@@ -378,50 +388,43 @@ public abstract class LockingStrategy {
         _stats.registerSince( NON_STICKY_AFTER_DELETE_FROM_MEMCACHED, start );
     }
 
-    private boolean pingSession( @Nonnull final String sessionId ) {
-        boolean touchResult; 
+    private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {
+        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(sessionId), 1, BYTE_1 );
         try {
-            touchResult = _memcached.add( _storageKeyFormat.format(sessionId), 1, BYTE_1 );
-        } catch ( final IOException e ) {
-            _log.warn( "An exception occurred when trying to ping session " + sessionId, e );
-            return false;
-        }
-
-        if ( touchResult ) {
-            _stats.nonStickySessionsPingFailed();
-            _log.warn( "The session " + sessionId
-                    + " should be touched in memcached, but it does not exist therein." );
-            return false;
-        }
-        else {
+            if ( touchResult.get() ) {
+                _stats.nonStickySessionsPingFailed();
+                _log.warn( "The session " + sessionId
+                        + " should be touched in memcached, but it does not exist therein." );
+                return false;
+            }
             _log.debug( "The session was ping'ed successfully." );
             return true;
+        } catch ( final ExecutionException e ) {
+            _log.warn( "An exception occurred when trying to ping session " + sessionId, e );
+            return false;
         }
     }
 
     private void pingSession( @Nonnull final MemcachedBackupSession session,
-            @Nonnull final BackupSessionService backupSessionService ) {
-        boolean touchResult;
+            @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
+        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(session.getIdInternal()), 5, BYTE_1 );
         try {
-            touchResult = _memcached.add( _storageKeyFormat.format(session.getIdInternal()), 5, BYTE_1 );
-        } catch ( final IOException e ) {
+            if ( touchResult.get() ) {
+                _stats.nonStickySessionsPingFailed();
+                _log.warn( "The session " + session.getIdInternal()
+                        + " should be touched in memcached, but it does not exist"
+                        + " therein. Will store in memcached again." );
+                updateSession( session, backupSessionService );
+            }
+            else
+                _log.debug( "The session was ping'ed successfully." );
+        } catch ( final ExecutionException e ) {
             _log.warn( "An exception occurred when trying to ping session " + session.getIdInternal(), e );
-            return;
         }
-        
-        if ( touchResult ) {
-            _stats.nonStickySessionsPingFailed();
-            _log.warn( "The session " + session.getIdInternal()
-                    + " should be touched in memcached, but it does not exist"
-                    + " therein. Will store in memcached again." );
-            updateSession( session, backupSessionService );
-        }
-        else
-            _log.debug( "The session was ping'ed successfully." );
     }
 
     private void updateSession( @Nonnull final MemcachedBackupSession session,
-            @Nonnull final BackupSessionService backupSessionService ) {
+            @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
         final Future<BackupResult> result = backupSessionService.backupSession( session, true );
         try {
             if ( result.get().getStatus() != BackupResultStatus.SUCCESS ) {
@@ -429,8 +432,6 @@ public abstract class LockingStrategy {
             }
         } catch ( final ExecutionException e ) {
             _log.warn( "An exception occurred when trying to update session " + session.getIdInternal(), e );
-        } catch ( final InterruptedException e ) {
-            _log.warn( "Got interrupted while trying to update session " + session.getIdInternal(), e );
         }
     }
 
@@ -496,7 +497,7 @@ public abstract class LockingStrategy {
             return null;
         }
 
-        public void saveSessionBackupFromResult( final BackupResult backupResult ) throws IOException {
+        public void saveSessionBackupFromResult( final BackupResult backupResult ) {
             final byte[] data = backupResult.getData();
             if ( data != null ) {
                 final String key = _sessionIdFormat.createBackupKey( _session.getId() );
@@ -509,7 +510,7 @@ public abstract class LockingStrategy {
             }
         }
 
-        public void saveValidityBackup() throws IOException {
+        public void saveValidityBackup() {
             final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
             final int maxInactiveInterval = _session.getMaxInactiveInterval();
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
@@ -517,37 +518,37 @@ public abstract class LockingStrategy {
             _memcached.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
         }
 
-        private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) {
+        private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( session.getId() );
-            final boolean touchResult;
+            final Future<Boolean> touchResultFuture = _memcached.add( key, 5, BYTE_1 );
             try {
-                touchResult = _memcached.add( key, 5, BYTE_1 );
-            } catch ( final Exception e ) {
-                _log.warn( "An exception occurred when trying to ping session " + session.getIdInternal(), e );
-                return;
-            }
-
-            if ( touchResult ) {
+                final boolean touchResult = touchResultFuture.get(_manager.getOperationTimeout(), TimeUnit.MILLISECONDS);
+                if ( touchResult ) {
+                    _log.warn( "The secondary backup for session " + session.getIdInternal()
+                            + " should be touched in memcached, but it seemed to be"
+                            + " not existing. Will store in memcached again." );
+                    saveSessionBackup( session, key );
+                }
+                else
+                    _log.debug( "The secondary session backup was ping'ed successfully." );
+            } catch ( final TimeoutException e ) {
                 _log.warn( "The secondary backup for session " + session.getIdInternal()
-                        + " should be touched in memcached, but it seemed to be"
-                        + " not existing. Will store in memcached again." );
-                saveSessionBackup( session, key );
+                		+ " could not be completed within " + _manager.getOperationTimeout() + " millis, was cancelled now." );
+            } catch ( final ExecutionException e ) {
+                _log.warn( "An exception occurred when trying to ping session " + session.getIdInternal(), e );
             }
-            else
-                _log.debug( "The secondary session backup was ping'ed successfully." );
         }
 
-        public void saveSessionBackup( @Nonnull final MemcachedBackupSession session, @Nonnull final String key ) {
-            final byte[] data = _manager.serialize( session );
-            boolean backupResult;
+        public void saveSessionBackup( @Nonnull final MemcachedBackupSession session, @Nonnull final String key )
+                throws InterruptedException {
             try {
-                backupResult = _memcached.set( key, toMemcachedExpiration(session.getMemcachedExpirationTimeToSet()), data );
-            } catch ( final Exception e ) {
+                final byte[] data = _manager.serialize( session );
+                final Future<Boolean> backupResult = _memcached.set( key, toMemcachedExpiration(session.getMemcachedExpirationTimeToSet()), data );
+                if ( !backupResult.get().booleanValue() ) {
+                    _log.warn( "Update for secondary backup of session "+ session.getIdInternal() +" (after unsuccessful ping) did not return sucess." );
+                }
+            } catch ( final ExecutionException e ) {
                 _log.warn( "An exception occurred when trying to update secondary session backup for " + session.getIdInternal(), e );
-                return;
-            }
-            if ( !backupResult ) {
-                _log.warn( "Update for secondary backup of session "+ session.getIdInternal() +" (after unsuccessful ping) did not return sucess." );
             }
         }
     }
@@ -600,24 +601,27 @@ public abstract class LockingStrategy {
             return null;
         }
 
-        private boolean pingSessionBackup( @Nonnull final String sessionId ) {
-            String key = _sessionIdFormat.createBackupKey( sessionId );
-            boolean touchResult;
+        private boolean pingSessionBackup( @Nonnull final String sessionId ) throws InterruptedException {
+            final String key = _sessionIdFormat.createBackupKey( sessionId );
+            final Future<Boolean> touchResultFuture = _memcached.add( key, 1, BYTE_1 );
             try {
-                touchResult = _memcached.add( key, 1, BYTE_1 );
-            } catch ( final Exception e ) {
+                final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
+                if ( touchResult ) {
+                    _log.warn( "The secondary backup for session " + sessionId
+                            + " should be touched in memcached, but it seemed to be"
+                            + " not existing." );
+                    return false;
+                }
+                _log.debug( "The secondary session backup was ping'ed successfully." );
+                return true;
+            } catch ( final TimeoutException e ) {
+                _log.warn( "The secondary backup for session " + sessionId
+                        + " could not be completed within 200 millis, was cancelled now." );
+                return false;
+            } catch ( final ExecutionException e ) {
                 _log.warn( "An exception occurred when trying to ping session " + sessionId, e );
                 return false;
             }
-
-            if ( touchResult ) {
-                _log.warn( "The secondary backup for session " + sessionId
-                        + " should be touched in memcached, but it seemed to be"
-                        + " not existing." );
-                return false;
-            }
-            _log.debug( "The secondary session backup was ping'ed successfully." );
-            return true;
         }
     }
 

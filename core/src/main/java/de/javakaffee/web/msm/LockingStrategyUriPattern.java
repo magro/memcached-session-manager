@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
@@ -50,7 +51,8 @@ public class LockingStrategyUriPattern extends LockingStrategy {
     }
 
     @Override
-    protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) {
+    protected LockStatus onBeforeLoadFromMemcached( final String sessionId ) throws InterruptedException,
+            ExecutionException {
 
         final Request request = _currentRequest.get();
 

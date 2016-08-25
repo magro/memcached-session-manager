@@ -23,10 +23,13 @@ import static de.javakaffee.web.msm.Statistics.StatsType.BACKUP;
 import static de.javakaffee.web.msm.Statistics.StatsType.MEMCACHED_UPDATE;
 import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -162,7 +165,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                     _log.debug( "Releasing lock for session " + _session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) );
+                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) ).get();
                 _statistics.registerSince( RELEASE_LOCK, start );
                 _session.releaseLock();
             } catch( final Exception e ) {
@@ -186,7 +189,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
      *
      * @return the {@link BackupResultStatus}
      */
-    BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) {
+    BackupResult doBackupSession( final MemcachedBackupSession session, final byte[] data, final byte[] attributesData ) throws InterruptedException {
         if ( _log.isDebugEnabled() ) {
             _log.debug( "Trying to store session in memcached: " + session.getId() );
         }
@@ -194,7 +197,10 @@ public class BackupSessionTask implements Callable<BackupResult> {
         try {
             storeSessionInMemcached( session, data );
             return new BackupResult( BackupResultStatus.SUCCESS, data, attributesData );
-        } catch (final IOException e) {
+        } catch (final ExecutionException e) {
+            handleException(session, e);
+            return new BackupResult(BackupResultStatus.FAILURE, data, null);
+        } catch (final TimeoutException e) {
             handleException(session, e);
             return new BackupResult(BackupResultStatus.FAILURE, data, null);
         }
@@ -212,7 +218,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
         _memcachedNodesManager.setNodeAvailableForSessionId(session.getId(), false);
     }
 
-    private void storeSessionInMemcached( final MemcachedBackupSession session, final byte[] data) throws IOException {
+    private void storeSessionInMemcached( final MemcachedBackupSession session, final byte[] data) throws InterruptedException, ExecutionException, TimeoutException {
 
         /* calculate the expiration time (instead of using just maxInactiveInterval), as
          * this is relevant for the update of the expiration time: if we would just use
@@ -222,11 +228,20 @@ public class BackupSessionTask implements Callable<BackupResult> {
         final int expirationTime = session.getMemcachedExpirationTimeToSet();
         final long start = System.currentTimeMillis();
         try {
-            _memcached.set(
+            final Future<Boolean> future = _memcached.set(
                     _memcachedNodesManager.getStorageKeyFormat().format(session.getId()),
                     toMemcachedExpiration(expirationTime), data );
-            session.setLastMemcachedExpirationTime( expirationTime );
-            session.setLastBackupTime( System.currentTimeMillis() );
+            if ( !_sessionBackupAsync ) {
+                future.get( _sessionBackupTimeout, TimeUnit.MILLISECONDS );
+                session.setLastMemcachedExpirationTime( expirationTime );
+                session.setLastBackupTime( System.currentTimeMillis() );
+            }
+            else {
+                /* in async mode, we asume the session was stored successfully
+                 */
+                session.setLastMemcachedExpirationTime( expirationTime );
+                session.setLastBackupTime( System.currentTimeMillis() );
+            }
         } finally {
             _statistics.registerSince( MEMCACHED_UPDATE, start );
         }

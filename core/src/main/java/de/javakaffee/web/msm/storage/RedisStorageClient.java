@@ -16,10 +16,25 @@
  */
 package de.javakaffee.web.msm.storage;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.juli.logging.Log;
@@ -28,14 +43,10 @@ import org.apache.juli.logging.LogFactory;
 import redis.clients.jedis.BinaryJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
+import de.javakaffee.web.msm.NamedThreadFactory;
+
 /**
- * <p>
  * Storage client backed by a Jedis client instance.
- * </p>
- * <p>
- * Note that although all functions return {@link Future} instances for compatibility with the memcached client,
- * all Redis commands are currently actually executed synchronously.
- * </p>
  */
 public class RedisStorageClient implements StorageClient {
     protected static final Log _log = LogFactory.getLog(RedisStorageClient.class);
@@ -44,7 +55,9 @@ public class RedisStorageClient implements StorageClient {
     private final int _port;
     private final boolean _ssl;
     private final JedisPool _pool = new JedisPool();
-    
+    private final ExecutorService _executor = Executors.newFixedThreadPool(
+            Runtime.getRuntime().availableProcessors(), new NamedThreadFactory("msm-redis-client"));
+
     /**
      * Creates a <code>MemcachedStorageClient</code> instance which connects to the given Redis URL.
      * 
@@ -57,7 +70,7 @@ public class RedisStorageClient implements StorageClient {
         if (_log.isDebugEnabled())
             _log.debug(String.format("Creating RedisStorageClient with URL \"%s\"", redisUrl));
 
-        // Support a redis URL in the form "redis://hostname:port" like the client "Lettuce" does
+        // Support a Redis URL in the form "redis://hostname:port" or "rediss://" (for SSL connections) like the client "Lettuce" does
         if (!(redisUrl.startsWith("redis://") || redisUrl.startsWith("rediss://")))
             throw new IllegalArgumentException("Redis URL must start with \"redis://\" or \"rediss://\"");
         
@@ -79,15 +92,15 @@ public class RedisStorageClient implements StorageClient {
     }
     
     @Override
-    public boolean add(final String key, final int exp, final byte[] o) throws IOException {
+    public Future<Boolean> add(final String key, final int exp, final byte[] o) {
         
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Adding key to Redis (key=%s, exp=%d, %d bytes)", key, exp, o.length));
-
-        return (new JedisCommandRunner<Boolean>() {
-            private boolean _setCompleted;
+            _log.debug(String.format("Adding key to Redis (key=%s, exp=%s, o=%s)", key, exp, o.getClass().getName()));
+        
+        return _executor.submit(new RedisCommandCallable<Boolean>() {
+            private volatile boolean _setCompleted;
             
-            @Override protected Boolean execute(BinaryJedis jedis) {
+            @Override protected Boolean execute(BinaryJedis jedis) throws Exception {
                 byte[] kb = keyBytes(key);
                 if (_setCompleted || jedis.setnx(kb, o) == 1) {
                     _setCompleted = true; // make sure to not call setnx() a second time if connection fails
@@ -99,53 +112,64 @@ public class RedisStorageClient implements StorageClient {
                     return false;
                 }
             }
-        }).run();
+        });
     }
 
     @Override
-    public boolean set(final String key, final int exp, final byte[] o) throws IOException {
+    public Future<Boolean> set(final String key, final int exp, final byte[] o) {
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Setting key in Redis (key=%s, exp=%d, %d bytes)", key, exp, o.length));
+            _log.debug(String.format("Setting key in Redis (key=%s, exp=%s, o=%s)", key, exp, o.getClass().getName()));
         
-        return (new JedisCommandRunner<Boolean>() {
-            @Override protected Boolean execute(BinaryJedis jedis) {
+        return _executor.submit(new RedisCommandCallable<Boolean>() {
+            @Override protected Boolean execute(BinaryJedis jedis) throws Exception {
                 if (exp == 0)
                     return jedis.set(keyBytes(key), o).equals("OK");
                 else
                     return jedis.setex(keyBytes(key), convertExp(exp), o).equals("OK");
             }
-        }).run();
+        });
     }
     
     @Override
-    public byte[] get(final String key) throws IOException {
+    public byte[] get(final String key) {
         if (_log.isDebugEnabled())
             _log.debug(String.format("Getting key from Redis (key=%s)", key));
         
-        return (new JedisCommandRunner<byte[]>() {
-            @Override protected byte[] execute(BinaryJedis jedis) {
+        Callable<byte[]> callable = new RedisCommandCallable<byte[]>() {
+            @Override protected byte[] execute(BinaryJedis jedis) throws Exception {
                 return jedis.get(keyBytes(key));
             }
-        }).run();
+        };
+        
+        // Execute callable synchronously since we need to wait for the result anyway
+        try {
+            return callable.call();
+        }
+        catch (Exception e) {
+            if (e instanceof RuntimeException)
+                throw (RuntimeException)e;
+            else
+                throw new RuntimeException("Error getting key from Redis", e);
+        }
     }
     
     @Override
-    public boolean delete(final String key) throws IOException {
+    public Future<Boolean> delete(final String key) {
         if (_log.isDebugEnabled())
             _log.debug(String.format("Deleting key in Redis (key=%s)", key));
 
-        return (new JedisCommandRunner<Boolean>() {
-            @Override protected Boolean execute(BinaryJedis jedis) {
+        return _executor.submit(new RedisCommandCallable<Boolean>() {
+            @Override protected Boolean execute(BinaryJedis jedis) throws Exception {
                 return jedis.del(keyBytes(key)) == 1;
             }
-        }).run();
+        });
     }
 
     @Override
     public void shutdown() {
         _pool.shutdown();
     }
-
+    
     private static int convertExp(int exp) {
         if (exp <= 60*60*24*30) // thirty days
             return exp;
@@ -157,39 +181,38 @@ public class RedisStorageClient implements StorageClient {
         return key.getBytes(StandardCharsets.UTF_8);
     }
     
-    private abstract class JedisCommandRunner<T> {
-        public T run() throws IOException {
+    private abstract class RedisCommandCallable<T> implements Callable<T> {
+        @Override
+        public T call() throws Exception {
+            BinaryJedis jedis = null;
+
+            // Borrow an instance from Jedis without checking it for performance reasons and execute the command on it
             try {
-                BinaryJedis jedis = null;
-                try {
-                    // Borrow an instance from Jedis without checking it for performance reasons and execute the command on it
-                    jedis = _pool.borrowInstance(false);
-                    return execute(jedis);
-                } catch (JedisConnectionException e) {
-                    // Connection error occurred with this Jedis connection, fall through to try again
-                    // The old connection is not given back to the pool since it is defunct anyway
-                    if (_log.isDebugEnabled())
-                        _log.debug("Connection error occurred, discarding Jedis connection: " + e.getMessage());
-                    jedis = null;
-                } finally {
-                    if (jedis != null)
-                        _pool.returnInstance(jedis);
-                }
-                
-                // Try to execute the command again with a known-good instance
-                try {
-                    jedis = _pool.borrowInstance(true);
-                    return execute(jedis);
-                } finally {
-                    if (jedis != null)
-                        _pool.returnInstance(jedis);
-                }
-            } catch (Exception e) {
-                throw new IOException(String.format("Error executing Redis command: %s", e.getMessage()), e);
+                jedis = _pool.borrowInstance(false);
+                return execute(jedis);
+            } catch (JedisConnectionException e) {
+                // Connection error occurred with this Jedis connection, so now make sure to get a known-good one
+                // The old connection is not given back to the pool since it is defunct anyway
+                if (_log.isDebugEnabled())
+                    _log.debug("Connection error occurred, discarding Jedis connection: " + e.getMessage());
+
+                jedis = null;
+            } finally {
+                if (jedis != null)
+                    _pool.returnInstance(jedis);
+            }
+            
+            // Try to execute the command again with a known-good instance
+            try {
+                jedis = _pool.borrowInstance(true);
+                return execute(jedis);
+            } finally {
+                if (jedis != null)
+                    _pool.returnInstance(jedis);
             }
         }
-
-        protected abstract T execute(BinaryJedis jedis) throws IOException;
+        
+        protected abstract T execute(BinaryJedis jedis) throws Exception;
     }
 
     private class JedisPool {

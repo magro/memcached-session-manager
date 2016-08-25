@@ -72,12 +72,8 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
         @Override
-        public byte[] get(final String key) throws IOException {
-            try {
-                return _client.get(key, ByteArrayTranscoder.INSTANCE);
-            } catch (Exception e) {
-                throw new IOException("Error getting key " + key, e);
-            }
+        public byte[] get(final String key) {
+            return _client.get(key, ByteArrayTranscoder.INSTANCE);
         }
     };
 

@@ -59,22 +59,22 @@ public class RedisStorageClientTest {
         RedisStorageClient client = createClient();
         
         // Add two keys
-        assertTrue(client.add("key1", 0, toBytes("foo")));
-        assertTrue(client.add("key2", 0, toBytes("bar")));
+        assertTrue(client.add("key1", 0, toBytes("foo")).get());
+        assertTrue(client.add("key2", 0, toBytes("bar")).get());
         
         // Check that the keys have the given value
         assertEquals("foo", toString(client.get("key1")));
         assertEquals("bar", toString(client.get("key2")));
         
         // Check difference between add() and set()
-        assertTrue(client.set("key1", 0, toBytes("baz")));
-        assertFalse(client.add("key2", 0, toBytes("zoom")));
+        assertTrue(client.set("key1", 0, toBytes("baz")).get());
+        assertFalse(client.add("key2", 0, toBytes("zoom")).get());
         
         assertEquals("baz", toString(client.get("key1")));
         assertEquals("bar", toString(client.get("key2")));
         
         // Delete key, make sure it is not accessible anymore, but other key should still be there
-        assertTrue(client.delete("key1"));
+        assertTrue(client.delete("key1").get());
         assertNull(client.get("key1"));
         assertEquals("bar", toString(client.get("key2")));
         
@@ -86,7 +86,7 @@ public class RedisStorageClientTest {
         RedisStorageClient client = createClient();
         
         // Add a key which expires
-        assertTrue(client.add("exp", 2, toBytes("foo")));
+        assertTrue(client.add("exp", 2, toBytes("foo")).get());
         
         // Wait some time
         Thread.sleep(1000);
@@ -108,7 +108,7 @@ public class RedisStorageClientTest {
         RedisStorageClient client = createClient();
         
         // Add a key which expires
-        assertTrue(client.add("exp", (int)(2 + (System.currentTimeMillis() / 1000)), toBytes("foo")));
+        assertTrue(client.add("exp", (int)(2 + (System.currentTimeMillis() / 1000)), toBytes("foo")).get());
         assertEquals("foo", toString(client.get("exp")));
         
         // Wait some time
@@ -131,7 +131,7 @@ public class RedisStorageClientTest {
         RedisStorageClient client = createClient();
 
         // Issue a command to create a connection
-        assertTrue(client.add("key1", 0, toBytes("foo")));
+        assertTrue(client.add("key1", 0, toBytes("foo")).get());
         assertEquals("foo", toString(client.get("key1")));
         
         // Stop and start server to close all connections
@@ -141,7 +141,7 @@ public class RedisStorageClientTest {
         }
 
         // If we now issue commands, the old connection is defunct and will be replaced
-        assertTrue(client.add("key1", 0, toBytes("foo")));
+        assertTrue(client.add("key1", 0, toBytes("foo")).get());
         assertEquals("foo", toString(client.get("key1")));
 
         client.shutdown();
@@ -154,7 +154,7 @@ public class RedisStorageClientTest {
     private byte[] toBytes(String s) {
         return s.getBytes(StandardCharsets.UTF_8);
     }
-    
+
     private String toString(byte[] bytes) {
         return new String(bytes, StandardCharsets.UTF_8);
     }

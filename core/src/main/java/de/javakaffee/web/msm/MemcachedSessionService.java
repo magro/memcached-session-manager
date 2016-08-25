@@ -484,7 +484,7 @@ public class MemcachedSessionService {
 	protected MemcachedClientCallback createMemcachedClientCallback() {
 		return new MemcachedClientCallback() {
 			@Override
-			public byte[] get(final String key) throws IOException {
+			public byte[] get(final String key) {
 				return _memcached.get(_memcachedNodesManager.getStorageKeyFormat().format( key ));
 			}
 		};
@@ -854,7 +854,7 @@ public class MemcachedSessionService {
             }
             try {
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) );
+                _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) ).get();
                 _statistics.registerSince( DELETE_FROM_MEMCACHED, start );
                 if ( !_sticky ) {
                     _lockingStrategy.onAfterDeleteFromMemcached( sessionId );
@@ -1173,12 +1173,7 @@ public class MemcachedSessionService {
         } catch ( final TranscoderDeserializationException e ) {
             _log.warn( "Could not deserialize session with id " + sessionId + " from memcached, session will be purged from storage.", e );
             releaseIfLocked( sessionId, lockStatus );
-            try {
-                _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) );
-            }
-            catch ( final IOException ioException ) {
-                _log.warn( "Error purging data for session with id " + sessionId + " from memcached.", e );
-            }
+            _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) );
             _invalidSessionsCache.put( sessionId, Boolean.TRUE );
         } catch ( final Exception e ) {
             _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
