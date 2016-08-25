@@ -17,6 +17,8 @@
 package de.javakaffee.web.msm;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -93,6 +95,29 @@ public class MemcachedBackupSession extends StandardSession {
                     };
         } catch (NoSuchFieldException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    // Cached one parameter StandardSession#exclude(String) method which was deprecated and removed in newer
+    // Tomcat versions (see CVE-2016-0714). It is called via reflection when it is present (and the two
+    // parameter variant is not) to maintain compatibility with older Tomcat versions.
+    private static final Method legacySessionExcludeMethod;
+
+    static {
+        try {
+            Method method;
+            try {
+                // StandardSession#exclude(String, Object) found in newer Tomcat versions is preferred
+                StandardSession.class.getDeclaredMethod("exclude", String.class, Object.class);
+                method = null;
+            } catch (NoSuchMethodException e) {
+                // Try to fallback to StandardSession#exclude(String) for compatibility reasons
+                method = StandardSession.class.getDeclaredMethod("exclude", String.class);
+            }
+            legacySessionExcludeMethod = method;
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException("Neither StandardSession#exclude(String) nor " +
+                    "StandardSession#exclude(String, Object) method was found.", e);
         }
     }
 
@@ -594,7 +619,20 @@ public class MemcachedBackupSession extends StandardSession {
      */
     @Override
     protected boolean exclude( final String name, Object value ) {
-        return super.exclude( name, value );
+        try {
+            if (legacySessionExcludeMethod != null) {
+                return (Boolean) legacySessionExcludeMethod.invoke(this, name);
+            } else {
+                return super.exclude(name, value);
+            }
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof RuntimeException) {
+                throw (RuntimeException) e.getCause();
+            }
+            throw new RuntimeException("Failed to invoke StandardSession#exclude(String) method.", e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Can not access StandardSession#exclude(String) method.", e);
+        }
     }
 
     /**
