@@ -36,13 +36,12 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * Represents the session locking hooks that must be implemented by the various locking strategies.
@@ -64,14 +63,15 @@ public abstract class LockingStrategy {
         URI_PATTERN
     }
 
-    protected static final String LOCK_VALUE = "locked";
+    protected static final byte[] LOCK_VALUE = new byte[] { 'l', 'o', 'c', 'k', 'e', 'd' };
+    protected static final byte[] BYTE_1 = new byte[] { 1 };
     protected static final int LOCK_RETRY_INTERVAL = 10;
     protected static final int LOCK_MAX_RETRY_INTERVAL = 500;
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
     protected MemcachedSessionService _manager;
-    protected final MemcachedClient _memcached;
+    protected final StorageClient _memcached;
     protected LRUCache<String, Boolean> _missingSessionsCache;
     protected final SessionIdFormat _sessionIdFormat;
     private final ExecutorService _executor;
@@ -82,7 +82,7 @@ public abstract class LockingStrategy {
 
     protected LockingStrategy( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
-            @Nonnull final MemcachedClient memcached,
+            @Nonnull final StorageClient memcached,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
             @Nonnull final CurrentRequest currentRequest ) {
@@ -102,7 +102,7 @@ public abstract class LockingStrategy {
      */
     @CheckForNull
     public static LockingStrategy create( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern,
-            @Nonnull final MemcachedClient memcached, @Nonnull final MemcachedSessionService manager,
+            @Nonnull final StorageClient memcached, @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
@@ -330,7 +330,7 @@ public abstract class LockingStrategy {
 
     @CheckForNull
     protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) {
-        final byte[] validityInfo = (byte[]) _memcached.get( validityInfoKey );
+        final byte[] validityInfo = _memcached.get( validityInfoKey );
         return validityInfo != null ? decode( validityInfo ) : null;
     }
 
@@ -389,7 +389,7 @@ public abstract class LockingStrategy {
     }
 
     private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(sessionId), 1, 1 );
+        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(sessionId), 1, BYTE_1 );
         try {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
@@ -407,7 +407,7 @@ public abstract class LockingStrategy {
 
     private void pingSession( @Nonnull final MemcachedBackupSession session,
             @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(session.getIdInternal()), 5, 1 );
+        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(session.getIdInternal()), 5, BYTE_1 );
         try {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
@@ -520,7 +520,7 @@ public abstract class LockingStrategy {
 
         private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( session.getId() );
-            final Future<Boolean> touchResultFuture = _memcached.add( key, 5, 1 );
+            final Future<Boolean> touchResultFuture = _memcached.add( key, 5, BYTE_1 );
             try {
                 final boolean touchResult = touchResultFuture.get(_manager.getOperationTimeout(), TimeUnit.MILLISECONDS);
                 if ( touchResult ) {
@@ -603,7 +603,7 @@ public abstract class LockingStrategy {
 
         private boolean pingSessionBackup( @Nonnull final String sessionId ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( sessionId );
-            final Future<Boolean> touchResultFuture = _memcached.add( key, 1, 1 );
+            final Future<Boolean> touchResultFuture = _memcached.add( key, 1, BYTE_1 );
             try {
                 final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
                 if ( touchResult ) {

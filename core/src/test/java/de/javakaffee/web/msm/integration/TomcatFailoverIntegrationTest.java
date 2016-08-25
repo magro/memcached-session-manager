@@ -52,6 +52,7 @@ import de.javakaffee.web.msm.integration.TestUtils.LoginType;
 import de.javakaffee.web.msm.integration.TestUtils.RecordingSessionActivationListener;
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
+import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
 
 /**
  * Integration test testing tomcat failover (tomcats failing).
@@ -71,8 +72,8 @@ public abstract class TomcatFailoverIntegrationTest {
 
     private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
         @Override
-        public Object get(final String key) {
-            return _client.get(key);
+        public byte[] get(final String key) {
+            return _client.get(key, ByteArrayTranscoder.INSTANCE);
         }
     };
 

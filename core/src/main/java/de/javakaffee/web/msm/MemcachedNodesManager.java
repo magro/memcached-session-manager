@@ -53,7 +53,7 @@ public class MemcachedNodesManager {
 		 * Must query the given key in memcached.
 		 */
 		@Nullable
-		Object get(@Nonnull String key);
+		byte[] get(@Nonnull String key);
 	}
 
 	private static final Log LOG = LogFactory.getLog(MemcachedNodesManager.class);
@@ -183,6 +183,13 @@ public class MemcachedNodesManager {
             final MemcachedClientCallback memcachedClientCallback) {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
+		}
+		
+        // Support a Redis URL in the form "redis://hostname:port" or "rediss://" (for SSL connections) like the client "Lettuce" does
+		if (memcachedNodes.startsWith("redis://") || memcachedNodes.startsWith("rediss://")) {
+		    // Redis configuration
+		    return new MemcachedNodesManager(memcachedNodes, new NodeIdList(), new ArrayList<String>(),
+		            new LinkedHashMap<InetSocketAddress, String>(), storageKeyFormat, memcachedClientCallback);
 		}
 
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
@@ -534,6 +541,14 @@ public class MemcachedNodesManager {
         return COUCHBASE_BUCKET_NODES_PATTERN.matcher(_memcachedNodes).matches();
     }
 
+    /**
+     * Determines, if the current memcachedNodes configuration is a Redis configuration
+     * (like e.g. redis://example.com or rediss://example.com).
+     */
+    public boolean isRedisConfig() {
+        return _memcachedNodes.startsWith("redis://") || _memcachedNodes.startsWith("rediss://");
+    }
+    
     /**
      * Returns a list of couchbase REST interface uris if the current configuration is
      * a couchbase bucket configuration.

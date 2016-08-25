@@ -35,12 +35,11 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * Stores the provided session in memcached if the session was modified
@@ -57,7 +56,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
     private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
-    private final MemcachedClient _memcached;
+    private final StorageClient _memcached;
     private final MemcachedNodesManager _memcachedNodesManager;
     private final Statistics _statistics;
 
@@ -79,7 +78,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
             final TranscoderService transcoderService,
             final boolean sessionBackupAsync,
             final int sessionBackupTimeout,
-            final MemcachedClient memcached,
+            final StorageClient memcached,
             final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         _session = session;

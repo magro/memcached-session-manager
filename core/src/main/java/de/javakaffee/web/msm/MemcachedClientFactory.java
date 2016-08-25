@@ -23,6 +23,10 @@ import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.auth.AuthDescriptor;
 import net.spy.memcached.auth.PlainCallbackHandler;
 
+import de.javakaffee.web.msm.storage.MemcachedStorageClient;
+import de.javakaffee.web.msm.storage.RedisStorageClient;
+import de.javakaffee.web.msm.storage.StorageClient;
+
 /**
  * Factory to create the {@link MemcachedClient}, either directly the spymemcached {@link MemcachedClient}
  * or the {@link com.couchbase.client.CouchbaseClient}.
@@ -39,18 +43,21 @@ public class MemcachedClientFactory {
                 long maxReconnectDelay, Statistics statistics );
     }
 
-    protected MemcachedClient createMemcachedClient(final MemcachedNodesManager memcachedNodesManager,
+    protected StorageClient createMemcachedClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
             final long maxReconnectDelay, final Statistics statistics ) {
         try {
+            if (memcachedNodesManager.isRedisConfig()) {
+                return new RedisStorageClient(memcachedNodesManager.getMemcachedNodes());
+            }
             final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), username, password);
             if (connectionType.isCouchbaseBucketConfig()) {
-                return createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password, operationTimeout, maxReconnectDelay,
-                        statistics);
+                return new MemcachedStorageClient(createCouchbaseClient(memcachedNodesManager, memcachedProtocol, username, password,
+                        operationTimeout, maxReconnectDelay, statistics));
             }
             final ConnectionFactory connectionFactory = createConnectionFactory(memcachedNodesManager, connectionType, memcachedProtocol,
                     username, password, operationTimeout, maxReconnectDelay, statistics);
-            return new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses());
+            return new MemcachedStorageClient(new MemcachedClient(connectionFactory, memcachedNodesManager.getAllMemcachedAddresses()));
         } catch (final Exception e) {
             throw new RuntimeException("Could not create memcached client", e);
         }

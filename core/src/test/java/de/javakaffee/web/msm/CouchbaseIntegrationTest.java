@@ -41,6 +41,7 @@ import com.couchbase.client.CouchbaseClient;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.integration.TestUtils;
 import de.javakaffee.web.msm.integration.TomcatBuilder;
+import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
 
 /**
  * @author @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
@@ -107,7 +108,7 @@ public abstract class CouchbaseIntegrationTest {
         final BackupResult backupResult = service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.SUCCESS);
 
-        final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), _tomcat1.getManager());
+        final MemcachedBackupSession loadedSession = transcoderService.deserialize(mc.get(sessionId, ByteArrayTranscoder.INSTANCE), _tomcat1.getManager());
         checkSession(loadedSession, session);
     }
 
@@ -130,7 +131,7 @@ public abstract class CouchbaseIntegrationTest {
         final BackupResult backupResult = service.backupSession( session.getIdInternal(), false, null ).get();
         assertEquals(backupResult.getStatus(), BackupResultStatus.SUCCESS);
 
-        final MemcachedBackupSession loadedSession = transcoderService.deserialize((byte[])mc.get(sessionId), _tomcat1.getManager());
+        final MemcachedBackupSession loadedSession = transcoderService.deserialize(mc.get(sessionId, ByteArrayTranscoder.INSTANCE), _tomcat1.getManager());
         checkSession(loadedSession, session);
     }
 
