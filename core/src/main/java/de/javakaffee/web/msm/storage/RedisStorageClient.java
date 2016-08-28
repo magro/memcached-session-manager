@@ -16,34 +16,19 @@
  */
 package de.javakaffee.web.msm.storage;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-
+import de.javakaffee.web.msm.NamedThreadFactory;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-
 import redis.clients.jedis.BinaryJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
-import de.javakaffee.web.msm.NamedThreadFactory;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Storage client backed by a Jedis client instance.
@@ -54,16 +39,17 @@ public class RedisStorageClient implements StorageClient {
     private final String _host;
     private final int _port;
     private final boolean _ssl;
+    private final int _timeout;
     private final JedisPool _pool = new JedisPool();
-    private final ExecutorService _executor = Executors.newFixedThreadPool(
-            Runtime.getRuntime().availableProcessors(), new NamedThreadFactory("msm-redis-client"));
+    private final ExecutorService _executor = Executors.newCachedThreadPool(new NamedThreadFactory("msm-redis-client"));
 
     /**
      * Creates a <code>MemcachedStorageClient</code> instance which connects to the given Redis URL.
      * 
-     * @param redisUrl redis URL 
+     * @param redisUrl redis URL
+     * @param operationTimeout the timeout to set for connection and socket timeout on the underlying jedis client.
      */
-    public RedisStorageClient(String redisUrl) {
+    public RedisStorageClient(String redisUrl, long operationTimeout) {
         if (redisUrl == null)
             throw new NullPointerException("Param \"redisUrl\" may not be null");
         
@@ -89,6 +75,9 @@ public class RedisStorageClient implements StorageClient {
             _host = hostNamePort;
             _port = 6379;
         }
+
+        // we just expect no practical problem here...
+        _timeout = (int)operationTimeout;
     }
     
     @Override
@@ -286,7 +275,7 @@ public class RedisStorageClient implements StorageClient {
         }
         
         private BinaryJedis createJedisInstance() {
-            return new BinaryJedis(_host, _port, _ssl);
+            return new BinaryJedis(_host, _port, _timeout, _ssl);
         }
     }
 }

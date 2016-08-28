@@ -148,7 +148,7 @@ public class RedisStorageClientTest {
     }
     
     private RedisStorageClient createClient() {
-       return new RedisStorageClient("redis://localhost:" + redisPort);
+       return new RedisStorageClient("redis://localhost:" + redisPort, 1000);
     }
     
     private byte[] toBytes(String s) {
