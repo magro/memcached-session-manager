@@ -33,7 +33,7 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -138,10 +138,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
      * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
      * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
      *
-     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
+     * @param storage the memcached client to use, for normal operations this should be <code>null</code>.
      */
-    protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        _msm.setMemcachedClient(memcachedClient);
+    protected void startInternal(final StorageClient storage ) throws LifecycleException {
+        _msm.setStorageClient(storage);
         _msm.startInternal();
     }
 

@@ -276,7 +276,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         manager.setSticky( sessionAffinity.isSticky() );
 
         try {
-            waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 1, 500);
+            waitForReconnect(manager.getMemcachedSessionService().getStorageClient(), 1, 500);
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
@@ -471,7 +471,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
         _daemon.start();
 
         // Wait so that the daemon will be available and the client can reconnect (async get didn't do the trick)
-        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 1, 4000);
+        waitForReconnect(manager.getMemcachedSessionService().getStorageClient(), 1, 4000);
 
         final String newSessionId = manager.getMemcachedSessionService().changeSessionIdOnMemcachedFailover( session.getId() );
         assertNotNull( newSessionId );

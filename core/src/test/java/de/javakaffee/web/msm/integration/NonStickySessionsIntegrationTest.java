@@ -626,7 +626,7 @@ public abstract class NonStickySessionsIntegrationTest {
         manager.setMemcachedNodes(memcachedNodes);
         manager.getMemcachedSessionService().setSessionBackupAsync(false);
 
-        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 3, 1000);
+        waitForReconnect(manager.getMemcachedSessionService().getStorageClient(), 3, 1000);
 
         final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
         final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
@@ -698,7 +698,7 @@ public abstract class NonStickySessionsIntegrationTest {
         manager.setMemcachedNodes(memcachedNodes);
         manager.getMemcachedSessionService().setSessionBackupAsync(false);
 
-        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 3, 1000);
+        waitForReconnect(manager.getMemcachedSessionService().getStorageClient(), 3, 1000);
 
         final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
         final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
@@ -787,7 +787,7 @@ public abstract class NonStickySessionsIntegrationTest {
     @Test( enabled = true )
     public void testSessionNotLoadedForNoSessionAccess() throws IOException, HttpException, InterruptedException {
         _tomcat1.getManager().setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
+        waitForReconnect(_tomcat1.getService().getStorageClient(), 1, 1000);
 
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
         assertNotNull( sessionId1 );
@@ -1020,8 +1020,8 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1.setChangeSessionIdOnAuth( false );
         _tomcat2.setChangeSessionIdOnAuth( false );
 
-        waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
-        waitForReconnect(_tomcat2.getService().getMemcached(), 1, 1000);
+        waitForReconnect(_tomcat1.getService().getStorageClient(), 1, 1000);
+        waitForReconnect(_tomcat2.getService().getStorageClient(), 1, 1000);
 
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();

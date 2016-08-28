@@ -36,8 +36,6 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Manager;
@@ -52,7 +50,6 @@ import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
-import de.javakaffee.web.msm.storage.MemcachedStorageClient;
 import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
@@ -416,13 +413,13 @@ public class MemcachedSessionService {
      * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
      * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
      *
-     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
+     * @param storage the storage client to use, for normal operations this should be <code>null</code>.
      */
-    void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        if (memcachedClient == null)
+    void startInternal( final StorageClient storage ) throws LifecycleException {
+        if (storage == null)
             _storage = null;
         else
-            _storage = new MemcachedStorageClient(memcachedClient);
+            _storage = storage;
         
         startInternal();
     }
@@ -1724,26 +1721,17 @@ public class MemcachedSessionService {
     }
 
     /**
-     * Get access to the {@link MemcachedClient} instance used by the {@link MemcachedStorageClient},
-     * or <code>null</code> if another storage backend is used. This method is used in tests.
+     * The storage client, this method is used in tests.
      */
-    public MemcachedClient getMemcached() {
-        if (_storage instanceof MemcachedStorageClient)
-            return ((MemcachedStorageClient) _storage).getMemcachedClient();
-        else
-            return null;
+    public StorageClient getStorageClient() {
+        return _storage;
     }
 
     /**
-     * 
-     * Create a new {@link MemcachedStorageClient} backed by the given {@link MemcachedClient}
-     * instance and set it as the used storage client. This method is used in tests.
+     * Set the given storage client, this method is used in tests.
      */
-    void setMemcachedClient(final MemcachedClient memcachedClient) {
-        if (memcachedClient != null)
-            _storage = new MemcachedStorageClient(memcachedClient);
-        else
-            _storage = null;
+    void setStorageClient(final StorageClient storage) {
+        _storage = storage;
     }
 
     RequestTrackingHostValve getTrackingHostValve() {

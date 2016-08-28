@@ -25,7 +25,6 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
 import java.util.Arrays;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CyclicBarrier;
@@ -38,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nonnull;
 
+import de.javakaffee.web.msm.storage.MemcachedStorageClient;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.internal.OperationFuture;
 import net.spy.memcached.transcoders.Transcoder;
@@ -117,15 +117,15 @@ public abstract class MemcachedSessionServiceTest {
     @Test
     public void testConfigurationFormatMemcachedNodesFeature44() throws LifecycleException {
         _service.setMemcachedNodes( "n1:127.0.0.1:11211" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         Assert.assertEquals( _service.getNodeIds(), Arrays.asList( "n1" ) );
 
         _service.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         Assert.assertEquals( _service.getNodeIds(), Arrays.asList( "n1", "n2" ) );
 
         _service.setMemcachedNodes( "n1:127.0.0.1:11211,n2:127.0.0.1:11212" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         Assert.assertEquals( _service.getNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
@@ -133,17 +133,17 @@ public abstract class MemcachedSessionServiceTest {
     public void testConfigurationFormatFailoverNodesFeature44() throws LifecycleException {
         _service.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" );
         _service.setFailoverNodes( "n1" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         Assert.assertEquals( _service.getFailoverNodeIds(), Arrays.asList( "n1" ) );
 
         _service.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _service.setFailoverNodes( "n1 n2" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         Assert.assertEquals( _service.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
 
         _service.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212 n3:127.0.0.1:11213" );
         _service.setFailoverNodes( "n1,n2" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         Assert.assertEquals( _service.getFailoverNodeIds(), Arrays.asList( "n1", "n2" ) );
     }
 
@@ -154,14 +154,14 @@ public abstract class MemcachedSessionServiceTest {
     @Test
     public void testConfigurationFormatMemcachedNodesFeature105() throws LifecycleException {
         _service.setMemcachedNodes( "127.0.0.1:11211" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         assertEquals(_service.getMemcachedNodesManager().getCountNodes(), 1);
         assertEquals(_service.getMemcachedNodesManager().isEncodeNodeIdInSessionId(), false);
         assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456"), true);
         _service.shutdown();
 
         _service.setMemcachedNodes( "n1:127.0.0.1:11211" );
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
         assertEquals(_service.getMemcachedNodesManager().getCountNodes(), 1);
         assertEquals(_service.getMemcachedNodesManager().isEncodeNodeIdInSessionId(), true);
         assertEquals(_service.getMemcachedNodesManager().isValidForMemcached("123456"), false);
@@ -176,7 +176,7 @@ public abstract class MemcachedSessionServiceTest {
     public void testBackupSessionFailureWithoutMemcachedNodeIdConfigured105() throws Exception {
         _service.setMemcachedNodes( "127.0.0.1:11211" );
         _service.setSessionBackupAsync(false);
-        _service.startInternal(_memcachedMock);
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock));
 
         final MemcachedBackupSession session = createSession( _service );
 
@@ -360,7 +360,7 @@ public abstract class MemcachedSessionServiceTest {
         if ( !stickyness.isSticky() ) {
             _service.setLockingMode( LockingMode.NONE, null, false );
             _service.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" ); // for backup support
-            _service.startInternal(_memcachedMock); // we must put in our mock again
+            _service.startInternal(new MemcachedStorageClient(_memcachedMock)); // we must put in our mock again
         }
 
         final MemcachedBackupSession session = createSession( _service );
@@ -410,7 +410,7 @@ public abstract class MemcachedSessionServiceTest {
         _service.setStickyInternal( false );
         _service.setLockingMode( LockingMode.NONE, null, false );
         _service.setMemcachedNodes( "n1:127.0.0.1:11211 n2:127.0.0.1:11212" ); // for backup support
-        _service.startInternal(_memcachedMock); // we must put in our mock again
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock)); // we must put in our mock again
 
         final String sessionId = "someSessionNotLoaded-n1";
 
@@ -550,7 +550,7 @@ public abstract class MemcachedSessionServiceTest {
         final TranscoderService transcoderService = new TranscoderService(new JavaSerializationTranscoder());
         _service.setTranscoderService( transcoderService );
 
-        _service.setMemcachedClient(_memcachedMock);
+        _service.setStorageClient(new MemcachedStorageClient(_memcachedMock));
         _service.startInternal();
 
         @SuppressWarnings("unchecked")
@@ -631,7 +631,7 @@ public abstract class MemcachedSessionServiceTest {
 
         _service.setStickyInternal( false );
         _service.setLockingMode( LockingMode.NONE, null, false );
-        _service.startInternal(_memcachedMock); // we must put in our mock again
+        _service.startInternal(new MemcachedStorageClient(_memcachedMock)); // we must put in our mock again
 
         final String sessionId = "nonStickySessionToTimeOut-n1";
 
