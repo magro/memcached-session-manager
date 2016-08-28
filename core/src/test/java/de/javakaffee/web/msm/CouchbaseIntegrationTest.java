@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import de.javakaffee.web.msm.storage.MemcachedStorageClient;
+import de.javakaffee.web.msm.storage.StorageClient;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.juli.logging.Log;
@@ -120,7 +122,7 @@ public abstract class CouchbaseIntegrationTest {
         service.setMemcachedNodes(getMemcachedNodesConfig(getURIs()));
         setupCouchbaseClient();
 
-        waitForReconnect(service.getMemcached(), cluster.size(), 1000);
+        waitForReconnect(service.getStorageClient(), cluster.size(), 1000);
         waitForReconnect(mc, cluster.size(), 1000);
 
         final MemcachedBackupSession session = createSession( service );
@@ -139,6 +141,11 @@ public abstract class CouchbaseIntegrationTest {
         assertNotNull(actual);
         assertEquals(actual.getId(), expected.getId());
         assertEquals(actual.getAttributesInternal(), expected.getAttributesInternal());
+    }
+
+    private void waitForReconnect(final StorageClient client, final int expectedServers, final long timeToWait )
+            throws InterruptedException, RuntimeException {
+        waitForReconnect(((MemcachedStorageClient)client).getMemcachedClient(), expectedServers, timeToWait);
     }
 
     private void waitForReconnect( final MemcachedClient client, final int expectedServers, final long timeToWait )

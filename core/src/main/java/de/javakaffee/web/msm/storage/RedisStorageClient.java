@@ -16,34 +16,19 @@
  */
 package de.javakaffee.web.msm.storage;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-
+import de.javakaffee.web.msm.NamedThreadFactory;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-
 import redis.clients.jedis.BinaryJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
-import de.javakaffee.web.msm.NamedThreadFactory;
+import java.nio.charset.StandardCharsets;
+import java.util.Queue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Storage client backed by a Jedis client instance.
@@ -54,16 +39,17 @@ public class RedisStorageClient implements StorageClient {
     private final String _host;
     private final int _port;
     private final boolean _ssl;
+    private final int _timeout;
     private final JedisPool _pool = new JedisPool();
-    private final ExecutorService _executor = Executors.newFixedThreadPool(
-            Runtime.getRuntime().availableProcessors(), new NamedThreadFactory("msm-redis-client"));
+    private final ExecutorService _executor = Executors.newCachedThreadPool(new NamedThreadFactory("msm-redis-client"));
 
     /**
      * Creates a <code>MemcachedStorageClient</code> instance which connects to the given Redis URL.
      * 
-     * @param redisUrl redis URL 
+     * @param redisUrl redis URL
+     * @param operationTimeout the timeout to set for connection and socket timeout on the underlying jedis client.
      */
-    public RedisStorageClient(String redisUrl) {
+    public RedisStorageClient(String redisUrl, long operationTimeout) {
         if (redisUrl == null)
             throw new NullPointerException("Param \"redisUrl\" may not be null");
         
@@ -89,6 +75,9 @@ public class RedisStorageClient implements StorageClient {
             _host = hostNamePort;
             _port = 6379;
         }
+
+        // we just expect no practical problem here...
+        _timeout = (int)operationTimeout;
     }
     
     @Override
@@ -196,6 +185,9 @@ public class RedisStorageClient implements StorageClient {
                 if (_log.isDebugEnabled())
                     _log.debug("Connection error occurred, discarding Jedis connection: " + e.getMessage());
 
+                if (jedis != null)
+                    try { jedis.close(); } catch (Exception e2) { /* ignore */ }
+
                 jedis = null;
             } finally {
                 if (jedis != null)
@@ -216,77 +208,70 @@ public class RedisStorageClient implements StorageClient {
     }
 
     private class JedisPool {
-        private List<BinaryJedis> _instances = new ArrayList<BinaryJedis>();
+        private Queue<BinaryJedis> _queue = new ConcurrentLinkedQueue<BinaryJedis>();
 
         public BinaryJedis borrowInstance(boolean knownGood) {
-            synchronized (_instances) {
-                if (_instances.isEmpty()) {
-                    if (_log.isDebugEnabled()) {
-                        _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
+            BinaryJedis res;
+            if((res = _queue.poll()) == null) {
+                if (_log.isDebugEnabled()) {
+                    _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
                             _host, _port, _ssl));
-                    }
-
-                    return createJedisInstance();
-                } else {
-                    if (knownGood) {
-                        // Check all existing connections until we find a good one
-                        BinaryJedis jedis;
-                        do {
-                            jedis = _instances.remove(_instances.size() - 1);
-                            try {
-                                jedis.ping();
-                                
-                                if (_log.isDebugEnabled())
-                                    _log.debug(String.format("Using known-good connection #%d", _instances.size()));
-
-                                return jedis;
-                            } catch (Exception e) {
-                                if (_log.isDebugEnabled()) {
-                                    _log.debug(String.format("Removing connection #%d since it cannot be pinged", _instances.size()));
-                                }
-                            }
-                        } while (!_instances.isEmpty());
-
-                        // No existing connections are good, so create new one
-                        if (_log.isDebugEnabled()) {
-                            _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
-                                _host, _port, _ssl));
-                        }
-                        
-                        return createJedisInstance();
-                    } else {
-                        if (_log.isDebugEnabled())
-                            _log.debug(String.format("Using connection #%d", _instances.size() - 1));
-
-                        return _instances.remove(_instances.size() - 1);
-                    }
                 }
+                return createJedisInstance();
+            }
+
+            if (knownGood) {
+                // Check all existing connections until we find a good one
+                do {
+                    try {
+                        res.ping();
+
+                        if (_log.isTraceEnabled())
+                            _log.trace(String.format("Using known-good connection #%d", _queue.size()));
+
+                        return res;
+                    } catch (Exception e) {
+                        if (_log.isDebugEnabled())
+                            _log.debug(String.format("Removing connection #%d since it cannot be pinged", _queue.size()));
+
+                        try { res.close(); } catch (Exception e2) { /* ignore */ }
+                    }
+                } while ((res = _queue.poll()) != null);
+
+                // No existing connections are good, so create new one
+                if (_log.isDebugEnabled()) {
+                    _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
+                            _host, _port, _ssl));
+                }
+
+                return createJedisInstance();
+            } else {
+                if (_log.isTraceEnabled())
+                    _log.trace(String.format("Using connection #%d", _queue.size()));
+
+                return res;
             }
         }
         
         public void returnInstance(BinaryJedis instance) {
-            synchronized (_instances) {
-                _instances.add(instance);
-                
-                if (_log.isDebugEnabled())
-                    _log.debug(String.format("Returned instance #%d", _instances.size() - 1));
-            }
+            _queue.offer(instance);
+
+            if (_log.isTraceEnabled())
+                _log.trace(String.format("Returned instance #%d", _queue.size()));
         }
         
         public void shutdown() {
-            synchronized (_instances) {
-                if (_log.isDebugEnabled())
-                    _log.debug(String.format("Closing %d remaining Jedis instance(s)", _instances.size()));
-                
-                for (BinaryJedis jedis: _instances) {
-                    try { jedis.close(); } catch (Exception e) { /* ignore exception */ }
-                }
-                _instances.clear();
+            if (_log.isDebugEnabled())
+                _log.debug(String.format("Closing %d Jedis instance(s)", _queue.size()));
+
+            BinaryJedis instance;
+            while ((instance = _queue.poll()) != null) {
+                try { instance.close(); } catch (Exception e) { /* ignore exception */ }
             }
         }
         
         private BinaryJedis createJedisInstance() {
-            return new BinaryJedis(_host, _port, _ssl);
+            return new BinaryJedis(_host, _port, _timeout, _ssl);
         }
     }
 }

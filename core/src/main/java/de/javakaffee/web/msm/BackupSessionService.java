@@ -21,7 +21,6 @@ import static de.javakaffee.web.msm.Statistics.StatsType.RELEASE_LOCK;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
@@ -55,7 +54,7 @@ public class BackupSessionService {
     private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
-    private final StorageClient _memcached;
+    private final StorageClient _storage;
     private final MemcachedNodesManager _memcachedNodesManager;
     private final Statistics _statistics;
 
@@ -66,7 +65,7 @@ public class BackupSessionService {
      * @param sessionBackupAsync
      * @param sessionBackupTimeout
      * @param backupThreadCount TODO
-     * @param memcached
+     * @param storage
      * @param memcachedNodesManager
      * @param failoverNodeIds
      */
@@ -74,13 +73,13 @@ public class BackupSessionService {
             final boolean sessionBackupAsync,
             final int sessionBackupTimeout,
             final int backupThreadCount,
-            final StorageClient memcached,
+            final StorageClient storage,
             final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
-        _memcached = memcached;
+        _storage = storage;
         _memcachedNodesManager = memcachedNodesManager;
         _statistics = statistics;
 
@@ -228,7 +227,7 @@ public class BackupSessionService {
                 _transcoderService,
                 _sessionBackupAsync,
                 _sessionBackupTimeout,
-                _memcached,
+                _storage,
                 _memcachedNodesManager,
                 _statistics );
     }
@@ -240,7 +239,7 @@ public class BackupSessionService {
                     _log.debug( "Releasing lock for session " + session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( session.getIdInternal() ) ).get();
+                _storage.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( session.getIdInternal() ) ).get();
                 _statistics.registerSince( RELEASE_LOCK, start );
                 session.releaseLock();
             } catch( final Exception e ) {

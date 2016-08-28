@@ -56,7 +56,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager;
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.NodeIdList;
 import de.javakaffee.web.msm.SessionIdFormat;
@@ -82,7 +82,7 @@ public abstract class NonStickySessionsIntegrationTest {
     private MemCacheDaemon<?> _daemon3;
     private MemcachedClient _client;
 
-    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+    private final StorageClientCallback _storageClientCallback = new StorageClientCallback() {
         @Override
         public byte[] get(final String key) {
             return _client.get(key, ByteArrayTranscoder.INSTANCE);
@@ -126,7 +126,7 @@ public abstract class NonStickySessionsIntegrationTest {
             throw e;
         }
 
-        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, null, _memcachedClientCallback);
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, null, _storageClientCallback);
         _client =
                 new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 ),
                         Arrays.asList( address1, address2 ) );
@@ -626,7 +626,7 @@ public abstract class NonStickySessionsIntegrationTest {
         manager.setMemcachedNodes(memcachedNodes);
         manager.getMemcachedSessionService().setSessionBackupAsync(false);
 
-        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 3, 1000);
+        waitForReconnect(manager.getMemcachedSessionService().getStorageClient(), 3, 1000);
 
         final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
         final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
@@ -698,7 +698,7 @@ public abstract class NonStickySessionsIntegrationTest {
         manager.setMemcachedNodes(memcachedNodes);
         manager.getMemcachedSessionService().setSessionBackupAsync(false);
 
-        waitForReconnect(manager.getMemcachedSessionService().getMemcached(), 3, 1000);
+        waitForReconnect(manager.getMemcachedSessionService().getStorageClient(), 3, 1000);
 
         final NodeIdList nodeIdList = NodeIdList.create(NODE_ID_1, NODE_ID_2, NODE_ID_3);
         final Map<String, MemCacheDaemon<?>> memcachedsByNodeId = new HashMap<String, MemCacheDaemon<?>>();
@@ -787,7 +787,7 @@ public abstract class NonStickySessionsIntegrationTest {
     @Test( enabled = true )
     public void testSessionNotLoadedForNoSessionAccess() throws IOException, HttpException, InterruptedException {
         _tomcat1.getManager().setMemcachedNodes( NODE_ID_1 + ":localhost:" + MEMCACHED_PORT_1 );
-        waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
+        waitForReconnect(_tomcat1.getService().getStorageClient(), 1, 1000);
 
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, "foo", "bar" ).getSessionId();
         assertNotNull( sessionId1 );
@@ -1020,8 +1020,8 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1.setChangeSessionIdOnAuth( false );
         _tomcat2.setChangeSessionIdOnAuth( false );
 
-        waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000);
-        waitForReconnect(_tomcat2.getService().getMemcached(), 1, 1000);
+        waitForReconnect(_tomcat1.getService().getStorageClient(), 1, 1000);
+        waitForReconnect(_tomcat2.getService().getStorageClient(), 1, 1000);
 
         final Response response1 = get( _httpClient, TC_PORT_1, null );
         final String sessionId = response1.getSessionId();

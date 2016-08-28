@@ -38,12 +38,12 @@ public class LockingStrategyUriPattern extends LockingStrategy {
     public LockingStrategyUriPattern( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final Pattern uriPattern,
-            @Nonnull final StorageClient memcached,
+            @Nonnull final StorageClient storage,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache,
             final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
             @Nonnull final CurrentRequest currentRequest ) {
-        super( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
+        super( manager, memcachedNodesManager, storage, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         if ( uriPattern == null ) {
             throw new IllegalArgumentException( "The uriPattern is null" );
         }

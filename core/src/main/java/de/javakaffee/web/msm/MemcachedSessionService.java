@@ -36,9 +36,6 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
-
-import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Manager;
@@ -52,8 +49,7 @@ import org.apache.juli.logging.LogFactory;
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
-import de.javakaffee.web.msm.storage.MemcachedStorageClient;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
 import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
@@ -134,7 +130,7 @@ public class MemcachedSessionService {
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link StorageClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
      * evaluated. If this is <code>true</code>, the {@link #setBackupThreadCount(int)}
      * is evaluated.
@@ -204,7 +200,7 @@ public class MemcachedSessionService {
     /*
      * the storage client (typically talks to a memcached server, but e.g. Redis is also supported)
      */
-    private StorageClient _memcached;
+    private StorageClient _storage;
 
     /*
      * findSession may be often called in one request. If a session is requested
@@ -239,7 +235,7 @@ public class MemcachedSessionService {
     private RequestTrackingContextValve _trackingContextValve;
 
     protected final SessionManager _manager;
-	private final MemcachedClientCallback _memcachedClientCallback = createMemcachedClientCallback();
+	private final StorageClientCallback _storageClientCallback = createStorageClientCallback();
 
     public MemcachedSessionService( final SessionManager manager ) {
         _manager = manager;
@@ -404,9 +400,9 @@ public class MemcachedSessionService {
         if ( _lockingStrategy != null ) {
             _lockingStrategy.shutdown();
         }
-        if ( _memcached != null ) {
-            _memcached.shutdown();
-            _memcached = null;
+        if ( _storage != null ) {
+            _storage.shutdown();
+            _storage = null;
         }
         _transcoderFactory = null;
         _invalidSessionsCache.clear();
@@ -417,13 +413,13 @@ public class MemcachedSessionService {
      * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
      * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
      *
-     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
+     * @param storage the storage client to use, for normal operations this should be <code>null</code>.
      */
-    void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        if (memcachedClient == null)
-            _memcached = null;
+    void startInternal( final StorageClient storage ) throws LifecycleException {
+        if (storage == null)
+            _storage = null;
         else
-            _memcached = new MemcachedStorageClient(memcachedClient);
+            _storage = storage;
         
         startInternal();
     }
@@ -439,8 +435,8 @@ public class MemcachedSessionService {
 
         _memcachedNodesManager = createMemcachedNodesManager( _memcachedNodes, _failoverNodes);
 
-        if(_memcached == null) {
-            _memcached = createMemcachedClient( _memcachedNodesManager, _statistics );
+        if(_storage == null) {
+            _storage = createStorageClient( _memcachedNodesManager, _statistics );
         }
 
         final String sessionCookieName = _manager.getSessionCookieName();
@@ -456,7 +452,7 @@ public class MemcachedSessionService {
         _transcoderService = createTranscoderService( _statistics );
 
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
+                _backupThreadCount, _storage, _memcachedNodesManager, _statistics );
 
         _log.info( "--------\n- " + getClass().getSimpleName() + " finished initialization:" +
                 "\n- sticky: "+ _sticky +
@@ -481,11 +477,11 @@ public class MemcachedSessionService {
         };
     }
 
-	protected MemcachedClientCallback createMemcachedClientCallback() {
-		return new MemcachedClientCallback() {
+	protected StorageClientCallback createStorageClientCallback() {
+		return new StorageClientCallback() {
 			@Override
 			public byte[] get(final String key) {
-				return _memcached.get(_memcachedNodesManager.getStorageKeyFormat().format( key ));
+				return _storage.get(_memcachedNodesManager.getStorageKeyFormat().format( key ));
 			}
 		};
 	}
@@ -494,7 +490,7 @@ public class MemcachedSessionService {
         final Context context = _manager.getContext();
         final String webappVersion = Reflections.invoke(context, "getWebappVersion", null);
         final StorageKeyFormat storageKeyFormat = StorageKeyFormat.of(_storageKeyPrefix, context.getParent().getName(), context.getName(), webappVersion);
-		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _memcachedClientCallback );
+		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _storageClientCallback);
 	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
@@ -512,14 +508,14 @@ public class MemcachedSessionService {
         return _transcoderFactory;
     }
 
-    protected StorageClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
-            final Statistics statistics ) {
+    protected StorageClient createStorageClient(final MemcachedNodesManager memcachedNodesManager,
+												final Statistics statistics ) {
         if ( ! _enabled.get() ) {
             return null;
         }
 
         final long maxReconnectDelay = getSystemProperty(MAX_RECONNECT_DELAY_KEY, 30);
-        return new MemcachedClientFactory().createMemcachedClient(memcachedNodesManager, _memcachedProtocol, _username, _password, _operationTimeout,
+        return new StorageClientFactory().createStorageClient(memcachedNodesManager, _memcachedProtocol, _username, _password, _operationTimeout,
                 maxReconnectDelay, statistics);
     }
 
@@ -854,7 +850,7 @@ public class MemcachedSessionService {
             }
             try {
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) ).get();
+                _storage.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) ).get();
                 _statistics.registerSince( DELETE_FROM_MEMCACHED, start );
                 if ( !_sticky ) {
                     _lockingStrategy.onAfterDeleteFromMemcached( sessionId );
@@ -971,7 +967,7 @@ public class MemcachedSessionService {
                 return null;
             }
 
-            final byte[] obj = _memcached.get( getSessionIdFormat().createBackupKey( requestedSessionId ) );
+            final byte[] obj = _storage.get( getSessionIdFormat().createBackupKey( requestedSessionId ) );
             if ( obj == null ) {
                 if(_log.isDebugEnabled())
                     _log.debug( "No backup found for sessionId " + requestedSessionId );
@@ -1143,7 +1139,7 @@ public class MemcachedSessionService {
              * they get deserialized by BaseSerializingTranscoder.deserialize or the appropriate
              * specializations.
              */
-            final byte[] object = _memcached.get( _memcachedNodesManager.getStorageKeyFormat().format( sessionId ) );
+            final byte[] object = _storage.get( _memcachedNodesManager.getStorageKeyFormat().format( sessionId ) );
             _memcachedNodesManager.onLoadFromMemcachedSuccess( sessionId );
 
             if ( object != null ) {
@@ -1173,7 +1169,7 @@ public class MemcachedSessionService {
         } catch ( final TranscoderDeserializationException e ) {
             _log.warn( "Could not deserialize session with id " + sessionId + " from memcached, session will be purged from storage.", e );
             releaseIfLocked( sessionId, lockStatus );
-            _memcached.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) );
+            _storage.delete( _memcachedNodesManager.getStorageKeyFormat().format(sessionId) );
             _invalidSessionsCache.put( sessionId, Boolean.TRUE );
         } catch ( final Exception e ) {
             _log.warn( "Could not load session with id " + sessionId + " from memcached.", e );
@@ -1230,16 +1226,16 @@ public class MemcachedSessionService {
         /* first create all dependent services
          */
         final MemcachedNodesManager memcachedNodesManager = createMemcachedNodesManager( memcachedNodes, failoverNodes );
-        final StorageClient memcachedClient = createMemcachedClient( memcachedNodesManager, _statistics );
+        final StorageClient storage = createStorageClient( memcachedNodesManager, _statistics );
         final BackupSessionService backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync,
-                _sessionBackupTimeout, _backupThreadCount, memcachedClient, memcachedNodesManager, _statistics );
+                _sessionBackupTimeout, _backupThreadCount, storage, memcachedNodesManager, _statistics );
 
         /* then assign new services
          */
-        if ( _memcached != null ) {
-            _memcached.shutdown();
+        if ( _storage != null ) {
+            _storage.shutdown();
         }
-        _memcached = memcachedClient;
+        _storage = storage;
         _memcachedNodesManager = memcachedNodesManager;
         _backupSessionService = backupSessionService;
 
@@ -1581,7 +1577,7 @@ public class MemcachedSessionService {
 
     public void setLockingMode( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern, final boolean storeSecondaryBackup ) {
         _log.info( "Setting lockingMode to " + lockingMode + ( uriPattern != null ? " with pattern " + uriPattern.pattern() : "" ) );
-        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _memcached, this, _memcachedNodesManager,
+        _lockingStrategy = LockingStrategy.create( lockingMode, uriPattern, _storage, this, _memcachedNodesManager,
                 _invalidSessionsCache, storeSecondaryBackup, _statistics, _currentRequest );
     }
 
@@ -1619,7 +1615,7 @@ public class MemcachedSessionService {
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
      * evaluated. If this is <code>true</code>, the {@link #setBackupThreadCount(int)}
      * is evaluated.
@@ -1637,13 +1633,13 @@ public class MemcachedSessionService {
         if ( ( oldSessionBackupAsync != sessionBackupAsync ) && _manager.isInitialized() ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                    _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
+                    _backupThreadCount, _storage, _memcachedNodesManager, _statistics );
         }
     }
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout from {@link #getSessionBackupTimeout()} is
      * evaluated.
      */
@@ -1698,7 +1694,7 @@ public class MemcachedSessionService {
     void setTranscoderService( final TranscoderService transcoderService ) {
         _transcoderService = transcoderService;
         _backupSessionService = new BackupSessionService( transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
-                _backupThreadCount, _memcached, _memcachedNodesManager, _statistics );
+                _backupThreadCount, _storage, _memcachedNodesManager, _statistics );
     }
 
     /**
@@ -1725,26 +1721,17 @@ public class MemcachedSessionService {
     }
 
     /**
-     * Get access to the {@link MemcachedClient} instance used by the {@link MemcachedStorageClient},
-     * or <code>null</code> if another storage backend is used. This method is used in tests.
+     * The storage client, this method is used in tests.
      */
-    public MemcachedClient getMemcached() {
-        if (_memcached instanceof MemcachedStorageClient)
-            return ((MemcachedStorageClient)_memcached).getMemcachedClient();
-        else
-            return null;
+    public StorageClient getStorageClient() {
+        return _storage;
     }
 
     /**
-     * 
-     * Create a new {@link MemcachedStorageClient} backed by the given {@link MemcachedClient}
-     * instance and set it as the used storage client. This method is used in tests.
+     * Set the given storage client, this method is used in tests.
      */
-    void setMemcachedClient(final MemcachedClient memcachedClient) {
-        if (memcachedClient != null)
-            _memcached = new MemcachedStorageClient(memcachedClient);
-        else
-            _memcached = null;
+    void setStorageClient(final StorageClient storage) {
+        _storage = storage;
     }
 
     RequestTrackingHostValve getTrackingHostValve() {

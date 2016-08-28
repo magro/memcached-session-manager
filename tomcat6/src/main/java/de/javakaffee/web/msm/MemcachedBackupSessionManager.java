@@ -33,7 +33,7 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
@@ -134,14 +134,14 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     /**
-     * Initialize this manager. The memcachedClient parameter is there for testing
-     * purposes. If the memcachedClient is provided it's used, otherwise a "real"/new
-     * memcached client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
+     * Initialize this manager. The storageClient parameter is there for testing
+     * purposes. If the storageClient is provided it's used, otherwise a "real"/new
+     * storage client is created based on the configuration (like {@link #setMemcachedNodes(String)} etc.).
      *
-     * @param memcachedClient the memcached client to use, for normal operations this should be <code>null</code>.
+     * @param storageClient the storage client to use, for normal operations this should be <code>null</code>.
      */
-    protected void startInternal( final MemcachedClient memcachedClient ) throws LifecycleException {
-        _msm.setMemcachedClient(memcachedClient);
+    protected void startInternal(final StorageClient storageClient ) throws LifecycleException {
+        _msm.setStorageClient(storageClient);
         _msm.startInternal();
     }
 
@@ -754,7 +754,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
      * evaluated. If this is <code>true</code>, the {@link #setBackupThreadCount(int)}
      * is evaluated.
@@ -772,7 +772,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout from {@link #getSessionBackupTimeout()} is
      * evaluated.
      */
