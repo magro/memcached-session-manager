@@ -23,9 +23,9 @@ import redis.clients.jedis.BinaryJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -205,72 +205,65 @@ public class RedisStorageClient implements StorageClient {
     }
 
     private class JedisPool {
-        private List<BinaryJedis> _instances = new ArrayList<BinaryJedis>();
+        private Queue<BinaryJedis> _queue = new ConcurrentLinkedQueue<BinaryJedis>();
 
         public BinaryJedis borrowInstance(boolean knownGood) {
-            synchronized (_instances) {
-                if (_instances.isEmpty()) {
-                    if (_log.isDebugEnabled()) {
-                        _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
+            BinaryJedis res;
+            if((res = _queue.poll()) == null) {
+                if (_log.isDebugEnabled()) {
+                    _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
                             _host, _port, _ssl));
-                    }
-
-                    return createJedisInstance();
-                } else {
-                    if (knownGood) {
-                        // Check all existing connections until we find a good one
-                        BinaryJedis jedis;
-                        do {
-                            jedis = _instances.remove(_instances.size() - 1);
-                            try {
-                                jedis.ping();
-                                
-                                if (_log.isDebugEnabled())
-                                    _log.debug(String.format("Using known-good connection #%d", _instances.size()));
-
-                                return jedis;
-                            } catch (Exception e) {
-                                if (_log.isDebugEnabled()) {
-                                    _log.debug(String.format("Removing connection #%d since it cannot be pinged", _instances.size()));
-                                }
-                            }
-                        } while (!_instances.isEmpty());
-
-                        // No existing connections are good, so create new one
-                        if (_log.isDebugEnabled()) {
-                            _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
-                                _host, _port, _ssl));
-                        }
-                        
-                        return createJedisInstance();
-                    } else {
-                        if (_log.isDebugEnabled())
-                            _log.debug(String.format("Using connection #%d", _instances.size() - 1));
-
-                        return _instances.remove(_instances.size() - 1);
-                    }
                 }
+                return createJedisInstance();
+            }
+
+            if (knownGood) {
+                // Check all existing connections until we find a good one
+                do {
+                    try {
+                        res.ping();
+
+                        if (_log.isTraceEnabled())
+                            _log.trace(String.format("Using known-good connection #%d", _queue.size()));
+
+                        return res;
+                    } catch (Exception e) {
+                        if (_log.isDebugEnabled()) {
+                            _log.debug(String.format("Removing connection #%d since it cannot be pinged", _queue.size()));
+                        }
+                        try { res.close(); } catch (Exception e2) { /* ignore */ }
+                    }
+                } while ((res = _queue.poll()) != null);
+
+                // No existing connections are good, so create new one
+                if (_log.isDebugEnabled()) {
+                    _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
+                            _host, _port, _ssl));
+                }
+
+                return createJedisInstance();
+            } else {
+                if (_log.isTraceEnabled())
+                    _log.trace(String.format("Using connection #%d", _queue.size()));
+
+                return res;
             }
         }
         
         public void returnInstance(BinaryJedis instance) {
-            synchronized (_instances) {
-                _instances.add(instance);
-                
-                if (_log.isDebugEnabled())
-                    _log.debug(String.format("Returned instance #%d", _instances.size() - 1));
-            }
+            _queue.offer(instance);
+
+            if (_log.isTraceEnabled())
+                _log.trace(String.format("Returned instance #%d", _queue.size()));
         }
         
         public void shutdown() {
-            synchronized (_instances) {
-                if (_log.isDebugEnabled())
-                    _log.debug(String.format("Closing %d remaining Jedis instance(s)", _instances.size()));
-                
-                for (BinaryJedis jedis: _instances) {
-                    try { jedis.close(); } catch (Exception e) { /* ignore exception */ }
-                }
-                _instances.clear();
+            if (_log.isDebugEnabled())
+                _log.debug(String.format("Closing %d Jedis instance(s)", _queue.size()));
+
+            BinaryJedis instance;
+            while ((instance = _queue.poll()) != null) {
+                try { instance.close(); } catch (Exception e) { /* ignore exception */ }
             }
         }
         
