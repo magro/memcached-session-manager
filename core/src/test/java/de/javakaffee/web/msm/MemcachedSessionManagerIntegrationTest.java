@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
 
 import com.thimbleware.jmemcached.MemCacheDaemon;
 
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.integration.TestServlet;
 import de.javakaffee.web.msm.integration.TestUtils;
@@ -86,7 +86,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
     private int _memcachedPort;
 
-    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+    private final StorageClientCallback _storageClientCallback = new StorageClientCallback() {
 		@Override
 		public byte[] get(final String key) {
 		    return _memcached.get(key, ByteArrayTranscoder.INSTANCE);
@@ -127,7 +127,7 @@ public abstract class MemcachedSessionManagerIntegrationTest {
     }
 
     private MemcachedClient createMemcachedClient( final String memcachedNodes, final InetSocketAddress address ) throws IOException, InterruptedException {
-        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(memcachedNodes, null, null, _memcachedClientCallback);
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(memcachedNodes, null, null, _storageClientCallback);
         final ConnectionFactory cf = nodesManager.isEncodeNodeIdInSessionId()
             ? new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 )
             : new DefaultConnectionFactory();

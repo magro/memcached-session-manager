@@ -33,7 +33,7 @@ import de.javakaffee.web.msm.storage.StorageClient;
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-public class MemcachedClientFactory {
+public class StorageClientFactory {
 
     public static final String PROTOCOL_BINARY = "binary";
 
@@ -43,9 +43,9 @@ public class MemcachedClientFactory {
                 long maxReconnectDelay, Statistics statistics );
     }
 
-    protected StorageClient createMemcachedClient(final MemcachedNodesManager memcachedNodesManager,
-            final String memcachedProtocol, final String username, final String password, final long operationTimeout,
-            final long maxReconnectDelay, final Statistics statistics ) {
+    protected StorageClient createStorageClient(final MemcachedNodesManager memcachedNodesManager,
+                                                final String memcachedProtocol, final String username, final String password, final long operationTimeout,
+                                                final long maxReconnectDelay, final Statistics statistics ) {
         try {
             if (memcachedNodesManager.isRedisConfig()) {
                 return new RedisStorageClient(memcachedNodesManager.getMemcachedNodes());

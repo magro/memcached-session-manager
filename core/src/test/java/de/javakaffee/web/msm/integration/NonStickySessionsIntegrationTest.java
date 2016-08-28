@@ -56,7 +56,7 @@ import com.thimbleware.jmemcached.MemCacheDaemon;
 
 import de.javakaffee.web.msm.LockingStrategy.LockingMode;
 import de.javakaffee.web.msm.MemcachedNodesManager;
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
 import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 import de.javakaffee.web.msm.NodeIdList;
 import de.javakaffee.web.msm.SessionIdFormat;
@@ -82,7 +82,7 @@ public abstract class NonStickySessionsIntegrationTest {
     private MemCacheDaemon<?> _daemon3;
     private MemcachedClient _client;
 
-    private final MemcachedClientCallback _memcachedClientCallback = new MemcachedClientCallback() {
+    private final StorageClientCallback _storageClientCallback = new StorageClientCallback() {
         @Override
         public byte[] get(final String key) {
             return _client.get(key, ByteArrayTranscoder.INSTANCE);
@@ -126,7 +126,7 @@ public abstract class NonStickySessionsIntegrationTest {
             throw e;
         }
 
-        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, null, _memcachedClientCallback);
+        final MemcachedNodesManager nodesManager = MemcachedNodesManager.createFor(MEMCACHED_NODES, null, null, _storageClientCallback);
         _client =
                 new MemcachedClient( new SuffixLocatorConnectionFactory( nodesManager, nodesManager.getSessionIdFormat(), Statistics.create(), 1000, 1000 ),
                         Arrays.asList( address1, address2 ) );

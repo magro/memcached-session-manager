@@ -31,7 +31,7 @@ import java.util.concurrent.Future;
 
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
 import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
@@ -63,14 +63,14 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
     }
 
     @Override
-    protected StorageClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
-            final Statistics statistics ) {
+    protected StorageClient createStorageClient(final MemcachedNodesManager memcachedNodesManager,
+                                                final Statistics statistics ) {
         return null;
     }
 
     @Override
-    protected MemcachedClientCallback createMemcachedClientCallback() {
-    	return new MemcachedClientCallback() {
+    protected StorageClientCallback createStorageClientCallback() {
+    	return new StorageClientCallback() {
 			@Override
 			public byte[] get(final String key) {
 				return null;

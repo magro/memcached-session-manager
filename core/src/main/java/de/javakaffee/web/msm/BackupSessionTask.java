@@ -56,7 +56,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
     private final TranscoderService _transcoderService;
     private final boolean _sessionBackupAsync;
     private final int _sessionBackupTimeout;
-    private final StorageClient _memcached;
+    private final StorageClient _storage;
     private final MemcachedNodesManager _memcachedNodesManager;
     private final Statistics _statistics;
 
@@ -69,7 +69,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
      *            node (the session id had been changed before in this case).
      * @param sessionBackupAsync
      * @param sessionBackupTimeout
-     * @param memcached
+     * @param storage
      * @param memcachedNodesManager
      * @param statistics
      */
@@ -78,7 +78,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
             final TranscoderService transcoderService,
             final boolean sessionBackupAsync,
             final int sessionBackupTimeout,
-            final StorageClient memcached,
+            final StorageClient storage,
             final MemcachedNodesManager memcachedNodesManager,
             final Statistics statistics ) {
         _session = session;
@@ -86,7 +86,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
         _transcoderService = transcoderService;
         _sessionBackupAsync = sessionBackupAsync;
         _sessionBackupTimeout = sessionBackupTimeout;
-        _memcached = memcached;
+        _storage = storage;
         _memcachedNodesManager = memcachedNodesManager;
         _statistics = statistics;
     }
@@ -165,7 +165,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
                     _log.debug( "Releasing lock for session " + _session.getIdInternal() );
                 }
                 final long start = System.currentTimeMillis();
-                _memcached.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) ).get();
+                _storage.delete( _memcachedNodesManager.getSessionIdFormat().createLockName( _session.getIdInternal() ) ).get();
                 _statistics.registerSince( RELEASE_LOCK, start );
                 _session.releaseLock();
             } catch( final Exception e ) {
@@ -228,7 +228,7 @@ public class BackupSessionTask implements Callable<BackupResult> {
         final int expirationTime = session.getMemcachedExpirationTimeToSet();
         final long start = System.currentTimeMillis();
         try {
-            final Future<Boolean> future = _memcached.set(
+            final Future<Boolean> future = _storage.set(
                     _memcachedNodesManager.getStorageKeyFormat().format(session.getId()),
                     toMemcachedExpiration(expirationTime), data );
             if ( !_sessionBackupAsync ) {
