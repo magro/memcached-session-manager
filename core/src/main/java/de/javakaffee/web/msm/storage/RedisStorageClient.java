@@ -185,6 +185,9 @@ public class RedisStorageClient implements StorageClient {
                 if (_log.isDebugEnabled())
                     _log.debug("Connection error occurred, discarding Jedis connection: " + e.getMessage());
 
+                if (jedis != null)
+                    try { jedis.close(); } catch (Exception e2) { /* ignore */ }
+
                 jedis = null;
             } finally {
                 if (jedis != null)
@@ -228,9 +231,9 @@ public class RedisStorageClient implements StorageClient {
 
                         return res;
                     } catch (Exception e) {
-                        if (_log.isDebugEnabled()) {
+                        if (_log.isDebugEnabled())
                             _log.debug(String.format("Removing connection #%d since it cannot be pinged", _queue.size()));
-                        }
+
                         try { res.close(); } catch (Exception e2) { /* ignore */ }
                     }
                 } while ((res = _queue.poll()) != null);
