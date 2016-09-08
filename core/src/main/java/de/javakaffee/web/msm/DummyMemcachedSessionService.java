@@ -29,10 +29,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import net.spy.memcached.MemcachedClient;
 import de.javakaffee.web.msm.BackupSessionService.SimpleFuture;
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * This {@link MemcachedSessionService} can be used for debugging session
@@ -63,16 +63,16 @@ public class DummyMemcachedSessionService<T extends MemcachedSessionService.Sess
     }
 
     @Override
-    protected MemcachedClient createMemcachedClient( final MemcachedNodesManager memcachedNodesManager,
-            final Statistics statistics ) {
+    protected StorageClient createStorageClient(final MemcachedNodesManager memcachedNodesManager,
+                                                final Statistics statistics ) {
         return null;
     }
 
     @Override
-    protected MemcachedClientCallback createMemcachedClientCallback() {
-    	return new MemcachedClientCallback() {
+    protected StorageClientCallback createStorageClientCallback() {
+    	return new StorageClientCallback() {
 			@Override
-			public Object get(final String key) {
+			public byte[] get(final String key) {
 				return null;
 			}
 		};

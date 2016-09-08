@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import de.javakaffee.web.msm.storage.MemcachedStorageClient;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Session;
@@ -309,9 +310,9 @@ public abstract class MemcachedFailoverIntegrationTest {
         MemcachedClient client;
         InetSocketAddress serverAddress;
         try {
-            final Method m = MemcachedSessionService.class.getDeclaredMethod( "getMemcached" );
+            final Method m = MemcachedSessionService.class.getDeclaredMethod("getStorageClient");
             m.setAccessible( true );
-            client = (MemcachedClient) m.invoke( service );
+            client = ((MemcachedStorageClient) m.invoke( service )).getMemcachedClient();
 
             final Field field = MemCacheDaemon.class.getDeclaredField( "addr" );
             field.setAccessible( true );
@@ -322,6 +323,8 @@ public abstract class MemcachedFailoverIntegrationTest {
 
         waitForReconnect( client, serverAddress, timeToWait );
     }
+
+
 
     public void waitForReconnect( final MemcachedClient client, final InetSocketAddress serverAddressToCheck, final long timeToWait )
             throws InterruptedException, RuntimeException {
@@ -423,7 +426,7 @@ public abstract class MemcachedFailoverIntegrationTest {
          */
         _daemon2.stop();
 
-        TestUtils.waitForReconnect(_tomcat1.getService().getMemcached(), 1, 1000l);
+        TestUtils.waitForReconnect(_tomcat1.getService().getStorageClient(), 1, 1000l);
 
         final Response response1 = get( _httpClient, _portTomcat1, null );
         final String sessionId = response1.getSessionId();

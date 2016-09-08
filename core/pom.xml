@@ -54,6 +54,13 @@
 			<version>1.4.11</version>
 			<scope>compile</scope>
 		</dependency>
+		<dependency>
+			<groupId>redis.clients</groupId>
+			<artifactId>jedis</artifactId>
+			<version>2.9.0</version>
+			<scope>compile</scope><!-- is needed without optional=true, because then the dep is missing in dependent modules (tests fail with CNFE) -->
+		</dependency>
+        
 		<!-- Needed if used with membase via http -->
 		<dependency>
 			<groupId>org.codehaus.jettison</groupId>
@@ -116,6 +123,17 @@
 						</goals>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<systemProperties>
+						<property> 
+							<name>java.util.logging.config.file</name>
+							<value>src/test/resources/logging.properties</value>
+						</property>
+					</systemProperties>
+				</configuration>	
 			</plugin>
 		</plugins>
 	</build>

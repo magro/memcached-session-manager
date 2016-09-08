@@ -19,7 +19,6 @@ package de.javakaffee.web.msm;
 
 import static de.javakaffee.web.msm.Statistics.StatsType.*;
 
-import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -32,8 +31,6 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
-
-import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.Lifecycle;
@@ -596,7 +593,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout set via {@link #setSessionBackupTimeout(int)} is
      * evaluated. If this is <code>true</code>, the {@link #setBackupThreadCount(int)}
      * is evaluated.
@@ -614,7 +611,7 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
 
     /**
      * Specifies if the session shall be stored asynchronously in memcached as
-     * {@link MemcachedClient#set(String, int, Object)} supports it. If this is
+     * {@link StorageClient#set(String, int, byte[])} supports it. If this is
      * false, the timeout from {@link #getSessionBackupTimeout()} is
      * evaluated.
      */

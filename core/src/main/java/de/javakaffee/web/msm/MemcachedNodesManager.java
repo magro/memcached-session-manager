@@ -46,14 +46,14 @@ import de.javakaffee.web.msm.NodeAvailabilityCache.CacheLoader;
 public class MemcachedNodesManager {
 
 	/**
-	 * Provides queries to memcached.
+	 * Provides queries to the storage.
 	 */
-	public static interface MemcachedClientCallback {
+	public static interface StorageClientCallback {
 		/**
 		 * Must query the given key in memcached.
 		 */
 		@Nullable
-		Object get(@Nonnull String key);
+		byte[] get(@Nonnull String key);
 	}
 
 	private static final Log LOG = LogFactory.getLog(MemcachedNodesManager.class);
@@ -92,12 +92,12 @@ public class MemcachedNodesManager {
      * @param failoverNodeIds the configured failover node ids.
      * @param address2Ids a mapping of inet addresses from the memcachedNodes configuration to their node ids.
      * @param storageKeyFormat the storage key format
-     * @param memcachedClientCallback a callback to memcached, can only be null if the memcachedNodes config
+     * @param storageClientCallback a callback to memcached, can only be null if the memcachedNodes config
      * 		contains a single node without node id.
      */
 	public MemcachedNodesManager(final String memcachedNodes, @Nonnull final NodeIdList primaryNodeIds, @Nonnull final List<String> failoverNodeIds,
 			@Nonnull final LinkedHashMap<InetSocketAddress, String> address2Ids,
-			@Nullable final StorageKeyFormat storageKeyFormat, @Nullable final MemcachedClientCallback memcachedClientCallback) {
+			@Nullable final StorageKeyFormat storageKeyFormat, @Nullable final StorageClientCallback storageClientCallback) {
 		_memcachedNodes = memcachedNodes;
 		_primaryNodeIds = primaryNodeIds;
 		_failoverNodeIds = failoverNodeIds;
@@ -107,11 +107,11 @@ public class MemcachedNodesManager {
         _encodeNodeIdInSessionId = !((getCountNodes() <= 1 || isCouchbaseConfig(memcachedNodes)) && _primaryNodeIds.isEmpty());
 
 		if (_encodeNodeIdInSessionId) {
-			if (memcachedClientCallback == null) {
+			if (storageClientCallback == null) {
 				throw new IllegalArgumentException("The MemcachedClientCallback must not be null.");
 			}
 			_sessionIdFormat = new SessionIdFormat(storageKeyFormat);
-	        _nodeIdService = new NodeIdService( createNodeAvailabilityCache( getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, memcachedClientCallback ),
+	        _nodeIdService = new NodeIdService( createNodeAvailabilityCache( getCountNodes(), NODE_AVAILABILITY_CACHE_TTL, storageClientCallback),
 	        				primaryNodeIds, failoverNodeIds );
 		}
 		else {
@@ -142,13 +142,13 @@ public class MemcachedNodesManager {
     }
 
     protected NodeAvailabilityCache<String> createNodeAvailabilityCache( final int size, final long ttlInMillis,
-            @Nonnull final MemcachedClientCallback memcachedClientCallback ) {
+            @Nonnull final StorageClientCallback storageClientCallback) {
         return new NodeAvailabilityCache<String>( size, ttlInMillis, new CacheLoader<String>() {
 
             @Override
             public boolean isNodeAvailable( final String key ) {
                 try {
-                	memcachedClientCallback.get(_sessionIdFormat.createSessionId( "ping", key ) );
+                	storageClientCallback.get(_sessionIdFormat.createSessionId( "ping", key ) );
                     return true;
                 } catch ( final Exception e ) {
                     return false;
@@ -175,14 +175,21 @@ public class MemcachedNodesManager {
 	 * @param memcachedNodes
 	 * @param failoverNodes TODO
 	 * @param storageKeyPrefix TODO
-	 * @param memcachedClientCallback TODO
+	 * @param storageClientCallback TODO
 	 * @return
 	 */
 	@Nonnull
     public static MemcachedNodesManager createFor(final String memcachedNodes, final String failoverNodes, final StorageKeyFormat storageKeyFormat,
-            final MemcachedClientCallback memcachedClientCallback) {
+            final StorageClientCallback storageClientCallback) {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
+		}
+		
+        // Support a Redis URL in the form "redis://hostname:port" or "rediss://" (for SSL connections) like the client "Lettuce" does
+		if (memcachedNodes.startsWith("redis://") || memcachedNodes.startsWith("rediss://")) {
+		    // Redis configuration
+		    return new MemcachedNodesManager(memcachedNodes, new NodeIdList(), new ArrayList<String>(),
+		            new LinkedHashMap<InetSocketAddress, String>(), storageKeyFormat, storageClientCallback);
 		}
 
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
@@ -240,7 +247,7 @@ public class MemcachedNodesManager {
 	        }
         }
 
-        return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, storageKeyFormat, memcachedClientCallback);
+        return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, storageKeyFormat, storageClientCallback);
 	}
 
     private static InetSocketAddress getSingleShortNodeDefinition(final Matcher singleNodeMatcher) {
@@ -534,6 +541,14 @@ public class MemcachedNodesManager {
         return COUCHBASE_BUCKET_NODES_PATTERN.matcher(_memcachedNodes).matches();
     }
 
+    /**
+     * Determines, if the current memcachedNodes configuration is a Redis configuration
+     * (like e.g. redis://example.com or rediss://example.com).
+     */
+    public boolean isRedisConfig() {
+        return _memcachedNodes.startsWith("redis://") || _memcachedNodes.startsWith("rediss://");
+    }
+    
     /**
      * Returns a list of couchbase REST interface uris if the current configuration is
      * a couchbase bucket configuration.

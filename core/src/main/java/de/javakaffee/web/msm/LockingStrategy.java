@@ -36,13 +36,12 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import net.spy.memcached.MemcachedClient;
-
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import de.javakaffee.web.msm.BackupSessionTask.BackupResult;
 import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.storage.StorageClient;
 
 /**
  * Represents the session locking hooks that must be implemented by the various locking strategies.
@@ -64,14 +63,15 @@ public abstract class LockingStrategy {
         URI_PATTERN
     }
 
-    protected static final String LOCK_VALUE = "locked";
+    protected static final byte[] LOCK_VALUE = new byte[] { 'l', 'o', 'c', 'k', 'e', 'd' };
+    protected static final byte[] BYTE_1 = new byte[] { 1 };
     protected static final int LOCK_RETRY_INTERVAL = 10;
     protected static final int LOCK_MAX_RETRY_INTERVAL = 500;
 
     protected final Log _log = LogFactory.getLog( getClass() );
 
     protected MemcachedSessionService _manager;
-    protected final MemcachedClient _memcached;
+    protected final StorageClient _storage;
     protected LRUCache<String, Boolean> _missingSessionsCache;
     protected final SessionIdFormat _sessionIdFormat;
     private final ExecutorService _executor;
@@ -82,12 +82,12 @@ public abstract class LockingStrategy {
 
     protected LockingStrategy( @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
-            @Nonnull final MemcachedClient memcached,
+            @Nonnull final StorageClient storage,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
             @Nonnull final CurrentRequest currentRequest ) {
         _manager = manager;
-        _memcached = memcached;
+        _storage = storage;
         _missingSessionsCache = missingSessionsCache;
         _sessionIdFormat = memcachedNodesManager.getSessionIdFormat();
         _storeSecondaryBackup = storeSecondaryBackup;
@@ -102,7 +102,7 @@ public abstract class LockingStrategy {
      */
     @CheckForNull
     public static LockingStrategy create( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern,
-            @Nonnull final MemcachedClient memcached, @Nonnull final MemcachedSessionService manager,
+            @Nonnull final StorageClient storage, @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
@@ -112,14 +112,14 @@ public abstract class LockingStrategy {
         }
         switch ( lockingMode ) {
         case ALL:
-            return new LockingStrategyAll( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
+            return new LockingStrategyAll( manager, memcachedNodesManager, storage, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         case AUTO:
-            return new LockingStrategyAuto( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
+            return new LockingStrategyAuto( manager, memcachedNodesManager, storage, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         case URI_PATTERN:
-            return new LockingStrategyUriPattern( manager, memcachedNodesManager, uriPattern, memcached, missingSessionsCache, storeSecondaryBackup,
+            return new LockingStrategyUriPattern( manager, memcachedNodesManager, uriPattern, storage, missingSessionsCache, storeSecondaryBackup,
                     stats, currentRequest );
         case NONE:
-            return new LockingStrategyNone( manager, memcachedNodesManager, memcached, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
+            return new LockingStrategyNone( manager, memcachedNodesManager, storage, missingSessionsCache, storeSecondaryBackup, stats, currentRequest );
         default:
             throw new IllegalArgumentException( "LockingMode not yet supported: " + lockingMode );
         }
@@ -166,7 +166,7 @@ public abstract class LockingStrategy {
 
     protected void acquireLock( @Nonnull final String sessionId, final long retryInterval, final long maxRetryInterval,
             final long timeout, final long start ) throws InterruptedException, ExecutionException, TimeoutException {
-        final Future<Boolean> result = _memcached.add( _sessionIdFormat.createLockName( sessionId ), 5, LOCK_VALUE );
+        final Future<Boolean> result = _storage.add( _sessionIdFormat.createLockName( sessionId ), 5, LOCK_VALUE );
         if ( result.get().booleanValue() ) {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Locked session " + sessionId );
@@ -197,7 +197,7 @@ public abstract class LockingStrategy {
                 _log.debug( "Releasing lock for session " + sessionId );
             }
             final long start = System.currentTimeMillis();
-            _memcached.delete( _sessionIdFormat.createLockName( sessionId ) ).get();
+            _storage.delete( _sessionIdFormat.createLockName( sessionId ) ).get();
             _stats.registerSince( RELEASE_LOCK, start );
         } catch ( final Exception e ) {
             _log.warn( "Caught exception when trying to release lock for session " + sessionId, e );
@@ -239,7 +239,7 @@ public abstract class LockingStrategy {
                     System.currentTimeMillis() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
+            final Future<Boolean> validityResult = _storage.set( validityKey, toMemcachedExpiration(expiration), validityData );
             if ( !_manager.isSessionBackupAsync() ) {
                 validityResult.get( _manager.getSessionBackupTimeout(), TimeUnit.MILLISECONDS );
             }
@@ -287,7 +287,7 @@ public abstract class LockingStrategy {
             final String validityKey = _sessionIdFormat.createValidityInfoKeyName( session.getIdInternal() );
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            final Future<Boolean> validityResult = _memcached.set( validityKey, toMemcachedExpiration(expiration), validityData );
+            final Future<Boolean> validityResult = _storage.set( validityKey, toMemcachedExpiration(expiration), validityData );
             if ( !_manager.isSessionBackupAsync() ) {
                 // TODO: together with session backup wait not longer than sessionBackupTimeout.
                 // Details: Now/here we're waiting the whole session backup timeout, even if (perhaps) some time
@@ -330,7 +330,7 @@ public abstract class LockingStrategy {
 
     @CheckForNull
     protected SessionValidityInfo loadSessionValidityInfoForValidityKey( @Nonnull final String validityInfoKey ) {
-        final byte[] validityInfo = (byte[]) _memcached.get( validityInfoKey );
+        final byte[] validityInfo = _storage.get( validityInfoKey );
         return validityInfo != null ? decode( validityInfo ) : null;
     }
 
@@ -378,18 +378,18 @@ public abstract class LockingStrategy {
         final long start = System.currentTimeMillis();
 
         final String validityInfoKey = _sessionIdFormat.createValidityInfoKeyName( sessionId );
-        _memcached.delete( validityInfoKey );
+        _storage.delete( validityInfoKey );
 
         if (_storeSecondaryBackup) {
-            _memcached.delete( _sessionIdFormat.createBackupKey( sessionId ) );
-            _memcached.delete( _sessionIdFormat.createBackupKey( validityInfoKey ) );
+            _storage.delete( _sessionIdFormat.createBackupKey( sessionId ) );
+            _storage.delete( _sessionIdFormat.createBackupKey( validityInfoKey ) );
         }
 
         _stats.registerSince( NON_STICKY_AFTER_DELETE_FROM_MEMCACHED, start );
     }
 
     private boolean pingSession( @Nonnull final String sessionId ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(sessionId), 1, 1 );
+        final Future<Boolean> touchResult = _storage.add( _storageKeyFormat.format(sessionId), 1, BYTE_1 );
         try {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
@@ -407,7 +407,7 @@ public abstract class LockingStrategy {
 
     private void pingSession( @Nonnull final MemcachedBackupSession session,
             @Nonnull final BackupSessionService backupSessionService ) throws InterruptedException {
-        final Future<Boolean> touchResult = _memcached.add( _storageKeyFormat.format(session.getIdInternal()), 5, 1 );
+        final Future<Boolean> touchResult = _storage.add( _storageKeyFormat.format(session.getIdInternal()), 5, BYTE_1 );
         try {
             if ( touchResult.get() ) {
                 _stats.nonStickySessionsPingFailed();
@@ -501,7 +501,7 @@ public abstract class LockingStrategy {
             final byte[] data = backupResult.getData();
             if ( data != null ) {
                 final String key = _sessionIdFormat.createBackupKey( _session.getId() );
-                _memcached.set( key, toMemcachedExpiration(_session.getMemcachedExpirationTimeToSet()), data );
+                _storage.set( key, toMemcachedExpiration(_session.getMemcachedExpirationTimeToSet()), data );
             }
             else {
                 _log.warn( "No data set for backupResultStatus " + backupResult.getStatus() + " for sessionId "
@@ -515,12 +515,12 @@ public abstract class LockingStrategy {
             final int maxInactiveInterval = _session.getMaxInactiveInterval();
             // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
             final int expiration = maxInactiveInterval <= 0 ? 0 : maxInactiveInterval;
-            _memcached.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
+            _storage.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
         }
 
         private void pingSessionBackup( @Nonnull final MemcachedBackupSession session ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( session.getId() );
-            final Future<Boolean> touchResultFuture = _memcached.add( key, 5, 1 );
+            final Future<Boolean> touchResultFuture = _storage.add( key, 5, BYTE_1 );
             try {
                 final boolean touchResult = touchResultFuture.get(_manager.getOperationTimeout(), TimeUnit.MILLISECONDS);
                 if ( touchResult ) {
@@ -543,7 +543,7 @@ public abstract class LockingStrategy {
                 throws InterruptedException {
             try {
                 final byte[] data = _manager.serialize( session );
-                final Future<Boolean> backupResult = _memcached.set( key, toMemcachedExpiration(session.getMemcachedExpirationTimeToSet()), data );
+                final Future<Boolean> backupResult = _storage.set( key, toMemcachedExpiration(session.getMemcachedExpirationTimeToSet()), data );
                 if ( !backupResult.get().booleanValue() ) {
                     _log.warn( "Update for secondary backup of session "+ session.getIdInternal() +" (after unsuccessful ping) did not return sucess." );
                 }
@@ -590,7 +590,7 @@ public abstract class LockingStrategy {
                     final String backupValidityKey = _sessionIdFormat.createBackupKey( _validityKey );
                     // fix for #88, along with the change in session.getMemcachedExpirationTimeToSet
                     final int expiration = _maxInactiveInterval <= 0 ? 0 : _maxInactiveInterval;
-                    _memcached.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
+                    _storage.set( backupValidityKey, toMemcachedExpiration(expiration), _validityData );
 
                 } catch( final RuntimeException e ) {
                     _log.info( "Could not store secondary backup of session " + _sessionId, e );
@@ -603,7 +603,7 @@ public abstract class LockingStrategy {
 
         private boolean pingSessionBackup( @Nonnull final String sessionId ) throws InterruptedException {
             final String key = _sessionIdFormat.createBackupKey( sessionId );
-            final Future<Boolean> touchResultFuture = _memcached.add( key, 1, 1 );
+            final Future<Boolean> touchResultFuture = _storage.add( key, 1, BYTE_1 );
             try {
                 final boolean touchResult = touchResultFuture.get(200, TimeUnit.MILLISECONDS);
                 if ( touchResult ) {

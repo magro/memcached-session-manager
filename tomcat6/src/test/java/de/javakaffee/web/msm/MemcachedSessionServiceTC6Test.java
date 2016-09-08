@@ -16,6 +16,7 @@
  */
 package de.javakaffee.web.msm;
 
+import de.javakaffee.web.msm.storage.MemcachedStorageClient;
 import net.spy.memcached.MemcachedClient;
 
 import org.apache.catalina.Context;
@@ -42,7 +43,7 @@ public class MemcachedSessionServiceTC6Test extends MemcachedSessionServiceTest 
 
     @Override
     protected void startInternal( final SessionManager manager, final MemcachedClient memcachedMock ) throws LifecycleException {
-        ((MemcachedBackupSessionManager)manager).startInternal( memcachedMock );
+        ((MemcachedBackupSessionManager)manager).startInternal( new MemcachedStorageClient(memcachedMock) );
     };
 
     @Override

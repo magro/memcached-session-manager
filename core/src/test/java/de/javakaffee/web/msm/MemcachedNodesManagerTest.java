@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -37,7 +38,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
 
 /**
  * Test for {@link MemcachedNodesManager}.
@@ -46,11 +47,11 @@ import de.javakaffee.web.msm.MemcachedNodesManager.MemcachedClientCallback;
  */
 public class MemcachedNodesManagerTest {
 
-	private MemcachedClientCallback _mcc;
+	private StorageClientCallback _mcc;
 
 	@BeforeMethod
 	public void beforeClass() {
-		_mcc = mock(MemcachedClientCallback.class);
+		_mcc = mock(StorageClientCallback.class);
 	}
 
 	@Test(expectedExceptions = IllegalArgumentException.class)
@@ -188,11 +189,11 @@ public class MemcachedNodesManagerTest {
 	}
 
     @Test
-    public void testGetNextAvailableNodeId() {
+    public void testGetNextAvailableNodeId() throws IOException {
         assertNull(createFor( "n1:localhost:11211", null, null, _mcc ).getNextAvailableNodeId("n1"));
         assertEquals(createFor( "n1:localhost:11211,n2:localhost:11212", null, null, _mcc ).getNextAvailableNodeId("n1"), "n2");
 
-        final MemcachedClientCallback mcc = mock(MemcachedClientCallback.class);
+        final StorageClientCallback mcc = mock(StorageClientCallback.class);
         when(mcc.get(anyString())).thenReturn(null);
         when(mcc.get(endsWith("n2"))).thenThrow(new OperationTimeoutException("SimulatedException"));
         assertNull(createFor( "n1:localhost:11211,n2:localhost:11212", null, null, mcc).getNextAvailableNodeId("n1"));
