@@ -3,7 +3,7 @@
 [![Build Status](https://jenkins.inoio.de/job/memcached-session-manager%20master/badge/icon)](https://jenkins.inoio.de/job/memcached-session-manager%20master/)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/de.javakaffee.msm/memcached-session-manager/badge.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22de.javakaffee.msm%22)
 
-memcached-session-manager is a tomcat session manager that keeps sessions in memcached, for highly available, scalable and fault tolerant web applications.
+memcached-session-manager is a tomcat session manager that keeps sessions in memcached or Redis, for highly available, scalable and fault tolerant web applications.
 It supports both sticky and non-sticky configurations, and is currently working with tomcat 6.x, 7.x and 8.x. For sticky sessions session failover (tomcat crash)
 is supported, for non-sticky sessions this is the default (a session is served by default by different tomcats for different requests).
 Also memcached failover (memcached crash) is supported via migration of sessions. There shall also be no single point of failure, so when a memcached fails
@@ -11,6 +11,7 @@ the session will not be lost (but either be available in tomcat or in another me
 
 ## Installation and Configuration
 Basically you must put the spymemcached jar and the memcached-session-manager jars into tomcat's lib folder.
+If you want to use Redis instead of memcached, you need the jar of the Redis client "jedis" instead.
 Additionally you must set the Manager class and add some configuration attributes. This is described in detail in the
 [SetupAndConfiguration wiki page](https://github.com/magro/memcached-session-manager/wiki/SetupAndConfiguration).
 
