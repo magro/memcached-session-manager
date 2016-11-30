@@ -39,6 +39,14 @@ public class MemcachedClientFactory {
                 long maxReconnectDelay, Statistics statistics );
     }
 
+    static interface MyConnectionFactory {
+        ConnectionFactory createBinaryConnectionFactory(long operationTimeout,
+                                              long maxReconnectDelay, boolean isClientDynamicMode);
+
+        ConnectionFactory createDefaultConnectionFactory(long operationTimeout,
+                                            long maxReconnectDelay, boolean isClientDynamicMode);
+    }
+
     protected MemcachedClient createMemcachedClient(final MemcachedNodesManager memcachedNodesManager,
             final String memcachedProtocol, final String username, final String password, final long operationTimeout,
             final long maxReconnectDelay, final Statistics statistics ) {
@@ -67,9 +75,32 @@ public class MemcachedClientFactory {
         }
     }
 
+
+    protected MyConnectionFactory createMyConnectionFactory() {
+        try {
+            Class.forName("net.spy.memcached.ClientMode");
+            return  Class.forName("de.javakaffee.web.msm.AwsConnectionFactory").asSubclass(MyConnectionFactory.class).newInstance();
+        } catch (final ClassNotFoundException e) {
+            try {
+                return Class.forName("de.javakaffee.web.msm.SpyConnectionFactory").asSubclass(MyConnectionFactory.class).newInstance();
+            } catch (final Exception ex)
+            {
+                throw new RuntimeException(ex);
+            }
+        } catch (final Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
     protected ConnectionFactory createConnectionFactory(final MemcachedNodesManager memcachedNodesManager,
             final ConnectionType connectionType, final String memcachedProtocol, final String username, final String password, final long operationTimeout,
             final long maxReconnectDelay, final Statistics statistics ) {
+        boolean isClientDynamicMode = false;
+        if (memcachedNodesManager.getMemcachedNodes().contains(".cfg."))
+        {
+            isClientDynamicMode=true;
+        }
         if (PROTOCOL_BINARY.equals( memcachedProtocol )) {
             if (connectionType.isSASL()) {
                 final AuthDescriptor authDescriptor = new AuthDescriptor(new String[]{"PLAIN"}, new PlainCallbackHandler(username, password));
@@ -86,30 +117,13 @@ public class MemcachedClientFactory {
             else {
                 return memcachedNodesManager.isEncodeNodeIdInSessionId() ? new SuffixLocatorBinaryConnectionFactory( memcachedNodesManager,
                         memcachedNodesManager.getSessionIdFormat(),
-                        statistics, operationTimeout, maxReconnectDelay ) : new BinaryConnectionFactory() {
-                    @Override
-                    public long getOperationTimeout() {
-                        return operationTimeout;
-                    }
-                    @Override
-                    public long getMaxReconnectDelay() {
-                        return maxReconnectDelay;
-                    }
-                };
+                        statistics, operationTimeout, maxReconnectDelay ) :
+                        createMyConnectionFactory().createBinaryConnectionFactory(operationTimeout, maxReconnectDelay,isClientDynamicMode);
             }
         }
         return memcachedNodesManager.isEncodeNodeIdInSessionId()
                 ? new SuffixLocatorConnectionFactory( memcachedNodesManager, memcachedNodesManager.getSessionIdFormat(), statistics, operationTimeout, maxReconnectDelay )
-                : new DefaultConnectionFactory() {
-                    @Override
-                    public long getOperationTimeout() {
-                        return operationTimeout;
-                    }
-                    @Override
-                    public long getMaxReconnectDelay() {
-                        return maxReconnectDelay;
-                    }
-                };
+                :createMyConnectionFactory().createDefaultConnectionFactory(operationTimeout, maxReconnectDelay,isClientDynamicMode);
     }
 
     static class ConnectionType {
