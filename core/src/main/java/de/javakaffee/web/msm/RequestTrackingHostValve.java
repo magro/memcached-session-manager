@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -274,9 +275,13 @@ public abstract class RequestTrackingHostValve extends ValveBase {
     protected abstract String[] getSetCookieHeaders(final Response response);
 
     private void logDebugResponseCookie( final Response response ) {
-        final String header = response.getHeader("Set-Cookie");
-        if ( header != null && header.contains( _sessionCookieName ) ) {
-            _log.debug( "Request finished, with Set-Cookie header: " + header );
+        final Collection<String> headers = response.getHeaders("Set-Cookie");
+        if ( headers != null ) {
+            for (final String header : headers) {
+                if (header != null && header.contains(_sessionCookieName)) {
+                    _log.debug( "Request finished, with Set-Cookie header: " + header );
+                }
+            }
         }
     }
 
