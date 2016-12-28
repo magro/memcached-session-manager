@@ -213,9 +213,9 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<tomcat6-version>6.0.45</tomcat6-version>
-		<tomcat7-version>7.0.69</tomcat7-version>
-		<tomcat8-version>8.5.3</tomcat8-version>
+		<tomcat6-version>6.0.48</tomcat6-version>
+		<tomcat7-version>7.0.73</tomcat7-version>
+		<tomcat8-version>8.5.9</tomcat8-version>
 
 		<tomcat-version>${tomcat6-version}</tomcat-version>
 		<slf4j-version>1.7.15</slf4j-version>
