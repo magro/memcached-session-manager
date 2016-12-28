@@ -91,7 +91,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
                                           final String[] customConverterClassNames,
                                           final boolean copyCollectionsForSerialization) {
 
-        final KryoBuilder kryoBuilder = new KryoBuilder() {
+        KryoBuilder kryoBuilder = new KryoBuilder() {
             @Override
             protected Kryo createKryo(ClassResolver classResolver, ReferenceResolver referenceResolver, StreamFactory streamFactory) {
                 return KryoTranscoder.this.createKryo(classResolver, referenceResolver, streamFactory,
@@ -101,13 +101,14 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
 
         final List<KryoBuilderConfiguration> builderConfigs = load(KryoBuilderConfiguration.class, customConverterClassNames, classLoader);
         for(KryoBuilderConfiguration config : builderConfigs) {
-            config.configure(kryoBuilder);
+            kryoBuilder = config.configure(kryoBuilder);
         }
 
+        final KryoBuilder finalKryoBuilder = kryoBuilder;
         return new KryoFactory() {
             @Override
             public Kryo create() {
-                Kryo kryo = kryoBuilder.build();
+                Kryo kryo = finalKryoBuilder.build();
 
                 kryo.setDefaultSerializer(new KryoDefaultSerializerFactory.SerializerFactoryAdapter(_defaultSerializerFactory));
 
