@@ -40,12 +40,11 @@ public class KryoBuilder {
      * @return the configured {@link Kryo} instance.
      */
     public Kryo build() {
-        Kryo kryo = createKryo(
+        return createKryo(
                 classResolver != null ? classResolver : new DefaultClassResolver(),
                 referenceResolver != null ? referenceResolver : new MapReferenceResolver(),
                 streamFactory != null ? streamFactory : new DefaultStreamFactory()
         );
-        return kryo;
     }
 
     protected Kryo createKryo(ClassResolver classResolver, ReferenceResolver referenceResolver, StreamFactory streamFactory) {
@@ -65,7 +64,7 @@ public class KryoBuilder {
         return this;
     }
 
-    private Kryo buildFrom(KryoBuilder target) {
+    protected Kryo buildFrom(KryoBuilder target) {
         // we must transfer local fields to the target which creates the Kryo instance.
         // yes, it's a bit hackish, but if s.o. calls the same method twice with different arguments it's kind of bullshit in...
         if(target.classResolver == null) target.classResolver = classResolver;
@@ -78,7 +77,7 @@ public class KryoBuilder {
         return new KryoBuilder() {
             @Override
             public Kryo build() {
-                Kryo k = buildFrom(KryoBuilder.this);
+                Kryo k = this.buildFrom(KryoBuilder.this);
                 k.setRegistrationRequired(registrationRequired);
                 return k;
             }
@@ -89,7 +88,7 @@ public class KryoBuilder {
         return new KryoBuilder() {
             @Override
             public Kryo build() {
-                Kryo k = buildFrom(KryoBuilder.this);
+                Kryo k = this.buildFrom(KryoBuilder.this);
                 k.setInstantiatorStrategy(instantiatorStrategy);
                 return k;
             }
@@ -100,7 +99,7 @@ public class KryoBuilder {
         return new KryoBuilder() {
             @Override
             public Kryo build() {
-                Kryo k = buildFrom(KryoBuilder.this);
+                Kryo k = this.buildFrom(KryoBuilder.this);
                 k.setReferences(references);
                 return k;
             }
@@ -111,7 +110,7 @@ public class KryoBuilder {
         return new KryoBuilder() {
             @Override
             public Kryo build() {
-                Kryo k = buildFrom(KryoBuilder.this);
+                Kryo k = this.buildFrom(KryoBuilder.this);
                 kryoCustomization.customize(k);
                 return k;
             }
