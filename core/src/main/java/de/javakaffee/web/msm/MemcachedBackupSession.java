@@ -54,16 +54,16 @@ public class MemcachedBackupSession extends StandardSession {
 
     private static final long serialVersionUID = 1L;
 
-    // Indirection for this.attributes is needed for tomcat 8 support.
-    // While this class (today) is compiled against tomcat 7 where attributes is declared as Map,
-    // in later versions of tomcat 8 this was changed to ConcurrentMap. In consequence, accessing
-    // this.attributes results in "java.lang.NoSuchFieldError: attributes".
+    // Indirection for this.attributes is needed for support of different tomcat versions.
+    // While this class (today) is compiled against latest tomcat 7 where attributes is declared as ConcurrentMap,
+    // in earlier versions of tomcat this was Map.
+    // In consequence, accessing this.attributes might result in "java.lang.NoSuchFieldError: attributes".
     private static final AttributeAccessor attributeAccessor;
 
     static {
         try {
             final Field attributesField = StandardSession.class.getDeclaredField("attributes");
-            attributeAccessor = attributesField.getType() == ConcurrentMap.class
+            attributeAccessor = attributesField.getType() != ConcurrentMap.class
                     ? new AttributeAccessor() {
                         { attributesField.setAccessible(true); }
                         @Override
@@ -86,7 +86,7 @@ public class MemcachedBackupSession extends StandardSession {
                     : new AttributeAccessor() {
                         @Override
                         public ConcurrentMap<String, Object> get(MemcachedBackupSession session) {
-                            return (ConcurrentMap<String, Object>) session.attributes;
+                            return session.attributes;
                         }
                         @Override
                         public void set(MemcachedBackupSession session, ConcurrentMap<String, Object> attributes) {
