@@ -381,8 +381,12 @@ public abstract class LockingStrategy {
         _storage.delete( validityInfoKey );
 
         if (_storeSecondaryBackup) {
-            _storage.delete( _sessionIdFormat.createBackupKey( sessionId ) );
-            _storage.delete( _sessionIdFormat.createBackupKey( validityInfoKey ) );
+            try {
+                _storage.delete(_sessionIdFormat.createBackupKey(sessionId));
+                _storage.delete(_sessionIdFormat.createBackupKey(validityInfoKey));
+            } catch (Exception e) {
+                _log.info("Could not delete backup data for session " + sessionId + " (not critical, data will be evicted by memcached automatically).", e);
+            }
         }
 
         _stats.registerSince( NON_STICKY_AFTER_DELETE_FROM_MEMCACHED, start );

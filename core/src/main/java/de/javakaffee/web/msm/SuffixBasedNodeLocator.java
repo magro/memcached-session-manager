@@ -108,7 +108,7 @@ class SuffixBasedNodeLocator implements NodeLocator {
         if ( !_sessionIdFormat.isBackupKey( key ) ) {
             return nodeId;
         }
-        return _memcachedNodesManager.getNextAvailableNodeId( nodeId );
+        return _memcachedNodesManager.getNextPrimaryNodeId( nodeId );
     }
 
     /**
