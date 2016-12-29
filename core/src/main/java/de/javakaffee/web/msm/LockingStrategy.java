@@ -102,12 +102,12 @@ public abstract class LockingStrategy {
      */
     @CheckForNull
     public static LockingStrategy create( @Nullable final LockingMode lockingMode, @Nullable final Pattern uriPattern,
-            @Nonnull final StorageClient storage, @Nonnull final MemcachedSessionService manager,
+            @Nullable final StorageClient storage, @Nonnull final MemcachedSessionService manager,
             @Nonnull final MemcachedNodesManager memcachedNodesManager,
             @Nonnull final LRUCache<String, Boolean> missingSessionsCache, final boolean storeSecondaryBackup,
             @Nonnull final Statistics stats,
             @Nonnull final CurrentRequest currentRequest ) {
-        if ( lockingMode == null ) {
+        if ( lockingMode == null || storage == null ) {
             return null;
         }
         switch ( lockingMode ) {
