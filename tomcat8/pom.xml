@@ -3,7 +3,7 @@
 	<parent>
 		<groupId>de.javakaffee.msm</groupId>
 		<artifactId>memcached-session-manager-project</artifactId>
-		<version>2.0.1-SNAPSHOT</version>
+		<version>2.1.0</version>
 	</parent>
 
 	<artifactId>memcached-session-manager-tc8</artifactId>
