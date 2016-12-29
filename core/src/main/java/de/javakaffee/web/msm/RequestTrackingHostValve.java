@@ -275,7 +275,7 @@ public abstract class RequestTrackingHostValve extends ValveBase {
     protected abstract String[] getSetCookieHeaders(final Response response);
 
     private void logDebugResponseCookie( final Response response ) {
-        final Collection<String> headers = response.getHeaders("Set-Cookie");
+        final String[] headers = getSetCookieHeaders(response);
         if ( headers != null ) {
             for (final String header : headers) {
                 if (header != null && header.contains(_sessionCookieName)) {
