@@ -90,25 +90,23 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     private KryoFactory createKryoFactory(final ClassLoader classLoader,
                                           final String[] customConverterClassNames,
                                           final boolean copyCollectionsForSerialization) {
-
-        KryoBuilder kryoBuilder = new KryoBuilder() {
-            @Override
-            protected Kryo createKryo(ClassResolver classResolver, ReferenceResolver referenceResolver, StreamFactory streamFactory) {
-                return KryoTranscoder.this.createKryo(classResolver, referenceResolver, streamFactory,
-                        classLoader, customConverterClassNames, copyCollectionsForSerialization);
-            }
-        }.withInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
-
-        final List<KryoBuilderConfiguration> builderConfigs = load(KryoBuilderConfiguration.class, customConverterClassNames, classLoader);
-        for(KryoBuilderConfiguration config : builderConfigs) {
-            kryoBuilder = config.configure(kryoBuilder);
-        }
-
-        final KryoBuilder finalKryoBuilder = kryoBuilder;
         return new KryoFactory() {
             @Override
             public Kryo create() {
-                Kryo kryo = finalKryoBuilder.build();
+                KryoBuilder kryoBuilder = new KryoBuilder() {
+                    @Override
+                    protected Kryo createKryo(ClassResolver classResolver, ReferenceResolver referenceResolver, StreamFactory streamFactory) {
+                        return KryoTranscoder.this.createKryo(classResolver, referenceResolver, streamFactory,
+                                classLoader, customConverterClassNames, copyCollectionsForSerialization);
+                    }
+                }.withInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+
+                final List<KryoBuilderConfiguration> builderConfigs = load(KryoBuilderConfiguration.class, customConverterClassNames, classLoader);
+                for(KryoBuilderConfiguration config : builderConfigs) {
+                    kryoBuilder = config.configure(kryoBuilder);
+                }
+
+                Kryo kryo = kryoBuilder.build();
 
                 kryo.setDefaultSerializer(new KryoDefaultSerializerFactory.SerializerFactoryAdapter(_defaultSerializerFactory));
 
