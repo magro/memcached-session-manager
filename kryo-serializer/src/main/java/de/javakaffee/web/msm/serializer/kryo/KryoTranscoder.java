@@ -25,6 +25,8 @@ import de.javakaffee.kryoserializers.*;
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderDeserializationException;
+
+import org.apache.commons.io.IOUtils;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.objenesis.strategy.StdInstantiatorStrategy;
@@ -149,15 +151,15 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
             private final List<SerializerFactory> serializerFactories = load(SerializerFactory.class, customConverterClassNames, classLoader, this);
 
             @Override
-            @SuppressWarnings( { "rawtypes", "unchecked" } )
-            public Serializer getDefaultSerializer(final Class clazz) {
-                final Serializer customSerializer = loadCustomSerializer( clazz, serializerFactories );
+            @SuppressWarnings( { "rawtypes" } )
+            public Serializer<?> getDefaultSerializer(final Class clazz) {
+                final Serializer<?> customSerializer = loadCustomSerializer( clazz, serializerFactories );
                 if ( customSerializer != null ) {
                     return customSerializer;
                 }
                 if ( copyCollectionsForSerialization ) {
                     // could also be installed via addDefaultSerializer
-                    final Serializer copyCollectionSerializer = loadCopyCollectionSerializer( clazz );
+                    final Serializer<?> copyCollectionSerializer = loadCopyCollectionSerializer( clazz );
                     if ( copyCollectionSerializer != null ) {
                         return copyCollectionSerializer;
                     }
@@ -165,10 +167,10 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
                 return super.getDefaultSerializer( clazz );
             }
 
-            private Serializer loadCustomSerializer(final Class<?> clazz, List<SerializerFactory> serializerFactories) {
+            private Serializer<?> loadCustomSerializer(final Class<?> clazz, List<SerializerFactory> serializerFactories) {
                 if ( serializerFactories != null ) {
                     for (SerializerFactory serializerFactory : serializerFactories) {
-                        final Serializer serializer = serializerFactory.newSerializer(clazz);
+                        final Serializer<?> serializer = serializerFactory.newSerializer(clazz);
                         if (serializer != null) {
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("Loading custom serializer " + serializer.getClass().getName() + " for class " + clazz);
@@ -183,7 +185,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         };
     }
     
-    private Serializer loadCopyCollectionSerializer( final Class<?> clazz ) {
+    private Serializer<?> loadCopyCollectionSerializer( final Class<?> clazz ) {
         if ( Collection.class.isAssignableFrom( clazz ) ) {
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug( "Loading CopyForIterateCollectionSerializer for class " + clazz );
@@ -206,11 +208,15 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     @Override
     public ConcurrentMap<String, Object> deserializeAttributes(final byte[] data ) {
         final Kryo kryo = _kryoPool.borrow();
+        Input in = null;
         try {
-            return kryo.readObject(new Input(data), ConcurrentHashMap.class);
+            in = kryo.getStreamFactory().getInput(data);
+            return kryo.readObject(in, ConcurrentHashMap.class);
         } catch ( final RuntimeException e ) {
             throw new TranscoderDeserializationException( e );
         } finally {
+            IOUtils.closeQuietly(in);
+            kryo.reset();   // to be safe
             _kryoPool.release(kryo);
         }
     }
@@ -221,18 +227,25 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
     @Override
     public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
         final Kryo kryo = _kryoPool.borrow();
+        Output out = null;
         try {
             /**
              * Creates an ObjectStream with an initial buffer size of 50KB and a maximum size of 1000KB.
              */
-            Output out = new Output(_initialBufferSize, _maxBufferSize);
+            out = kryo.getStreamFactory().getOutput(_initialBufferSize, _maxBufferSize);
             kryo.writeObject(out, attributes);
             return out.toBytes();
         } catch ( final RuntimeException e ) {
             throw new TranscoderDeserializationException( e );
         } finally {
+            IOUtils.closeQuietly(out);
+            kryo.reset();   // to be safe
             _kryoPool.release(kryo);
         }
+    }
+
+    public KryoPool getKryoPool() {
+        return _kryoPool;
     }
 
     private <T> List<T> load( Class<T> type, final String[] customConverterClassNames, final ClassLoader classLoader) {
