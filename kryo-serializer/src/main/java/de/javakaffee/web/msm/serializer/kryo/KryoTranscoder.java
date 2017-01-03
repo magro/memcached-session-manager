@@ -26,11 +26,12 @@ import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.SessionAttributesTranscoder;
 import de.javakaffee.web.msm.TranscoderDeserializationException;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -215,7 +216,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         } catch ( final RuntimeException e ) {
             throw new TranscoderDeserializationException( e );
         } finally {
-            IOUtils.closeQuietly(in);
+            closeSilently(in);
             kryo.reset();   // to be safe
             _kryoPool.release(kryo);
         }
@@ -238,7 +239,7 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
         } catch ( final RuntimeException e ) {
             throw new TranscoderDeserializationException( e );
         } finally {
-            IOUtils.closeQuietly(out);
+            closeSilently(out);
             kryo.reset();   // to be safe
             _kryoPool.release(kryo);
         }
@@ -246,6 +247,16 @@ public class KryoTranscoder implements SessionAttributesTranscoder {
 
     public KryoPool getKryoPool() {
         return _kryoPool;
+    }
+
+    private void closeSilently( Closeable closeable ) {
+        if ( closeable != null ) {
+            try {
+                closeable.close();
+            } catch ( final IOException f ) {
+                // fail silently
+            }
+        }
     }
 
     private <T> List<T> load( Class<T> type, final String[] customConverterClassNames, final ClassLoader classLoader) {
