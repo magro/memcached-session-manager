@@ -1734,7 +1734,7 @@ public class MemcachedSessionService {
         _storage = storage;
     }
 
-    RequestTrackingHostValve getTrackingHostValve() {
+    public RequestTrackingHostValve getTrackingHostValve() {
         return _trackingHostValve;
     }
 

@@ -48,7 +48,10 @@ public class KryoBuilder {
     }
 
     protected Kryo createKryo(ClassResolver classResolver, ReferenceResolver referenceResolver, StreamFactory streamFactory) {
-        return new Kryo(classResolver, referenceResolver, streamFactory);
+        Kryo kryo = new Kryo(classResolver, referenceResolver, streamFactory);
+        // Maintain Kryo compatibility (pre version 4) - can turn this off by calling withOptimizedGenerics(false) 
+        kryo.getFieldSerializerConfig().setOptimizedGenerics(true);
+        return kryo;
     }
 
     public KryoBuilder withClassResolver(final ClassResolver classResolver) {
@@ -117,4 +120,14 @@ public class KryoBuilder {
         };
     }
     
+    public KryoBuilder withOptimizedGenerics(final boolean optimizedGenerics) {
+        return new KryoBuilder() {
+            @Override
+            public Kryo build() {
+                Kryo k = this.buildFrom(KryoBuilder.this);
+                k.getFieldSerializerConfig().setOptimizedGenerics(optimizedGenerics);
+                return k;
+            }
+        };
+    }
 }

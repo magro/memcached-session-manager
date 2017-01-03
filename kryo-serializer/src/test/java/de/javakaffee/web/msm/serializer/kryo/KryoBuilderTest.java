@@ -53,6 +53,7 @@ public class KryoBuilderTest {
 								.withInstantiatorStrategy(instantiatorStrategy)
 								.withRegistrationRequired(true) // Kryo default is false
 								.withReferences(false) // Kryo default is true
+								.withOptimizedGenerics(false)
 								.build();
 					}
 				} },
@@ -71,6 +72,7 @@ public class KryoBuilderTest {
 								.withInstantiatorStrategy(instantiatorStrategy)
 								.withRegistrationRequired(true) // Kryo default is false
 								.withReferences(false) // Kryo default is true
+								.withOptimizedGenerics(false)
 								.withKryoCustomization(enableAsm)
 								.withKryoCustomization(registerMyCollectionSerializer)
 								.build();
@@ -89,7 +91,7 @@ public class KryoBuilderTest {
 
 		KryoCustomization enableAsm = new KryoCustomization() {
 			@Override public void customize(Kryo kryo) {
-				kryo.setAsmEnabled(true); // Kryo default false
+				kryo.getFieldSerializerConfig().setUseAsm(true); // Kryo default false
 			}
 		};
 
@@ -108,8 +110,9 @@ public class KryoBuilderTest {
 		assertSame(kryo.getInstantiatorStrategy(), instantiatorStrategy);
 		assertTrue(kryo.isRegistrationRequired());
 		assertFalse(kryo.getReferences());
-		assertTrue(kryo.getAsmEnabled());
+		assertTrue(kryo.getFieldSerializerConfig().isUseAsm());
 		assertSame(kryo.getDefaultSerializer(Collection.class), collectionSerializer);
+		assertFalse(kryo.getFieldSerializerConfig().isOptimizedGenerics());
 	}
 
 	static abstract class BuildKryo {
