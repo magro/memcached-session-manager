@@ -17,7 +17,8 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -251,6 +252,7 @@ public abstract class RequestTrackingHostValve extends ValveBase {
         if (headers == null) {
             return null;
         }
+        List<String> sessionCookies = new ArrayList<String>(headers.length);
         for (final String header : headers) {
             if (header != null && header.contains(_sessionCookieName)) {
                 final String sessionIdPrefix = _sessionCookieName + "=";
@@ -263,9 +265,25 @@ public abstract class RequestTrackingHostValve extends ValveBase {
                 if (idxValueEnd == -1) {
                     idxValueEnd = header.length();
                 }
-                return header.substring(idxValueStart, idxValueEnd);
+                String result = header.substring(idxValueStart, idxValueEnd);
+
+                if(header.substring(idxValueEnd - 1).contains(sessionIdPrefix)) {
+                    _log.warn("Response contains Set-Cookie header with multiple "+ _sessionCookieName+" entries: " + header +
+                            ". Session handling might be negatively affected, you should investigate this.");
+                }
+
+                sessionCookies.add(result);
             }
         }
+
+        if (sessionCookies.size() == 1)
+            return sessionCookies.get(0);
+        else if (sessionCookies.size() > 1) {
+            _log.warn("Response contains multiple Set-Cookie headers with a "+ _sessionCookieName+", returning the first one from: " + sessionCookies.toString() +
+                    ". Session handling might be negatively affected, you should investigate this.");
+            return sessionCookies.get(0);
+        }
+
         return null;
     }
 
