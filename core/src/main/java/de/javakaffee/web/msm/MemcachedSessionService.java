@@ -575,7 +575,13 @@ public class MemcachedSessionService {
             // -> with container managed auth protected resources should not be ignored
             // TODO: check ignored resource also below
             if (!_sticky && !_trackingHostValve.isIgnoredRequest() && !isContainerSessionLookup()) {
-                result.registerReference();
+                synchronized (_manager.getSessionsInternal()) {
+                    // the session could have been removed in the meantime...
+                    if(_manager.getSessionInternal(id) == null) {
+                        addValidLoadedSession(result);
+                    }
+                    result.registerReference();
+                }
             }
         }
         else if ( canHitMemcached( id ) && _invalidSessionsCache.get( id ) == null ) {
