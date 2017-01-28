@@ -1,4 +1,4 @@
-The transcoder that uses kryo for serialization (http://code.google.com/p/kryo/). It requires kryo-serializers (http://github.com/magro/kryo-serializers).
+The transcoder that uses kryo for serialization (https://github.com/EsotericSoftware/kryo). It requires kryo-serializers (http://github.com/magro/kryo-serializers).
 
 == Custom Converter ==
 * de.javakaffee.web.msm.serializer.kryo.KryoCustomization: implement this if you want to register a Serializer for a known class (at start time)
