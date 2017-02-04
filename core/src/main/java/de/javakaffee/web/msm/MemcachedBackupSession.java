@@ -16,13 +16,6 @@
  */
 package de.javakaffee.web.msm;
 
-import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import org.apache.catalina.Manager;
-import org.apache.catalina.SessionListener;
-import org.apache.catalina.authenticator.Constants;
-import org.apache.catalina.session.StandardSession;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -34,6 +27,14 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
+
+import org.apache.catalina.Manager;
+import org.apache.catalina.SessionListener;
+import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.session.StandardSession;
+
+import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
 
 /**
  * The session class used by the {@link MemcachedSessionService}.
