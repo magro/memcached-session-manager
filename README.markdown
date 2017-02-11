@@ -1,7 +1,6 @@
 # memcached session manager
 
-[![Join the chat at https://gitter.im/memcached-session-manager/Lobby](https://badges.gitter.im/memcached-session-manager/Lobby.svg)](https://gitter.im/memcached-session-manager/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
+[![Join the chat at https://gitter.im/memcached-session-manager/Lobby](https://badges.gitter.im/memcached-session-manager/Lobby.svg)](https://gitter.im/memcached-session-manager/Lobby)
 [![Build Status](https://jenkins.inoio.de/job/memcached-session-manager%20master/badge/icon)](https://jenkins.inoio.de/job/memcached-session-manager%20master/)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/de.javakaffee.msm/memcached-session-manager/badge.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22de.javakaffee.msm%22)
 
