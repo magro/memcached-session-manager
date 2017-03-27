@@ -31,6 +31,7 @@ import de.javakaffee.web.msm.serializer.TestClasses.Address;
 import de.javakaffee.web.msm.serializer.TestClasses.Component;
 import de.javakaffee.web.msm.serializer.TestClasses.Person;
 import de.javakaffee.web.msm.serializer.TestClasses.Person.Gender;
+import de.javakaffee.web.msm.serializer.javalz4.JavaLZ4Transcoder;
 import de.javakaffee.web.msm.serializer.javolution.JavolutionTranscoder;
 import de.javakaffee.web.msm.serializer.kryo.KryoTranscoder;
 
@@ -67,6 +68,7 @@ serialized size is 70122 bytes.
         warmup( manager, new KryoTranscoder(), warmupCycles, 100, 3 );
         warmup( manager, new JavaSerializationTranscoder(), warmupCycles, 100, 3 );
         warmup( manager, new JavolutionTranscoder( Thread.currentThread().getContextClassLoader(), false ), warmupCycles, 100, 3 );
+        warmup( manager, new JavaLZ4Transcoder(null, false, 1, 0), warmupCycles, 100, 3 );
         recover();
 
         benchmark( manager, 10, 500, 4 /* 4^4 = 256 */ );
@@ -96,10 +98,18 @@ serialized size is 70122 bytes.
 
         recover();
         
+        final Stats javalz4SerStats = new Stats();
+        final Stats javalz4DeSerStats = new Stats();
+        benchmark( manager, new JavaLZ4Transcoder(null, false, 1, 0), javalz4SerStats,
+                javalz4DeSerStats, rounds, countPersons, nodesPerEdge );
+
+        recover();
+        
         System.out.println( "Serialization,Size,Ser-Min,Ser-Avg,Ser-Max,Deser-Min,Deser-Avg,Deser-Max");
         System.out.println( toCSV( "Java", javaSerStats, javaDeSerStats ) );
         System.out.println( toCSV( "Javolution", javolutionSerStats, javolutionDeSerStats ) );
         System.out.println( toCSV( "Kryo", kryoSerStats, kryoDeSerStats ) );
+        System.out.println( toCSV( "JavaLZ4", javalz4SerStats, javalz4DeSerStats ) );
     }
 
     private static String toCSV( final String name, final Stats serStats, final Stats deSerStats ) {

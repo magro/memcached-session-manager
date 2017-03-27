@@ -40,25 +40,15 @@ import java.util.concurrent.TimeUnit;
 import net.spy.memcached.MemcachedClient;
 
 /**
- * A simple benchmark for existing serialization strategies.
+ * A simple benchmark for existing serialization strategies with a memcache server
+ * to take in account the cost of the session size when writing and reeding.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @author ivolucas
  */
 public class BenchmarkWithMemcache {
 
-    /*
-     * 50000:
-     * -- JavaSerializationTranscoder --
-Serializing 1000 sessions took 156863 msec.
-serialized size is 59016 bytes.
--- JavolutionTranscoder --
-Serializing 1000 sessions took 251870 msec.
-serialized size is 138374 bytes.
--- KryoTranscoder --
-Serializing 1000 sessions took 154816 msec.
-serialized size is 70122 bytes.
 
-     */
     public static void main(final String[] args) throws InterruptedException, IOException {
 
         //Thread.sleep( 1000 );
@@ -144,7 +134,6 @@ serialized size is 70122 bytes.
         for (int r = 0; r < rounds; r++) {
 
             for (int i = 0; i < 500; i++) {
-                //TODO Add a timming or memcache server to take in account operations that are afected by the size of the session
                 long start = System.nanoTime();
                 byte[] sessionData = transcoderService.serialize(session);
                 serializationStats.registerSince(start);
