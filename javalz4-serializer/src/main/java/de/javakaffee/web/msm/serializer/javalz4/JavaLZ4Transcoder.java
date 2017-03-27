@@ -70,7 +70,6 @@ public class JavaLZ4Transcoder implements SessionAttributesTranscoder {
      * Constructor.
      *
      * @param classLoader
-     * @param compresser
      * @param retryActive
      * @param retryNumber
      * @param retryInterval
@@ -119,7 +118,7 @@ public class JavaLZ4Transcoder implements SessionAttributesTranscoder {
 
     private byte[] writeAttributes(final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes) throws IllegalArgumentException {
         ByteArrayOutputStream bos = null;
-        OutputStream gzs = null;
+        LZ4BlockOutputStream gzs = null;
         ObjectOutputStream oos = null;
         try {
             bos = new ByteArrayOutputStream();
