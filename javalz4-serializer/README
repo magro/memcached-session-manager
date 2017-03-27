@@ -1,0 +1,1 @@
+A serialization strategy for the memcached-session-manager (http://code.google.com/p/memcached-session-manager ) that uses native Java Serialization and uses LZ4 to reduce the size of the session
