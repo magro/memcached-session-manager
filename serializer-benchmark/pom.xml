@@ -57,6 +57,16 @@
 			<artifactId>msm-xstream-serializer</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+                <dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>msm-javalz4-serializer</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+                <dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>msm-javagzip-serializer</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>commons-lang</groupId>
 			<artifactId>commons-lang</artifactId>
