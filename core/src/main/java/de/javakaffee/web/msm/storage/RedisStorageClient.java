@@ -22,6 +22,8 @@ import org.apache.juli.logging.LogFactory;
 import redis.clients.jedis.BinaryJedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Queue;
 import java.util.concurrent.Callable;
@@ -30,22 +32,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import static java.lang.String.format;
+
 /**
  * Storage client backed by a Jedis client instance.
  */
 public class RedisStorageClient implements StorageClient {
     protected static final Log _log = LogFactory.getLog(RedisStorageClient.class);
 
-    private final String _host;
-    private final int _port;
-    private final boolean _ssl;
+    private final URI _uri;
     private final int _timeout;
     private final JedisPool _pool = new JedisPool();
     private final ExecutorService _executor = Executors.newCachedThreadPool(new NamedThreadFactory("msm-redis-client"));
 
     /**
      * Creates a <code>MemcachedStorageClient</code> instance which connects to the given Redis URL.
-     * 
+     *
      * @param redisUrl redis URL
      * @param operationTimeout the timeout to set for connection and socket timeout on the underlying jedis client.
      */
@@ -54,37 +56,31 @@ public class RedisStorageClient implements StorageClient {
             throw new NullPointerException("Param \"redisUrl\" may not be null");
         
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Creating RedisStorageClient with URL \"%s\"", redisUrl));
+            _log.debug(format("Creating RedisStorageClient with URL \"%s\"", redisUrl));
 
-        // Support a Redis URL in the form "redis://hostname:port" or "rediss://" (for SSL connections) like the client "Lettuce" does
-        if (!(redisUrl.startsWith("redis://") || redisUrl.startsWith("rediss://")))
-            throw new IllegalArgumentException("Redis URL must start with \"redis://\" or \"rediss://\"");
-        
-        _ssl = redisUrl.startsWith("rediss://");
-
-        String hostNamePort = redisUrl.substring(redisUrl.indexOf('/') + 2);
-        int pos = hostNamePort.indexOf(':');
-        if (pos != -1) {
-            _host = hostNamePort.substring(0, pos);
-            try {
-                _port = Integer.parseInt(hostNamePort.substring(pos + 1));
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Error parsing port number in Redis URL");
-            }
-        } else {
-            _host = hostNamePort;
-            _port = 6379;
+        try {
+            _uri = createURI(redisUrl);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException("Error parsing redisUrl", e);
         }
 
         // we just expect no practical problem here...
         _timeout = (int)operationTimeout;
     }
-    
+
+    URI createURI(String redisUrl) throws URISyntaxException {
+        URI uri = new URI(redisUrl);
+        // set default port 6379 unless specified.
+        if (uri.getPort() < 0)
+            uri = new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), 6379, uri.getPath(), uri.getQuery(), uri.getFragment());
+        return uri;
+    }
+
     @Override
     public Future<Boolean> add(final String key, final int exp, final byte[] o) {
         
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Adding key to Redis (key=%s, exp=%s, o=%s)", key, exp, o.getClass().getName()));
+            _log.debug(format("Adding key to Redis (key=%s, exp=%s, o=%s)", key, exp, o.getClass().getName()));
         
         return _executor.submit(new RedisCommandCallable<Boolean>() {
             private volatile boolean _setCompleted;
@@ -107,7 +103,7 @@ public class RedisStorageClient implements StorageClient {
     @Override
     public Future<Boolean> set(final String key, final int exp, final byte[] o) {
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Setting key in Redis (key=%s, exp=%s, o=%s)", key, exp, o.getClass().getName()));
+            _log.debug(format("Setting key in Redis (key=%s, exp=%s, o=%s)", key, exp, o.getClass().getName()));
         
         return _executor.submit(new RedisCommandCallable<Boolean>() {
             @Override protected Boolean execute(BinaryJedis jedis) throws Exception {
@@ -122,7 +118,7 @@ public class RedisStorageClient implements StorageClient {
     @Override
     public byte[] get(final String key) {
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Getting key from Redis (key=%s)", key));
+            _log.debug(format("Getting key from Redis (key=%s)", key));
         
         Callable<byte[]> callable = new RedisCommandCallable<byte[]>() {
             @Override protected byte[] execute(BinaryJedis jedis) throws Exception {
@@ -145,7 +141,7 @@ public class RedisStorageClient implements StorageClient {
     @Override
     public Future<Boolean> delete(final String key) {
         if (_log.isDebugEnabled())
-            _log.debug(String.format("Deleting key in Redis (key=%s)", key));
+            _log.debug(format("Deleting key in Redis (key=%s)", key));
 
         return _executor.submit(new RedisCommandCallable<Boolean>() {
             @Override protected Boolean execute(BinaryJedis jedis) throws Exception {
@@ -214,8 +210,8 @@ public class RedisStorageClient implements StorageClient {
             BinaryJedis res;
             if((res = _queue.poll()) == null) {
                 if (_log.isDebugEnabled()) {
-                    _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
-                            _host, _port, _ssl));
+                    _log.debug(format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
+                            _uri.getHost(), _uri.getPort(), _uri.getScheme().startsWith("rediss")));
                 }
                 return createJedisInstance();
             }
@@ -227,12 +223,12 @@ public class RedisStorageClient implements StorageClient {
                         res.ping();
 
                         if (_log.isTraceEnabled())
-                            _log.trace(String.format("Using known-good connection #%d", _queue.size()));
+                            _log.trace(format("Using known-good connection #%d", _queue.size()));
 
                         return res;
                     } catch (Exception e) {
                         if (_log.isDebugEnabled())
-                            _log.debug(String.format("Removing connection #%d since it cannot be pinged", _queue.size()));
+                            _log.debug(format("Removing connection #%d since it cannot be pinged", _queue.size()));
 
                         try { res.close(); } catch (Exception e2) { /* ignore */ }
                     }
@@ -240,14 +236,14 @@ public class RedisStorageClient implements StorageClient {
 
                 // No existing connections are good, so create new one
                 if (_log.isDebugEnabled()) {
-                    _log.debug(String.format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
-                            _host, _port, _ssl));
+                    _log.debug(format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
+                            _uri.getHost(), _uri.getPort(), _uri.getScheme().startsWith("rediss")));
                 }
 
                 return createJedisInstance();
             } else {
                 if (_log.isTraceEnabled())
-                    _log.trace(String.format("Using connection #%d", _queue.size()));
+                    _log.trace(format("Using connection #%d", _queue.size()));
 
                 return res;
             }
@@ -257,12 +253,12 @@ public class RedisStorageClient implements StorageClient {
             _queue.offer(instance);
 
             if (_log.isTraceEnabled())
-                _log.trace(String.format("Returned instance #%d", _queue.size()));
+                _log.trace(format("Returned instance #%d", _queue.size()));
         }
         
         public void shutdown() {
             if (_log.isDebugEnabled())
-                _log.debug(String.format("Closing %d Jedis instance(s)", _queue.size()));
+                _log.debug(format("Closing %d Jedis instance(s)", _queue.size()));
 
             BinaryJedis instance;
             while ((instance = _queue.poll()) != null) {
@@ -271,7 +267,10 @@ public class RedisStorageClient implements StorageClient {
         }
         
         private BinaryJedis createJedisInstance() {
-            return new BinaryJedis(_host, _port, _timeout, _ssl);
+            BinaryJedis binaryJedis = new BinaryJedis(_uri);
+            binaryJedis.getClient().setConnectionTimeout(_timeout);
+            binaryJedis.getClient().setSoTimeout(_timeout);
+            return binaryJedis;
         }
     }
 }

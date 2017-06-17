@@ -19,6 +19,8 @@ package de.javakaffee.web.msm.storage;
 import static org.testng.Assert.*;
 
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 
 import org.testng.annotations.*;
@@ -146,7 +148,27 @@ public class RedisStorageClientTest {
 
         client.shutdown();
     }
-    
+
+    @Test
+    public void testCreateUri01() throws Exception {
+        RedisStorageClient client = createClient();
+        URI uri = client.createURI("redis://user:pwd@localhost");
+        assertEquals(uri.getScheme(), "redis");
+        assertEquals(uri.getUserInfo(), "user:pwd");
+        assertEquals(uri.getHost(), "localhost");
+        assertTrue(uri.getPort() == 6379);
+
+        uri = client.createURI("rediss://:pwd@localhost:9999");
+        assertEquals(uri.getScheme(), "rediss");
+        assertEquals(uri.getUserInfo(), ":pwd");
+        assertTrue(uri.getPort() == 9999);
+
+        uri = client.createURI("redis://localhost");
+        assertEquals(uri.getScheme(), "redis");
+        assertNull(uri.getUserInfo());
+        assertTrue(uri.getPort() == 6379);
+    }
+
     private RedisStorageClient createClient() {
        return new RedisStorageClient("redis://localhost:" + redisPort, 1000);
     }
