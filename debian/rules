@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+DEB_JARS_BASE	:= /usr/share/java
+PKGNAME		:= memcached-session-manager
+
+build: build-stamp
+	mvn package -DskipTests=true
+build-stamp:
+	dh_testdir
+	touch build-stamp
+	mkdir -p build-tree
+
+clean:
+	dh_testdir
+	dh_testroot
+	mvn clean
+	rm -rf build-tree
+	rm -f build-stamp
+	dh_clean
+
+install:
+	dh_testdir
+	dh_testroot
+	dh_prep
+	cp core/target/${PKGNAME}*.jar build-tree
+	rm -f build-tree/${PKGNAME}*-tests.jar
+	cp lib/memcached-2.5.jar build-tree
+	dh_installdirs
+
+binary-indep: install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
+	dh_install
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep
+.PHONY: build clean binary-indep binary-arch binary install
+

@@ -1,0 +1,14 @@
+Source: memcached-session-manager
+Section: web
+Priority: optional
+Maintainer: Infra Dev <infra-dev@locaweb.com.br>
+Build-Depends: debhelper (>= 5.0.0), java6-sdk
+Build-Depends-Indep: 
+Standards-Version: 3.8.1
+Homepage: http://github.com/magro/memcached-session-manager
+
+Package: memcached-session-manager
+Architecture: all
+Depends: tomcat6, java6-sdk
+Description: Tomcat session manager that stores session data in memcached clusters.
+ It is useful for tomcat clusters session replication.

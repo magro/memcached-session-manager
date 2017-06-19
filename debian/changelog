@@ -1,0 +1,6 @@
+memcached-session-manager (1.5.0) stable; urgency=low
+
+  * Added debian packaging
+
+ -- Fabio Kung <fabio.kung@gmail.com>  Tue, 26 Jul 2011 10:15:00 -0300
+
