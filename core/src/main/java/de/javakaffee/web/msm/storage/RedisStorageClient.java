@@ -24,7 +24,6 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -163,7 +162,11 @@ public class RedisStorageClient implements StorageClient {
     }
     
     private static byte[] keyBytes(String key) {
-        return key.getBytes(StandardCharsets.UTF_8);
+        try {
+            return key.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
     }
     
     private abstract class RedisCommandCallable<T> implements Callable<T> {
