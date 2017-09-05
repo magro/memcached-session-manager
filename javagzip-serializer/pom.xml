@@ -7,71 +7,63 @@
 	</parent>
 
 	<groupId>de.javakaffee.msm</groupId>
-	<artifactId>msm-serializer-benchmark</artifactId>
-	<name>memcached-session-manager serializer-benchmark</name>
+	<artifactId>msm-javagzip-serializer</artifactId>
+	<name>memcached-session-manager javagzip-serializer</name>
 	<version>2.1.2-SNAPSHOT</version>
 	<packaging>jar</packaging>
-
-	<properties>
-		<tomcat-version>${tomcat7-version}</tomcat-version>
-	</properties>
 
 	<dependencies>
 		<dependency>
 			<groupId>de.javakaffee.msm</groupId>
 			<artifactId>memcached-session-manager</artifactId>
 			<version>${project.version}</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
-			<artifactId>tomcat-juli</artifactId>
+			<artifactId>juli</artifactId>
 			<version>${tomcat-version}</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
-			<artifactId>tomcat-coyote</artifactId>
+			<artifactId>coyote</artifactId>
 			<version>${tomcat-version}</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
-			<artifactId>tomcat-catalina</artifactId>
+			<artifactId>catalina</artifactId>
 			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+	
+
+        
+
+		<!-- use msm core test classes in tests -->
+		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
+		<dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
 		</dependency>
         <dependency>
             <groupId>de.javakaffee.msm</groupId>
             <artifactId>memcached-session-manager-tc7</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
-		<dependency>
-			<groupId>de.javakaffee.msm</groupId>
-			<artifactId>msm-kryo-serializer</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>de.javakaffee.msm</groupId>
-			<artifactId>msm-javolution-serializer</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>de.javakaffee.msm</groupId>
-			<artifactId>msm-xstream-serializer</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-                <dependency>
-			<groupId>de.javakaffee.msm</groupId>
-			<artifactId>msm-javalz4-serializer</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-                <dependency>
-			<groupId>de.javakaffee.msm</groupId>
-			<artifactId>msm-javagzip-serializer</artifactId>
-			<version>${project.version}</version>
-		</dependency>
 		<dependency>
 			<groupId>commons-lang</groupId>
 			<artifactId>commons-lang</artifactId>
 			<version>2.6</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+	
 
 </project>
