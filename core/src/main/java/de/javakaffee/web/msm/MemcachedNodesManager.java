@@ -81,6 +81,7 @@ public class MemcachedNodesManager {
     private final LinkedHashMap<InetSocketAddress, String> _address2Ids;
     private final boolean _encodeNodeIdInSessionId;
     private final StorageKeyFormat _storageKeyFormat;
+	private final String _redisMode;
     @Nullable
 	private NodeIdService _nodeIdService;
 	private SessionIdFormat _sessionIdFormat;
@@ -97,12 +98,13 @@ public class MemcachedNodesManager {
      */
 	public MemcachedNodesManager(final String memcachedNodes, @Nonnull final NodeIdList primaryNodeIds, @Nonnull final List<String> failoverNodeIds,
 			@Nonnull final LinkedHashMap<InetSocketAddress, String> address2Ids,
-			@Nullable final StorageKeyFormat storageKeyFormat, @Nullable final StorageClientCallback storageClientCallback) {
+			@Nullable final StorageKeyFormat storageKeyFormat, @Nullable final StorageClientCallback storageClientCallback, @Nonnull String redisMode) {
 		_memcachedNodes = memcachedNodes;
 		_primaryNodeIds = primaryNodeIds;
 		_failoverNodeIds = failoverNodeIds;
 		_address2Ids = address2Ids;
 		_storageKeyFormat = storageKeyFormat;
+		_redisMode = redisMode;
 
         _encodeNodeIdInSessionId = !((getCountNodes() <= 1 || isCouchbaseConfig(memcachedNodes)) && _primaryNodeIds.isEmpty());
 
@@ -180,7 +182,7 @@ public class MemcachedNodesManager {
 	 */
 	@Nonnull
     public static MemcachedNodesManager createFor(final String memcachedNodes, final String failoverNodes, final StorageKeyFormat storageKeyFormat,
-            final StorageClientCallback storageClientCallback) {
+            final StorageClientCallback storageClientCallback, final String redisMode) {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
 		}
@@ -189,7 +191,7 @@ public class MemcachedNodesManager {
 		if (memcachedNodes.startsWith("redis://") || memcachedNodes.startsWith("rediss://")) {
 		    // Redis configuration
 		    return new MemcachedNodesManager(memcachedNodes, new NodeIdList(), new ArrayList<String>(),
-		            new LinkedHashMap<InetSocketAddress, String>(), storageKeyFormat, storageClientCallback);
+		            new LinkedHashMap<InetSocketAddress, String>(), storageKeyFormat, storageClientCallback, redisMode);
 		}
 
         if ( !NODES_PATTERN.matcher( memcachedNodes ).matches() && !SINGLE_NODE_PATTERN.matcher(memcachedNodes).matches()
@@ -247,7 +249,7 @@ public class MemcachedNodesManager {
 	        }
         }
 
-        return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, storageKeyFormat, storageClientCallback);
+        return new MemcachedNodesManager(memcachedNodes, primaryNodeIds, failoverNodeIds, address2Ids, storageKeyFormat, storageClientCallback, redisMode);
 	}
 
     private static InetSocketAddress getSingleShortNodeDefinition(final Matcher singleNodeMatcher) {
@@ -569,4 +571,7 @@ public class MemcachedNodesManager {
         return result;
     }
 
+	public String getRedisMode() {
+		return _redisMode;
+	}
 }

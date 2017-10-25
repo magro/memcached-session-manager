@@ -627,6 +627,10 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         _msm.setStorageKeyPrefix(storageKeyPrefix);
     }
 
+    public void setRedisMode(final String redisMode) {
+        _msm.setRedisMode(redisMode);
+    }
+    
     /**
      * {@inheritDoc}
      */
