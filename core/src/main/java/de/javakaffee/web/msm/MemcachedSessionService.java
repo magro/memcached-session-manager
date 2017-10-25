@@ -434,7 +434,7 @@ public class MemcachedSessionService {
      * Initialize this manager.
      */
     void startInternal() throws LifecycleException {
-        _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
+        _log.info( MemcachedSessionService.class.getSimpleName() + " starts initialization... (configured" +
                 " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
 
         _statistics = Statistics.create( _enableStatistics );
@@ -460,13 +460,14 @@ public class MemcachedSessionService {
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                 _backupThreadCount, _storage, _memcachedNodesManager, _statistics );
 
-        _log.info( "--------\n- " + getClass().getSimpleName() + " finished initialization:" +
+        _log.info( "--------\n- " + MemcachedSessionService.class.getSimpleName() + " finished initialization:" +
                 "\n- sticky: "+ _sticky +
                 "\n- operation timeout: " + _operationTimeout +
                 "\n- node ids: " + _memcachedNodesManager.getPrimaryNodeIds() +
                 "\n- failover node ids: " + _memcachedNodesManager.getFailoverNodeIds() +
                 "\n- storage key prefix: " + _memcachedNodesManager.getStorageKeyFormat().prefix +
                 "\n- locking mode: " + _lockingMode + " (expiration: " + _lockExpiration + "s)" +
+                "\n- redis mode: " + _redisMode +
                 "\n--------");
 
     }
