@@ -54,14 +54,14 @@
 
 	<modules>
 		<module>core</module>
-		<module>tomcat6</module>
+<!-- 		<module>tomcat6</module> -->
 		<module>tomcat7</module>
 		<module>tomcat8</module>
-		<module>kryo-serializer</module>
+<!--		<module>kryo-serializer</module>
 		<module>javolution-serializer</module>
 		<module>xstream-serializer</module>
 		<module>flexjson-serializer</module>
-		<module>serializer-benchmark</module>
+		<module>serializer-benchmark</module>-->
 	</modules>
 
 	<build>
@@ -220,7 +220,7 @@
 		<tomcat-version>${tomcat6-version}</tomcat-version>
 		<slf4j-version>1.7.15</slf4j-version>
 		<hibernate-core-version>5.0.7.Final</hibernate-core-version>
-		<couchbasemock-version>0.5-69e953bd</couchbasemock-version>
+		<couchbasemock-version>0.5-SNAPSHOT</couchbasemock-version>
 	</properties>
 
 	<dependencyManagement>
