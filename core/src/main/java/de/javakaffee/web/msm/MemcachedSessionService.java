@@ -89,6 +89,9 @@ public class MemcachedSessionService {
      */
     protected static final String NEW_SESSION_ID = "msm.session.id";
 
+    public static final String REDIS_MODE_NORMAL = "normal";
+    public static final String REDIS_MODE_CLUSTER = "cluster";
+
     protected final Log _log = LogFactory.getLog( getClass() );
 
     // -------------------- configuration properties --------------------
@@ -193,6 +196,8 @@ public class MemcachedSessionService {
 
     private String _storageKeyPrefix = StorageKeyFormat.WEBAPP_VERSION;
 
+    private String _redisMode = REDIS_MODE_NORMAL;
+    
     // -------------------- END configuration properties --------------------
 
     protected Statistics _statistics;
@@ -429,7 +434,7 @@ public class MemcachedSessionService {
      * Initialize this manager.
      */
     void startInternal() throws LifecycleException {
-        _log.info( getClass().getSimpleName() + " starts initialization... (configured" +
+        _log.info( MemcachedSessionService.class.getSimpleName() + " starts initialization... (configured" +
                 " nodes definition " + _memcachedNodes + ", failover nodes " + _failoverNodes + ")" );
 
         _statistics = Statistics.create( _enableStatistics );
@@ -455,13 +460,14 @@ public class MemcachedSessionService {
         _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                 _backupThreadCount, _storage, _memcachedNodesManager, _statistics );
 
-        _log.info( "--------\n- " + getClass().getSimpleName() + " finished initialization:" +
+        _log.info( "--------\n- " + MemcachedSessionService.class.getSimpleName() + " finished initialization:" +
                 "\n- sticky: "+ _sticky +
                 "\n- operation timeout: " + _operationTimeout +
                 "\n- node ids: " + _memcachedNodesManager.getPrimaryNodeIds() +
                 "\n- failover node ids: " + _memcachedNodesManager.getFailoverNodeIds() +
                 "\n- storage key prefix: " + _memcachedNodesManager.getStorageKeyFormat().prefix +
                 "\n- locking mode: " + _lockingMode + " (expiration: " + _lockExpiration + "s)" +
+                "\n- redis mode: " + _redisMode +
                 "\n--------");
 
     }
@@ -492,7 +498,7 @@ public class MemcachedSessionService {
         final Context context = _manager.getContext();
         final String webappVersion = Reflections.invoke(context, "getWebappVersion", null);
         final StorageKeyFormat storageKeyFormat = StorageKeyFormat.of(_storageKeyPrefix, context.getParent().getName(), context.getName(), webappVersion);
-		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _storageClientCallback);
+		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _storageClientCallback, _redisMode);
 	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
@@ -1827,4 +1833,16 @@ public class MemcachedSessionService {
         _storageKeyPrefix = storageKeyPrefix;
     }
 
+	public String getRedisMode() {
+		return _redisMode;
+	}
+
+	public void setRedisMode(String redisMode) {
+        if ( !REDIS_MODE_NORMAL.equals( redisMode )
+                && !REDIS_MODE_CLUSTER.equals( redisMode ) ) {
+            _log.warn( "Illegal redisMode " + redisMode + ", using default (" + _redisMode + ")." );
+            return;
+        }
+		this._redisMode = redisMode;
+	}
 }
