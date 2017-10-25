@@ -17,6 +17,7 @@ package de.javakaffee.web.msm;
 
 import de.javakaffee.web.msm.storage.MemcachedStorageClient;
 import de.javakaffee.web.msm.storage.RedisClusterStorageClient;
+import de.javakaffee.web.msm.storage.RedisStorageClient;
 import de.javakaffee.web.msm.storage.StorageClient;
 import net.spy.memcached.BinaryConnectionFactory;
 import net.spy.memcached.ConnectionFactory;
@@ -35,6 +36,7 @@ import net.spy.memcached.auth.PlainCallbackHandler;
 public class StorageClientFactory {
 
     public static final String PROTOCOL_BINARY = "binary";
+    public static final String REDIS_MODE_CLUSTER = "cluster";
 
     static interface CouchbaseClientFactory {
         MemcachedClient createCouchbaseClient(MemcachedNodesManager memcachedNodesManager,
@@ -47,7 +49,11 @@ public class StorageClientFactory {
                                                 final long maxReconnectDelay, final Statistics statistics ) {
         try {
             if (memcachedNodesManager.isRedisConfig()) {
-                return new RedisClusterStorageClient(memcachedNodesManager.getMemcachedNodes(), operationTimeout);
+            	if(REDIS_MODE_CLUSTER.equals(memcachedNodesManager.getRedisMode())) {
+            		return new RedisClusterStorageClient(memcachedNodesManager.getMemcachedNodes(), operationTimeout);
+            	} else {
+            		return new RedisStorageClient(memcachedNodesManager.getMemcachedNodes(), operationTimeout);
+            	}
             }
             final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), username, password);
             if (connectionType.isCouchbaseBucketConfig()) {

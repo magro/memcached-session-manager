@@ -89,6 +89,9 @@ public class MemcachedSessionService {
      */
     protected static final String NEW_SESSION_ID = "msm.session.id";
 
+    public static final String REDIS_MODE_NORMAL = "normal";
+    public static final String REDIS_MODE_CLUSTER = "cluster";
+
     protected final Log _log = LogFactory.getLog( getClass() );
 
     // -------------------- configuration properties --------------------
@@ -193,6 +196,8 @@ public class MemcachedSessionService {
 
     private String _storageKeyPrefix = StorageKeyFormat.WEBAPP_VERSION;
 
+    private String _redisMode = REDIS_MODE_NORMAL;
+    
     // -------------------- END configuration properties --------------------
 
     protected Statistics _statistics;
@@ -492,7 +497,7 @@ public class MemcachedSessionService {
         final Context context = _manager.getContext();
         final String webappVersion = Reflections.invoke(context, "getWebappVersion", null);
         final StorageKeyFormat storageKeyFormat = StorageKeyFormat.of(_storageKeyPrefix, context.getParent().getName(), context.getName(), webappVersion);
-		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _storageClientCallback);
+		return MemcachedNodesManager.createFor( memcachedNodes, failoverNodes, storageKeyFormat, _storageClientCallback, _redisMode);
 	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
@@ -1827,4 +1832,16 @@ public class MemcachedSessionService {
         _storageKeyPrefix = storageKeyPrefix;
     }
 
+	public String getRedisMode() {
+		return _redisMode;
+	}
+
+	public void setRedisMode(String redisMode) {
+        if ( !REDIS_MODE_NORMAL.equals( redisMode )
+                && !REDIS_MODE_CLUSTER.equals( redisMode ) ) {
+            _log.warn( "Illegal redisMode " + redisMode + ", using default (" + _redisMode + ")." );
+            return;
+        }
+		this._redisMode = redisMode;
+	}
 }
