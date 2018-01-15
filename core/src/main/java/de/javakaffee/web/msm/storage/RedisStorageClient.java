@@ -20,7 +20,6 @@ import de.javakaffee.web.msm.NamedThreadFactory;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import redis.clients.jedis.BinaryJedis;
-import redis.clients.jedis.exceptions.JedisConnectionException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -178,11 +177,11 @@ public class RedisStorageClient implements StorageClient {
             try {
                 jedis = _pool.borrowInstance(false);
                 return execute(jedis);
-            } catch (JedisConnectionException e) {
-                // Connection error occurred with this Jedis connection, so now make sure to get a known-good one
-                // The old connection is not given back to the pool since it is defunct anyway
-                if (_log.isDebugEnabled())
-                    _log.debug("Connection error occurred, discarding Jedis connection: " + e.getMessage());
+            } catch (Exception e) {
+                // An error occurred with this Jedis connection, so now make sure to get a known-good one
+                // The old connection is not given back to the pool since it is assumed to be defunct anyway
+                if (_log.isErrorEnabled())
+                    _log.error("Redis connection error occurred, discarding Jedis instance", e);
 
                 if (jedis != null)
                     try { jedis.close(); } catch (Exception e2) { /* ignore */ }
@@ -209,9 +208,27 @@ public class RedisStorageClient implements StorageClient {
     private class JedisPool {
         private Queue<BinaryJedis> _queue = new ConcurrentLinkedQueue<BinaryJedis>();
 
-        public BinaryJedis borrowInstance(boolean knownGood) {
+        public BinaryJedis borrowInstance(boolean reinitializePool) {
+            if (reinitializePool) {
+                if (_log.isInfoEnabled())
+                    _log.info("Reinitializing Redis connection pool");
+                
+                // Shut down pool, effectively closing all connections
+                // Note that there is a chance that connections which are currently in use are still returned to the
+                // pool after the shutdown because of a race condition, but since we create a new instance below
+                // unconditionally we can at least be sure no operation will fail a second time
+                shutdown();
+                
+                if (_log.isDebugEnabled()) {
+                    _log.debug(format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) after reinitializing pool",
+                            _uri.getHost(), _uri.getPort(), _uri.getScheme().startsWith("rediss")));
+                }
+                return createJedisInstance();
+            }
+            
             BinaryJedis res;
-            if((res = _queue.poll()) == null) {
+
+            if ((res = _queue.poll()) == null) {
                 if (_log.isDebugEnabled()) {
                     _log.debug(format("Creating new Jedis instance (host=%s, port=%s, ssl=%s)",
                             _uri.getHost(), _uri.getPort(), _uri.getScheme().startsWith("rediss")));
@@ -219,37 +236,30 @@ public class RedisStorageClient implements StorageClient {
                 return createJedisInstance();
             }
 
-            if (knownGood) {
-                // Check all existing connections until we find a good one
-                do {
-                    try {
-                        res.ping();
+            // Check all existing connections until we find a good one
+            do {
+                try {
+                    res.ping();
 
-                        if (_log.isTraceEnabled())
-                            _log.trace(format("Using known-good connection #%d", _queue.size()));
+                    if (_log.isTraceEnabled())
+                        _log.trace(format("Using known-good connection #%d", _queue.size()));
 
-                        return res;
-                    } catch (Exception e) {
-                        if (_log.isDebugEnabled())
-                            _log.debug(format("Removing connection #%d since it cannot be pinged", _queue.size()));
+                    return res;
+                } catch (Exception e) {
+                    if (_log.isDebugEnabled())
+                        _log.debug(format("Removing connection #%d since it cannot be pinged", _queue.size()));
 
-                        try { res.close(); } catch (Exception e2) { /* ignore */ }
-                    }
-                } while ((res = _queue.poll()) != null);
-
-                // No existing connections are good, so create new one
-                if (_log.isDebugEnabled()) {
-                    _log.debug(format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
-                            _uri.getHost(), _uri.getPort(), _uri.getScheme().startsWith("rediss")));
+                    try { res.close(); } catch (Exception e2) { /* ignore */ }
                 }
+            } while ((res = _queue.poll()) != null);
 
-                return createJedisInstance();
-            } else {
-                if (_log.isTraceEnabled())
-                    _log.trace(format("Using connection #%d", _queue.size()));
-
-                return res;
+            // No existing connections are good, so create new one
+            if (_log.isDebugEnabled()) {
+                _log.debug(format("Creating new Jedis instance (host=%s, port=%s, ssl=%s) since all existing connections were bad",
+                        _uri.getHost(), _uri.getPort(), _uri.getScheme().startsWith("rediss")));
             }
+
+            return createJedisInstance();
         }
         
         public void returnInstance(BinaryJedis instance) {
