@@ -182,7 +182,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>findbugs-maven-plugin</artifactId>
-				<version>3.0.3</version>
+				<version>3.0.5</version>
 				<configuration>
 					<findbugsXmlOutput>true</findbugsXmlOutput>
 					<threshold>Normal</threshold> <!-- High|Normal|Low|Exp|Ignore -->
