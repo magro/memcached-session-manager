@@ -58,10 +58,10 @@
 		<module>tomcat7</module>
 		<module>tomcat8</module>
 		<module>kryo-serializer</module>
-		<module>javolution-serializer</module>
+		<!--module>javolution-serializer</module-->
 		<module>xstream-serializer</module>
 		<module>flexjson-serializer</module>
-		<module>serializer-benchmark</module>
+		<!--module>serializer-benchmark</module-->
 	</modules>
 
 	<build>
