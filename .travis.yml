@@ -5,7 +5,7 @@ jdk:
   - oraclejdk8
 
 script:
-  - mvn test -B -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SunLogger
+  - mvn test -Dsurefire.useFile=false -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SunLogger
 
 cache:
   directories:
