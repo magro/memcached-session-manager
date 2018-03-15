@@ -30,4 +30,11 @@ public class NonStickySessionsIntegrationTC8Test extends NonStickySessionsIntegr
     TestUtils<?> getTestUtils() {
         return new TestUtilsTC8();
     }
+
+    @Override
+    protected int getExpectedHitsForNoSessionAccess() {
+        // for testSessionNotLoadedForNoSessionAccess, see the comment there.
+        return 2;
+    }
+
 }
