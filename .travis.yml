@@ -4,6 +4,9 @@ jdk:
   - openjdk7
   - oraclejdk8
 
+script:
+  - mvn test -B -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SunLogger
+
 cache:
   directories:
     - $HOME/.m2
