@@ -58,7 +58,7 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.couchbase.mock</groupId>
+			<groupId>com.couchbase.mock</groupId>
 			<artifactId>CouchbaseMock</artifactId>
 			<version>${couchbasemock-version}</version>
 			<scope>test</scope>
