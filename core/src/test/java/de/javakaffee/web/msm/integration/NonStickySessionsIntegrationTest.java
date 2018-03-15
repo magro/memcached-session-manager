@@ -808,7 +808,7 @@ public abstract class NonStickySessionsIntegrationTest {
         // And we want to allow context level valves to access the session (issue #286), therefore we load the session even
         // if our context valve has not been passed (i.e. findSession is not directly triggered from the webapp).
         //
-        // For TC{6,8} there's no call from AuthenticatorBase, so there's only 1 hit (validity info)
+        // For TC{6,7,8} there's no call from AuthenticatorBase, so there's only 1 hit (validity info)
         assertEquals( _daemon1.getCache().getGetHits(), getExpectedHitsForNoSessionAccess());
     }
 
