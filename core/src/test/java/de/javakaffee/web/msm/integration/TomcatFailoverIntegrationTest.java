@@ -16,31 +16,7 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.integration.TestUtils.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-
-import net.spy.memcached.ConnectionFactory;
-import net.spy.memcached.DefaultConnectionFactory;
-import net.spy.memcached.MemcachedClient;
-
-import org.apache.http.HttpException;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
-
 import com.thimbleware.jmemcached.MemCacheDaemon;
-
 import de.javakaffee.web.msm.MemcachedBackupSession;
 import de.javakaffee.web.msm.MemcachedNodesManager;
 import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
@@ -53,6 +29,36 @@ import de.javakaffee.web.msm.integration.TestUtils.RecordingSessionActivationLis
 import de.javakaffee.web.msm.integration.TestUtils.Response;
 import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
 import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
+import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.DefaultConnectionFactory;
+import net.spy.memcached.MemcachedClient;
+import org.apache.http.HttpException;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+import org.hamcrest.CustomTypeSafeMatcher;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.concurrent.Callable;
+
+import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
+import static de.javakaffee.web.msm.integration.TestUtils.asMap;
+import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.get;
+import static de.javakaffee.web.msm.integration.TestUtils.loginWithForm;
+import static de.javakaffee.web.msm.integration.TestUtils.post;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 /**
  * Integration test testing tomcat failover (tomcats failing).
@@ -237,8 +243,12 @@ public abstract class TomcatFailoverIntegrationTest {
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, key, value ).getSessionId();
         assertEquals( format.extractJvmRoute( sessionId1 ), JVM_ROUTE_1 );
 
-        final Object session = _client.get( sessionId1 );
-        assertNotNull( session, "Session not found in memcached: " + sessionId1 );
+        await().until(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                return _client.get( sessionId1 );
+            }
+        }, notNullValue() );
 
         final Response response = get( _httpClient, TC_PORT_2, sessionId1 );
         final String sessionId2 = response.getSessionId();
@@ -455,11 +465,22 @@ public abstract class TomcatFailoverIntegrationTest {
         assertEquals(_daemon2.getCache().getCurrentItems(), 1);
 
         // failover simulation, just request the session from tomcat2
-        final Response response = get( _httpClient, TC_PORT_2, sessionId1 );
-        final String sessionId2 = response.getSessionId();
-        assertEquals( format.extractMemcachedId( sessionId2 ), "n1" );
+		Response response = await().until(new Callable<Response>() {
+			@Override
+			public Response call() throws Exception {
+				return get(_httpClient, TC_PORT_2, sessionId1);
+			}
+		}, new CustomTypeSafeMatcher<Response>("session id should contain 'n1'") {
+			@Override
+			public boolean matchesSafely(Response response) {
+				final String sessionId2 = response.getSessionId();
+				return format.extractMemcachedId(sessionId2).equals("n1");
+			}
+		});
+
         assertEquals(_daemon.getCache().getCurrentItems(), 1);
 
+		final String sessionId2 = response.getSessionId();
         assertEquals( format.stripJvmRoute( sessionId1 ).replaceAll("n2", "n1"), format.stripJvmRoute( sessionId2 ) );
 
         /* check session attributes could be read
