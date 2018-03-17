@@ -20,6 +20,7 @@ import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static de.javakaffee.web.msm.integration.TestUtils.createContext;
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
@@ -382,7 +383,9 @@ public abstract class MemcachedSessionServiceTest {
 
             // As the backup is done asynchronously, we shutdown the executor so that we know the backup
             // task is executed/finished.
-            _service.getLockingStrategy().getExecutorService().shutdown();
+            ExecutorService executorService = _service.getLockingStrategy().getExecutorService();
+            executorService.shutdown();
+            executorService.awaitTermination(1, SECONDS);
 
             // On windows we need to wait a little bit so that the tasks _really_ have finished (not needed on linux)
             Thread.sleep(15);

@@ -16,27 +16,20 @@
  */
 package de.javakaffee.web.msm;
 
-import static de.javakaffee.web.msm.integration.TestServlet.PARAM_REMOVE;
-import static de.javakaffee.web.msm.integration.TestServlet.PATH_INVALIDATE;
-import static de.javakaffee.web.msm.integration.TestUtils.*;
-import static org.testng.Assert.*;
-
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import javax.annotation.Nonnull;
-
+import com.thimbleware.jmemcached.MemCacheDaemon;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.integration.TestServlet;
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtils.Predicates;
+import de.javakaffee.web.msm.integration.TestUtils.Response;
+import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
+import de.javakaffee.web.msm.integration.TomcatBuilder;
+import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.MemcachedClientIF;
-
 import org.apache.catalina.Container;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Session;
@@ -48,17 +41,34 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import com.thimbleware.jmemcached.MemCacheDaemon;
+import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.integration.TestServlet;
-import de.javakaffee.web.msm.integration.TestUtils;
-import de.javakaffee.web.msm.integration.TestUtils.Predicates;
-import de.javakaffee.web.msm.integration.TestUtils.Response;
-import de.javakaffee.web.msm.integration.TestUtils.SessionAffinityMode;
-import de.javakaffee.web.msm.integration.TomcatBuilder;
-import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
+import static de.javakaffee.web.msm.integration.TestServlet.PARAM_REMOVE;
+import static de.javakaffee.web.msm.integration.TestServlet.PATH_INVALIDATE;
+import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
+import static de.javakaffee.web.msm.integration.TestUtils.asMap;
+import static de.javakaffee.web.msm.integration.TestUtils.assertWaitingWithProxy;
+import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.get;
+import static de.javakaffee.web.msm.integration.TestUtils.makeRequest;
+import static de.javakaffee.web.msm.integration.TestUtils.post;
+import static de.javakaffee.web.msm.integration.TestUtils.waitForReconnect;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.Matchers.nullValue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 /**
  * Integration test testing basic session manager functionality.
@@ -329,11 +339,16 @@ public abstract class MemcachedSessionManagerIntegrationTest {
 
         final Response response = get( _httpClient, _portTomcat1, PATH_INVALIDATE, sessionId1 );
         assertNull( response.getResponseSessionId() );
-        assertEquals(_daemon.getCache().getGetMisses(), 1); // 1 is ok
 
         assertNull( _memcached.get( sessionId1 ), "Invalidated session still existing in memcached" );
         if(!sessionAffinity.isSticky()) {
-            assertNull( _memcached.get(new SessionIdFormat().createValidityInfoKeyName( sessionId1 )), "ValidityInfo for invalidated session still exists in memcached." );
+            // Check that ValidityInfo for invalidated session does not exist in memcached
+			await().until(new Callable<Object>() {
+				@Override
+				public Object call() throws Exception {
+					return _memcached.get(new SessionIdFormat().createValidityInfoKeyName(sessionId1));
+				}
+			}, nullValue() );
         }
     }
 
