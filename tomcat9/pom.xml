@@ -1,0 +1,125 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>de.javakaffee.msm</groupId>
+		<artifactId>memcached-session-manager-project</artifactId>
+		<version>2.2.1-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>memcached-session-manager-tc9</artifactId>
+	<packaging>jar</packaging>
+	<name>memcached-session-manager tomcat9</name>
+	<description>The msm tomcat9 specific implementation.</description>
+
+	<properties>
+		<tomcat-version>${tomcat9-version}</tomcat-version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
+		<!-- Tomcat dependencies -->
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-servlet-api</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- JASPIC -->
+		<dependency>
+			<groupId>javax.security.auth.message</groupId>
+			<artifactId>javax.security.auth.message-api</artifactId>
+			<version>1.1</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-catalina</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-catalina-ha</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>tomcat-coyote</artifactId>
+			<version>${tomcat-version}</version>
+			<scope>provided</scope>
+		</dependency>
+        <dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>tomcat-jasper</artifactId>
+            <version>${tomcat-version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+		<!-- use msm core test classes in tests -->
+		<!-- see http://maven.apache.org/guides/mini/guide-attached-tests.htmlf -->
+		<dependency>
+			<groupId>de.javakaffee.msm</groupId>
+			<artifactId>memcached-session-manager</artifactId>
+			<version>${project.version}</version>
+			<!-- use classifier:tests, as type:test-jar creates a wrong classpath,
+			     see http://jira.codehaus.org/browse/MNG-5096 -->
+			<classifier>tests</classifier>
+			<scope>test</scope>
+		</dependency>
+		<!-- Mocks -->
+		<dependency>
+			<groupId>com.couchbase.mock</groupId>
+			<artifactId>CouchbaseMock</artifactId>
+			<version>${couchbasemock-version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Needed for membase via http -->
+		<dependency>
+			<groupId>org.codehaus.jettison</groupId>
+			<artifactId>jettison</artifactId>
+			<version>1.3</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+	
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+          			<source>1.7</source>
+          			<target>1.7</target>
+        		</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<profile>
+			<!-- tomcat9 requires java8, therefore we disable tests on java7 -->
+			<id>disable-tests-on-jdk7</id>
+			<activation>
+				<jdk>(,1.7]</jdk>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<skipTests>true</skipTests>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>

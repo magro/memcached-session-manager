@@ -57,6 +57,7 @@
 		<module>tomcat6</module>
 		<module>tomcat7</module>
 		<module>tomcat8</module>
+		<module>tomcat9</module>
 		<module>kryo-serializer</module>
 		<!--module>javolution-serializer</module-->
 		<module>xstream-serializer</module>
@@ -216,6 +217,7 @@
 		<tomcat6-version>6.0.53</tomcat6-version>
 		<tomcat7-version>7.0.85</tomcat7-version>
 		<tomcat8-version>8.5.29</tomcat8-version>
+		<tomcat9-version>9.0.6</tomcat9-version>
 
 		<tomcat-version>${tomcat6-version}</tomcat-version>
 		<slf4j-version>1.7.15</slf4j-version>
