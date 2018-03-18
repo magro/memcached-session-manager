@@ -19,6 +19,7 @@ package de.javakaffee.web.msm.integration;
 import static de.javakaffee.web.msm.integration.TestServlet.*;
 import static de.javakaffee.web.msm.integration.TestUtils.*;
 import static de.javakaffee.web.msm.integration.TestUtils.Predicates.equalTo;
+import static java.lang.System.currentTimeMillis;
 import static org.testng.Assert.*;
 
 import java.io.IOException;
@@ -443,7 +444,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         // now do it again, now in the background, and in parallel start another readonly request,
         // both should not block each other
-        final long start = System.currentTimeMillis();
+        final long start = currentTimeMillis();
         final Future<Response> response2 = _executor.submit( new Callable<Response>() {
             @Override
             public Response call() throws Exception {
@@ -458,7 +459,7 @@ public abstract class NonStickySessionsIntegrationTest {
         });
         response2.get();
         response3.get();
-        assertTrue ( ( System.currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
+        assertTrue ( ( currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
                 "The time for both requests should be less than 2 * the wait time if they don't block each other." );
         assertEquals( response2.get().getSessionId(), sessionId );
         assertEquals( response3.get().getSessionId(), sessionId );
@@ -495,7 +496,7 @@ public abstract class NonStickySessionsIntegrationTest {
         // that should lock the session
         final long timeToWaitInMillis = 500;
         final Map<String, String> paramsWait = asMap( PARAM_WAIT, "true", PARAM_MILLIS, String.valueOf( timeToWaitInMillis ) );
-        final long start = System.currentTimeMillis();
+        final long start = currentTimeMillis();
         final Future<Response> response2 = _executor.submit( new Callable<Response>() {
             @Override
             public Response call() throws Exception {
@@ -510,7 +511,7 @@ public abstract class NonStickySessionsIntegrationTest {
         });
         response2.get();
         response3.get();
-        assertTrue ( ( System.currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
+        assertTrue ( ( currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
                 "The time for both requests should be less than 2 * the wait time if they don't block each other." );
         assertEquals( response2.get().getSessionId(), sessionId );
         assertEquals( response3.get().getSessionId(), sessionId );
@@ -540,14 +541,15 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1.getManager().setMaxInactiveInterval( 1 );
         _tomcat1.getManager().setLockingMode( lockingMode, uriPattern, true );
 
+        long start = currentTimeMillis();
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
 
-        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId, "Wrong/new sessionId after " + (currentTimeMillis() - start) + " ms." );
         Thread.sleep( 500 );
-        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId, "Wrong/new sessionId after " + (currentTimeMillis() - start) + " ms." );
         Thread.sleep( 500 );
-        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId, "Wrong/new sessionId after " + (currentTimeMillis() - start) + " ms." );
 
     }
 
