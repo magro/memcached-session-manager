@@ -48,7 +48,7 @@ public class StorageClientFactory {
                                                 final long maxReconnectDelay, final Statistics statistics ) {
         try {
             if (memcachedNodesManager.isRedisConfig()) {
-                return new RedisStorageClient(memcachedNodesManager.getMemcachedNodes(), operationTimeout);
+                return new RedisStorageClient(memcachedNodesManager.getMemcachedNodes(), operationTimeout, password);
             }
             final ConnectionType connectionType = ConnectionType.valueOf(memcachedNodesManager.isCouchbaseBucketConfig(), username, password);
             if (connectionType.isCouchbaseBucketConfig()) {
