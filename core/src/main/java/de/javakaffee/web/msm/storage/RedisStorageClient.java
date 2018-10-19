@@ -41,6 +41,7 @@ public class RedisStorageClient implements StorageClient {
 
     private final URI _uri;
     private final int _timeout;
+    private final String _auth;
     private final JedisPool _pool = new JedisPool();
     private final ExecutorService _executor = Executors.newCachedThreadPool(new NamedThreadFactory("msm-redis-client"));
 
@@ -51,9 +52,20 @@ public class RedisStorageClient implements StorageClient {
      * @param operationTimeout the timeout to set for connection and socket timeout on the underlying jedis client.
      */
     public RedisStorageClient(String redisUrl, long operationTimeout) {
+        this(redisUrl, operationTimeout, null);
+    }
+
+    /**
+     * Creates a <code>MemcachedStorageClient</code> instance which connects to the given Redis URL with AUTH password.
+     *
+     * @param redisUrl redis URL
+     * @param operationTimeout the timeout to set for connection and socket timeout on the underlying jedis client.
+     * @param auth password
+     */
+    public RedisStorageClient(String redisUrl, long operationTimeout, String auth) {
         if (redisUrl == null)
             throw new NullPointerException("Param \"redisUrl\" may not be null");
-        
+
         if (_log.isDebugEnabled())
             _log.debug(format("Creating RedisStorageClient with URL \"%s\"", redisUrl));
 
@@ -65,6 +77,7 @@ public class RedisStorageClient implements StorageClient {
 
         // we just expect no practical problem here...
         _timeout = (int)operationTimeout;
+        _auth = auth;
     }
 
     URI createURI(String redisUrl) throws URISyntaxException {
@@ -271,6 +284,9 @@ public class RedisStorageClient implements StorageClient {
         
         private BinaryJedis createJedisInstance() {
             BinaryJedis binaryJedis = new BinaryJedis(_uri);
+            if(_auth != null && _auth.trim().length() > 0) {
+                binaryJedis.auth(_auth);
+            }
             binaryJedis.getClient().setConnectionTimeout(_timeout);
             binaryJedis.getClient().setSoTimeout(_timeout);
             return binaryJedis;
