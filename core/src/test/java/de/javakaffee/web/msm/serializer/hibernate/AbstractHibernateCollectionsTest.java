@@ -47,6 +47,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -198,7 +199,7 @@ public abstract class AbstractHibernateCollectionsTest {
 
     }
 
-    <T> T withSession( final Callback<T> callback ) {
+    private <T> T withSession(final Callback<T> callback) {
         final Session session = _sessionFactory.openSession();
         Transaction transaction = null;
         try {
@@ -212,7 +213,7 @@ public abstract class AbstractHibernateCollectionsTest {
             }
             throw new RuntimeException( e );
         } finally {
-            session.close();
+            try{ session.close(); } catch (Throwable t) { /* ignore */ }
         }
     }
 

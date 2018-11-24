@@ -215,14 +215,14 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<tomcat6-version>6.0.53</tomcat6-version>
-		<tomcat7-version>7.0.85</tomcat7-version>
-		<tomcat8-version>8.5.29</tomcat8-version>
-		<tomcat9-version>9.0.6</tomcat9-version>
+		<tomcat7-version>7.0.92</tomcat7-version>
+		<tomcat8-version>8.5.35</tomcat8-version>
+		<tomcat9-version>9.0.13</tomcat9-version>
 
 		<tomcat-version>${tomcat6-version}</tomcat-version>
-		<slf4j-version>1.7.15</slf4j-version>
-		<hibernate-core-version>5.0.7.Final</hibernate-core-version>
-		<couchbasemock-version>1.5.14</couchbasemock-version>
+		<slf4j-version>1.7.25</slf4j-version>
+		<hibernate-core-version>5.3.7.Final</hibernate-core-version>
+		<couchbasemock-version>1.5.19</couchbasemock-version>
 	</properties>
 
 	<dependencyManagement>
@@ -239,8 +239,6 @@
 				<version>${slf4j-version}</version>
 				<scope>test</scope>
 			</dependency>
-			<!-- dependency> <groupId>org.slf4j</groupId> <artifactId>slf4j</artifactId> 
-				<version>${slf4j-version}</version> </dependency -->
 			<!-- Testing -->
 			<dependency>
 				<groupId>com.thimbleware.jmemcached</groupId>
