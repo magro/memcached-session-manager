@@ -16,6 +16,13 @@
  */
 package de.javakaffee.web.msm;
 
+import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import org.apache.catalina.Manager;
+import org.apache.catalina.SessionListener;
+import org.apache.catalina.authenticator.Constants;
+import org.apache.catalina.session.StandardSession;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -28,13 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
 
-import org.apache.catalina.Manager;
-import org.apache.catalina.SessionListener;
-import org.apache.catalina.authenticator.Constants;
-import org.apache.catalina.session.StandardSession;
-
-import de.javakaffee.web.msm.MemcachedSessionService.LockStatus;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import static java.lang.Math.max;
 
 /**
  * The session class used by the {@link MemcachedSessionService}.
@@ -322,7 +323,10 @@ public class MemcachedBackupSession extends StandardSession {
          */
         final int timeIdle = Math.round( (float)timeIdleInMillis / 1000L );
         final int expirationTime = _lastMemcachedExpirationTime - timeIdle;
-        return expirationTime;
+        /* prevent negative expiration times.
+         * because 0 means no expiration at all, we use 1 as min value here
+         */
+        return max(1, expirationTime);
     }
 
     /**
