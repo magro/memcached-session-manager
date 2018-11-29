@@ -3,13 +3,13 @@
 	<parent>
 		<groupId>de.javakaffee.msm</groupId>
 		<artifactId>memcached-session-manager-project</artifactId>
-		<version>2.3.2</version>
+		<version>2.3.3-SNAPSHOT</version>
 	</parent>
 
 	<groupId>de.javakaffee.msm</groupId>
 	<artifactId>msm-flexjson-serializer</artifactId>
 	<name>memcached-session-manager flexjson-serializer</name>
-	<version>2.3.2</version>
+	<version>2.3.3-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<dependencies>
