@@ -57,7 +57,7 @@
 		<dependency>
 			<groupId>redis.clients</groupId>
 			<artifactId>jedis</artifactId>
-			<version>2.9.0</version>
+			<version>3.0.0</version>
 			<scope>compile</scope><!-- is needed without optional=true, because then the dep is missing in dependent modules (tests fail with CNFE) -->
 		</dependency>
         
