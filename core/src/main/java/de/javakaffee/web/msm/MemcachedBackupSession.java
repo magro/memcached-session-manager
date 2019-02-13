@@ -28,8 +28,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -594,13 +594,13 @@ public class MemcachedBackupSession extends StandardSession {
         }
         final Pattern pattern = ((SessionManager)manager).getMemcachedSessionService().getSessionAttributePattern();
         final ConcurrentMap<String, Object> attributes = getAttributesInternal();
-        if ( pattern == null ) {
-            return attributes;
-        }
         final ConcurrentMap<String, Object> result = new ConcurrentHashMap<String, Object>( attributes.size() );
-        for ( final Map.Entry<String, Object> entry: attributes.entrySet() ) {
-            if ( pattern.matcher(entry.getKey()).matches() ) {
-                result.put( entry.getKey(), entry.getValue() );
+        // sort attributes
+        Object[] attributeKeys = attributes.keySet().toArray();
+        Arrays.sort(attributeKeys);
+        for ( Object attributeKey : attributeKeys ) {
+            if ( pattern == null || pattern.matcher((String )attributeKey).matches() ) {
+                result.put( (String )attributeKey, attributes.get(attributeKey) );
             }
         }
         return result;
