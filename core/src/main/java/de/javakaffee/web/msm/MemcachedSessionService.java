@@ -951,11 +951,17 @@ public class MemcachedSessionService {
         // if we didn't find the backup in the next node, let's go through other nodes
         // to see if the backup is there. For this we have to fake the session id so that
         // the SuffixBasedNodeLocator selects another backup node.
+
+        // to make sure the list is iterated only once, it's iterated less than primary node list size
+        int maxNodes = _memcachedNodesManager.getPrimaryNodeIds().size();
+        int count=1; // while starts if first loadBackupSession has failed
         while(result == null
                 && (nextNodeId = _memcachedNodesManager.getNextAvailableNodeId(nextNodeId)) != null
-                && !nextNodeId.equals(nodeId)) {
+                && !nextNodeId.equals(nodeId)
+                && count < maxNodes) {
             final String newSessionId = getSessionIdFormat().createNewSessionId(requestedSessionId, nextNodeId);
             result = loadBackupSession(newSessionId, newNodeId);
+            count++;
         }
 
         if ( result == null ) {
