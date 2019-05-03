@@ -16,28 +16,21 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import static de.javakaffee.web.msm.integration.TestServlet.*;
-import static de.javakaffee.web.msm.integration.TestUtils.*;
-import static de.javakaffee.web.msm.integration.TestUtils.Predicates.equalTo;
-import static org.testng.Assert.*;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.regex.Pattern;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
+import com.thimbleware.jmemcached.MemCacheDaemon;
+import de.javakaffee.web.msm.LockingStrategy.LockingMode;
+import de.javakaffee.web.msm.MemcachedNodesManager;
+import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
+import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
+import de.javakaffee.web.msm.NodeIdList;
+import de.javakaffee.web.msm.SessionIdFormat;
+import de.javakaffee.web.msm.Statistics;
+import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
+import de.javakaffee.web.msm.integration.TestUtils.LoginType;
+import de.javakaffee.web.msm.integration.TestUtils.Response;
+import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
+import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 import net.spy.memcached.MemcachedClient;
-
 import org.apache.http.HttpException;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.conn.scheme.PlainSocketFactory;
@@ -52,22 +45,48 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.thimbleware.jmemcached.MemCacheDaemon;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 
-import de.javakaffee.web.msm.LockingStrategy.LockingMode;
-import de.javakaffee.web.msm.MemcachedNodesManager;
-import de.javakaffee.web.msm.MemcachedNodesManager.StorageClientCallback;
-import de.javakaffee.web.msm.MemcachedSessionService.SessionManager;
-import de.javakaffee.web.msm.NodeIdList;
-import de.javakaffee.web.msm.SessionIdFormat;
-import de.javakaffee.web.msm.Statistics;
-import de.javakaffee.web.msm.SuffixLocatorConnectionFactory;
-import de.javakaffee.web.msm.integration.TestUtils.LoginType;
-import de.javakaffee.web.msm.integration.TestUtils.Response;
-import de.javakaffee.web.msm.integration.TestUtils.SessionTrackingMode;
-import de.javakaffee.web.msm.storage.MemcachedStorageClient.ByteArrayTranscoder;
-
-import edu.umd.cs.findbugs.annotations.SuppressWarnings;
+import static de.javakaffee.web.msm.integration.TestServlet.KEY_IS_REQUESTED_SESSION_ID_VALID;
+import static de.javakaffee.web.msm.integration.TestServlet.KEY_REQUESTED_SESSION_ID;
+import static de.javakaffee.web.msm.integration.TestServlet.PARAM_MILLIS;
+import static de.javakaffee.web.msm.integration.TestServlet.PARAM_WAIT;
+import static de.javakaffee.web.msm.integration.TestServlet.PATH_GET_REQUESTED_SESSION_INFO;
+import static de.javakaffee.web.msm.integration.TestServlet.PATH_INVALIDATE;
+import static de.javakaffee.web.msm.integration.TestServlet.PATH_NO_SESSION_ACCESS;
+import static de.javakaffee.web.msm.integration.TestServlet.PATH_WAIT;
+import static de.javakaffee.web.msm.integration.TestUtils.Predicates.equalTo;
+import static de.javakaffee.web.msm.integration.TestUtils.asMap;
+import static de.javakaffee.web.msm.integration.TestUtils.assertNotNullElementWaitingWithProxy;
+import static de.javakaffee.web.msm.integration.TestUtils.assertWaitingWithProxy;
+import static de.javakaffee.web.msm.integration.TestUtils.createDaemon;
+import static de.javakaffee.web.msm.integration.TestUtils.get;
+import static de.javakaffee.web.msm.integration.TestUtils.isRedirect;
+import static de.javakaffee.web.msm.integration.TestUtils.key;
+import static de.javakaffee.web.msm.integration.TestUtils.loginWithForm;
+import static de.javakaffee.web.msm.integration.TestUtils.post;
+import static de.javakaffee.web.msm.integration.TestUtils.waitForReconnect;
+import static java.lang.System.currentTimeMillis;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 /**
  * Integration test testing non-sticky sessions.
  *
@@ -152,7 +171,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
     @AfterMethod
     public void tearDown() throws Exception {
-        _client.shutdown();
+        _client.shutdown(10, SECONDS);
         _daemon1.stop();
         _daemon2.stop();
         if(_daemon3 != null && _daemon3.isRunning()) {
@@ -344,8 +363,12 @@ public abstract class NonStickySessionsIntegrationTest {
         final String sessionId1 = post( _httpClient, TC_PORT_1, null, key, value1 ).getSessionId();
         assertNotNull( sessionId1 );
 
-        final Object session = _client.get( sessionId1 );
-        assertNotNull( session, "Session not found in memcached: " + sessionId1 );
+        await("session exists in memcached").ignoreExceptions().until(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                return _client.get( sessionId1 );
+            }
+        }, notNullValue());
 
         /* We modify the stored value with the next request which is served by tc2
          */
@@ -443,7 +466,7 @@ public abstract class NonStickySessionsIntegrationTest {
 
         // now do it again, now in the background, and in parallel start another readonly request,
         // both should not block each other
-        final long start = System.currentTimeMillis();
+        final long start = currentTimeMillis();
         final Future<Response> response2 = _executor.submit( new Callable<Response>() {
             @Override
             public Response call() throws Exception {
@@ -458,7 +481,7 @@ public abstract class NonStickySessionsIntegrationTest {
         });
         response2.get();
         response3.get();
-        assertTrue ( ( System.currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
+        assertTrue ( ( currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
                 "The time for both requests should be less than 2 * the wait time if they don't block each other." );
         assertEquals( response2.get().getSessionId(), sessionId );
         assertEquals( response3.get().getSessionId(), sessionId );
@@ -495,7 +518,7 @@ public abstract class NonStickySessionsIntegrationTest {
         // that should lock the session
         final long timeToWaitInMillis = 500;
         final Map<String, String> paramsWait = asMap( PARAM_WAIT, "true", PARAM_MILLIS, String.valueOf( timeToWaitInMillis ) );
-        final long start = System.currentTimeMillis();
+        final long start = currentTimeMillis();
         final Future<Response> response2 = _executor.submit( new Callable<Response>() {
             @Override
             public Response call() throws Exception {
@@ -510,7 +533,7 @@ public abstract class NonStickySessionsIntegrationTest {
         });
         response2.get();
         response3.get();
-        assertTrue ( ( System.currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
+        assertTrue ( ( currentTimeMillis() - start ) < ( 2 * timeToWaitInMillis ),
                 "The time for both requests should be less than 2 * the wait time if they don't block each other." );
         assertEquals( response2.get().getSessionId(), sessionId );
         assertEquals( response3.get().getSessionId(), sessionId );
@@ -540,14 +563,15 @@ public abstract class NonStickySessionsIntegrationTest {
         _tomcat1.getManager().setMaxInactiveInterval( 1 );
         _tomcat1.getManager().setLockingMode( lockingMode, uriPattern, true );
 
+        long start = currentTimeMillis();
         final String sessionId = get( _httpClient, TC_PORT_1, null ).getSessionId();
         assertNotNull( sessionId );
 
-        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId, "Wrong/new sessionId after " + (currentTimeMillis() - start) + " ms." );
         Thread.sleep( 500 );
-        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId, "Wrong/new sessionId after " + (currentTimeMillis() - start) + " ms." );
         Thread.sleep( 500 );
-        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId );
+        assertEquals( get( _httpClient, TC_PORT_1, sessionId ).getSessionId(), sessionId, "Wrong/new sessionId after " + (currentTimeMillis() - start) + " ms." );
 
     }
 
@@ -808,7 +832,7 @@ public abstract class NonStickySessionsIntegrationTest {
         // And we want to allow context level valves to access the session (issue #286), therefore we load the session even
         // if our context valve has not been passed (i.e. findSession is not directly triggered from the webapp).
         //
-        // For TC{6,8} there's no call from AuthenticatorBase, so there's only 1 hit (validity info)
+        // For TC{6,7} there's no call from AuthenticatorBase, so there's only 1 hit (validity info)
         assertEquals( _daemon1.getCache().getGetHits(), getExpectedHitsForNoSessionAccess());
     }
 

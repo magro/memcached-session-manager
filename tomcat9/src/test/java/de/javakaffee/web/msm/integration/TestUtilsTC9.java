@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Martin Grotzke
+ * Copyright 2009 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,17 @@
  */
 package de.javakaffee.web.msm.integration;
 
-import org.testng.annotations.Test;
 
 /**
- * Integration test testing non-sticky sessions.
+ * Integration test utils impl for tomcat8.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
-@Test
-public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegrationTest {
-
-    @Override
-    TestUtils<?> getTestUtils() {
-        return new TestUtilsTC7();
-    }
+public class TestUtilsTC9 extends TestUtils<Tomcat9Builder> {
+	
+	@Override
+	public Tomcat9Builder tomcatBuilder() {
+		return new Tomcat9Builder();
+	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Martin Grotzke
+ * Copyright 2016 Markus Ellinger
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,24 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtilsTC9;
+
 /**
- * Integration test testing non-sticky sessions.
+ * Integration test testing session manager functionality with Redis.
  *
- * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @author <a href="mailto:markus@ellinger.it">Markus Ellinger</a>
  */
 @Test
-public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegrationTest {
+public class RedisIntegrationTC9Test extends RedisIntegrationTest {
 
     @Override
     TestUtils<?> getTestUtils() {
-        return new TestUtilsTC7();
+        return new TestUtilsTC9();
     }
 
 }

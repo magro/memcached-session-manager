@@ -20,6 +20,7 @@ import static de.javakaffee.web.msm.SessionValidityInfo.encode;
 import static de.javakaffee.web.msm.integration.TestUtils.STICKYNESS_PROVIDER;
 import static de.javakaffee.web.msm.integration.TestUtils.createContext;
 import static de.javakaffee.web.msm.integration.TestUtils.createSession;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
@@ -371,7 +372,7 @@ public abstract class MemcachedSessionServiceTest {
         session.setAttribute( "foo", "bar" );
         final String sessionId = session.getId();
 
-        _service.backupSession( sessionId, false, null ).get();
+        _service.backupSession( sessionId, false, "unused" ).get();
 
         verify( _memcachedMock, times( 1 ) ).set( eq( sessionId ), eq( 0 ), any(), any( Transcoder.class ) );
 
@@ -382,7 +383,9 @@ public abstract class MemcachedSessionServiceTest {
 
             // As the backup is done asynchronously, we shutdown the executor so that we know the backup
             // task is executed/finished.
-            _service.getLockingStrategy().getExecutorService().shutdown();
+            ExecutorService executorService = _service.getLockingStrategy().getExecutorService();
+            executorService.shutdown();
+            executorService.awaitTermination(1, SECONDS);
 
             // On windows we need to wait a little bit so that the tasks _really_ have finished (not needed on linux)
             Thread.sleep(15);
@@ -426,7 +429,7 @@ public abstract class MemcachedSessionServiceTest {
         when( futureMock.get( anyInt(), any( TimeUnit.class ) ) ).thenReturn( Boolean.FALSE );
         when( _memcachedMock.add( any( String.class ), anyInt(), any(), any( Transcoder.class ) ) ).thenReturn( futureMock );
 
-        _service.backupSession( sessionId, false, null ).get();
+        _service.backupSession( sessionId, false, "unused" ).get();
 
         // update validity info
         verify( _memcachedMock, times( 1 ) ).set( eq( validityKey ), eq( 0 ), any(), any( Transcoder.class ) );
@@ -563,7 +566,7 @@ public abstract class MemcachedSessionServiceTest {
         // the session is now already added to the internal session map
         assertNotNull(session.getId());
 
-        Future<BackupResult> result = _service.backupSession(session.getId(), false, null);
+        Future<BackupResult> result = _service.backupSession(session.getId(), false, "unused");
         assertFalse(_service.getManager().getSessionsInternal().containsKey(session.getId()));
 
         // start another request that loads the session from mc
@@ -594,7 +597,7 @@ public abstract class MemcachedSessionServiceTest {
                 // and wait again so that the other thread can do some work
                 barrier.await();
 
-                final Future<BackupResult> result = _service.backupSession(session.getId(), false, null);
+                final Future<BackupResult> result = _service.backupSession(session.getId(), false, "unused");
                 _service.getTrackingHostValve().resetRequestThreadLocal();
 
                 assertEquals(result.get().getStatus(), BackupResultStatus.SUCCESS);

@@ -24,11 +24,17 @@ import org.testng.annotations.Test;
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 @Test
-public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegrationTest {
+public class NonStickySessionsIntegrationTC9Test extends NonStickySessionsIntegrationTest {
 
     @Override
     TestUtils<?> getTestUtils() {
-        return new TestUtilsTC7();
+        return new TestUtilsTC9();
+    }
+
+    @Override
+    protected int getExpectedHitsForNoSessionAccess() {
+        // for testSessionNotLoadedForNoSessionAccess, see the comment there.
+        return 2;
     }
 
 }

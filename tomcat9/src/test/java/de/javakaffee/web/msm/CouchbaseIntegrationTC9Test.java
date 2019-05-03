@@ -14,21 +14,24 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtilsTC9;
+
 /**
- * Integration test testing non-sticky sessions.
+ * Integration test testing session manager functionality with membase.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
  */
 @Test
-public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegrationTest {
+public class CouchbaseIntegrationTC9Test extends CouchbaseIntegrationTest {
 
     @Override
     TestUtils<?> getTestUtils() {
-        return new TestUtilsTC7();
+        return new TestUtilsTC9();
     }
 
 }

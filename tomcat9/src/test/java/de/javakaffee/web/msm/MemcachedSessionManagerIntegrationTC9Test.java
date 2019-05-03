@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Martin Grotzke
+ * Copyright 2009 Martin Grotzke
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,25 @@
  * limitations under the License.
  *
  */
-package de.javakaffee.web.msm.integration;
+package de.javakaffee.web.msm;
 
 import org.testng.annotations.Test;
 
+import de.javakaffee.web.msm.integration.TestUtils;
+import de.javakaffee.web.msm.integration.TestUtilsTC9;
+
 /**
- * Integration test testing non-sticky sessions.
+ * Integration test testing basic session manager functionality.
  *
  * @author <a href="mailto:martin.grotzke@javakaffee.de">Martin Grotzke</a>
+ * @version $Id$
  */
 @Test
-public class NonStickySessionsIntegrationTC7Test extends NonStickySessionsIntegrationTest {
+public class MemcachedSessionManagerIntegrationTC9Test extends MemcachedSessionManagerIntegrationTest {
 
     @Override
     TestUtils<?> getTestUtils() {
-        return new TestUtilsTC7();
+        return new TestUtilsTC9();
     }
 
 }

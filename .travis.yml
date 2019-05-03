@@ -1,0 +1,15 @@
+language: java
+
+jdk:
+  - openjdk7
+  - oraclejdk8
+
+script:
+  - mvn test -Dsurefire.useFile=false -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SunLogger
+
+cache:
+  directories:
+    - $HOME/.m2
+
+# use container
+sudo: false

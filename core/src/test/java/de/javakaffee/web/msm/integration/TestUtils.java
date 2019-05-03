@@ -152,7 +152,6 @@ public abstract class TestUtils<T extends TomcatBuilder<?>> {
         params.put( LoginServlet.J_PASSWORD, TestUtils.PASSWORD );
         final Response tc1Response2 = post( client, tcPort, "/j_security_check", sessionId, params );
         assertEquals(tc1Response2.getSessionId(), sessionId);
-        new RuntimeException("err").printStackTrace();
         assertEquals( tc1Response2.get( TestServlet.ID ), sessionId );
 
         return tc1Response2.getSessionId();

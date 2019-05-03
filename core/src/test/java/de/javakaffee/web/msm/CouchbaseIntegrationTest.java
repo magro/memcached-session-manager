@@ -33,7 +33,7 @@ import net.spy.memcached.MemcachedClient;
 
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.couchbase.mock.CouchbaseMock;
+import com.couchbase.mock.CouchbaseMock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -52,7 +52,7 @@ public abstract class CouchbaseIntegrationTest {
 
     private static final Log LOG = LogFactory.getLog(CouchbaseIntegrationTest.class);
 
-    private final List<Pair<CouchbaseMock, Thread>> cluster = new ArrayList<Pair<CouchbaseMock,Thread>>(2);
+    private final List<CouchbaseMock> cluster = new ArrayList<CouchbaseMock>(2);
     private MemcachedClient mc;
 
     private TomcatBuilder<?> _tomcat1;
@@ -172,25 +172,22 @@ public abstract class CouchbaseIntegrationTest {
 
     private List<URI> getURIs() throws URISyntaxException {
         final List<URI> uris = new ArrayList<URI>(cluster.size());
-        for (final Pair<CouchbaseMock, Thread> server : cluster) {
-            uris.add(new URI("http://localhost:"+ server.getFirst().getHttpPort() +"/pools"));
+        for (final CouchbaseMock server : cluster) {
+            uris.add(new URI("http://localhost:"+ server.getHttpPort() +"/pools"));
         }
         return uris;
     }
 
-    private Pair<CouchbaseMock, Thread> setupCouchbase(final int couchbasePort) throws IOException {
+    private CouchbaseMock setupCouchbase(final int couchbasePort) throws IOException {
         final CouchbaseMock couchbase = new CouchbaseMock("localhost", couchbasePort, 1, 1);
-        couchbase.setRequiredHttpAuthorization(null);
-        final Thread thread = new Thread(couchbase);
-        thread.start();
-        return Pair.of(couchbase, thread);
+        // couchbase.setRequiredHttpAuthorization(null);
+        couchbase.start();
+        return couchbase;
     }
 
     private void tearDownCouchbase() throws InterruptedException {
-        for (final Pair<CouchbaseMock, Thread> server : cluster) {
-            server.getSecond().interrupt();
-            server.getSecond().join(1000);
-            server.getFirst().close();
+        for (final CouchbaseMock server : cluster) {
+            server.stop();
         }
         cluster.clear();
     }
@@ -201,12 +198,11 @@ public abstract class CouchbaseIntegrationTest {
             if(sb.length() > 1) sb.append(",");
             sb.append(uri.toString());
         }
-        final String couchbaseNodes = sb.toString();
-        return couchbaseNodes;
+        return sb.toString();
     }
 
     private int getMaxCouchbasePort() {
-        return cluster.get(cluster.size() - 1).getFirst().getHttpPort();
+        return cluster.get(cluster.size() - 1).getHttpPort();
     }
 
 }
