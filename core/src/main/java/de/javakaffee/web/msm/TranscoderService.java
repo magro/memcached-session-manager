@@ -148,6 +148,9 @@ public class TranscoderService {
      * @see de.javakaffee.web.msm.SessionAttributesTranscoder#serializeAttributes(MemcachedBackupSession, ConcurrentMap)
      */
     public byte[] serializeAttributes( final MemcachedBackupSession session, final ConcurrentMap<String, Object> attributes ) {
+    	if(LOG.isTraceEnabled()) {
+    		LOG.trace("Context Classloader - serialize: " + Thread.currentThread().getContextClassLoader());
+    	}
         return _attributesTranscoder.serializeAttributes( session, attributes );
     }
 
@@ -164,6 +167,9 @@ public class TranscoderService {
      * @see de.javakaffee.web.msm.SessionAttributesTranscoder#deserializeAttributes(byte[])
      */
     public ConcurrentMap<String, Object> deserializeAttributes(final byte[] data ) {
+    	if(LOG.isTraceEnabled()) {
+    		LOG.trace("Context Classloader - deserialize: " + Thread.currentThread().getContextClassLoader());
+    	}
         return _attributesTranscoder.deserializeAttributes( data );
     }
 

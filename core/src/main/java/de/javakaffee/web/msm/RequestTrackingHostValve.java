@@ -158,7 +158,25 @@ public abstract class RequestTrackingHostValve extends ValveBase {
                 getNext().invoke( request, response );
             } finally {
                 final Boolean sessionIdChanged = (Boolean) request.getNote(SESSION_ID_CHANGED);
-                backupSession( request, response, sessionIdChanged == null ? false : sessionIdChanged.booleanValue() );
+                
+                ClassLoader old = Thread.currentThread().getContextClassLoader(); 
+                //From org.apache.catalina.core.StandardHostValve.invoke(Request, Response)
+                // Bind the context CL to the current thread
+                if( _msmContext.getLoader() != null ) {
+                    // Not started - it should check for availability first
+                    // This should eventually move to Engine, it's generic.
+                    Thread.currentThread().setContextClassLoader
+                            (_msmContext.getLoader().getClassLoader());
+                }
+                try {
+                	backupSession( request, response, sessionIdChanged == null ? false : sessionIdChanged.booleanValue() );
+                }finally {
+                    // Restore the context classloader
+                	if(old!=null) {
+                		Thread.currentThread().setContextClassLoader(old);
+                	}
+                }
+                
                 resetRequestThreadLocal();
             }
 
