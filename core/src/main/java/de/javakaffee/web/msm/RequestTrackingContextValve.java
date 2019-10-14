@@ -17,6 +17,7 @@
 package de.javakaffee.web.msm;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
@@ -50,12 +51,6 @@ public class RequestTrackingContextValve extends ValveBase {
      * {@link MemcachedSessionService}.
      * @param sessionBackupService
      *            the service that actually backups sessions
-     * @param ignorePattern
-     *            the regular expression for request uris to ignore
-     * @param context
-     *            the catalina context of this valve
-     * @param statistics
-     *            used to store statistics
      */
     public RequestTrackingContextValve( @Nonnull final String sessionCookieName,
             @Nonnull final MemcachedSessionService sessionBackupService ) {
@@ -123,9 +118,22 @@ public class RequestTrackingContextValve extends ValveBase {
          */
         if ( request.getRequestedSessionId() != null ) {
 
-        	String newSessionId = _sessionBackupService.changeSessionIdOnTomcatFailover( request.getRequestedSessionId() );
+
+
+            String newSessionId = TimeoutExecutor.callWithTimeout(new Callable<String>() {
+                @Override
+                public String call() {
+                    return _sessionBackupService.changeSessionIdOnTomcatFailover(request.getRequestedSessionId());
+                }
+            }, TimeoutExecutor.DEFAULT_CALLABLE_TIMEOUT_MS, _log);
+
         	if ( newSessionId == null ) {
-                newSessionId = _sessionBackupService.changeSessionIdOnMemcachedFailover( request.getRequestedSessionId() );
+                newSessionId = TimeoutExecutor.callWithTimeout(new Callable<String>() {
+                    @Override
+                    public String call() {
+                        return _sessionBackupService.changeSessionIdOnMemcachedFailover( request.getRequestedSessionId() );
+                    }
+                }, TimeoutExecutor.DEFAULT_CALLABLE_TIMEOUT_MS, _log);
             }
 
             if ( newSessionId != null ) {

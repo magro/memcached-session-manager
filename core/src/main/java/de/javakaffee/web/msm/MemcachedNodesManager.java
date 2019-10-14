@@ -151,6 +151,9 @@ public class MemcachedNodesManager {
                 	storageClientCallback.get(_sessionIdFormat.createSessionId( "ping", key ) );
                     return true;
                 } catch ( final Exception e ) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("removing node due to exception.", e);
+                    }
                     return false;
                 }
             }
@@ -184,7 +187,7 @@ public class MemcachedNodesManager {
 		if ( memcachedNodes == null || memcachedNodes.trim().isEmpty() ) {
 			throw new IllegalArgumentException("null or empty memcachedNodes not allowed.");
 		}
-		
+
         // Support a Redis URL in the form "redis://hostname:port" or "rediss://" (for SSL connections) like the client "Lettuce" does
 		if (memcachedNodes.startsWith("redis://") || memcachedNodes.startsWith("rediss://")) {
 		    // Redis configuration
@@ -415,11 +418,11 @@ public class MemcachedNodesManager {
 		}
 	}
 
-    /**
-     * Determines, if the given nodeId is available.
-     * @param nodeId the node to check, not <code>null</code>.
-     * @return <code>true</code>, if the node is marked as available
-     */
+	/**
+	 * Determines, if the given nodeId is available.
+	 * @param nodeId the node to check, not <code>null</code>.
+	 * @return <code>true</code>, if the node is marked as available
+	 */
 	public boolean isNodeAvailable(final String nodeId) {
 		return _nodeIdService.isNodeAvailable(nodeId);
 	}
