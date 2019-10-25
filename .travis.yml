@@ -4,6 +4,11 @@ jdk:
   - openjdk7
   - oraclejdk8
 
+# needed for jdk8:
+# https://travis-ci.community/t/solved-oraclejdk8-installation-failing-still-again/3428
+# https://blog.travis-ci.com/2019-04-15-xenial-default-build-environment
+dist: trusty
+
 script:
   - mvn test -Dsurefire.useFile=false -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SunLogger
 
