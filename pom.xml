@@ -375,17 +375,17 @@
 		<repository>
 			<id>msm</id>
 			<name>msm repository</name>
-			<url>http://memcached-session-manager.googlecode.com/svn/maven</url>
+			<url>https://memcached-session-manager.googlecode.com/svn/maven</url>
 		</repository>
 		<repository>
 			<id>couchbase</id>
 			<name>Couchbase Repository</name>
-			<url>http://files.couchbase.com/maven2</url>
+			<url>https://files.couchbase.com/maven2</url>
 		</repository>
 		<repository>
 			<id>jboss</id>
 			<name>jboss Repository</name>
-			<url>http://repository.jboss.org/nexus/content/groups/public</url>
+			<url>https://repository.jboss.org/nexus/content/groups/public</url>
 		</repository>
 	</repositories>
 
