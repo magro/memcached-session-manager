@@ -22,7 +22,7 @@
 	</modules>
 
 	<properties>
-		<tomcat-version>7.0.91</tomcat-version>
+		<tomcat-version>7.0.107</tomcat-version>
 		<tomcat.port>9090</tomcat.port>
 	</properties>
 
