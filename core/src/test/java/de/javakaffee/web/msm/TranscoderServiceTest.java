@@ -110,8 +110,8 @@ public abstract class TranscoderServiceTest {
         final Principal saved = createPrincipal();
         session.setNote(Constants.FORM_PRINCIPAL_NOTE, saved);
 
-        final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager ).getSession();
+        final byte[] data = new TranscoderService(new JavaSerializationTranscoder()).serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = new TranscoderService(new JavaSerializationTranscoder()).deserializeSessionFields(data, _manager ).getSession();
 
         final Principal actual = (Principal) deserialized.getNote(Constants.FORM_PRINCIPAL_NOTE);
         assertNotNull(actual);
@@ -127,8 +127,8 @@ public abstract class TranscoderServiceTest {
         saved.setRequestURI("http://www.foo.org");
         session.setNote(Constants.FORM_REQUEST_NOTE, saved);
 
-        final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager ).getSession();
+        final byte[] data = new TranscoderService(new JavaSerializationTranscoder()).serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = new TranscoderService(new JavaSerializationTranscoder()).deserializeSessionFields(data, _manager ).getSession();
 
         final SavedRequest actual = (SavedRequest) deserialized.getNote(Constants.FORM_REQUEST_NOTE);
         assertNotNull(actual);
@@ -139,8 +139,8 @@ public abstract class TranscoderServiceTest {
     public void testVersionUpgrade() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
 
-        final byte[] data = TranscoderService.serializeSessionFields( session, TranscoderService.VERSION_1 );
-        final byte[] attributesData = TranscoderService.deserializeSessionFields(data, _manager ).getAttributesData();
+        final byte[] data = new TranscoderService(new JavaSerializationTranscoder()).serializeSessionFields( session, TranscoderService.VERSION_1 );
+        final byte[] attributesData = new TranscoderService(new JavaSerializationTranscoder()).deserializeSessionFields(data, _manager ).getAttributesData();
 
         // we just check that data is read (w/o) bounds issues and no data
         // is left (we just passed data in, w/o added attributesData appended)
@@ -151,8 +151,8 @@ public abstract class TranscoderServiceTest {
     public void testSerializeSessionFields() {
         final MemcachedBackupSession session = (MemcachedBackupSession) _manager.createSession( null );
         session.setLastBackupTime( System.currentTimeMillis() );
-        final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields(data, _manager ).getSession();
+        final byte[] data = new TranscoderService(new JavaSerializationTranscoder()).serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = new TranscoderService(new JavaSerializationTranscoder()).deserializeSessionFields(data, _manager ).getSession();
 
         assertSessionFields( session, deserialized );
     }
@@ -166,8 +166,8 @@ public abstract class TranscoderServiceTest {
 
         session.setLastBackupTime( System.currentTimeMillis() );
 
-        final byte[] data = TranscoderService.serializeSessionFields( session );
-        final MemcachedBackupSession deserialized = TranscoderService.deserializeSessionFields( data, _manager ).getSession();
+        final byte[] data = new TranscoderService(new JavaSerializationTranscoder()).serializeSessionFields( session );
+        final MemcachedBackupSession deserialized = new TranscoderService(new JavaSerializationTranscoder()).deserializeSessionFields( data, _manager ).getSession();
 
         assertSessionFields( session, deserialized );
     }

@@ -20,8 +20,8 @@ package de.javakaffee.web.msm;
 import static de.javakaffee.web.msm.Statistics.StatsType.*;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Map;
@@ -909,12 +909,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     @Override
-    public void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutputStream oos) throws IOException {
+    public void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutput oos) throws IOException {
         SerializablePrincipal.writePrincipal((GenericPrincipal) principal, oos );
     }
 
     @Override
-    public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
+    public Principal readPrincipal( final ObjectInput ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois );
     }
 

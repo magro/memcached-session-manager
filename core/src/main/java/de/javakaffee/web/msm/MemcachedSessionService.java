@@ -23,7 +23,9 @@ import static de.javakaffee.web.msm.Statistics.StatsType.LOAD_FROM_MEMCACHED;
 import static de.javakaffee.web.msm.Statistics.StatsType.SESSION_DESERIALIZATION;
 
 import java.io.IOException;
+import java.io.ObjectInput;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.security.Principal;
 import java.util.List;
@@ -160,6 +162,13 @@ public class MemcachedSessionService {
      * {@link JavaSerializationTranscoderFactory}.
      */
     private String _transcoderFactoryClassName = JavaSerializationTranscoderFactory.class.getName();
+    
+    /**
+     * The class name of the factory for
+     * {@link net.spy.memcached.transcoders.Transcoder}s. Default class name is
+     * {@link JavaSerializationTranscoderFactory}.
+     */
+    private String _objectIOFactoryClassName = DefaultObjectIOFactory.class.getName();
 
     /**
      * Specifies, if iterating over collection elements shall be done on a copy
@@ -222,6 +231,7 @@ public class MemcachedSessionService {
     protected TranscoderService _transcoderService;
 
     private TranscoderFactory _transcoderFactory;
+    private ObjectIOFactory _objectIOFactory;
 
     private BackupSessionService _backupSessionService;
 
@@ -339,7 +349,7 @@ public class MemcachedSessionService {
          * @param oos the output stream
          * @throws IOException expected to be declared by the implementation.
          */
-        void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutputStream oos) throws IOException;
+        void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutput oos) throws IOException;
 
         /**
          * Reads the Principal from the given OIS.
@@ -349,7 +359,7 @@ public class MemcachedSessionService {
          * @throws IOException expected to be declared by the implementation.
          */
         @Nonnull
-        Principal readPrincipal( @Nonnull ObjectInputStream ois ) throws ClassNotFoundException, IOException;
+        Principal readPrincipal( @Nonnull ObjectInput ois ) throws ClassNotFoundException, IOException;
 
         /**
          * Determines if the context has a security contraint with form based login.
@@ -496,7 +506,7 @@ public class MemcachedSessionService {
 	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
-        return new TranscoderService( getTranscoderFactory().createTranscoder( _manager ) );
+        return new TranscoderService( getTranscoderFactory().createTranscoder( _manager ), getObjectIOFactory().createObjectIOStrategy() );
     }
 
     protected TranscoderFactory getTranscoderFactory() {
@@ -509,6 +519,17 @@ public class MemcachedSessionService {
         }
         return _transcoderFactory;
     }
+    
+    protected ObjectIOFactory getObjectIOFactory() {
+      if ( _objectIOFactory == null ) {
+          try {
+          	_objectIOFactory = createObjectIOFactory();
+          } catch ( final Exception e ) {
+              throw new RuntimeException( "Could not create transcoder factory.", e );
+          }
+      }
+      return _objectIOFactory;
+  }
 
     protected StorageClient createStorageClient(final MemcachedNodesManager memcachedNodesManager,
 												final Statistics statistics ) {
@@ -523,7 +544,7 @@ public class MemcachedSessionService {
 
     private TranscoderFactory createTranscoderFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         _log.info( "Creating transcoder factory " + _transcoderFactoryClassName );
-        final Class<? extends TranscoderFactory> transcoderFactoryClass = loadTranscoderFactoryClass();
+        final Class<? extends TranscoderFactory> transcoderFactoryClass = loadFactoryClass(_transcoderFactoryClassName, _manager.getContainerClassLoader(), TranscoderFactory.class);
         final TranscoderFactory transcoderFactory = transcoderFactoryClass.newInstance();
         transcoderFactory.setCopyCollectionsForSerialization( _copyCollectionsForSerialization );
         if ( _customConverterClassNames != null ) {
@@ -532,18 +553,25 @@ public class MemcachedSessionService {
         }
         return transcoderFactory;
     }
+    
+    private ObjectIOFactory createObjectIOFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+      _log.info( "Creating objectIO factory " + _objectIOFactoryClassName );
+      final Class<? extends ObjectIOFactory> objectIOFactoryClass = loadFactoryClass(_objectIOFactoryClassName, _manager.getContainerClassLoader(), ObjectIOFactory.class);
+      final ObjectIOFactory objectIOFactory = objectIOFactoryClass.newInstance();
+      return objectIOFactory;
+  }
 
-    private Class<? extends TranscoderFactory> loadTranscoderFactoryClass() throws ClassNotFoundException {
-        Class<? extends TranscoderFactory> transcoderFactoryClass;
-        final ClassLoader classLoader = _manager.getContainerClassLoader();
+
+    private <T> Class<? extends T> loadFactoryClass(String className, ClassLoader classLoader, Class<T> factoryInterface) throws ClassNotFoundException {
+        Class<? extends T> factoryClass;
         try {
-            _log.debug( "Loading transcoder factory class " + _transcoderFactoryClassName + " using classloader " + classLoader );
-            transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, classLoader ).asSubclass( TranscoderFactory.class );
+            _log.debug( "Loading transcoder factory class " + className + " using classloader " + classLoader );
+            factoryClass = Class.forName( className, false, classLoader ).asSubclass(factoryInterface);
         } catch ( final ClassNotFoundException e ) {
             _log.info( "Could not load transcoderfactory class with classloader "+ classLoader +", trying " + getClass().getClassLoader() );
-            transcoderFactoryClass = Class.forName( _transcoderFactoryClassName, false, getClass().getClassLoader() ).asSubclass( TranscoderFactory.class );
+            factoryClass = Class.forName( className, false, getClass().getClassLoader() ).asSubclass( factoryInterface );
         }
-        return transcoderFactoryClass;
+        return factoryClass;
     }
 
     /**
