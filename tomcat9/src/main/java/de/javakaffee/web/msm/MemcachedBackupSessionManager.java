@@ -917,4 +917,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return result.toArray(new String[result.size()]);
     }
 
+    public String getObjectIOFactoryClassName() {
+			return _msm.getObjectIOFactoryClassName();
+		}
+
+		public void setObjectIOFactoryClassName(final String objectIOFactoryClassName) {
+			_msm.setObjectIOFactoryClassName(objectIOFactoryClassName);
+		}
 }

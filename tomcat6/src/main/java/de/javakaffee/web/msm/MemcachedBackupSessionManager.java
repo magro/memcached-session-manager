@@ -1120,4 +1120,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return response.getHeaderValues("Set-Cookie");
     }
 
+    public String getObjectIOFactoryClassName() {
+			return _msm.getObjectIOFactoryClassName();
+		}
+
+		public void setObjectIOFactoryClassName(final String objectIOFactoryClassName) {
+			_msm.setObjectIOFactoryClassName(objectIOFactoryClassName);
+		}
 }

@@ -162,15 +162,23 @@ public class MemcachedSessionService {
      * {@link JavaSerializationTranscoderFactory}.
      */
     private String _transcoderFactoryClassName = JavaSerializationTranscoderFactory.class.getName();
-    
+
     /**
      * The class name of the factory for
-     * {@link net.spy.memcached.transcoders.Transcoder}s. Default class name is
-     * {@link JavaSerializationTranscoderFactory}.
+     * {@link de.javakaffee.web.msm.ObjectIOFactory}s. Default class name is
+     * {@link de.javakaffee.web.msm.DefaultObjectIOFactory}.
      */
     private String _objectIOFactoryClassName = DefaultObjectIOFactory.class.getName();
 
-    /**
+    public String getObjectIOFactoryClassName() {
+			return _objectIOFactoryClassName;
+		}
+
+		public void setObjectIOFactoryClassName(final String objectIOFactoryClassName) {
+			this._objectIOFactoryClassName = objectIOFactoryClassName;
+		}
+
+		/**
      * Specifies, if iterating over collection elements shall be done on a copy
      * of the collection or on the collection itself.
      * <p>
@@ -305,8 +313,10 @@ public class MemcachedSessionService {
         String getString(final String key, final Object... args);
 
         boolean isMaxInactiveIntervalSet();
-        int getMaxInactiveInterval();
-        void setMaxInactiveInterval(int interval);
+        @Override
+				int getMaxInactiveInterval();
+        @Override
+				void setMaxInactiveInterval(int interval);
 
         int getMaxActiveSessions();
         void incrementSessionCounter();
@@ -427,11 +437,12 @@ public class MemcachedSessionService {
      * @param storage the storage client to use, for normal operations this should be <code>null</code>.
      */
     void startInternal( final StorageClient storage ) throws LifecycleException {
-        if (storage == null)
-            _storage = null;
-        else
-            _storage = storage;
-        
+        if (storage == null) {
+					_storage = null;
+				} else {
+					_storage = storage;
+				}
+
         startInternal();
     }
 
@@ -506,7 +517,7 @@ public class MemcachedSessionService {
 	}
 
     private TranscoderService createTranscoderService( final Statistics statistics ) {
-        return new TranscoderService( getTranscoderFactory().createTranscoder( _manager ), getObjectIOFactory().createObjectIOStrategy() );
+        return new TranscoderService( getTranscoderFactory().createTranscoder( _manager ), getObjectIOFactory().createObjectIOStrategy( _manager ) );
     }
 
     protected TranscoderFactory getTranscoderFactory() {
@@ -519,7 +530,7 @@ public class MemcachedSessionService {
         }
         return _transcoderFactory;
     }
-    
+
     protected ObjectIOFactory getObjectIOFactory() {
       if ( _objectIOFactory == null ) {
           try {
@@ -553,7 +564,7 @@ public class MemcachedSessionService {
         }
         return transcoderFactory;
     }
-    
+
     private ObjectIOFactory createObjectIOFactory() throws InstantiationException, IllegalAccessException, ClassNotFoundException {
       _log.info( "Creating objectIO factory " + _objectIOFactoryClassName );
       final Class<? extends ObjectIOFactory> objectIOFactoryClass = loadFactoryClass(_objectIOFactoryClassName, _manager.getContainerClassLoader(), ObjectIOFactory.class);
@@ -562,7 +573,7 @@ public class MemcachedSessionService {
   }
 
 
-    private <T> Class<? extends T> loadFactoryClass(String className, ClassLoader classLoader, Class<T> factoryInterface) throws ClassNotFoundException {
+    private <T> Class<? extends T> loadFactoryClass(final String className, final ClassLoader classLoader, final Class<T> factoryInterface) throws ClassNotFoundException {
         Class<? extends T> factoryClass;
         try {
             _log.debug( "Loading transcoder factory class " + className + " using classloader " + classLoader );
@@ -751,7 +762,7 @@ public class MemcachedSessionService {
             if ( _log.isDebugEnabled() ) {
                 _log.debug( "Remove session id  " + session.getId() + "  from _invalidSessionsCache, marking new session valid" );
             }
-            _invalidSessionsCache.remove(session.getId());            
+            _invalidSessionsCache.remove(session.getId());
         }
         return session;
 
@@ -998,15 +1009,17 @@ public class MemcachedSessionService {
         try {
             final SessionValidityInfo validityInfo = _lockingStrategy.loadBackupSessionValidityInfo( requestedSessionId );
             if ( validityInfo == null || !validityInfo.isValid() ) {
-                if(_log.isDebugEnabled())
-                    _log.debug( "No validity info (or no valid one) found for sessionId " + requestedSessionId );
+                if(_log.isDebugEnabled()) {
+									_log.debug( "No validity info (or no valid one) found for sessionId " + requestedSessionId );
+								}
                 return null;
             }
 
             final byte[] obj = _storage.get( getSessionIdFormat().createBackupKey( requestedSessionId ) );
             if ( obj == null ) {
-                if(_log.isDebugEnabled())
-                    _log.debug( "No backup found for sessionId " + requestedSessionId );
+                if(_log.isDebugEnabled()) {
+									_log.debug( "No backup found for sessionId " + requestedSessionId );
+								}
                 return null;
             }
 
@@ -1036,14 +1049,16 @@ public class MemcachedSessionService {
         if(!_sticky) {
             final MemcachedBackupSession msmSession = _manager.getSessionInternal( sessionId );
             if ( msmSession == null ) {
-                if(_log.isDebugEnabled())
-                    _log.debug( "No session found in session map for " + sessionId );
+                if(_log.isDebugEnabled()) {
+									_log.debug( "No session found in session map for " + sessionId );
+								}
                 return;
             }
 
             if ( !msmSession.isValidInternal() ) {
-                if(_log.isDebugEnabled())
-                    _log.debug( "Non valid session found in session map for " + sessionId );
+                if(_log.isDebugEnabled()) {
+									_log.debug( "Non valid session found in session map for " + sessionId );
+								}
                 return;
             }
 
@@ -1052,8 +1067,9 @@ public class MemcachedSessionService {
                 // we must not remove it as this would case session data loss
                 // for the other request
                 if ( msmSession.releaseReference() > 0 ) {
-                    if(_log.isDebugEnabled())
-                        _log.debug( "Session " + sessionId + " is still used by another request, skipping backup and (optional) lock handling/release." );
+                    if(_log.isDebugEnabled()) {
+											_log.debug( "Session " + sessionId + " is still used by another request, skipping backup and (optional) lock handling/release." );
+										}
                     return;
                 }
                 msmSession.passivate();
@@ -1090,8 +1106,9 @@ public class MemcachedSessionService {
 
         final MemcachedBackupSession msmSession = _manager.getSessionInternal( sessionId );
         if ( msmSession == null ) {
-            if(_log.isDebugEnabled())
-                _log.debug( "No session found in session map for " + sessionId );
+            if(_log.isDebugEnabled()) {
+							_log.debug( "No session found in session map for " + sessionId );
+						}
             if ( !_sticky ) {
                 // Issue 116/137: Only notify the lockingStrategy if the session was loaded and has not been removed/invalidated
                 if(!_invalidSessionsCache.containsKey(sessionId)) {
@@ -1102,8 +1119,9 @@ public class MemcachedSessionService {
         }
 
         if ( !msmSession.isValidInternal() ) {
-            if(_log.isDebugEnabled())
-                _log.debug( "Non valid session found in session map for " + sessionId );
+            if(_log.isDebugEnabled()) {
+							_log.debug( "Non valid session found in session map for " + sessionId );
+						}
             return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
         }
 
@@ -1113,8 +1131,9 @@ public class MemcachedSessionService {
                 // we must not remove it as this would case session data loss
                 // for the other request
                 if ( msmSession.releaseReference() > 0 ) {
-                    if(_log.isDebugEnabled())
-                        _log.debug( "Session " + sessionId + " is still used by another request, skipping backup and (optional) lock handling/release." );
+                    if(_log.isDebugEnabled()) {
+											_log.debug( "Session " + sessionId + " is still used by another request, skipping backup and (optional) lock handling/release." );
+										}
                     return new SimpleFuture<BackupResult>( BackupResult.SKIPPED );
                 }
                 msmSession.passivate();
@@ -1122,7 +1141,7 @@ public class MemcachedSessionService {
             }
         }
 
-        final boolean force = sessionIdChanged || msmSession.isSessionIdChanged() || !_sticky && (msmSession.getSecondsSinceLastBackup() >= msmSession.getMaxInactiveInterval());
+        final boolean force = sessionIdChanged || msmSession.isSessionIdChanged() || !_sticky && msmSession.getSecondsSinceLastBackup() >= msmSession.getMaxInactiveInterval();
         final Future<BackupResult> result = _backupSessionService.backupSession( msmSession, force );
 
         if ( !_sticky ) {
@@ -1256,7 +1275,7 @@ public class MemcachedSessionService {
     public String getMemcachedNodes() {
         return _memcachedNodes;
     }
-    
+
     private MemcachedNodesManager reloadMemcachedConfig( final String memcachedNodes, final String failoverNodes ) {
 
         /* first create all dependent services
@@ -1666,7 +1685,7 @@ public class MemcachedSessionService {
     public void setSessionBackupAsync( final boolean sessionBackupAsync ) {
         final boolean oldSessionBackupAsync = _sessionBackupAsync;
         _sessionBackupAsync = sessionBackupAsync;
-        if ( ( oldSessionBackupAsync != sessionBackupAsync ) && _manager.isInitialized() ) {
+        if ( oldSessionBackupAsync != sessionBackupAsync && _manager.isInitialized() ) {
             _log.info( "SessionBackupAsync was changed to " + sessionBackupAsync + ", creating new BackupSessionService with new configuration." );
             _backupSessionService = new BackupSessionService( _transcoderService, _sessionBackupAsync, _sessionBackupTimeout,
                     _backupThreadCount, _storage, _memcachedNodesManager, _statistics );

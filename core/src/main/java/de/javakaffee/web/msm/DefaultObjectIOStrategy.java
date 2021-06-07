@@ -9,14 +9,13 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 
 public class DefaultObjectIOStrategy implements ObjectIOStrategy {
-
 	@Override
-	public ObjectInput createObjectInput(InputStream is) throws IOException {
+	public ObjectInput createObjectInput(final InputStream is) throws IOException {
 		return new ObjectInputStream(is);
 	}
 
 	@Override
-	public ObjectOutput createObjectOutput(OutputStream os) throws IOException {
+	public ObjectOutput createObjectOutput(final OutputStream os) throws IOException {
 		return new ObjectOutputStream(os);
 	}
 }

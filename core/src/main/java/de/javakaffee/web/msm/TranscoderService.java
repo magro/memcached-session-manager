@@ -79,13 +79,13 @@ public class TranscoderService {
         _attributesTranscoder = attributesTranscoder;
         _objectIOStrategy = new DefaultObjectIOStrategy();
     }
-    
+
     /**
      * Creates a new {@link TranscoderService}.
      *
      * @param attributesTranscoder the {@link SessionAttributesTranscoder} strategy to use.
      */
-    public TranscoderService( final SessionAttributesTranscoder attributesTranscoder, ObjectIOStrategy objectIOStrategy) {
+    public TranscoderService( final SessionAttributesTranscoder attributesTranscoder, final ObjectIOStrategy objectIOStrategy) {
         _attributesTranscoder = attributesTranscoder;
         _objectIOStrategy = objectIOStrategy;
     }
@@ -512,7 +512,7 @@ public class TranscoderService {
         for ( int i = 0; i < maxBytes; i++ ) {
             final int pos = maxBytes - i - 1; // the position of the byte in the number
             final int idx = beginIndex + pos; // the index in the data array
-            data[idx] = (byte) ( ( num >> ( 8 * i ) ) & 0xff );
+            data[idx] = (byte) ( num >> 8 * i & 0xff );
         }
         return beginIndex + maxBytes;
     }
@@ -521,7 +521,7 @@ public class TranscoderService {
         long result = 0;
         for ( int i = 0; i < numBytes; i++ ) {
             final byte b = data[beginIndex + i];
-            result = ( result << 8 ) | ( b < 0
+            result = result << 8 | ( b < 0
                 ? 256 + b
                 : b );
         }
