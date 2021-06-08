@@ -22,8 +22,8 @@ import static de.javakaffee.web.msm.Statistics.StatsType.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Map;
@@ -1088,12 +1088,12 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
     }
 
     @Override
-    public void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutputStream oos) throws IOException {
+    public void writePrincipal( @Nonnull Principal principal, @Nonnull ObjectOutput oos) throws IOException {
         SerializablePrincipal.writePrincipal((GenericPrincipal) principal, oos );
     }
 
     @Override
-    public Principal readPrincipal( final ObjectInputStream ois ) throws ClassNotFoundException, IOException {
+    public Principal readPrincipal( final ObjectInput ois ) throws ClassNotFoundException, IOException {
         return SerializablePrincipal.readPrincipal( ois, getContainer().getRealm() );
     }
 
@@ -1120,4 +1120,11 @@ public class MemcachedBackupSessionManager extends ManagerBase implements Lifecy
         return response.getHeaderValues("Set-Cookie");
     }
 
+    public String getObjectIOFactoryClassName() {
+			return _msm.getObjectIOFactoryClassName();
+		}
+
+		public void setObjectIOFactoryClassName(final String objectIOFactoryClassName) {
+			_msm.setObjectIOFactoryClassName(objectIOFactoryClassName);
+		}
 }

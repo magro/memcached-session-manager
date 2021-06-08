@@ -18,11 +18,10 @@ package de.javakaffee.web.msm;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.UnsupportedEncodingException;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -69,14 +68,26 @@ public class TranscoderService {
             + 8; // lastBackupTime
 
     private final SessionAttributesTranscoder _attributesTranscoder;
+    private final ObjectIOStrategy _objectIOStrategy;
 
     /**
      * Creates a new {@link TranscoderService}.
      *
      * @param attributesTranscoder the {@link SessionAttributesTranscoder} strategy to use.
      */
-    public TranscoderService( final SessionAttributesTranscoder attributesTranscoder ) {
+    public TranscoderService( final SessionAttributesTranscoder attributesTranscoder) {
         _attributesTranscoder = attributesTranscoder;
+        _objectIOStrategy = new DefaultObjectIOStrategy();
+    }
+
+    /**
+     * Creates a new {@link TranscoderService}.
+     *
+     * @param attributesTranscoder the {@link SessionAttributesTranscoder} strategy to use.
+     */
+    public TranscoderService( final SessionAttributesTranscoder attributesTranscoder, final ObjectIOStrategy objectIOStrategy) {
+        _attributesTranscoder = attributesTranscoder;
+        _objectIOStrategy = objectIOStrategy;
     }
 
     /**
@@ -186,11 +197,11 @@ public class TranscoderService {
 
     // ---------------------  private/protected helper methods  -------------------
 
-    static byte[] serializeSessionFields( final MemcachedBackupSession session ) {
+    byte[] serializeSessionFields( final MemcachedBackupSession session ) {
         return serializeSessionFields(session, VERSION_2);
     }
 
-    static byte[] serializeSessionFields( final MemcachedBackupSession session, final int version ) {
+    byte[] serializeSessionFields( final MemcachedBackupSession session, final int version ) {
 
         final byte[] idData = serializeId( session.getIdInternal() );
 
@@ -249,7 +260,7 @@ public class TranscoderService {
         return data;
     }
 
-    static DeserializationResult deserializeSessionFields( final byte[] data, final SessionManager manager ) throws InvalidVersionException {
+    DeserializationResult deserializeSessionFields( final byte[] data, final SessionManager manager ) throws InvalidVersionException {
         final MemcachedBackupSession result = manager.newMemcachedBackupSession();
 
         final short version = (short) decodeNum( data, 0, 2 );
@@ -336,15 +347,15 @@ public class TranscoderService {
         }
     }
 
-    private static byte[] serializePrincipal( final Principal principal, final SessionManager manager ) {
+    private byte[] serializePrincipal( final Principal principal, final SessionManager manager ) {
         if(principal == null) {
             return null;
         }
         ByteArrayOutputStream bos = null;
-        ObjectOutputStream oos = null;
+        ObjectOutput oos = null;
         try {
             bos = new ByteArrayOutputStream();
-            oos = new ObjectOutputStream( bos );
+            oos = _objectIOStrategy.createObjectOutput(bos);
             manager.writePrincipal(principal, oos);
             oos.flush();
             return bos.toByteArray();
@@ -356,12 +367,12 @@ public class TranscoderService {
         }
     }
 
-    private static Principal deserializePrincipal( final byte[] data, final SessionManager manager ) {
+    private Principal deserializePrincipal( final byte[] data, final SessionManager manager ) {
         ByteArrayInputStream bis = null;
-        ObjectInputStream ois = null;
+        ObjectInput ois = null;
         try {
             bis = new ByteArrayInputStream( data );
-            ois = new ObjectInputStream( bis );
+            ois = _objectIOStrategy.createObjectInput(bis);
             return manager.readPrincipal( ois );
         } catch ( final IOException e ) {
             throw new IllegalArgumentException( "Could not deserialize principal", e );
@@ -373,17 +384,17 @@ public class TranscoderService {
         }
     }
 
-    private static byte[] serializeSavedRequest( final Object obj ) {
+    private byte[] serializeSavedRequest( final Object obj ) {
         if(obj == null) {
             return null;
         }
 
         final SavedRequest savedRequest = (SavedRequest) obj;
         ByteArrayOutputStream bos = null;
-        ObjectOutputStream oos = null;
+        ObjectOutput oos = null;
         try {
             bos = new ByteArrayOutputStream();
-            oos = new ObjectOutputStream( bos );
+            oos = _objectIOStrategy.createObjectOutput(bos);
             oos.writeObject(savedRequest.getBody());
             oos.writeObject(savedRequest.getContentType());
             // Cookies not cloneable... omit for now - oos.writeObject(newArrayList(savedRequest.getCookies()));
@@ -406,12 +417,12 @@ public class TranscoderService {
     }
 
     @SuppressWarnings("unchecked")
-    private static SavedRequest deserializeSavedRequest( final byte[] data ) {
+    private SavedRequest deserializeSavedRequest( final byte[] data ) {
         ByteArrayInputStream bis = null;
-        ObjectInputStream ois = null;
+        ObjectInput ois = null;
         try {
             bis = new ByteArrayInputStream( data );
-            ois = new ObjectInputStream( bis );
+            ois = _objectIOStrategy.createObjectInput(bis);
 
             final SavedRequest savedRequest = new SavedRequest();
             savedRequest.setBody((ByteChunk) ois.readObject());
@@ -501,7 +512,7 @@ public class TranscoderService {
         for ( int i = 0; i < maxBytes; i++ ) {
             final int pos = maxBytes - i - 1; // the position of the byte in the number
             final int idx = beginIndex + pos; // the index in the data array
-            data[idx] = (byte) ( ( num >> ( 8 * i ) ) & 0xff );
+            data[idx] = (byte) ( num >> 8 * i & 0xff );
         }
         return beginIndex + maxBytes;
     }
@@ -510,7 +521,7 @@ public class TranscoderService {
         long result = 0;
         for ( int i = 0; i < numBytes; i++ ) {
             final byte b = data[beginIndex + i];
-            result = ( result << 8 ) | ( b < 0
+            result = result << 8 | ( b < 0
                 ? 256 + b
                 : b );
         }
@@ -553,24 +564,24 @@ public class TranscoderService {
         return destBeginIndex + src.length;
     }
 
-    private static void closeSilently( final OutputStream os ) {
-        if ( os != null ) {
+    private static void closeSilently( final Closeable closeable ) {
+        if ( closeable != null ) {
             try {
-                os.close();
+            	closeable.close();
             } catch ( final IOException f ) {
                 // fail silently
             }
         }
     }
 
-    private static void closeSilently( final InputStream is ) {
-        if ( is != null ) {
-            try {
-                is.close();
-            } catch ( final IOException f ) {
-                // fail silently
-            }
-        }
+    private static void closeSilently( final AutoCloseable closeable ) {
+      if ( closeable != null ) {
+          try {
+          	closeable.close();
+          } catch ( final Exception f ) {
+              // fail silently
+          }
+      }
     }
 
     /**
