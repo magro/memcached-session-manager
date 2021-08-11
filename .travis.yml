@@ -13,3 +13,6 @@ cache:
 
 # use container
 sudo: false
+
+git:
+  depth: 1
