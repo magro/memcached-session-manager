@@ -583,7 +583,8 @@ public class TranscoderService {
         BASIC( (short)1, HttpServletRequest.BASIC_AUTH ),
         CLIENT_CERT( (short)2, HttpServletRequest.CLIENT_CERT_AUTH ),
         DIGEST( (short)3, HttpServletRequest.DIGEST_AUTH ),
-        FORM( (short)4, HttpServletRequest.FORM_AUTH );
+        FORM( (short)4, HttpServletRequest.FORM_AUTH ),
+        JASPIC( (short)5, "JASPIC" );
 
         private final short _id;
         private final String _value;
