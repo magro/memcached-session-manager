@@ -41,6 +41,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.catalina.Session;
 import org.apache.catalina.authenticator.Constants;
 import org.apache.catalina.authenticator.SavedRequest;
+import org.apache.catalina.util.CustomObjectInputStream;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.ByteChunk;
@@ -361,7 +362,7 @@ public class TranscoderService {
         ObjectInputStream ois = null;
         try {
             bis = new ByteArrayInputStream( data );
-            ois = new ObjectInputStream( bis );
+            ois = new CustomObjectInputStream( bis, manager.getContainerClassLoader() );
             return manager.readPrincipal( ois );
         } catch ( final IOException e ) {
             throw new IllegalArgumentException( "Could not deserialize principal", e );
