@@ -221,7 +221,7 @@
 
 		<tomcat-version>${tomcat6-version}</tomcat-version>
 		<slf4j-version>1.7.15</slf4j-version>
-		<hibernate-core-version>5.0.7.Final</hibernate-core-version>
+		<hibernate-core-version>5.3.20.Final</hibernate-core-version>
 		<couchbasemock-version>1.5.14</couchbasemock-version>
 	</properties>
 
